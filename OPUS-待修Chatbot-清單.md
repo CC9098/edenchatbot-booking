@@ -31,13 +31,13 @@
 - [x] 6. Cancel/Reschedule 頁面翻譯成中文
   呢兩頁而家全部英文（"Cancel Appointment"、"Confirm Cancellation"），但成個 chatbot 都係繁體中文。對病人嚟講好突兀。
 
-- [ ] 7. 防止 double booking
+- [x] 7. 防止 double booking
   用戶揀完時間到真正確認之間，另一個人可以 book 同一個 slot。/api/booking POST 應該 re-check getFreeBusy 先再建立 event。
 
 - [ ] 8. 「諮詢醫師」表單而家係假嘅
   收集咗病人姓名、電話、email、症狀描述之後乜都冇做。顯示「資料已收 (Simulated)」。應該 send email 去診所或者存入 database。
 
-- [ ] 9. 清理未用依賴
+- [x] 9. 清理未用依賴
   package.json 有 20+ 個 Radix/Shadcn 組件從未 import 過（accordion、dialog、tabs 等）。刪除可以減少 build 時間同 bundle size。
 
 - [ ] 10. 建立 Admin Dashboard（長遠）
