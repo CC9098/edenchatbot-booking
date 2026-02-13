@@ -1,0 +1,220 @@
+// Gmail integration using Replit Connector (google-mail)
+import { google } from 'googleapis';
+
+import { getGoogleAuthClient } from './google-auth';
+
+async function getUncachableGmailClient() {
+  const auth = await getGoogleAuthClient();
+  return google.gmail({ version: 'v1', auth });
+}
+
+interface ConfirmationEmailData {
+  patientName: string;
+  patientEmail: string;
+  doctorName: string;
+  doctorNameZh: string;
+  clinicName: string;
+  clinicNameZh: string;
+  clinicAddress: string;
+  date: string;
+  time: string;
+  eventId?: string;
+  calendarId?: string;
+}
+
+function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
+  const googleCalendarStart = data.date.replace(/-/g, '') + 'T' + data.time.replace(':', '') + '00';
+  const [h, m] = data.time.split(':').map(Number);
+  const endMinutes = h * 60 + m + 15;
+  const endH = String(Math.floor(endMinutes / 60)).padStart(2, '0');
+  const endM = String(endMinutes % 60).padStart(2, '0');
+  const googleCalendarEnd = data.date.replace(/-/g, '') + 'T' + endH + endM + '00';
+
+  const eventTitle = encodeURIComponent(`醫天圓 - ${data.doctorNameZh} ${data.doctorName} 預約`);
+  const eventDetails = encodeURIComponent(`Appointment with ${data.doctorNameZh} ${data.doctorName} at ${data.clinicNameZh}`);
+  const eventLocation = encodeURIComponent(data.clinicAddress);
+
+  const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${eventTitle}&dates=${googleCalendarStart}/${googleCalendarEnd}&details=${eventDetails}&location=${eventLocation}&ctz=Asia/Hong_Kong&sf=true&output=xml`;
+
+  const dateObj = new Date(data.date + 'T00:00:00');
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const dayName = days[dateObj.getDay()];
+  const monthName = months[dateObj.getMonth()];
+  const dateFormatted = `${dayName}, ${monthName} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
+
+  // Determine the Base URL for links
+  const baseUrl = process.env.BASE_URL
+    ? process.env.BASE_URL.replace(/\/$/, '')
+    : (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'http://localhost:3000'); // Default to Next.js port 3000
+
+  // Helper to construct full URL
+  const getUrl = (path: string, params: Record<string, string>) => {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) searchParams.append(key, value);
+    });
+    return `${baseUrl}${path}?${searchParams.toString()}`;
+  };
+
+  const rescheduleUrl = getUrl('/reschedule', { eventId: data.eventId || '', calendarId: data.calendarId || '' });
+  const cancelUrl = getUrl('/cancel', { eventId: data.eventId || '', calendarId: data.calendarId || '' });
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, 'Noto Sans TC', sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 0; background-color: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background: #fff; }
+    .header { background-color: #5c8d4d; padding: 24px; text-align: center; }
+    .header h1 { color: #fff; margin: 0; font-size: 24px; letter-spacing: 4px; }
+    .header p { color: #e0e0e0; margin: 4px 0 0; font-size: 13px; }
+    .content { padding: 32px 24px; }
+    .booking-card { background: #f8faf6; border: 1px solid #e0e8d8; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .booking-card h3 { margin: 0 0 4px; color: #333; font-size: 16px; }
+    .booking-card table { width: 100%; border-collapse: collapse; }
+    .booking-card td { padding: 6px 0; vertical-align: top; }
+    .booking-card td:first-child { color: #888; width: 80px; font-size: 14px; }
+    .booking-card td:last-child { color: #333; font-size: 14px; }
+    .thank-you { text-align: center; color: #5c8d4d; font-size: 16px; font-weight: bold; margin: 20px 0; }
+    .whatsapp-link { display: inline-block; background: #25d366; color: #fff !important; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; margin: 10px 0; }
+    .divider { border: 0; border-top: 1px dashed #ccc; margin: 24px 0; }
+    .clinic-info { font-size: 13px; color: #555; line-height: 1.8; }
+    .clinic-info strong { color: #333; }
+    .footer { background: #f0f0f0; padding: 16px 24px; font-size: 12px; color: #888; text-align: center; line-height: 1.8; }
+    .btn { display: inline-block; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; margin: 4px; font-size: 14px; }
+    .btn-green { background-color: #5c8d4d; color: #fff !important; }
+    .btn-outline { background-color: #fff; color: #5c8d4d !important; border: 1px solid #5c8d4d; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>醫 天 圓</h1>
+      <p>EDEN TCM CLINIC</p>
+    </div>
+    <div class="content">
+      <h2 style="margin-top:0;">預約診症</h2>
+      <p style="font-size:18px; font-weight:bold;">${data.patientName.toUpperCase()}</p>
+      
+      <div class="booking-card">
+        <table>
+          <tr>
+            <td>預約</td>
+            <td><strong>${data.doctorNameZh} ${data.doctorName}｜${data.clinicNameZh} ${data.clinicName}</strong></td>
+          </tr>
+          <tr>
+            <td>時段</td>
+            <td><strong>${dateFormatted} ${data.time}</strong></td>
+          </tr>
+          <tr>
+            <td>地址</td>
+            <td>${data.clinicAddress}</td>
+          </tr>
+        </table>
+      </div>
+      
+      <p class="thank-you">感謝你，我們已成功為你預約。</p>
+      
+      <p style="font-size:14px;">如有任何疑問或查詢，請按此連結，<br>以 WHATSAPP 信息傳送各分店診所姑娘溝通，姑娘樂意回答你的不同查詢。</p>
+      
+      <div style="text-align:center; margin: 16px 0;">
+        <a href="https://wa.me/85295909468" class="whatsapp-link">WhatsApp 聯絡我們</a>
+      </div>
+      
+      <hr class="divider">
+      
+      <div class="clinic-info">
+        <p>📍<strong>中環店</strong><br>
+        地址：中環皇后大道中70號卡佛大廈23樓2310室</p>
+        
+        <p>📍<strong>佐敦店</strong><br>
+        地址：佐敦寶靈街6號佐敦中心7樓全層</p>
+        
+        <p>📍<strong>荃灣店</strong><br>
+        地址：荃灣富麗花園商場A座地下20號舖</p>
+        
+        <p>🔗 附上診所路綫圖，方便你參考：<br>
+        <a href="https://www.edenclinic.hk/eden/關於我們/診所地址及聯絡方法/" style="color:#5c8d4d;">https://www.edenclinic.hk/eden/關於我們/診所地址及聯絡方法/</a></p>
+      </div>
+      
+      <hr class="divider">
+      
+      <div style="text-align:center; margin: 20px 0;">
+        <a href="${googleCalendarUrl}" class="btn btn-green" target="_blank">添加行程至 GOOGLE 日曆</a>
+      </div>
+      
+      <hr class="divider">
+      
+      <div style="text-align:center; margin: 20px 0;">
+        <p style="font-size:14px; color:#666; margin-bottom:12px;">需要更改預約？ Need to change your appointment?</p>
+        <a href="${rescheduleUrl}" class="btn btn-outline" target="_blank">重新預約 RESCHEDULE</a>
+        <a href="${cancelUrl}" class="btn btn-outline" target="_blank" style="background-color:#fff; color:#d32f2f !important; border-color:#d32f2f;">取消預約 CANCEL</a>
+      </div>
+    </div>
+    <div class="footer">
+      <p>【此電郵只作通知 / 確認預約用途，請勿回覆此郵件。】</p>
+      <p>【溫馨提示】為減低病毒傳播風險和保護病人，到診時請盡量佩戴外科口罩。</p>
+      <p>【📌預約前 1 小時無法自行更改/取消時間，如需要更改/取消請聯絡我們。】</p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+export async function sendBookingConfirmationEmail(data: ConfirmationEmailData): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!data.patientEmail) {
+      return { success: false, error: 'No email address provided' };
+    }
+
+    const gmail = await getUncachableGmailClient();
+
+    const dateObj = new Date(data.date + 'T00:00:00');
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const dayName = days[dateObj.getDay()];
+    const monthName = months[dateObj.getMonth()];
+    const dateFormatted = `${dayName}, ${monthName} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
+
+    const subject = `確認預約: 與${data.doctorNameZh} ${data.doctorName}｜${data.clinicNameZh} ${data.clinicName} ${dateFormatted} ${data.time} 的預約`;
+
+    const htmlBody = buildConfirmationEmailHtml(data);
+
+    const messageParts = [
+      `To: ${data.patientEmail}`,
+      `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      Buffer.from(htmlBody).toString('base64')
+    ];
+
+    const rawMessage = Buffer.from(messageParts.join('\r\n'))
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: rawMessage,
+      },
+    });
+
+    console.log(`Confirmation email sent to ${data.patientEmail}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Detailed Gmail Error:', error);
+    if (error.response) {
+      console.error('Gmail API Response Error:', error.response.data);
+    }
+    return { success: false, error: error.message || 'Failed to send email' };
+  }
+}
