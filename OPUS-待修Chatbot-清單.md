@@ -14,7 +14,7 @@
   - gmail.ts → 診所地址
   已完成：建立 `shared/clinic-data.ts`（含 `DoctorId`/`ClinicId` 強型別）+ `shared/clinic-schedule-data.ts`，並遷移相關引用至 shared source。
 
-- [ ] 3. 拆分 ChatWidget.tsx（1,072 行太大）
+- [x] 3. 拆分 ChatWidget.tsx（1,072 行太大）
   而家一個 component 包含 14 個 useState、booking 流程、AI 對話、表單、touch handlers……
   建議拆成：
   - ChatWidget.tsx — 外殼（開關、佈局）
@@ -34,7 +34,7 @@
 - [x] 7. 防止 double booking
   用戶揀完時間到真正確認之間，另一個人可以 book 同一個 slot。/api/booking POST 應該 re-check getFreeBusy 先再建立 event。
 
-- [ ] 8. 「諮詢醫師」表單而家係假嘅
+- [x] 8. 「諮詢醫師」表單而家係假嘅
   收集咗病人姓名、電話、email、症狀描述之後乜都冇做。顯示「資料已收 (Simulated)」。應該 send email 去診所或者存入 database。
 
 - [x] 9. 清理未用依賴

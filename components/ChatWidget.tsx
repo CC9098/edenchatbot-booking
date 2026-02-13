@@ -1,10 +1,8 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Link as LinkIcon, MessageCircle, RotateCcw, Send, X, Loader2 } from 'lucide-react';
-import Link from 'next/link';
+import { MessageCircle, RotateCcw, X } from 'lucide-react';
 import { CALENDAR_MAPPINGS, getScheduleForDay } from '@/shared/schedule-config';
 import {
   CLINIC_BY_ID,
@@ -17,132 +15,39 @@ import {
   isClinicId,
 } from '@/shared/clinic-data';
 import { getBookableDoctorNameZhList, getDoctorScheduleSummaryByNameZh } from '@/shared/clinic-schedule-data';
-
-type Sender = 'bot' | 'user';
-
-type Message = {
-  id: string;
-  sender: Sender;
-  text: string;
-  links?: { label: string; href: string }[];
-};
-
-type OptionKey =
-  | 'fees'
-  | 'clinic'
-  | 'hours'
-  | 'addresses'
-  | 'booking'
-  | 'timetable'
-  | 'other'
-  | 'consult'
-  | 'end'
-  | 'main'
-  | `doctor-${string}`
-  | `booking_clinic-${string}`
-  | `booking_date-${string}`
-  | `booking_time-${string}`
-  | 'booking_visit_first'
-  | 'booking_visit_followup'
-  | `booking_receipt-${string}`
-  | `booking_pickup-${string}`
-  | `booking_gender-${string}`
-  | `booking_referral-${string}`
-  | 'booking_confirm'
-  | 'booking_cancel'
-  | 'booking_back';
-
-type Option = { label: string; value: OptionKey };
-
-type FormStepKey = 'reason' | 'name' | 'email' | 'phone';
-
-// Booking flow types
-type BookingStep =
-  | 'doctor' | 'clinic' | 'visitType' | 'date' | 'time'
-  | 'lastName' | 'firstName' | 'phone' | 'email'
-  | 'receipt' | 'medicationPickup'
-  | 'idCard' | 'dob' | 'gender' | 'allergies' | 'medications' | 'symptoms' | 'referralSource'
-  | 'confirm';
-
-type BookingState = {
-  step: BookingStep;
-  doctorId?: string;
-  doctorNameZh?: string;
-  doctorName?: string;
-  clinicId?: string;
-  clinicNameZh?: string;
-  clinicName?: string;
-  isFirstVisit?: boolean;
-  date?: string;
-  time?: string;
-  lastName?: string;
-  firstName?: string;
-  phone?: string;
-  email?: string;
-  needReceipt?: string;
-  medicationPickup?: string;
-  idCard?: string;
-  dob?: string;
-  gender?: string;
-  allergies?: string;
-  medications?: string;
-  symptoms?: string;
-  referralSource?: string;
-};
-
-const DAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
-
-const PRIMARY = '#2d5016';
-const ACCENT = '#9b7b5a';
-
-const mainMenu: Option[] = [
-  { label: '收費', value: 'fees' },
-  { label: '診所資訊', value: 'clinic' },
-  { label: '預約', value: 'booking' },
-  { label: '醫師時間表', value: 'timetable' },
-  { label: '其他問題', value: 'other' },
-  { label: '諮詢醫師', value: 'consult' },
-];
-
-
-const formFlow: { key: FormStepKey; prompt: string; placeholder: string }[] = [
-  {
-    key: 'reason',
-    prompt: '我地好樂意為你介紹合適的醫師。請問你有邊方面問題想搵醫師幫手？',
-    placeholder: '描述你的症狀或想諮詢的問題',
-  },
-  {
-    key: 'name',
-    prompt: '請問你的姓名係？',
-    placeholder: '輸入姓名',
-  },
-  {
-    key: 'email',
-    prompt: '想請問你的電郵地址 😊 讓我地醫師可以回覆你',
-    placeholder: 'your@email.com',
-  },
-  {
-    key: 'phone',
-    prompt: '然後係你的電話號碼? (請確保輸入正確，讓同事Whatsapp或電話回覆)',
-    placeholder: '852XXXXXXX',
-  },
-];
-
-const generateId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+import { ChatMessages } from '@/components/chat/ChatMessages';
+import { ChatOptions } from '@/components/chat/ChatOptions';
+import { ChatInput } from '@/components/chat/ChatInput';
+import { DAY_NAMES, FORM_FLOW, MAIN_MENU, PRIMARY, TEXT_INPUT_STEPS } from '@/components/chat/constants';
+import { useChatState } from '@/components/chat/hooks/useChatState';
+import { type BookingState, type BookingStep, type ConsultationFormData, type Option, type OptionKey } from '@/components/chat/types';
 
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [options, setOptions] = useState<Option[]>(mainMenu);
+  const [options, setOptions] = useState<Option[]>(MAIN_MENU);
   const [aiMode, setAiMode] = useState(false);
   const [formMode, setFormMode] = useState(false);
   const [formStep, setFormStep] = useState(0);
   const [input, setInput] = useState('');
   const [formError, setFormError] = useState('');
+  const [consultationFormData, setConsultationFormData] = useState<ConsultationFormData>({
+    reason: '',
+    name: '',
+    email: '',
+    phone: '',
+  });
   const [bookingMode, setBookingMode] = useState(false);
   const [booking, setBooking] = useState<BookingState>({ step: 'doctor' });
-  const [isLoading, setIsLoading] = useState(false);
+  const [, setIsLoading] = useState(false);
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const {
+    messages,
+    addMessage,
+    addBotMessage,
+    replaceBotLoadingMessage,
+    removeMessageByExactText,
+    clearMessages,
+  } = useChatState();
 
   // 通知父窗口 chatbot 打开/关闭状态，让父窗口调整 iframe 大小
   useEffect(() => {
@@ -154,15 +59,9 @@ export function ChatWidget() {
   useEffect(() => {
     if (open && messages.length === 0) {
       const whatsappLines = getWhatsappContactLines().join('\n');
-      setMessages([
-        {
-          id: generateId(),
-          sender: 'bot',
-          text: `你好，我係醫天圓小助手，請問有咩幫到你😊\n會為你提供即時資訊和更多幫助。如有需要直接Whatsapp聯繫，請與我們姑娘真人聯絡。\n\n真人聯絡通道：\n${whatsappLines}`,
-        },
-      ]);
+      addBotMessage(`你好，我係醫天圓小助手，請問有咩幫到你😊\n會為你提供即時資訊和更多幫助。如有需要直接Whatsapp聯繫，請與我們姑娘真人聯絡。\n\n真人聯絡通道：\n${whatsappLines}`);
     }
-  }, [open, messages.length]);
+  }, [open, messages.length, addBotMessage]);
 
   useEffect(() => {
     // 使用 setTimeout 确保 DOM 更新完成后再滚动
@@ -203,14 +102,8 @@ export function ChatWidget() {
     });
   };
 
-  const addMessage = (sender: Sender, text: string, links?: Message['links']) => {
-    setMessages((prev) => [...prev, { id: generateId(), sender, text, links }]);
-  };
-
-  const addBotMessage = (text: string, links?: Message['links']) => addMessage('bot', text, links);
-
   const resetToMain = () => {
-    setOptions(mainMenu);
+    setOptions(MAIN_MENU);
     setAiMode(false);
     setFormMode(false);
     setBookingMode(false);
@@ -219,6 +112,7 @@ export function ChatWidget() {
     setFormStep(0);
     setInput('');
     setFormError('');
+    setConsultationFormData({ reason: '', name: '', email: '', phone: '' });
   };
 
   const handleAIResponse = async (text: string) => {
@@ -241,25 +135,15 @@ export function ChatWidget() {
       const data = await response.json();
 
       // 移除 loading 訊息並添加 AI 回應
-      setMessages((prev) => {
-        const filtered = prev.filter((msg) => msg.text !== 'Connecting to AI... 正在為你連接Gemini，稍後回覆。');
-        return [...filtered, { id: generateId(), sender: 'bot', text: data.response }];
-      });
+      replaceBotLoadingMessage('Connecting to AI... 正在為你連接Gemini，稍後回覆。', data.response);
     } catch (error) {
       console.error('AI Error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setMessages((prev) => {
-        const filtered = prev.filter((msg) => msg.text !== 'Connecting to AI... 正在為你連接Gemini，稍後回覆。');
-        const whatsappLines = getWhatsappContactLines().join('\n');
-        return [
-          ...filtered,
-          {
-            id: generateId(),
-            sender: 'bot',
-            text: `抱歉，AI 服務暫時無法使用。\n\n錯誤訊息：${errorMessage}\n\n請直接聯絡我們姑娘：\n${whatsappLines}`,
-          },
-        ];
-      });
+      const whatsappLines = getWhatsappContactLines().join('\n');
+      replaceBotLoadingMessage(
+        'Connecting to AI... 正在為你連接Gemini，稍後回覆。',
+        `抱歉，AI 服務暫時無法使用。\n\n錯誤訊息：${errorMessage}\n\n請直接聯絡我們姑娘：\n${whatsappLines}`,
+      );
     }
   };
 
@@ -520,7 +404,7 @@ export function ChatWidget() {
       setIsLoading(false);
 
       // Remove loading message
-      setMessages(prev => prev.filter(m => m.text !== '正在查詢可預約時段... ⏳'));
+      removeMessageByExactText('正在查詢可預約時段... ⏳');
 
       if (data.isClosed) {
         addBotMessage(data.isHoliday ? '呢日係假期，醫師休息。請揀另一日。' : '呢日醫師唔應診。請揀另一日。');
@@ -545,7 +429,7 @@ export function ChatWidget() {
       setOptions([...timeOpts, { label: '⬅️ 上一步', value: 'booking_back' }, { label: '取消預約', value: 'booking_cancel' }]);
     } catch (error) {
       setIsLoading(false);
-      setMessages(prev => prev.filter(m => m.text !== '正在查詢可預約時段... ⏳'));
+      removeMessageByExactText('正在查詢可預約時段... ⏳');
       addBotMessage('抱歉，查詢時段時發生錯誤，請稍後再試。');
       setOptions([{ label: '返回主選單', value: 'main' }]);
     }
@@ -594,7 +478,7 @@ export function ChatWidget() {
       setIsLoading(false);
 
       // Remove loading message
-      setMessages(prev => prev.filter(m => m.text !== '正在處理預約... ⏳'));
+      removeMessageByExactText('正在處理預約... ⏳');
 
       if (data.success) {
         const d = new Date(booking.date!);
@@ -618,7 +502,7 @@ export function ChatWidget() {
       }
     } catch (error) {
       setIsLoading(false);
-      setMessages(prev => prev.filter(m => m.text !== '正在處理預約... ⏳'));
+      removeMessageByExactText('正在處理預約... ⏳');
       addBotMessage('抱歉，預約時發生錯誤，請稍後再試或直接聯絡診所。');
     }
 
@@ -698,11 +582,11 @@ export function ChatWidget() {
     setOptions([]);
     setFormStep(0);
     setInput('');
-    addBotMessage(formFlow[0].prompt);
+    addBotMessage(FORM_FLOW[0].prompt);
   };
 
   const validateInput = () => {
-    const step = formFlow[formStep];
+    const step = FORM_FLOW[formStep];
     if (step.key === 'email') {
       const emailOk = /^[\w-.]+@([\w-]+\.)+[\w-]{2,}$/i.test(input.trim());
       if (!emailOk) return '請輸入有效的電郵地址';
@@ -714,24 +598,62 @@ export function ChatWidget() {
     return '';
   };
 
-  const handleFormSubmit = () => {
+  const submitConsultationForm = async (payload: ConsultationFormData) => {
+    setIsLoading(true);
+    setOptions([]);
+    addBotMessage('正在提交諮詢資料... ⏳');
+
+    try {
+      const response = await fetch('/api/consultation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      removeMessageByExactText('正在提交諮詢資料... ⏳');
+      setIsLoading(false);
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || '提交失敗');
+      }
+
+      addBotMessage('資料已提交，我們會盡快以電話或電郵聯絡你。');
+      resetToMain();
+    } catch (error) {
+      removeMessageByExactText('正在提交諮詢資料... ⏳');
+      setIsLoading(false);
+      addBotMessage('抱歉，提交諮詢時發生錯誤。請稍後再試，或直接 WhatsApp 聯絡診所姑娘。');
+      setOptions([{ label: '返回主選單', value: 'main' }]);
+      setFormMode(false);
+    }
+  };
+
+  const handleFormSubmit = async () => {
     if (!input.trim()) return;
     const error = validateInput();
     if (error) {
       setFormError(error);
       return;
     }
+
+    const step = FORM_FLOW[formStep];
+    const value = input.trim();
+    const nextFormData = {
+      ...consultationFormData,
+      [step.key]: value,
+    };
+    setConsultationFormData(nextFormData);
     setFormError('');
-    addMessage('user', input.trim());
+    addMessage('user', value);
     const nextStep = formStep + 1;
     setInput('');
-    if (nextStep < formFlow.length) {
+    if (nextStep < FORM_FLOW.length) {
       setFormStep(nextStep);
-      addBotMessage(formFlow[nextStep].prompt);
+      addBotMessage(FORM_FLOW[nextStep].prompt);
     } else {
       setFormMode(false);
-      addBotMessage('資料已收到 (Simulated)。我們會盡快聯絡你。');
-      resetToMain();
+      await submitConsultationForm(nextFormData);
     }
   };
 
@@ -1000,16 +922,11 @@ export function ChatWidget() {
     setInput('');
   };
 
-  const TEXT_INPUT_STEPS: BookingStep[] = [
-    'lastName', 'firstName', 'phone', 'email',
-    'idCard', 'dob', 'allergies', 'medications', 'symptoms'
-  ];
-
   const handleSend = () => {
     if (bookingMode && TEXT_INPUT_STEPS.includes(booking.step)) {
       handleBookingInput();
     } else if (formMode) {
-      handleFormSubmit();
+      void handleFormSubmit();
     } else if (aiMode) {
       handleAIInput();
     }
@@ -1028,7 +945,7 @@ export function ChatWidget() {
       symptoms: '請簡述你的症狀',
     };
     if (bookingMode) return placeholders[booking.step] || '';
-    if (formMode) return formFlow[formStep]?.placeholder ?? '請輸入';
+    if (formMode) return FORM_FLOW[formStep]?.placeholder ?? '請輸入';
     if (aiMode) return '輸入你的問題...（Enter 或 Send）';
     return '';
   }, [aiMode, formMode, formStep, bookingMode, booking.step]);
@@ -1070,14 +987,14 @@ export function ChatWidget() {
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        setMessages([]);
+                        clearMessages();
                         resetToMain();
                       }}
                       onTouchEnd={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         e.currentTarget.style.opacity = '';
-                        setMessages([]);
+                        clearMessages();
                         resetToMain();
                       }}
                       onTouchStart={(e) => {
@@ -1146,156 +1063,24 @@ export function ChatWidget() {
                   ref={viewportRef}
                   className="flex-1 space-y-3 overflow-y-auto px-4 py-4 scrollbar-thin scrollbar-thumb-gray-200/70 scrollbar-track-transparent"
                 >
-                  <div className="flex min-h-0 flex-col gap-3 pr-1">
-                    {messages.map((msg) => (
-                      <motion.div
-                        key={msg.id}
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`flex items-start gap-2 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                      >
-                        {msg.sender === 'bot' && (
-                          <div className="relative h-8 w-8 shrink-0">
-                            <Image src="/logo eden.png" alt="醫天圓" fill className="object-contain" />
-                          </div>
-                        )}
-                        <div
-                          className={`max-w-[82%] whitespace-pre-line rounded-2xl px-4 py-3 text-sm shadow-sm ${msg.sender === 'user'
-                            ? 'border border-[--primary]/25 bg-[#e8f3eb] text-[#1f3a18]'
-                            : 'bg-gray-100 text-gray-800'
-                            }`}
-                          style={msg.sender === 'user' ? { ['--primary' as string]: PRIMARY } : {}}
-                        >
-                          {linkify(msg.text)}
-                          {msg.links && (
-                            <div className="mt-2 space-y-1">
-                              {msg.links.map((link) => (
-                                <Link
-                                  key={link.href}
-                                  href={link.href}
-                                  className="flex items-center gap-1 text-xs underline transition hover:text-gray-200 md:hover:text-gray-700"
-                                  target="_blank"
-                                >
-                                  <LinkIcon size={14} />
-                                  {link.label}
-                                </Link>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
+                  <ChatMessages messages={messages} linkify={linkify} primaryColor={PRIMARY} />
                 </div>
 
                 {options.length > 0 && (
-                  <div className="shrink-0 px-4 pb-4">
-                    <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-inner">
-                      <div className="grid grid-cols-2 gap-2">
-                        {options.map((option) => (
-                          <button
-                            key={option.label}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleOptionSelect(option);
-                            }}
-                            onTouchEnd={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              e.currentTarget.style.transform = '';
-                              e.currentTarget.style.backgroundColor = '';
-                              handleOptionSelect(option);
-                            }}
-                            onTouchStart={(e) => {
-                              e.currentTarget.style.transform = 'scale(0.95)';
-                              e.currentTarget.style.backgroundColor = PRIMARY;
-                              e.currentTarget.style.color = 'white';
-                            }}
-                            onTouchCancel={(e) => {
-                              e.currentTarget.style.transform = '';
-                              e.currentTarget.style.backgroundColor = '';
-                              e.currentTarget.style.color = '';
-                            }}
-                            className="relative z-10 rounded-xl border-2 border-[#2d5016] bg-white px-3 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 hover:bg-[#2d5016] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2d5016] active:scale-95 active:bg-[#2d5016] active:text-white"
-                            style={{
-                              color: PRIMARY,
-                              touchAction: 'manipulation',
-                              minHeight: '48px',
-                              WebkitTapHighlightColor: 'transparent',
-                              WebkitUserSelect: 'none',
-                              userSelect: 'none'
-                            }}
-                            type="button"
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  <ChatOptions options={options} onSelect={handleOptionSelect} primaryColor={PRIMARY} />
                 )}
               </div>
 
               {showInput && (
-                <div className="border-t border-gray-100 bg-white px-4 py-3">
-                  <div
-                    className="flex items-center gap-2 rounded-2xl border border-[--primary]/20 bg-[#f4fbf3] px-3 py-2 shadow-sm focus-within:border-[--primary] focus-within:bg-white focus-within:ring-2 focus-within:ring-[--primary]/20"
-                    style={{ ['--primary' as string]: PRIMARY }}
-                  >
-                    <input
-                      className="flex-1 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none"
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      placeholder={placeholder}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSend();
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleSend();
-                      }}
-                      onTouchEnd={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        e.currentTarget.style.transform = '';
-                        handleSend();
-                      }}
-                      onTouchStart={(e) => {
-                        e.currentTarget.style.transform = 'scale(0.95)';
-                      }}
-                      onTouchCancel={(e) => {
-                        e.currentTarget.style.transform = '';
-                      }}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl bg-[--primary] text-white transition hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[--primary] active:scale-95"
-                      aria-label="Send"
-                      type="button"
-                      style={{
-                        ['--primary' as string]: PRIMARY,
-                        touchAction: 'manipulation',
-                        minHeight: '44px',
-                        minWidth: '44px',
-                        WebkitTapHighlightColor: 'transparent',
-                        WebkitUserSelect: 'none',
-                        userSelect: 'none'
-                      }}
-                    >
-                      <Send size={16} />
-                    </button>
-                  </div>
-                  {aiMode && (
-                    <p className="mt-2 text-xs text-[--primary]" style={{ ['--primary' as string]: PRIMARY }}>
-                      已進入 AI 模式：直接輸入問題後按 Enter 或右側 Send。
-                    </p>
-                  )}
-                  {formError && <p className="mt-2 text-xs text-red-500">{formError}</p>}
-                </div>
+                <ChatInput
+                  value={input}
+                  onChange={setInput}
+                  placeholder={placeholder}
+                  onSend={handleSend}
+                  primaryColor={PRIMARY}
+                  aiMode={aiMode}
+                  formError={formError}
+                />
               )}
             </div>
           </motion.div>

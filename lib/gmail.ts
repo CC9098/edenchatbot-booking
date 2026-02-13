@@ -23,6 +23,13 @@ interface ConfirmationEmailData {
   calendarId?: string;
 }
 
+interface ConsultationEmailData {
+  patientName: string;
+  patientEmail: string;
+  patientPhone: string;
+  reason: string;
+}
+
 function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
   const clinicInfoHtml = getClinicInfoHtmlSections();
   const googleCalendarStart = data.date.replace(/-/g, '') + 'T' + data.time.replace(':', '') + '00';
@@ -211,5 +218,76 @@ export async function sendBookingConfirmationEmail(data: ConfirmationEmailData):
       console.error('Gmail API Response Error:', error.response.data);
     }
     return { success: false, error: error.message || 'Failed to send email' };
+  }
+}
+
+function buildConsultationEmailHtml(data: ConsultationEmailData): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, 'Noto Sans TC', sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 20px; background: #f5f5f5; }
+    .card { max-width: 640px; margin: 0 auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; }
+    h1 { margin: 0 0 16px; font-size: 20px; color: #2d5016; }
+    table { width: 100%; border-collapse: collapse; }
+    td { border-top: 1px solid #f0f0f0; padding: 10px 0; vertical-align: top; }
+    td:first-child { width: 90px; color: #666; }
+    .reason { white-space: pre-line; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>新諮詢表單通知</h1>
+    <table>
+      <tr><td>姓名</td><td><strong>${data.patientName}</strong></td></tr>
+      <tr><td>電話</td><td>${data.patientPhone}</td></tr>
+      <tr><td>電郵</td><td>${data.patientEmail}</td></tr>
+      <tr><td>症狀</td><td class="reason">${data.reason}</td></tr>
+    </table>
+  </div>
+</body>
+</html>`;
+}
+
+export async function sendConsultationNotificationEmail(
+  data: ConsultationEmailData
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const to = process.env.CLINIC_NOTIFICATION_EMAIL;
+    if (!to) {
+      return { success: false, error: 'Missing CLINIC_NOTIFICATION_EMAIL' };
+    }
+
+    const gmail = await getUncachableGmailClient();
+    const subject = `新諮詢：${data.patientName} (${data.patientPhone})`;
+    const htmlBody = buildConsultationEmailHtml(data);
+    const messageParts = [
+      `To: ${to}`,
+      `Reply-To: ${data.patientEmail}`,
+      `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      Buffer.from(htmlBody).toString('base64'),
+    ];
+
+    const rawMessage = Buffer.from(messageParts.join('\r\n'))
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw: rawMessage },
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Consultation email error:', error);
+    return { success: false, error: error.message || 'Failed to send consultation email' };
   }
 }
