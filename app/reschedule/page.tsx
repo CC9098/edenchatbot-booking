@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Loader2, AlertCircle, CheckCircle2, Calendar, Clock, ChevronRight, ChevronLeft } from 'lucide-react';
-import { cn } from '@/lib/utils'; // Assuming this exists, otherwise I'll mock it or use standard className
+
 
 // Define maps locally (matching ChatWidget)
 const DOCTOR_REVERSE_MAP: Record<string, string> = {
