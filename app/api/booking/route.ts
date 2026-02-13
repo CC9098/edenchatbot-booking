@@ -2,12 +2,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { fromZonedTime } from 'date-fns-tz';
-import { createBooking } from '@/lib/google-calendar';
+import { createBooking, getFreeBusy, getEvent, deleteEvent, updateEvent } from '@/lib/google-calendar';
 import { sendBookingConfirmationEmail } from '@/lib/gmail';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { bookingSchema } from '@/shared/types';
-import { getEvent, deleteEvent, updateEvent } from '@/lib/google-calendar';
 import { getClinicAddress } from '@/shared/clinic-data';
+import { isSlotAvailableUtc } from '@/lib/booking-helpers';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
@@ -53,6 +53,24 @@ export async function POST(request: NextRequest) {
                                 }
 
                                 const endDate = new Date(startDate.getTime() + bookingData.durationMinutes * 60000);
+
+                                // Re-check Google Calendar right before creating the event
+                                // to prevent race conditions / double booking.
+                                try {
+                                                const requestedDayUtc = fromZonedTime(`${bookingData.date}T00:00:00`, HONG_KONG_TIMEZONE);
+                                                const busySlots = await getFreeBusy(calendarId, requestedDayUtc);
+                                                const isStillAvailable = isSlotAvailableUtc(startDate, endDate, busySlots);
+
+                                                if (!isStillAvailable) {
+                                                                return NextResponse.json(
+                                                                                { error: 'This time slot has just been booked. Please pick another time.' },
+                                                                                { status: 409 }
+                                                                );
+                                                }
+                                } catch (calError) {
+                                                console.error('Calendar availability re-check failed:', calError);
+                                                return NextResponse.json({ error: 'Failed to verify slot availability' }, { status: 500 });
+                                }
 
                                 // Create Google Calendar Event
                                 const calResult = await createBooking(calendarId, {
