@@ -17,7 +17,7 @@ function CancelBookingContent() {
 
                 useEffect(() => {
                                 if (!eventId || !calendarId) {
-                                                setError('Invalid booking link. Please check your email.');
+                                                setError('預約連結無效，請檢查電郵內容。');
                                                 setLoading(false);
                                                 return;
                                 }
@@ -31,7 +31,7 @@ function CancelBookingContent() {
                                                                 const data = await res.json();
                                                                 setBooking(data);
                                                 } catch (err) {
-                                                                setError('Could not find booking details. It may have already been cancelled.');
+                                                                setError('找不到預約資料，可能已經取消。');
                                                 } finally {
                                                                 setLoading(false);
                                                 }
@@ -49,7 +49,7 @@ function CancelBookingContent() {
                                                 if (!res.ok) throw new Error('Failed to cancel');
                                                 setCancelled(true);
                                 } catch (err) {
-                                                setError('Failed to cancel booking. Please try again or contact the clinic directly.');
+                                                setError('取消預約失敗，請稍後再試或直接聯絡診所。');
                                 } finally {
                                                 setCancelling(false);
                                 }
@@ -59,7 +59,7 @@ function CancelBookingContent() {
                                 return (
                                                 <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
                                                                 <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-                                                                <p className="text-slate-600">Loading booking details...</p>
+                                                                <p className="text-slate-600">正在載入預約資料...</p>
                                                 </div>
                                 );
                 }
@@ -68,7 +68,7 @@ function CancelBookingContent() {
                                 return (
                                                 <div className="mx-auto max-w-md rounded-xl border border-red-100 bg-red-50 p-6 text-center">
                                                                 <AlertCircle className="mx-auto mb-4 h-10 w-10 text-red-500" />
-                                                                <h2 className="mb-2 text-lg font-semibold text-red-700">Error</h2>
+                                                                <h2 className="mb-2 text-lg font-semibold text-red-700">發生錯誤</h2>
                                                                 <p className="text-red-600">{error}</p>
                                                 </div>
                                 );
@@ -78,51 +78,51 @@ function CancelBookingContent() {
                                 return (
                                                 <div className="mx-auto max-w-md rounded-xl border border-emerald-100 bg-emerald-50 p-8 text-center">
                                                                 <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-emerald-600" />
-                                                                <h2 className="mb-2 text-2xl font-bold text-emerald-800">Booking Cancelled</h2>
-                                                                <p className="text-emerald-700">Your appointment has been successfully cancelled.</p>
-                                                                <p className="mt-4 text-sm text-emerald-600">You can close this window now.</p>
+                                                                <h2 className="mb-2 text-2xl font-bold text-emerald-800">預約已取消</h2>
+                                                                <p className="text-emerald-700">你的預約已成功取消。</p>
+                                                                <p className="mt-4 text-sm text-emerald-600">你現在可以關閉此視窗。</p>
                                                 </div>
                                 );
                 }
 
                 // Parse booking details for display
-                const summary = booking.summary || 'Consultation';
+                const summary = booking.summary || '諮詢服務';
                 const start = new Date(booking.start.dateTime);
                 const dateStr = start.toLocaleDateString('zh-HK', { month: 'long', day: 'numeric', weekday: 'long' });
                 const timeStr = start.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit' });
 
                 return (
                                 <div className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-                                                <h1 className="mb-6 text-center text-2xl font-bold text-slate-800">Cancel Appointment</h1>
+                                                <h1 className="mb-6 text-center text-2xl font-bold text-slate-800">取消預約</h1>
 
                                                 <div className="mb-8 space-y-4 rounded-xl bg-slate-50 p-5">
                                                                 <div>
-                                                                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Service</p>
+                                                                                <p className="text-xs font-semibold tracking-wider text-slate-500">服務</p>
                                                                                 <p className="text-lg font-medium text-slate-800">{summary}</p>
                                                                 </div>
 
                                                                 <div className="grid grid-cols-2 gap-4">
                                                                                 <div>
-                                                                                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Date</p>
+                                                                                                <p className="text-xs font-semibold tracking-wider text-slate-500">日期</p>
                                                                                                 <p className="font-medium text-slate-800">{dateStr}</p>
                                                                                 </div>
                                                                                 <div>
-                                                                                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Time</p>
+                                                                                                <p className="text-xs font-semibold tracking-wider text-slate-500">時間</p>
                                                                                                 <p className="font-medium text-slate-800">{timeStr}</p>
                                                                                 </div>
                                                                 </div>
 
                                                                 <div>
-                                                                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Status</p>
+                                                                                <p className="text-xs font-semibold tracking-wider text-slate-500">狀態</p>
                                                                                 <p className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                                                                                                Confirmed
+                                                                                                已確認
                                                                                 </p>
                                                                 </div>
                                                 </div>
 
                                                 <div className="space-y-3">
                                                                 <p className="mb-4 text-center text-sm text-slate-600">
-                                                                                Are you sure you want to cancel this appointment? This action cannot be undone.
+                                                                                你確定要取消此預約嗎？此操作無法還原。
                                                                 </p>
 
                                                                 <button
@@ -133,10 +133,10 @@ function CancelBookingContent() {
                                                                                 {cancelling ? (
                                                                                                 <>
                                                                                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                                                                                Cancelling...
+                                                                                                                取消中...
                                                                                                 </>
                                                                                 ) : (
-                                                                                                'Confirm Cancellation'
+                                                                                                '確認取消'
                                                                                 )}
                                                                 </button>
 
@@ -144,7 +144,7 @@ function CancelBookingContent() {
                                                                                 onClick={() => window.close()} // Won't work in all browsers if not opened by script, but good fallback intent
                                                                                 className="w-full rounded-xl border border-slate-200 px-4 py-3 font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
                                                                 >
-                                                                                Keep Appointment
+                                                                                保留預約
                                                                 </button>
                                                 </div>
                                 </div>

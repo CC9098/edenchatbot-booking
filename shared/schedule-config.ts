@@ -1,4 +1,5 @@
 // Shared schedule configuration between frontend and backend
+import { PHYSICAL_CLINIC_IDS, type ClinicId, type DoctorId, type PhysicalClinicId } from '@/shared/clinic-data';
 
 // Time range like "11:00-13:30" or "15:30-19:00"
 export interface TimeRange {
@@ -13,8 +14,8 @@ export type WeeklySchedule = {
 };
 
 export interface CalendarMapping {
-  doctorId: string;
-  clinicId: string;
+  doctorId: DoctorId;
+  clinicId: ClinicId;
   calendarId: string;
   isActive: boolean;
   schedule: WeeklySchedule;
@@ -340,7 +341,7 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
 ];
 
 // Helper functions
-export function getMapping(doctorId: string, clinicId: string): CalendarMapping | undefined {
+export function getMapping(doctorId: DoctorId, clinicId: ClinicId): CalendarMapping | undefined {
   return CALENDAR_MAPPINGS.find(m => m.doctorId === doctorId && m.clinicId === clinicId);
 }
 
@@ -353,15 +354,14 @@ export function isDayClosed(schedule: WeeklySchedule, dayOfWeek: number): boolea
 }
 
 export interface TimeRangeWithClinic extends TimeRange {
-  clinicId: string;
+  clinicId: PhysicalClinicId;
   calendarId: string;
 }
 
-export function getAllPhysicalClinicsForDay(doctorId: string, dayOfWeek: number): CalendarMapping[] {
-  const physicalClinics = ["central", "jordan", "tsuenwan"];
+export function getAllPhysicalClinicsForDay(doctorId: DoctorId, dayOfWeek: number): CalendarMapping[] {
   const result: CalendarMapping[] = [];
   
-  for (const clinicId of physicalClinics) {
+  for (const clinicId of PHYSICAL_CLINIC_IDS) {
     const mapping = getMapping(doctorId, clinicId);
     if (mapping && mapping.isActive) {
       const daySchedule = getScheduleForDay(mapping.schedule, dayOfWeek);
@@ -374,12 +374,11 @@ export function getAllPhysicalClinicsForDay(doctorId: string, dayOfWeek: number)
   return result;
 }
 
-export function getPhysicalClinicForTime(doctorId: string, dayOfWeek: number, time: string): CalendarMapping | null {
-  const physicalClinics = ["central", "jordan", "tsuenwan"];
+export function getPhysicalClinicForTime(doctorId: DoctorId, dayOfWeek: number, time: string): CalendarMapping | null {
   const [targetHour, targetMin] = time.split(':').map(Number);
   const targetMinutes = targetHour * 60 + targetMin;
   
-  for (const clinicId of physicalClinics) {
+  for (const clinicId of PHYSICAL_CLINIC_IDS) {
     const mapping = getMapping(doctorId, clinicId);
     if (mapping && mapping.isActive) {
       const daySchedule = getScheduleForDay(mapping.schedule, dayOfWeek);
@@ -401,8 +400,7 @@ export function getPhysicalClinicForTime(doctorId: string, dayOfWeek: number, ti
   return null;
 }
 
-export function getOnlineScheduleForDoctor(doctorId: string): WeeklySchedule {
-  const physicalClinics = ["central", "jordan", "tsuenwan"];
+export function getOnlineScheduleForDoctor(doctorId: DoctorId): WeeklySchedule {
   const onlineSchedule: WeeklySchedule = {
     0: null, 1: null, 2: null, 3: null, 4: null, 5: null, 6: null
   };
@@ -410,7 +408,7 @@ export function getOnlineScheduleForDoctor(doctorId: string): WeeklySchedule {
   for (let day = 0; day <= 6; day++) {
     const allRanges: TimeRange[] = [];
     
-    for (const clinicId of physicalClinics) {
+    for (const clinicId of PHYSICAL_CLINIC_IDS) {
       const mapping = getMapping(doctorId, clinicId);
       if (mapping && mapping.isActive) {
         const daySchedule = getScheduleForDay(mapping.schedule, day);
@@ -429,11 +427,10 @@ export function getOnlineScheduleForDoctor(doctorId: string): WeeklySchedule {
   return onlineSchedule;
 }
 
-export function getOnlineScheduleWithClinics(doctorId: string, dayOfWeek: number): TimeRangeWithClinic[] {
-  const physicalClinics = ["central", "jordan", "tsuenwan"];
+export function getOnlineScheduleWithClinics(doctorId: DoctorId, dayOfWeek: number): TimeRangeWithClinic[] {
   const result: TimeRangeWithClinic[] = [];
   
-  for (const clinicId of physicalClinics) {
+  for (const clinicId of PHYSICAL_CLINIC_IDS) {
     const mapping = getMapping(doctorId, clinicId);
     if (mapping && mapping.isActive) {
       const daySchedule = getScheduleForDay(mapping.schedule, dayOfWeek);
@@ -442,7 +439,7 @@ export function getOnlineScheduleWithClinics(doctorId: string, dayOfWeek: number
           result.push({
             start: range.start,
             end: range.end,
-            clinicId: mapping.clinicId,
+            clinicId,
             calendarId: mapping.calendarId,
           });
         }

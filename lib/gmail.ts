@@ -2,6 +2,7 @@
 import { google } from 'googleapis';
 
 import { getGoogleAuthClient } from './google-auth';
+import { getClinicInfoHtmlSections } from '@/shared/clinic-data';
 
 async function getUncachableGmailClient() {
   const auth = await getGoogleAuthClient();
@@ -23,6 +24,7 @@ interface ConfirmationEmailData {
 }
 
 function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
+  const clinicInfoHtml = getClinicInfoHtmlSections();
   const googleCalendarStart = data.date.replace(/-/g, '') + 'T' + data.time.replace(':', '') + '00';
   const [h, m] = data.time.split(':').map(Number);
   const endMinutes = h * 60 + m + 15;
@@ -129,14 +131,7 @@ function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
       <hr class="divider">
       
       <div class="clinic-info">
-        <p>📍<strong>中環店</strong><br>
-        地址：中環皇后大道中70號卡佛大廈23樓2310室</p>
-        
-        <p>📍<strong>佐敦店</strong><br>
-        地址：佐敦寶靈街6號佐敦中心7樓全層</p>
-        
-        <p>📍<strong>荃灣店</strong><br>
-        地址：荃灣富麗花園商場A座地下20號舖</p>
+        ${clinicInfoHtml}
         
         <p>🔗 附上診所路綫圖，方便你參考：<br>
         <a href="https://www.edenclinic.hk/eden/關於我們/診所地址及聯絡方法/" style="color:#5c8d4d;">https://www.edenclinic.hk/eden/關於我們/診所地址及聯絡方法/</a></p>

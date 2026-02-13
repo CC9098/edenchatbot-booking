@@ -6,6 +6,17 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Link as LinkIcon, MessageCircle, RotateCcw, Send, X, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { CALENDAR_MAPPINGS, getScheduleForDay } from '@/shared/schedule-config';
+import {
+  CLINIC_BY_ID,
+  DOCTOR_BY_NAME_ZH,
+  getClinicAddressLines,
+  getClinicHoursLines,
+  getClinicRouteLinks,
+  getDoctorBookingLinkOrNote,
+  getWhatsappContactLines,
+  isClinicId,
+} from '@/shared/clinic-data';
+import { getBookableDoctorNameZhList, getDoctorScheduleSummaryByNameZh } from '@/shared/clinic-schedule-data';
 
 type Sender = 'bot' | 'user';
 
@@ -57,23 +68,6 @@ type BookingState = {
   email?: string;
 };
 
-// Doctor display name to API ID mapping
-type DoctorInfo = { id: string; nameZh: string; nameEn: string };
-const DOCTOR_MAP: Record<string, DoctorInfo> = {
-  '陳家富醫師': { id: 'chan', nameZh: '陳家富醫師', nameEn: 'Dr. Chan' },
-  '李芊霖醫師': { id: 'lee', nameZh: '李芊霖醫師', nameEn: 'Dr. Lee' },
-  '韓曉恩醫師': { id: 'hon', nameZh: '韓曉恩醫師', nameEn: 'Dr. Hon' },
-  '周德健醫師': { id: 'chau', nameZh: '周德健醫師', nameEn: 'Dr. Chau' },
-};
-
-// Clinic display name to API ID mapping
-type ClinicInfo = { id: string; nameZh: string; nameEn: string };
-const CLINIC_MAP: Record<string, ClinicInfo> = {
-  'central': { id: 'central', nameZh: '中環', nameEn: 'Central' },
-  'jordan': { id: 'jordan', nameZh: '佐敦', nameEn: 'Jordan' },
-  'tsuenwan': { id: 'tsuenwan', nameZh: '荃灣', nameEn: 'Tsuen Wan' },
-};
-
 const DAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
 
 const PRIMARY = '#2d5016';
@@ -88,20 +82,6 @@ const mainMenu: Option[] = [
   { label: '諮詢醫師', value: 'consult' },
 ];
 
-const doctorLinks: Record<string, string> = {
-  陳家富醫師: 'https://edentcm.as.me/DrCHAN',
-  李芊霖醫師: 'https://edentcm.as.me/DrLEE',
-  韓曉恩醫師: 'https://edentcm.as.me/DrHon',
-  周德健醫師: 'https://edentcm.as.me/DrChau',
-  張天慧醫師: '視像診症服務，暫停開放預約，請聯絡診所姑娘查詢。',
-};
-
-const doctorSchedules: Record<string, string> = {
-  陳家富醫師: '中環：星期一 11am-2pm, 星期四 11am-2pm\n佐敦：星期一 3:30pm-7:30pm, 星期四 3:30pm-7:30pm\n荃灣：星期二 10:30am-2pm, 3:30pm-7pm | 星期五 10:30am-2pm, 3:30pm-7pm | 星期六 10:30am-2pm, 3:30pm-7pm',
-  李芊霖醫師: '中環：星期一 3:30pm-7:30pm | 星期二 3:30pm-7:30pm | 星期三 11am-2pm, 3:30pm-7:30pm\n佐敦：星期一 11am-2pm | 星期二 11am-2pm | 星期五 3:30pm-7:30pm | 星期六 11am-2pm, 3:30pm-6:30pm\n荃灣：星期四 10:30am-2pm, 3:30pm-7pm',
-  韓曉恩醫師: '中環：星期四 3:30pm-7:30pm | 星期五 3:30pm-7:30pm\n佐敦：星期三 11am-2pm, 3:30pm-7:30pm | 星期五 11am-2pm\n荃灣：星期一 10:30am-2pm, 3:30pm-7pm | 星期日 10:30am-2pm, 3:30pm-7pm',
-  周德健醫師: '中環：星期二 11am-2pm | 星期五 11am-2pm\n佐敦：星期二 3:30pm-7:30pm',
-};
 
 const formFlow: { key: FormStepKey; prompt: string; placeholder: string }[] = [
   {
@@ -151,11 +131,12 @@ export function ChatWidget() {
 
   useEffect(() => {
     if (open && messages.length === 0) {
+      const whatsappLines = getWhatsappContactLines().join('\n');
       setMessages([
         {
           id: generateId(),
           sender: 'bot',
-          text: '你好，我係醫天圓小助手，請問有咩幫到你😊\n會為你提供即時資訊和更多幫助。如有需要直接Whatsapp聯繫，請與我們姑娘真人聯絡。\n\n真人聯絡通道：\n中環診所 WhatsApp: https://wa.me/+85267333234\n佐敦診所 WhatsApp: https://wa.me/+85267333801\n荃灣診所 WhatsApp: https://wa.me/+85260977363',
+          text: `你好，我係醫天圓小助手，請問有咩幫到你😊\n會為你提供即時資訊和更多幫助。如有需要直接Whatsapp聯繫，請與我們姑娘真人聯絡。\n\n真人聯絡通道：\n${whatsappLines}`,
         },
       ]);
     }
@@ -244,12 +225,13 @@ export function ChatWidget() {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setMessages((prev) => {
         const filtered = prev.filter((msg) => msg.text !== 'Connecting to AI... 正在為你連接Gemini，稍後回覆。');
+        const whatsappLines = getWhatsappContactLines().join('\n');
         return [
           ...filtered,
           {
             id: generateId(),
             sender: 'bot',
-            text: `抱歉，AI 服務暫時無法使用。\n\n錯誤訊息：${errorMessage}\n\n請直接聯絡我們姑娘：\n中環診所 WhatsApp: https://wa.me/+85267333234\n佐敦診所 WhatsApp: https://wa.me/+85267333801\n荃灣診所 WhatsApp: https://wa.me/+85260977363`,
+            text: `抱歉，AI 服務暫時無法使用。\n\n錯誤訊息：${errorMessage}\n\n請直接聯絡我們姑娘：\n${whatsappLines}`,
           },
         ];
       });
@@ -284,20 +266,18 @@ export function ChatWidget() {
         break;
       }
       case 'hours': {
+        const hoursText = getClinicHoursLines().join('\n');
         addBotMessage(
-          '🏥 中環診所：週一至五 11:00-14:00, 15:30-19:30；週六日及公眾假期休息。\n🏥 佐敦診所：週一至五 11:00-14:00, 15:30-19:30；週六 11:00-14:00, 15:30-18:30；週日及公眾假期休息。\n🏥 荃灣診所：週一、二、四至日 10:30-14:00，15:30-19:00；週三及公眾假期休息。\n\n⚠️ **重要提示**：以上時間僅供參考，具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。\n\n🔗 詳情請參考： https://www.edenclinic.hk/timetable/\n🔗 立即預約及查看最新時間表： https://edentcm.as.me/schedule.php'
+          `${hoursText}\n\n⚠️ **重要提示**：以上時間僅供參考，具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。\n\n🔗 詳情請參考： https://www.edenclinic.hk/timetable/\n🔗 立即預約及查看最新時間表： https://edentcm.as.me/schedule.php`
         );
         setOptions([{ label: '返回主選單', value: 'main' }]);
         break;
       }
       case 'addresses': {
+        const addressText = getClinicAddressLines().join('\n\n');
         addBotMessage(
-          '請問你想查詢邊間診所呢？\n\n中環：請參考中環街景路線圖。\n電話：3575 9733, 6733 3234\n\n佐敦：九龍佐敦寶靈街6號佐敦中心7樓全層。\n電話：3105 0733, 6733 3801\n\n荃灣：荃灣富麗花園商場A座地下20號。\n電話：2698 5422, 6097 7363',
-          [
-            { label: '中環路線圖', href: 'https://www.edenclinic.hk/中環街景路線圖/' },
-            { label: '佐敦路線圖', href: 'https://www.edenclinic.hk/佐敦街景路線圖/' },
-            { label: '荃灣路線圖', href: 'https://www.edenclinic.hk/荃灣街景路線圖/' },
-          ]
+          `請問你想查詢邊間診所呢？\n\n${addressText}`,
+          getClinicRouteLinks()
         );
         setOptions([{ label: '返回主選單', value: 'main' }]);
         break;
@@ -306,8 +286,7 @@ export function ChatWidget() {
         addBotMessage('請問你想預約邊位醫師呢？😊');
         setBookingMode(true);
         setBooking({ step: 'doctor' });
-        // Only show doctors that have active schedules (exclude 張天慧)
-        const bookableDoctors = Object.keys(DOCTOR_MAP);
+        const bookableDoctors = getBookableDoctorNameZhList();
         const doctorOpts: Option[] = bookableDoctors.map((name) => ({
           label: name,
           value: `doctor-${name}`,
@@ -324,9 +303,10 @@ export function ChatWidget() {
         break;
       }
       case 'other': {
+        const whatsappLines = getWhatsappContactLines().join('\n');
         setAiMode(true);
         addBotMessage(
-          '請問你有無咩問題，我會儘量以我所知為你解答。😊\n如有需要，請與我們姑娘真人聯絡：\n中環診所：https://wa.me/+85267333234\n佐敦診所：https://wa.me/+85267333801\n荃灣診所：https://wa.me/+85260977363'
+          `請問你有無咩問題，我會儘量以我所知為你解答。😊\n如有需要，請與我們姑娘真人聯絡：\n${whatsappLines}`
         );
         setOptions([]);
         break;
@@ -363,8 +343,8 @@ export function ChatWidget() {
         } else if (option.value.startsWith('doctor-')) {
           // Non-booking doctor info (timetable mode)
           const name = option.value.replace('doctor-', '');
-          const link = doctorLinks[name] || 'https://edentcm.as.me/schedule.php';
-          const schedule = doctorSchedules[name];
+          const link = getDoctorBookingLinkOrNote(name) || 'https://edentcm.as.me/schedule.php';
+          const schedule = getDoctorScheduleSummaryByNameZh(name);
           if (link.startsWith('http')) {
             let message = `無問題😊 呢個係${name}的應診時間：\n\n`;
             if (schedule) {
@@ -386,7 +366,7 @@ export function ChatWidget() {
   // ==================== BOOKING FLOW HANDLERS ====================
 
   const handleBookingDoctorSelect = (doctorNameZh: string) => {
-    const doctor = DOCTOR_MAP[doctorNameZh];
+    const doctor = DOCTOR_BY_NAME_ZH[doctorNameZh];
     if (!doctor) {
       addBotMessage('抱歉，此醫師暫不支援線上預約。');
       setOptions([{ label: '返回主選單', value: 'main' }]);
@@ -404,7 +384,7 @@ export function ChatWidget() {
       })
       .map(m => m.clinicId);
 
-    const uniqueClinics = [...new Set(activeClinics)];
+    const uniqueClinics = [...new Set(activeClinics)].filter(isClinicId);
 
     if (uniqueClinics.length === 0) {
       addBotMessage(`抱歉，${doctorNameZh}目前暫無可預約的診所。`);
@@ -414,14 +394,15 @@ export function ChatWidget() {
 
     addBotMessage(`好的！你要預約${doctorNameZh}，請選擇診所：`);
     const clinicOpts: Option[] = uniqueClinics.map(cId => {
-      const clinic = CLINIC_MAP[cId];
+      const clinic = CLINIC_BY_ID[cId];
       return { label: clinic?.nameZh || cId, value: `booking_clinic-${cId}` as OptionKey };
     });
     setOptions([...clinicOpts, { label: '取消預約', value: 'booking_cancel' }]);
   };
 
   const handleBookingClinicSelect = (clinicId: string) => {
-    const clinic = CLINIC_MAP[clinicId];
+    if (!isClinicId(clinicId)) return;
+    const clinic = CLINIC_BY_ID[clinicId];
     if (!clinic) return;
 
     setBooking(prev => ({ ...prev, step: 'date', clinicId: clinic.id, clinicNameZh: clinic.nameZh, clinicName: clinic.nameEn }));

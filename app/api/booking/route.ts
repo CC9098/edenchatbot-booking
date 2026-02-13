@@ -6,9 +6,8 @@ import { createBooking } from '@/lib/google-calendar';
 import { sendBookingConfirmationEmail } from '@/lib/gmail';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { bookingSchema } from '@/shared/types';
-import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
-import { storage } from '@/lib/storage';
 import { getEvent, deleteEvent, updateEvent } from '@/lib/google-calendar';
+import { getClinicAddress } from '@/shared/clinic-data';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
@@ -86,7 +85,7 @@ export async function POST(request: NextRequest) {
                                                                                 doctorNameZh: bookingData.doctorNameZh,
                                                                                 clinicName: bookingData.clinicName,
                                                                                 clinicNameZh: bookingData.clinicNameZh,
-                                                                                clinicAddress: getClinicAddress(bookingData.clinicId), // Helper needed
+                                                                                clinicAddress: getClinicAddress(bookingData.clinicId),
                                                                                 date: bookingData.date,
                                                                                 time: bookingData.time,
                                                                                 eventId: calResult.eventId,
@@ -181,14 +180,4 @@ export async function PATCH(request: NextRequest) {
                                 }
                                 return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
                 }
-}
-
-function getClinicAddress(clinicId: string): string {
-                const addresses: Record<string, string> = {
-                                central: "以 WhatsApp 信息查詢 Please inquire via WhatsApp", // Placeholder
-                                jordan: "九龍佐敦寶靈街6號佐敦中心7樓全層",
-                                tsuenwan: "荃灣富麗花園商場A座地下20號",
-                                online: "網上 Zoom / WhatsApp Video",
-                };
-                return addresses[clinicId] || "";
 }

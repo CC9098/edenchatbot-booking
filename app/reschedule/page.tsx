@@ -3,21 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Loader2, AlertCircle, CheckCircle2, Calendar, Clock, ChevronRight, ChevronLeft } from 'lucide-react';
-
-
-// Define maps locally (matching ChatWidget)
-const DOCTOR_REVERSE_MAP: Record<string, string> = {
-                '陳家富醫師': 'chan',
-                '李芊霖醫師': 'lee',
-                '韓曉恩醫師': 'hon',
-                '周德健醫師': 'chau',
-};
-
-const CLINIC_REVERSE_MAP: Record<string, string> = {
-                '中環': 'central',
-                '佐敦': 'jordan',
-                '荃灣': 'tsuenwan',
-};
+import { CLINIC_ID_BY_NAME_ZH, DOCTOR_ID_BY_NAME_ZH } from '@/shared/clinic-data';
 
 const DAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -69,7 +55,7 @@ function RescheduleBookingContent() {
 
                 useEffect(() => {
                                 if (!eventId || !calendarId) {
-                                                setError('Invalid booking link.');
+                                                setError('預約連結無效。');
                                                 setLoading(false);
                                                 return;
                                 }
@@ -88,16 +74,16 @@ function RescheduleBookingContent() {
                                                                 const docMatch = desc.match(/Doctor \/ 醫師: (.+?) \(/);
                                                                 const clinicMatch = desc.match(/Clinic \/ 診所: (.+?) \(/);
 
-                                                                if (docMatch && DOCTOR_REVERSE_MAP[docMatch[1]]) {
-                                                                                setDoctor({ id: DOCTOR_REVERSE_MAP[docMatch[1]], nameZh: docMatch[1] });
+                                                                if (docMatch && DOCTOR_ID_BY_NAME_ZH[docMatch[1]]) {
+                                                                                setDoctor({ id: DOCTOR_ID_BY_NAME_ZH[docMatch[1]], nameZh: docMatch[1] });
                                                                 }
 
-                                                                if (clinicMatch && CLINIC_REVERSE_MAP[clinicMatch[1]]) {
-                                                                                setClinic({ id: CLINIC_REVERSE_MAP[clinicMatch[1]], nameZh: clinicMatch[1] });
+                                                                if (clinicMatch && CLINIC_ID_BY_NAME_ZH[clinicMatch[1]]) {
+                                                                                setClinic({ id: CLINIC_ID_BY_NAME_ZH[clinicMatch[1]], nameZh: clinicMatch[1] });
                                                                 }
 
                                                 } catch (err) {
-                                                                setError('Could not find booking details.');
+                                                                setError('找不到預約資料。');
                                                 } finally {
                                                                 setLoading(false);
                                                 }
@@ -127,12 +113,12 @@ function RescheduleBookingContent() {
                                                 if (data.slots) {
                                                                 setAvailableSlots(data.slots);
                                                 } else if (data.isClosed || data.isHoliday) {
-                                                                setSlotError('Clinic is closed on this day.');
+                                                                setSlotError('診所當日休診。');
                                                 } else {
-                                                                setSlotError('No available slots.');
+                                                                setSlotError('當日暫無可預約時段。');
                                                 }
                                 } catch (err) {
-                                                setSlotError('Failed to load slots.');
+                                                setSlotError('載入時段失敗。');
                                 } finally {
                                                 setCheckingSlots(false);
                                 }
@@ -164,10 +150,10 @@ function RescheduleBookingContent() {
                                                 if (data.success) {
                                                                 setStep('success');
                                                 } else {
-                                                                setError(data.error || 'Failed to reschedule.');
+                                                                setError(data.error || '改期失敗。');
                                                 }
                                 } catch (err) {
-                                                setError('An error occurred. Please try again.');
+                                                setError('發生錯誤，請稍後再試。');
                                 } finally {
                                                 setSubmitting(false);
                                 }
@@ -185,7 +171,7 @@ function RescheduleBookingContent() {
                                 return (
                                                 <div className="mx-auto mt-10 max-w-md rounded-xl border border-red-100 bg-red-50 p-6 text-center">
                                                                 <AlertCircle className="mx-auto mb-4 h-10 w-10 text-red-500" />
-                                                                <h2 className="mb-2 text-lg font-semibold text-red-700">Error</h2>
+                                                                <h2 className="mb-2 text-lg font-semibold text-red-700">發生錯誤</h2>
                                                                 <p className="text-red-600">{error}</p>
                                                 </div>
                                 );
@@ -195,12 +181,12 @@ function RescheduleBookingContent() {
                                 return (
                                                 <div className="mx-auto mt-10 max-w-md rounded-xl border border-emerald-100 bg-emerald-50 p-8 text-center">
                                                                 <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-emerald-600" />
-                                                                <h2 className="mb-2 text-2xl font-bold text-emerald-800">Reschedule Successful!</h2>
-                                                                <p className="text-emerald-700">Your appointment has been updated.</p>
+                                                                <h2 className="mb-2 text-2xl font-bold text-emerald-800">改期成功！</h2>
+                                                                <p className="text-emerald-700">你的預約已更新。</p>
                                                                 <div className="mt-6 rounded-lg bg-white/60 p-4 text-left text-sm text-emerald-900">
-                                                                                <p><strong>New Time:</strong> {selectedDate} {selectedTime}</p>
+                                                                                <p><strong>新預約時間：</strong> {selectedDate} {selectedTime}</p>
                                                                 </div>
-                                                                <p className="mt-6 text-sm text-emerald-600">You will receive a confirmation email shortly.</p>
+                                                                <p className="mt-6 text-sm text-emerald-600">你將於稍後收到確認電郵。</p>
                                                 </div>
                                 );
                 }
@@ -210,8 +196,8 @@ function RescheduleBookingContent() {
                                                 <div className="mx-auto mt-10 max-w-md rounded-xl border border-amber-100 bg-amber-50 p-6 text-center">
                                                                 <AlertCircle className="mx-auto mb-4 h-10 w-10 text-amber-500" />
                                                                 <p className="text-amber-800">
-                                                                                We could not automatically identify your doctor or clinic from the booking details.
-                                                                                Please contact us via WhatsApp to reschedule.
+                                                                                無法從預約資料自動識別你的醫師或診所。
+                                                                                請透過 WhatsApp 聯絡我們辦理改期。
                                                                 </p>
                                                 </div>
                                 );
@@ -224,12 +210,12 @@ function RescheduleBookingContent() {
 
                 return (
                                 <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-                                                <h1 className="mb-6 text-center text-2xl font-bold text-[#2d5016]">Reschedule Appointment</h1>
+                                                <h1 className="mb-6 text-center text-2xl font-bold text-[#2d5016]">更改預約</h1>
 
                                                 {step === 'summary' && (
                                                                 <div className="space-y-6">
                                                                                 <div className="rounded-xl bg-slate-50 p-5">
-                                                                                                <h3 className="mb-3 text-sm font-semibold uppercase text-slate-500">Current Appointment</h3>
+                                                                                                <h3 className="mb-3 text-sm font-semibold text-slate-500">目前預約</h3>
                                                                                                 <p className="text-lg font-semibold text-slate-800">{doctor.nameZh} @ {clinic.nameZh}</p>
                                                                                                 <div className="mt-2 flex items-center gap-2 text-slate-600">
                                                                                                                 <Calendar className="h-4 w-4" />
@@ -245,7 +231,7 @@ function RescheduleBookingContent() {
                                                                                                 onClick={() => setStep('date')}
                                                                                                 className="flex w-full items-center justify-center rounded-xl bg-[#2d5016] px-4 py-3 font-semibold text-white transition hover:bg-[#1f3810]"
                                                                                 >
-                                                                                                Select New Time
+                                                                                                選擇新時段
                                                                                 </button>
                                                                 </div>
                                                 )}
@@ -253,9 +239,9 @@ function RescheduleBookingContent() {
                                                 {step === 'date' && (
                                                                 <div>
                                                                                 <button onClick={() => setStep('summary')} className="mb-4 flex items-center text-sm text-slate-500 hover:text-slate-800">
-                                                                                                <ChevronLeft className="mr-1 h-4 w-4" /> Back
+                                                                                                <ChevronLeft className="mr-1 h-4 w-4" /> 返回
                                                                                 </button>
-                                                                                <h3 className="mb-4 text-lg font-semibold text-slate-800">Select Date</h3>
+                                                                                <h3 className="mb-4 text-lg font-semibold text-slate-800">選擇日期</h3>
                                                                                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                                                                                                 {dates.map((d) => (
                                                                                                                 <button
@@ -274,9 +260,9 @@ function RescheduleBookingContent() {
                                                 {step === 'time' && (
                                                                 <div>
                                                                                 <button onClick={() => setStep('date')} className="mb-4 flex items-center text-sm text-slate-500 hover:text-slate-800">
-                                                                                                <ChevronLeft className="mr-1 h-4 w-4" /> Back to Dates
+                                                                                                <ChevronLeft className="mr-1 h-4 w-4" /> 返回日期列表
                                                                                 </button>
-                                                                                <h3 className="mb-4 text-lg font-semibold text-slate-800">Select Time for {selectedDate}</h3>
+                                                                                <h3 className="mb-4 text-lg font-semibold text-slate-800">選擇 {selectedDate} 的時段</h3>
 
                                                                                 {checkingSlots ? (
                                                                                                 <div className="flex justify-center py-8">
@@ -288,7 +274,7 @@ function RescheduleBookingContent() {
                                                                                                 </div>
                                                                                 ) : availableSlots.length === 0 ? (
                                                                                                 <div className="rounded-lg bg-slate-50 p-4 text-center text-slate-600">
-                                                                                                                No slots available.
+                                                                                                                暫無可預約時段。
                                                                                                 </div>
                                                                                 ) : (
                                                                                                 <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
@@ -309,13 +295,13 @@ function RescheduleBookingContent() {
                                                 {step === 'confirm' && (
                                                                 <div>
                                                                                 <button onClick={() => setStep('time')} className="mb-4 flex items-center text-sm text-slate-500 hover:text-slate-800">
-                                                                                                <ChevronLeft className="mr-1 h-4 w-4" /> Back to Time
+                                                                                                <ChevronLeft className="mr-1 h-4 w-4" /> 返回時段列表
                                                                                 </button>
-                                                                                <h3 className="mb-6 text-xl font-bold text-slate-800">Confirm Reschedule</h3>
+                                                                                <h3 className="mb-6 text-xl font-bold text-slate-800">確認更改預約</h3>
 
                                                                                 <div className="space-y-4">
                                                                                                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 opacity-70">
-                                                                                                                <p className="mb-1 text-xs font-bold uppercase text-slate-500">Old Appointment</p>
+                                                                                                                <p className="mb-1 text-xs font-bold text-slate-500">原預約</p>
                                                                                                                 <div className="flex items-center gap-2 text-slate-600 line-through">
                                                                                                                                 <Calendar className="h-4 w-4" />
                                                                                                                                 <span>{currentDateStr}</span>
@@ -329,7 +315,7 @@ function RescheduleBookingContent() {
                                                                                                 </div>
 
                                                                                                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-                                                                                                                <p className="mb-1 text-xs font-bold uppercase text-emerald-600">New Appointment</p>
+                                                                                                                <p className="mb-1 text-xs font-bold text-emerald-600">新預約</p>
                                                                                                                 <div className="flex items-center gap-2 text-lg font-bold text-emerald-800">
                                                                                                                                 <Calendar className="h-5 w-5" />
                                                                                                                                 <span>{selectedDate}</span>
@@ -344,7 +330,7 @@ function RescheduleBookingContent() {
                                                                                                 disabled={submitting}
                                                                                                 className="mt-8 flex w-full items-center justify-center rounded-xl bg-[#2d5016] px-4 py-3 font-semibold text-white transition hover:bg-[#1f3810] disabled:opacity-70"
                                                                                 >
-                                                                                                {submitting ? <Loader2 className="animate-spin" /> : 'Confirm Change'}
+                                                                                                {submitting ? <Loader2 className="animate-spin" /> : '確認更改'}
                                                                                 </button>
                                                                 </div>
                                                 )}
