@@ -1,6 +1,9 @@
 import { google } from 'googleapis';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 
 import { getGoogleAuthClient } from './google-auth';
+
+const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
 // WARNING: Never cache this client.
 // Access tokens expire, so a new client must be created each time.
@@ -14,19 +17,17 @@ export async function getUncachableGoogleCalendarClient() {
 export async function getFreeBusy(calendarId: string, date: Date): Promise<{ start: Date; end: Date }[]> {
   const calendar = await getUncachableGoogleCalendarClient();
 
-  // Set time range for the entire day in Hong Kong timezone
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-
-  const dayEnd = new Date(date);
-  dayEnd.setHours(23, 59, 59, 999);
+  // Build day boundaries from Hong Kong local day, independent of server timezone.
+  const targetDate = formatInTimeZone(date, HONG_KONG_TIMEZONE, 'yyyy-MM-dd');
+  const dayStart = fromZonedTime(`${targetDate}T00:00:00`, HONG_KONG_TIMEZONE);
+  const dayEnd = fromZonedTime(`${targetDate}T23:59:59.999`, HONG_KONG_TIMEZONE);
 
   try {
     const response = await calendar.freebusy.query({
       requestBody: {
         timeMin: dayStart.toISOString(),
         timeMax: dayEnd.toISOString(),
-        timeZone: 'Asia/Hong_Kong',
+        timeZone: HONG_KONG_TIMEZONE,
         items: [{ id: calendarId }],
       },
     });

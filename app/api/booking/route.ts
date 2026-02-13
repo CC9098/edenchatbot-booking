@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { fromZonedTime } from 'date-fns-tz';
 import { createBooking } from '@/lib/google-calendar';
 import { sendBookingConfirmationEmail } from '@/lib/gmail';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
@@ -8,6 +9,8 @@ import { bookingSchema } from '@/shared/types';
 import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
 import { storage } from '@/lib/storage';
 import { getEvent, deleteEvent, updateEvent } from '@/lib/google-calendar';
+
+const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
 // Schema for rescheduling
 const rescheduleSchema = z.object({
@@ -40,9 +43,10 @@ export async function POST(request: NextRequest) {
                                 }
 
                                 // Calculate start and end times
-                                const [hours, minutes] = bookingData.time.split(':').map(Number);
-                                const startDate = new Date(bookingData.date);
-                                startDate.setHours(hours, minutes, 0, 0);
+                                const startDate = fromZonedTime(
+                                                `${bookingData.date}T${bookingData.time}:00`,
+                                                HONG_KONG_TIMEZONE
+                                );
 
                                 // Check if valid date
                                 if (isNaN(startDate.getTime())) {
@@ -148,9 +152,10 @@ export async function PATCH(request: NextRequest) {
                                 const { eventId, calendarId, date, time, durationMinutes } = rescheduleSchema.parse(body);
 
                                 // Calculate start and end times
-                                const [hours, minutes] = time.split(':').map(Number);
-                                const startDate = new Date(date);
-                                startDate.setHours(hours, minutes, 0, 0);
+                                const startDate = fromZonedTime(
+                                                `${date}T${time}:00`,
+                                                HONG_KONG_TIMEZONE
+                                );
 
                                 if (isNaN(startDate.getTime())) {
                                                 return NextResponse.json({ error: 'Invalid date/time' }, { status: 400 });

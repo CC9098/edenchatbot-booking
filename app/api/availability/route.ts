@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { getMappingWithFallback } from '@/lib/storage-helpers'; // Need to create this helper wrapper or use direct storage
 import { getFreeBusy } from '@/lib/google-calendar';
 import { getScheduleForDayFromWeekly, isDateBlocked, isSlotAvailableUtc } from '@/lib/booking-helpers';
@@ -16,10 +17,16 @@ const availabilitySchema = z.object({
                 durationMinutes: z.number().default(15),
 });
 
+const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
+
 export async function POST(request: NextRequest) {
                 try {
                                 const body = await request.json();
                                 const { doctorId, clinicId, date, durationMinutes } = availabilitySchema.parse(body);
+                                const requestedDate = date.slice(0, 10);
+                                if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
+                                                return NextResponse.json({ error: 'Invalid date format. Use YYYY-MM-DD' }, { status: 400 });
+                                }
 
                                 const mapping = await getMappingWithFallback(doctorId, clinicId);
                                 if (!mapping || !mapping.isActive) {
@@ -30,7 +37,7 @@ export async function POST(request: NextRequest) {
                                 let isBlocked = false;
                                 try {
                                                 console.time('db-check-holidays');
-                                                isBlocked = await isDateBlocked(date, doctorId, clinicId);
+                                                isBlocked = await isDateBlocked(requestedDate, doctorId, clinicId);
                                                 console.timeEnd('db-check-holidays');
                                 } catch (error: any) {
                                                 console.timeEnd('db-check-holidays');
@@ -43,8 +50,9 @@ export async function POST(request: NextRequest) {
                                                 return NextResponse.json({ isClosed: true, isHoliday: true, slots: [] });
                                 }
 
-                                const dateObj = new Date(date);
-                                const dayOfWeek = dateObj.getDay();
+                                const requestedDayUtc = fromZonedTime(`${requestedDate}T00:00:00`, HONG_KONG_TIMEZONE);
+                                const requestedDayInHk = toZonedTime(requestedDayUtc, HONG_KONG_TIMEZONE);
+                                const dayOfWeek = requestedDayInHk.getDay();
                                 const daySchedule = getScheduleForDayFromWeekly(mapping.schedule, dayOfWeek);
 
                                 if (!daySchedule || daySchedule.length === 0) {
@@ -54,31 +62,26 @@ export async function POST(request: NextRequest) {
                                 // Get busy slots from Google Calendar
                                 try {
                                                 console.time('fetch-google-calendar');
-                                                const busySlots = await getFreeBusy(mapping.calendarId, dateObj);
+                                                const busySlots = await getFreeBusy(mapping.calendarId, requestedDayUtc);
                                                 console.timeEnd('fetch-google-calendar');
 
                                                 const availableSlots: string[] = [];
-                                                const now = new Date(); // Current time to prevent booking in the past
+                                                const nowUtc = new Date(); // Current time to prevent booking in the past
 
                                                 // Is today?
-                                                const isToday = dateObj.toDateString() === now.toDateString();
+                                                const todayInHk = formatInTimeZone(nowUtc, HONG_KONG_TIMEZONE, 'yyyy-MM-dd');
+                                                const isToday = requestedDate === todayInHk;
                                                 const bufferMinutes = 60; // 1 hour buffer for same-day bookings
-                                                now.setMinutes(now.getMinutes() + bufferMinutes);
+                                                const bookingCutoffUtc = new Date(nowUtc.getTime() + bufferMinutes * 60 * 1000);
 
                                                 for (const range of daySchedule) {
-                                                                const [startHour, startMin] = range.start.split(':').map(Number);
-                                                                const [endHour, endMin] = range.end.split(':').map(Number);
-
-                                                                let currentSlot = new Date(dateObj);
-                                                                currentSlot.setHours(startHour, startMin, 0, 0);
-
-                                                                const endData = new Date(dateObj);
-                                                                endData.setHours(endHour, endMin, 0, 0);
+                                                                let currentSlot = fromZonedTime(`${requestedDate}T${range.start}:00`, HONG_KONG_TIMEZONE);
+                                                                const endData = fromZonedTime(`${requestedDate}T${range.end}:00`, HONG_KONG_TIMEZONE);
 
                                                                 while (currentSlot < endData) {
                                                                                 // If booking for today, skip past times
-                                                                                if (isToday && currentSlot < now) {
-                                                                                                currentSlot.setMinutes(currentSlot.getMinutes() + 15); // Increment by 15 mins
+                                                                                if (isToday && currentSlot < bookingCutoffUtc) {
+                                                                                                currentSlot = new Date(currentSlot.getTime() + 15 * 60 * 1000); // Increment by 15 mins
                                                                                                 continue;
                                                                                 }
 
@@ -89,11 +92,11 @@ export async function POST(request: NextRequest) {
                                                                                 // Check against Google Calendar busy slots
                                                                                 if (isSlotAvailableUtc(currentSlot, slotEnd, busySlots)) {
                                                                                                 // Format as HH:mm
-                                                                                                const slotStr = currentSlot.toTimeString().slice(0, 5);
+                                                                                                const slotStr = formatInTimeZone(currentSlot, HONG_KONG_TIMEZONE, 'HH:mm');
                                                                                                 availableSlots.push(slotStr);
                                                                                 }
 
-                                                                                currentSlot.setMinutes(currentSlot.getMinutes() + 15); // Increment by 15 mins
+                                                                                currentSlot = new Date(currentSlot.getTime() + 15 * 60 * 1000); // Increment by 15 mins
                                                                 }
                                                 }
 
