@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "phase3:smoke": "bash ./scripts/phase3-smoke.sh",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, AuthError } from "@/lib/auth-helpers";
 import { createServiceClient } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const user = await getCurrentUser();
