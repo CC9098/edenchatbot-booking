@@ -5,33 +5,20 @@ import { ModeIndicator, type ChatMode } from "./ModeSelector";
 import { MessageList, type ChatMessage } from "./MessageList";
 import { ChatInputV2 } from "./ChatInputV2";
 
-type ConstitutionType = "depleting" | "crossing" | "hoarding";
+const STORAGE_KEY = "eden.chat.v1";
+const SESSION_KEY = "eden.chat.session.v1";
 
-const WELCOME_MESSAGES: Record<ConstitutionType, string> = {
-  depleting:
-    "你好！我是醫天圓 AI 體質顧問。你屬於「虛損型」體質，代表身體的氣血津液可能有不足的傾向。我可以為你提供飲食、作息及調養建議。有什麼想了解的嗎？",
-  crossing:
-    "你好！我是醫天圓 AI 體質顧問。你屬於「交叉型」體質，代表身體可能同時存在寒熱或虛實交雜的情況。我可以幫助你了解如何平衡調理。有什麼想問的嗎？",
-  hoarding:
-    "你好！我是醫天圓 AI 體質顧問。你屬於「積滯型」體質，代表身體可能有痰濕、瘀血或食積等停滯的傾向。我可以為你提供疏通調理的建議。有什麼想了解的嗎？",
-};
-
-function getStorageKey(type: ConstitutionType) {
-  return `eden.chat.${type}.v1`;
-}
-
-function getSessionKey(type: ConstitutionType) {
-  return `eden.chat.session.${type}.v1`;
-}
+const WELCOME_MESSAGE =
+  "你好！我是醫天圓 AI 體質顧問。我會根據你嘅體質及照護資料，提供個人化嘅飲食、作息及調養建議。有什麼想了解的嗎？";
 
 function generateSessionId(): string {
   return `sess_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function loadMessages(type: ConstitutionType): ChatMessage[] {
+function loadMessages(): ChatMessage[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(getStorageKey(type));
+    const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch {
     // Corrupted data, start fresh
@@ -39,20 +26,20 @@ function loadMessages(type: ConstitutionType): ChatMessage[] {
   return [];
 }
 
-function loadOrCreateSession(type: ConstitutionType): string {
+function loadOrCreateSession(): string {
   if (typeof window === "undefined") return generateSessionId();
   try {
-    const existing = localStorage.getItem(getSessionKey(type));
+    const existing = localStorage.getItem(SESSION_KEY);
     if (existing) return existing;
   } catch {
     // Ignore
   }
   const id = generateSessionId();
-  localStorage.setItem(getSessionKey(type), id);
+  localStorage.setItem(SESSION_KEY, id);
   return id;
 }
 
-export function ChatRoom({ type }: { type: ConstitutionType }) {
+export function ChatRoom() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [mode, setMode] = useState<ChatMode>("G1");
   const [sessionId, setSessionId] = useState("");
@@ -64,34 +51,33 @@ export function ChatRoom({ type }: { type: ConstitutionType }) {
     if (initialized.current) return;
     initialized.current = true;
 
-    const stored = loadMessages(type);
-    const sid = loadOrCreateSession(type);
+    const stored = loadMessages();
+    const sid = loadOrCreateSession();
     setSessionId(sid);
 
     if (stored.length > 0) {
       setMessages(stored);
     } else {
-      // Add welcome message
       const welcome: ChatMessage = {
         role: "assistant",
-        content: WELCOME_MESSAGES[type],
+        content: WELCOME_MESSAGE,
         mode: "G1",
         createdAt: new Date().toISOString(),
       };
       setMessages([welcome]);
     }
-  }, [type]);
+  }, []);
 
   // Persist messages to localStorage whenever they change
   useEffect(() => {
     if (!initialized.current) return;
     if (messages.length === 0) return;
     try {
-      localStorage.setItem(getStorageKey(type), JSON.stringify(messages));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
     } catch {
       // Storage full or unavailable
     }
-  }, [messages, type]);
+  }, [messages]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -110,7 +96,6 @@ export function ChatRoom({ type }: { type: ConstitutionType }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            type,
             sessionId,
             messages: updatedMessages.map((m) => ({
               role: m.role,
@@ -124,7 +109,6 @@ export function ChatRoom({ type }: { type: ConstitutionType }) {
         }
 
         const data = await response.json();
-        // Mode is AI-determined from API response
         const detectedMode: ChatMode = data.mode ?? "G1";
         setMode(detectedMode);
 
@@ -137,7 +121,7 @@ export function ChatRoom({ type }: { type: ConstitutionType }) {
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
-      } catch (error) {
+      } catch {
         const errorMessage: ChatMessage = {
           role: "assistant",
           content: "抱歉，發生了錯誤。請檢查網路連線後再試一次。",
@@ -149,26 +133,25 @@ export function ChatRoom({ type }: { type: ConstitutionType }) {
         setLoading(false);
       }
     },
-    [messages, sessionId, type]
+    [messages, sessionId, mode]
   );
 
   const handleClearChat = useCallback(() => {
     const welcome: ChatMessage = {
       role: "assistant",
-      content: WELCOME_MESSAGES[type],
+      content: WELCOME_MESSAGE,
       mode: "G1",
       createdAt: new Date().toISOString(),
     };
     setMessages([welcome]);
-    // Reset session
     const newSid = generateSessionId();
     setSessionId(newSid);
-    localStorage.setItem(getSessionKey(type), newSid);
-  }, [type]);
+    localStorage.setItem(SESSION_KEY, newSid);
+  }, []);
 
   return (
     <div className="flex h-full flex-col">
-      {/* Mode selector bar */}
+      {/* Mode indicator bar */}
       <div className="flex items-center justify-between border-b border-[#2d5016]/10 bg-white px-4 py-2">
         <ModeIndicator currentMode={mode} />
         <button

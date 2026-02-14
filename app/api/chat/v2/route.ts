@@ -18,7 +18,6 @@ interface ChatMessagePayload {
 }
 
 interface RequestBody {
-  type: ConstitutionType;
   sessionId: string;
   messages: ChatMessagePayload[];
 }
@@ -43,24 +42,52 @@ const G3_KEYWORDS = [
 function resolveMode(latestUserMessage: string): ChatMode {
   const lower = latestUserMessage.toLowerCase();
 
-  // Priority 1: Booking keywords
   if (BOOKING_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()))) {
     return 'B';
   }
 
-  // Priority 2: Semantic analysis
-  // G3 — long messages or coaching keywords
   if (lower.length > 150 || G3_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()))) {
     return 'G3';
   }
 
-  // G2 — requests for more detail / theory
   if (G2_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()))) {
     return 'G2';
   }
 
-  // G1 — short questions or default
   return 'G1';
+}
+
+// ---------------------------------------------------------------------------
+// Resolve Constitution from User Profile
+// ---------------------------------------------------------------------------
+
+async function resolveConstitution(userId: string): Promise<ConstitutionType> {
+  const supabase = createServiceClient();
+
+  // Priority 1: patient_care_profile (doctor-assigned)
+  const { data: careProfile } = await supabase
+    .from('patient_care_profile')
+    .select('constitution')
+    .eq('patient_user_id', userId)
+    .maybeSingle();
+
+  if (careProfile?.constitution && ['depleting', 'crossing', 'hoarding'].includes(careProfile.constitution)) {
+    return careProfile.constitution as ConstitutionType;
+  }
+
+  // Priority 2: profiles.constitution_type (quiz result)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('constitution_type')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (profile?.constitution_type && ['depleting', 'crossing', 'hoarding'].includes(profile.constitution_type)) {
+    return profile.constitution_type as ConstitutionType;
+  }
+
+  // Default
+  return 'depleting';
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +118,6 @@ async function fetchCareContext(userId: string): Promise<string> {
   const supabase = createServiceClient();
   const lines: string[] = [];
 
-  // Fetch patient care profile
   const { data: profile } = await supabase
     .from('patient_care_profile')
     .select('constitution, constitution_note')
@@ -107,7 +133,6 @@ async function fetchCareContext(userId: string): Promise<string> {
     }
   }
 
-  // Fetch active care instructions
   const today = new Date().toISOString().split('T')[0];
   const { data: instructions } = await supabase
     .from('care_instructions')
@@ -125,7 +150,6 @@ async function fetchCareContext(userId: string): Promise<string> {
     }
   }
 
-  // Fetch next pending follow-up plan
   const { data: followUp } = await supabase
     .from('follow_up_plans')
     .select('suggested_date, reason')
@@ -155,7 +179,6 @@ async function logChatMessages(
   try {
     const supabase = createServiceClient();
 
-    // Log user message
     await supabase.from('chat_messages').insert({
       session_id: sessionId,
       role: 'user',
@@ -163,7 +186,6 @@ async function logChatMessages(
       model_gear: mode,
     });
 
-    // Log assistant message
     await supabase.from('chat_messages').insert({
       session_id: sessionId,
       role: 'assistant',
@@ -171,18 +193,16 @@ async function logChatMessages(
       model_gear: mode,
     });
 
-    // Log request metadata with token estimates
     const estimatedPromptTokens = Math.ceil(userContent.length / 2);
     const estimatedCompletionTokens = Math.ceil(assistantContent.length / 2);
 
     await supabase.from('chat_request_logs').insert({
       session_id: sessionId,
-      model_id: 'gemini-pro',
+      model_id: 'gemini-flash-latest',
       prompt_tokens: estimatedPromptTokens,
       completion_tokens: estimatedCompletionTokens,
     });
   } catch (error) {
-    // Logging failures should not break the chat response
     console.error('[chat/v2] Failed to log chat messages:', error);
   }
 }
@@ -191,10 +211,6 @@ async function logChatMessages(
 // Build System Prompt (DB-driven with fallback)
 // ---------------------------------------------------------------------------
 
-/**
- * Fallback prompt builder — uses hardcoded prompts when DB has no settings.
- * Preserves the original prompt structure so chat still works if DB is down.
- */
 function buildFallbackPrompt(
   type: ConstitutionType,
   mode: ChatMode,
@@ -232,11 +248,6 @@ ${whatsappInfo}
 重要提示：具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。`;
 }
 
-/**
- * Primary prompt builder — fetches prompts from `chat_prompt_settings` and
- * knowledge documents from `knowledge_docs` tables, falling back to
- * hardcoded prompts when DB rows are missing.
- */
 async function buildSystemPrompt(
   type: ConstitutionType,
   mode: ChatMode,
@@ -244,7 +255,6 @@ async function buildSystemPrompt(
 ): Promise<string> {
   const supabase = createServiceClient();
 
-  // 1. Fetch prompt settings for this constitution type
   const { data: settings, error: settingsError } = await supabase
     .from('chat_prompt_settings')
     .select('prompt_md, gear_g1_md, gear_g2_md, gear_g3_md, extra_instructions_md')
@@ -256,7 +266,6 @@ async function buildSystemPrompt(
     console.error('[chat/v2] Failed to fetch chat_prompt_settings:', settingsError);
   }
 
-  // 2. Fetch knowledge docs for this constitution type
   const { data: docs, error: docsError } = await supabase
     .from('knowledge_docs')
     .select('title, content_md')
@@ -269,24 +278,20 @@ async function buildSystemPrompt(
     console.error('[chat/v2] Failed to fetch knowledge_docs:', docsError);
   }
 
-  // 3. If no settings found, fall back to the hardcoded prompt
   if (!settings) {
     return buildFallbackPrompt(type, mode, careContext);
   }
 
-  // 4. Build knowledge and sources strings from knowledge_docs rows
   const knowledgeEntries = (docs || [])
     .map((d) => `【${d.title}】\n${d.content_md}`)
     .join('\n\n');
   const sourcesList = (docs || []).map((d) => d.title).join('、');
 
-  // 5. Replace placeholders in prompt_md
   let systemPrompt = settings.prompt_md
     .replace('{{KNOWLEDGE}}', knowledgeEntries || '（暫無站內知識庫內容）')
     .replace('{{SOURCES}}', sourcesList || '（無）')
     .replace('{{EXTRA_INSTRUCTIONS}}', settings.extra_instructions_md || '');
 
-  // 6. Append gear-specific instructions based on mode
   const gearMap: Record<string, string | null> = {
     G1: settings.gear_g1_md,
     G2: settings.gear_g2_md,
@@ -297,14 +302,12 @@ async function buildSystemPrompt(
     systemPrompt += '\n\n【當前回覆檔位】\n' + gearMap[mode];
   }
 
-  // 7. If mode is B, append booking instructions
   if (mode === 'B') {
     const clinicInfo = getPromptClinicInfoLines().map((l) => `- ${l}`).join('\n');
     const whatsappInfo = getWhatsappContactLines().map((l) => `- ${l}`).join('\n');
     systemPrompt += `\n\n【預約模式】\n你係預約助手。幫助用戶查詢及安排診所預約。\n\n診所資訊：\n${clinicInfo}\n\n${whatsappInfo}\n\n引導用戶到預約系統：https://edentcm.as.me/schedule.php`;
   }
 
-  // 8. Append care context if available
   if (careContext) {
     systemPrompt += careContext;
   }
@@ -319,15 +322,7 @@ async function buildSystemPrompt(
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as RequestBody;
-    const { type, sessionId, messages } = body;
-
-    // Validate constitution type
-    if (!type || !['depleting', 'crossing', 'hoarding'].includes(type)) {
-      return NextResponse.json(
-        { error: 'Invalid constitution type. Must be depleting, crossing, or hoarding.' },
-        { status: 400 },
-      );
-    }
+    const { sessionId, messages } = body;
 
     if (!sessionId || typeof sessionId !== 'string') {
       return NextResponse.json(
@@ -343,7 +338,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the latest user message for mode detection
     const latestUserMessage = [...messages].reverse().find((m) => m.role === 'user');
     if (!latestUserMessage) {
       return NextResponse.json(
@@ -355,18 +349,21 @@ export async function POST(request: NextRequest) {
     // Detect mode from message content
     const mode = resolveMode(latestUserMessage.content);
 
-    // Fetch care context if user is authenticated (optional — don't throw)
+    // Resolve constitution type from user profile (auto-detect)
+    let type: ConstitutionType = 'depleting'; // default for unauthenticated
     let careContext = '';
+
     try {
       const user = await getCurrentUser();
       if (user) {
+        type = await resolveConstitution(user.id);
         careContext = await fetchCareContext(user.id);
       }
     } catch {
-      // Not authenticated or auth error — continue without care context
+      // Not authenticated — continue with defaults
     }
 
-    // Build system prompt (now async — fetches from DB with fallback)
+    // Build system prompt (DB-driven with fallback)
     const systemPrompt = await buildSystemPrompt(type, mode, careContext);
 
     // Call Gemini
@@ -381,8 +378,6 @@ export async function POST(request: NextRequest) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
-    // Build conversation history for Gemini
-    // Gemini's generateContent takes a single prompt, so we combine system + history
     const conversationHistory = messages
       .map((m) => `${m.role === 'user' ? '用戶' : 'AI助手'}：${m.content}`)
       .join('\n\n');
@@ -393,10 +388,10 @@ export async function POST(request: NextRequest) {
     const response = result.response;
     const reply = response.text();
 
-    // Log messages to Supabase (fire-and-forget)
+    // Log messages (fire-and-forget)
     logChatMessages(sessionId, latestUserMessage.content, reply, mode);
 
-    return NextResponse.json({ reply, mode });
+    return NextResponse.json({ reply, mode, type });
   } catch (error) {
     console.error('[chat/v2] Error:', error);
     return NextResponse.json(
