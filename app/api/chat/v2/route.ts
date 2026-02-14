@@ -64,10 +64,10 @@ function resolveMode(latestUserMessage: string): ChatMode {
 }
 
 // ---------------------------------------------------------------------------
-// Constitution Context
+// Hardcoded Fallback Prompts (used when DB has no settings)
 // ---------------------------------------------------------------------------
 
-const CONSTITUTION_CONTEXT: Record<ConstitutionType, string> = {
+const FALLBACK_CONSTITUTION_CONTEXT: Record<ConstitutionType, string> = {
   depleting:
     '用戶屬於「虛損型」體質。重點關注氣血不足、津液虧虛的問題。建議方向包括補氣養血、滋陰潤燥、健脾益腎。避免過度勞累和寒涼飲食。',
   crossing:
@@ -76,11 +76,7 @@ const CONSTITUTION_CONTEXT: Record<ConstitutionType, string> = {
     '用戶屬於「積滯型」體質。重點關注痰濕、瘀血、食積等停滯問題。建議方向包括化痰祛濕、活血化瘀、消食導滯。鼓勵適量運動和清淡飲食。',
 };
 
-// ---------------------------------------------------------------------------
-// Mode-specific System Prompts
-// ---------------------------------------------------------------------------
-
-const MODE_PROMPTS: Record<ChatMode, string> = {
+const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
   G1: '用簡短方式回答（2-3句），然後問一個引導問題，例如「想知多啲關於呢方面嘅原理嗎？」',
   G2: '提供詳細嘅理論原理說明，包括中醫理論基礎，用段落方式解釋。',
   G3: '以教練模式進行深入引導式對話。先理解用戶情況，提問引導反思，給予個人化建議。用同理心回應。',
@@ -192,10 +188,14 @@ async function logChatMessages(
 }
 
 // ---------------------------------------------------------------------------
-// Build System Prompt
+// Build System Prompt (DB-driven with fallback)
 // ---------------------------------------------------------------------------
 
-function buildSystemPrompt(
+/**
+ * Fallback prompt builder — uses hardcoded prompts when DB has no settings.
+ * Preserves the original prompt structure so chat still works if DB is down.
+ */
+function buildFallbackPrompt(
   type: ConstitutionType,
   mode: ChatMode,
   careContext: string,
@@ -207,10 +207,10 @@ function buildSystemPrompt(
   return `你係醫天圓中醫診所的 AI 體質顧問，角色設定係親切、專業的中醫健康助理。請用繁體中文（廣東話口語）回答用戶問題。
 
 【回答模式】
-${MODE_PROMPTS[mode]}
+${FALLBACK_MODE_PROMPTS[mode]}
 
 【用戶體質背景】
-${CONSTITUTION_CONTEXT[type]}
+${FALLBACK_CONSTITUTION_CONTEXT[type]}
 ${careContext}
 
 【診所資訊】
@@ -230,6 +230,86 @@ ${whatsappInfo}
 - 時間表網頁：https://www.edenclinic.hk/timetable/
 
 重要提示：具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。`;
+}
+
+/**
+ * Primary prompt builder — fetches prompts from `chat_prompt_settings` and
+ * knowledge documents from `knowledge_docs` tables, falling back to
+ * hardcoded prompts when DB rows are missing.
+ */
+async function buildSystemPrompt(
+  type: ConstitutionType,
+  mode: ChatMode,
+  careContext: string,
+): Promise<string> {
+  const supabase = createServiceClient();
+
+  // 1. Fetch prompt settings for this constitution type
+  const { data: settings, error: settingsError } = await supabase
+    .from('chat_prompt_settings')
+    .select('prompt_md, gear_g1_md, gear_g2_md, gear_g3_md, extra_instructions_md')
+    .eq('type', type)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (settingsError) {
+    console.error('[chat/v2] Failed to fetch chat_prompt_settings:', settingsError);
+  }
+
+  // 2. Fetch knowledge docs for this constitution type
+  const { data: docs, error: docsError } = await supabase
+    .from('knowledge_docs')
+    .select('title, content_md')
+    .eq('type', type)
+    .eq('enabled', true)
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+
+  if (docsError) {
+    console.error('[chat/v2] Failed to fetch knowledge_docs:', docsError);
+  }
+
+  // 3. If no settings found, fall back to the hardcoded prompt
+  if (!settings) {
+    return buildFallbackPrompt(type, mode, careContext);
+  }
+
+  // 4. Build knowledge and sources strings from knowledge_docs rows
+  const knowledgeEntries = (docs || [])
+    .map((d) => `【${d.title}】\n${d.content_md}`)
+    .join('\n\n');
+  const sourcesList = (docs || []).map((d) => d.title).join('、');
+
+  // 5. Replace placeholders in prompt_md
+  let systemPrompt = settings.prompt_md
+    .replace('{{KNOWLEDGE}}', knowledgeEntries || '（暫無站內知識庫內容）')
+    .replace('{{SOURCES}}', sourcesList || '（無）')
+    .replace('{{EXTRA_INSTRUCTIONS}}', settings.extra_instructions_md || '');
+
+  // 6. Append gear-specific instructions based on mode
+  const gearMap: Record<string, string | null> = {
+    G1: settings.gear_g1_md,
+    G2: settings.gear_g2_md,
+    G3: settings.gear_g3_md,
+  };
+
+  if (mode !== 'B' && gearMap[mode]) {
+    systemPrompt += '\n\n【當前回覆檔位】\n' + gearMap[mode];
+  }
+
+  // 7. If mode is B, append booking instructions
+  if (mode === 'B') {
+    const clinicInfo = getPromptClinicInfoLines().map((l) => `- ${l}`).join('\n');
+    const whatsappInfo = getWhatsappContactLines().map((l) => `- ${l}`).join('\n');
+    systemPrompt += `\n\n【預約模式】\n你係預約助手。幫助用戶查詢及安排診所預約。\n\n診所資訊：\n${clinicInfo}\n\n${whatsappInfo}\n\n引導用戶到預約系統：https://edentcm.as.me/schedule.php`;
+  }
+
+  // 8. Append care context if available
+  if (careContext) {
+    systemPrompt += careContext;
+  }
+
+  return systemPrompt;
 }
 
 // ---------------------------------------------------------------------------
@@ -286,8 +366,8 @@ export async function POST(request: NextRequest) {
       // Not authenticated or auth error — continue without care context
     }
 
-    // Build system prompt
-    const systemPrompt = buildSystemPrompt(type, mode, careContext);
+    // Build system prompt (now async — fetches from DB with fallback)
+    const systemPrompt = await buildSystemPrompt(type, mode, careContext);
 
     // Call Gemini
     const apiKey = process.env.GEMINI_API_KEY;
