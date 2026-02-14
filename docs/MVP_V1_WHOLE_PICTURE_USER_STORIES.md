@@ -251,5 +251,47 @@ MVP v1 的定位是：**醫師可控、病人專屬、可持續跟進** 的 AI �
 - 任務分工與先後：見 `docs/MVP_V1_MULTI_CODEX_PLAN.md`
 - 資料/API 契約：見 `docs/MVP_V1_INTEGRATION_NOTES.md`
 
-本文件是產品層（why/what/how），  
+本文件是產品層（why/what/how），
 `INTEGRATION_NOTES` 是工程契約層（schema/api/rls）。
+
+---
+
+## 11) 實際實作與 User Stories 對照（2026-02-14 更新）
+
+### 架構變更影響
+> **P-002（三分型聊天室）已修改**：用戶反饋三個 chatroom 不合理，改為單一 `/chat`。
+> 體質類型由 server 自動從用戶 profile 讀取。
+
+### User Stories 完成狀態
+
+#### 病人故事
+| ID | 標題 | 狀態 | 備註 |
+|---|---|---|---|
+| P-001 | Google 登入建立身份 | ✅ 完成 | Google OAuth + profiles 自動同步 |
+| P-002 | ~~三分型聊天室~~ → 單一聊天室 | ✅ 完成（已修改） | 改為 `/chat`，體質自動讀取 |
+| P-003 | 收到醫師個人化介口提醒 | ✅ 完成 | care_instructions 自動注入 prompt |
+| P-004 | 被提醒覆診建議日期 | ✅ 完成 | follow_up_plans 自動注入 prompt |
+| P-005 | 同一聊天切去預約模式 | ✅ API 完成 | B mode + booking bridge endpoints 就緒，待 E2E 測試 |
+| P-006 | 預約完成後更新跟進狀態 | ✅ API 完成 | ±3 日自動連結 follow_up_plan，待測試 |
+
+#### 醫師故事
+| ID | 標題 | 狀態 | 備註 |
+|---|---|---|---|
+| D-001 | 搜尋與開啟病人檔案 | ✅ 完成 | 病人列表 + 搜尋 + 詳情頁 |
+| D-002 | 更新體質與備註 | ✅ 完成 | PATCH constitution API + UI modal |
+| D-003 | 新增介口/生活建議 | ✅ 完成 | POST/PATCH instructions API + UI modal |
+| D-004 | 建立覆診建議 | ✅ 完成 | POST/PATCH follow-ups API + UI modal |
+| D-005 | 查閱變更稽核 | ⚠️ API 完成 | audit_logs 有寫入，但缺 UI 查閱介面 |
+
+#### 系統故事
+| ID | 標題 | 狀態 | 備註 |
+|---|---|---|---|
+| S-001 | 跨帳戶資料隔離 | ⚠️ 待測試 | RLS 已建立，待驗證 |
+| S-002 | 既有 booking 相容 | ✅ 完成 | 現有 booking API 未修改 |
+| S-003 | 模式邊界清晰 | ✅ 完成 | B mode 只經 bridge endpoint，不直接寫 calendar |
+
+#### 助理/管理員故事
+| ID | 標題 | 狀態 | 備註 |
+|---|---|---|---|
+| A-001 | 助理協助維護 | ⚠️ 待做 | API 支援 assistant role，缺獨立 UI |
+| A-002 | Admin 管理 care team | ⚠️ 待做 | 目前以 SQL 手動管理 |

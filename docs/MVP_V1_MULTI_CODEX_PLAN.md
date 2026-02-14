@@ -127,6 +127,37 @@
 3. Day 3-4：Phase 2 完成 + Phase 3 整合。
 4. Day 5：Phase 4 驗收，準備 deploy。
 
+---
+
+## 10) 實際執行進度（2026-02-14 更新）
+
+> **重要變更**：實際執行中，由 Claude Code 在單一 main branch 上直接實作，
+> 並非用 6 個 Codex chat + 6 個 branch。以下記錄實際完成狀態。
+
+### 架構重大變更
+1. **三聊天室合併為一**：原計劃 3 路由（depleting/crossing/hoarding），實際改為單一 `/chat`。
+   - 體質類型由 server 自動從用戶 profile 讀取
+   - 用戶不再需要選擇體質類型
+2. **Mode 由 AI 自動判斷**：原計劃用戶可切換 G1/G2/G3/B，實際改為 server `resolveMode()` 語意分析。
+3. **DB-driven prompts**：system prompt 從 `chat_prompt_settings` 表讀取，知識庫從 `knowledge_docs` 表讀取。
+
+### 各組完成狀態
+| 分組 | 狀態 | 備註 |
+|---|---|---|
+| Chat-0 (Orchestrator) | ✅ 完成 | 契約文件已建立，進度追蹤在 INTEGRATION_NOTES.md |
+| Chat-1 (DB + RLS) | ✅ 完成 | 10 新表 + 51 RLS + 6 enum + 5 index |
+| Chat-2 (Auth + Profile) | ✅ 完成 | Google OAuth + AuthProvider + AuthGuard |
+| Chat-3 (Doctor Console) | ✅ 完成 | 病人列表 + 詳情頁 + CRUD modals |
+| Chat-4 (Chat Engine) | ✅ 完成 | 單一聊天室 + DB-driven prompts + auto mode/type |
+| Chat-5 (Booking Bridge) | ✅ 完成 | 4 endpoints + Zod 驗證 + follow-up 自動連結 |
+
+### 部署狀態
+- Production URL: `https://edenchatbot-booking.vercel.app`
+- Google Login: ✅ 可用
+- AI Chat: ✅ 可用（gemini-flash-latest）
+- Doctor Console: ✅ DB seed 完成，待 UI 測試
+- Booking Bridge: ✅ API 完成，待 E2E 測試
+
 ## 9) 可直接貼給各 Codex chat 的開場指令模板
 ```md
 你是本組負責的 Codex。請只處理以下範圍，不要越界修改：

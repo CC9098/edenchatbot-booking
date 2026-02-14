@@ -17,14 +17,14 @@
 - `G3`：教練式
 - `B`：booking 導流/執行（只可調用現有 booking API，不可直接寫 Google Calendar）
 
-3. 新增三分型聊天室路由：
-- `/chat/depleting`
-- `/chat/crossing`
-- `/chat/hoarding`
+3. ~~新增三分型聊天室路由~~ → **已改為單一聊天室**（2026-02-14）：
+- `/chat` — 唯一聊天入口
+- 體質類型由 server 自動從用戶 profile 讀取（`patient_care_profile.constitution` → `profiles.constitution_type`）
+- 不再需要用戶選擇體質類型
 
-4. 每型獨立本地記憶：
-- `localStorage key`: `eden.chat.<type>.v1`
-- `session key`: `eden.chat.session.<type>.v1`
+4. 單一本地記憶：
+- `localStorage key`: `eden.chat.v1`
+- `session key`: `eden.chat.session.v1`
 
 5. 單一資料平台：
 - 目標：app data + chat logs + doctor console 全走 Supabase Postgres。
@@ -201,31 +201,38 @@
 }
 ```
 
-## 5.3 Chat API（統一）
-`POST /api/chat`
+## 5.3 Chat API（統一）— **已更新 2026-02-14**
+`POST /api/chat/v2`
 
 Request:
 ```json
 {
-  "type": "depleting",
-  "mode": "G2",
-  "sessionId": "uuid",
-  "messages": [],
-  "modelId": "optional"
+  "sessionId": "string",
+  "messages": [{ "role": "user", "content": "..." }]
+}
+```
+> **注意**：`type` 和 `mode` 已從 request body 移除。server 自動判斷。
+
+Response:
+```json
+{
+  "reply": "AI 回覆文字",
+  "mode": "G1",
+  "type": "hoarding"
 }
 ```
 
-Response:
-- Streaming UI messages（與現代 `ai` SDK 格式一致）。
-
 Server 行為契約：
-1. `mode=G1/G2/G3`：按檔位規則回覆。
-2. `mode=B`：只做 booking 導流與 API 編排，不可直接 calendar write。
-3. 自動注入：
+1. `mode` 由 `resolveMode()` 語意自動分析（非用戶選擇）。
+2. `type` 由 `resolveConstitution()` 從用戶 profile 自動讀取（`patient_care_profile` → `profiles.constitution_type`）。
+3. `mode=B`：只做 booking 導流與 API 編排，不可直接 calendar write。
+4. 自動注入：
 - `patient_care_profile`
 - `active care_instructions`
 - `next pending follow_up_plan`
-4. 寫入 `chat_request_logs`（包含 mode）。
+5. System prompt 從 `chat_prompt_settings` 表讀取（DB-driven），支援 `{{KNOWLEDGE}}`、`{{SOURCES}}`、`{{EXTRA_INSTRUCTIONS}}` 佔位符。
+6. 知識庫從 `knowledge_docs` 表按 `type` + `enabled` + `is_active` 讀取。
+7. 寫入 `chat_messages` + `chat_request_logs`（fire-and-forget）。
 
 ## 5.4 Booking bridge（B mode 專用）
 1. `POST /api/chat/booking/availability`
@@ -330,44 +337,55 @@ Server 行為契約：
 - `requireStaffRole` 已修正：`staff_roles` 主鍵是 `user_id`（非 `id`），select 改為 `user_id, role, is_active`
 - `requirePatientAccess` 已修正：`patient_care_team` 是複合主鍵 `(patient_user_id, staff_user_id)`
 
-### Phase 1 — Chat-4 聊天室骨架 ✅ 完成
-- [x] 三分型路由：`/chat/depleting`、`/chat/crossing`、`/chat/hoarding`
-- [x] `/chat` 自動重定向到 `/chat/depleting`
-- [x] ChatLayoutShell（桌面側邊欄 + 手機 tab 切換）
-- [x] ChatRoom 組件（localStorage 持久化 + session 管理）
+### Phase 1 — Chat-4 聊天室骨架 ✅ 完成（已重構為單一聊天室）
+- [x] ~~三分型路由~~ → **單一聊天室 `/chat`**（2026-02-14 重構）
+- [x] 體質類型由 server 自動從用戶 profile 讀取
+- [x] ChatLayoutShell（簡潔 header，已移除側邊欄與底部 tab）
+- [x] ChatRoom 組件（無 `type` prop，單一 localStorage key）
 - [x] ChatInputV2（自動調整高度 textarea）
 - [x] MessageList（訊息氣泡 + 模式徽章 + 時間戳）
 - [x] ModeIndicator（唯讀模式顯示，非用戶選擇）
 
 **重要設計決定：**
 - 模式（G1/G2/G3/B）由 AI 自動判斷，**不是**用戶手動選擇
-- `ModeSelector.tsx` 已改為 `ModeIndicator`（read-only），只顯示當前 AI 判斷的模式
+- 體質類型由 server 自動讀取，**不是**用戶選擇聊天室
+- `ModeSelector.tsx` 已改為 `ModeIndicator`（read-only）
 - ChatRoom 從 API response `data.mode` 接收模式，不再由前端控制
+- `app/chat/[type]/page.tsx` 已刪除，`/chat` 直接渲染 ChatRoom
 
 **產出檔案：**
-- `app/chat/page.tsx`、`app/chat/layout.tsx`、`app/chat/[type]/page.tsx`
+- `app/chat/page.tsx`、`app/chat/layout.tsx`
 - `components/chat-v2/ChatLayoutShell.tsx`
 - `components/chat-v2/ChatRoom.tsx`
 - `components/chat-v2/ChatInputV2.tsx`
 - `components/chat-v2/MessageList.tsx`
 - `components/chat-v2/ModeSelector.tsx`（已重構為 ModeIndicator）
 
-### Phase 2 — Chat-4 統一 Chat API ✅ 完成
-- [x] `POST /api/chat/v2` — 新三分型聊天室專用 API
+### Phase 2 — Chat-4 統一 Chat API ✅ 完成（已重寫為 DB-driven）
+- [x] `POST /api/chat/v2` — 統一聊天 API
 - [x] `resolveMode()` — 語意自動分檔（關鍵字 + 訊息長度分析）
   - 預約關鍵字（預約/book/改期/取消）→ `B`
   - 長訊息(>150字) / 教練關鍵字 → `G3`
   - 理論關鍵字（點解/原理/why）→ `G2`
   - 預設 → `G1`
+- [x] `resolveConstitution()` — 從用戶 profile 自動讀取體質類型
+  - 優先級 1：`patient_care_profile.constitution`（醫師指定）
+  - 優先級 2：`profiles.constitution_type`（問卷結果）
+  - 預設：`depleting`
+- [x] **DB-driven prompt system**（與 educational-platform 同架構）：
+  - 從 `chat_prompt_settings` 讀取 system prompt（`prompt_md`, `gear_g1/g2/g3_md`, `extra_instructions_md`）
+  - 從 `knowledge_docs` 讀取知識庫文章（按 `type` + `enabled` + `is_active`）
+  - 支援佔位符：`{{KNOWLEDGE}}`、`{{SOURCES}}`、`{{EXTRA_INSTRUCTIONS}}`
+  - 若 DB 無資料，自動 fallback 到 hardcoded prompt
 - [x] Care context 自動注入（patient_care_profile + care_instructions + follow_up_plans）
-- [x] 體質專屬 system prompt（虛損/交叉/積滯各有側重）
 - [x] Chat logging 寫入 Supabase（chat_messages + chat_request_logs）
-- [x] ChatRoom.tsx 已更新為呼叫 `/api/chat/v2`
+- [x] `type` 已從 request body 移除，server 自動判斷
 
 **備註：**
 - 舊有 `/api/chat`（route.ts）保持不變，繼續服務 WordPress 內嵌 chatbot
 - 新 API 放在 `/api/chat/v2`，避免破壞現有功能
 - 未登入用戶仍可使用聊天，但不會有個人化 care context 注入
+- AI 模型：`gemini-flash-latest`（**非** `gemini-pro`，已停用）
 
 **產出檔案：**
 - `app/api/chat/v2/route.ts`
@@ -400,31 +418,79 @@ Server 行為契約：
 
 ---
 
-## 12) 未完成項目 / 下一步
+### Phase 2 — Chat-3 醫師控制台 UI ✅ 完成
+- [x] `app/doctor/layout.tsx` — 控制台框架（header + AuthGuard + 登出按鈕）
+- [x] `app/doctor/page.tsx` — 病人列表（debounced 搜尋、桌面表格 + 手機卡片、loading/error/empty 狀態）
+- [x] `app/doctor/patients/[patientUserId]/page.tsx` — 病人詳情頁，含三個區塊：
+  - 體質評估：顯示 + modal 編輯（`PATCH /api/doctor/patients/:id/constitution`）
+  - 護理指引：列表 + 新增/編輯 modal（`POST` + `PATCH` instructions）
+  - 覆診計劃：列表 + 新增/編輯 modal（`POST` + `PATCH` follow-ups）
 
-### Phase 2 — 待做
-- [ ] **Chat-3：醫師控制台 UI 頁面**
-  - API 已建好，需要建立前端頁面（`app/doctor/*`、`components/doctor/*`）
-  - 包含：病人列表、病人詳情、體質編輯、介口管理、覆診管理
-  - 每次更新需顯示更新者與時間
-- [ ] **Chat-5：Booking Bridge（B mode 專用）**
-  - 4 個 bridge endpoint 未建立：
-    - `POST /api/chat/booking/availability`
-    - `POST /api/chat/booking/create`
-    - `POST /api/chat/booking/reschedule`
-    - `POST /api/chat/booking/cancel`
-  - 需做 server-side schema validation + 白名單欄位
-  - 預約成功後自動回寫 `follow_up_plans` 狀態
+**UI 設計：**
+- 綠色主題（`#2d5016`）與聊天室一致
+- 體質顏色：depleting=emerald, crossing=blue, hoarding=purple, mixed=orange, unknown=gray
+- 指引類型：diet_avoid=紅, diet_recommend=綠, lifestyle=藍, warning=橙, medication_note=紫
+- 覆診狀態：pending=amber, booked=blue, done=green, overdue=red, cancelled=gray
+- 全繁體中文標籤，mobile-responsive
 
-### Phase 3 — 整合測試
-- [ ] 全流程 E2E 測試
+**產出檔案：**
+- `app/doctor/layout.tsx`
+- `app/doctor/page.tsx`
+- `app/doctor/patients/[patientUserId]/page.tsx`
+
+### Phase 2 — Chat-5 Booking Bridge ✅ 完成
+- [x] `POST /api/chat/booking/availability` — 查詢可用時段（直接 import 底層函數）
+- [x] `POST /api/chat/booking/create` — 建立預約 + 自動連結 follow_up_plan（±3 日匹配）
+- [x] `POST /api/chat/booking/reschedule` — 改期
+- [x] `POST /api/chat/booking/cancel` — 取消預約
+
+**設計決定：**
+- 直接 import 底層函數（非 HTTP 轉發），避免冷啟動延遲
+- Zod `.strict()` 白名單驗證，拒絕未知欄位
+- `getCurrentUser()` optional — 未登入用戶不阻擋，僅用於 follow-up 連結
+- Follow-up 連結：預約成功後搜尋 ±3 日內 pending follow_up_plan，自動更新為 `booked`
+
+**產出檔案：**
+- `app/api/chat/booking/availability/route.ts`
+- `app/api/chat/booking/create/route.ts`
+- `app/api/chat/booking/reschedule/route.ts`
+- `app/api/chat/booking/cancel/route.ts`
+
+---
+
+## 12) 未完成項目 / 下一步（2026-02-14 更新）
+
+### 已完成的部署與設定 ✅
+- [x] Supabase Google OAuth provider 設定完成
+- [x] Vercel 環境變數設定完成（兩個 Vercel project 共用同一 Supabase）
+- [x] Google Login → Chat 流程已驗證可用
+- [x] 醫師控制台 DB seed 完成（staff_roles, care_team, care_profile, instructions, follow_ups）
+- [x] `profiles` 表欄位修正（PK 是 `id` 非 `user_id`，doctor patients API 已修正）
+- [x] 三聊天室合併為單一聊天室（`/chat`）
+- [x] 體質類型由 server 自動從 profile 讀取
+
+### 測試帳號資料
+| Email | User ID | 角色 |
+|---|---|---|
+| chetleung@gmail.com | `9d37a816-708b-4fb6-9b67-48146db55eba` | admin + 測試病人（hoarding） |
+| drleungeden@gmail.com | `7d903d0c-63e9-4f0e-807e-426784faafb3` | doctor |
+| cheungtinw@gmail.com | `d077c923-5a15-42a7-b544-f89e39b4c4b4` | 測試病人（無體質） |
+| chet@stceciliacare.com | `823ce629-b4aa-4f9f-8446-5eb4f61f01e5` | 測試病人（無體質） |
+
+### Phase 3 — 下一步待做
+- [ ] 聊天 prompt 品質調校：測試 DB prompt 是否正確注入知識庫內容
+- [ ] B mode 實際預約測試（需 Google Calendar API credentials）
+- [ ] 醫師控制台 E2E 測試（drleungeden@gmail.com 登入 → 見 3 病人 → CRUD 操作）
 - [ ] RLS 權限驗證（跨帳戶隔離）
 - [ ] 現有 booking/cancel/reschedule 回歸測試
+- [ ] 舊有 `/api/chat`（WordPress chatbot）更新 Gemini 模型（仍用已廢棄的 `gemini-pro`）
 
-### Phase 4 — 上線前
-- [ ] Supabase Dashboard 設定 Google OAuth provider
-- [ ] Vercel 環境變數確認（4 個 Supabase vars 已加）
-- [ ] Production smoke test
+### Phase 4 — 優化項目
+- [ ] Streaming response（目前是一次性 JSON 回覆，較慢）
+- [ ] 更精準的 token 計算
+- [ ] Follow-up `overdue` 自動標記（cron job）
+- [ ] 醫師控制台增加 audit log 查閱 UI
+- [ ] 手機端 UI 優化（doctor console 表格在窄屏體驗待改善）
 
 ---
 
@@ -433,26 +499,77 @@ Server 行為契約：
 ### 契約偏差記錄
 1. **Chat API 路徑**：契約寫 `POST /api/chat`，實作用 `POST /api/chat/v2`。
    - 原因：`/api/chat` 已被 WordPress chatbot 佔用，不可破壞。
-   - 建議：契約可更新為 `/api/chat/v2`，或待 WordPress chatbot 遷移後合併。
 
-2. **Mode 不在 request body**：契約寫 request 含 `"mode": "G2"`，實作改為 server 自動判斷。
-   - 原因：用戶明確要求「模式由 AI 語意分析決定，唔係用戶選」。
-   - 實作：server 端 `resolveMode()` 分析最新用戶訊息，response 返回 `mode` 欄位。
+2. **Mode 和 Type 均不在 request body**：
+   - `mode`：server 端 `resolveMode()` 語意分析自動判斷。
+   - `type`：server 端 `resolveConstitution()` 從用戶 profile 自動讀取。
+   - 原因：用戶明確要求「只有一個聊天室，體質和模式全由 AI/server 決定」。
 
-3. **`staff_roles` / `patient_care_team` 主鍵**：
-   - `staff_roles` 主鍵是 `user_id`（非自動生成的 `id`）
+3. **三聊天室合併為一**：原計劃 3 路由（`/chat/depleting`, `/chat/crossing`, `/chat/hoarding`），實際改為單一 `/chat`。
+   - 原因：用戶反饋「三個 chatroom 不合理，應只有一個」。
+   - 體質從用戶 DB profile 自動讀取。
+
+4. **`profiles` 表主鍵是 `id`（非 `user_id`）**：
+   - 契約文件寫 `user_id uuid pk`，但實際表建立時用了 `id`。
+   - `app/api/doctor/patients/route.ts` 已修正為 `.select("id, display_name").in("id", ...)`。
+
+5. **`staff_roles` / `patient_care_team` 主鍵**：
+   - `staff_roles` 主鍵是 `user_id`
    - `patient_care_team` 是複合主鍵 `(patient_user_id, staff_user_id)`
    - `auth-helpers.ts` 已修正對應的 select 語句
 
 ### 技術決定
-- Supabase 專案：`3types`（`ophpnzswebrmjmkrtmwe`）
-- AI 模型：Gemini Pro（`gemini-pro`）
-- 前端狀態：localStorage per type（`eden.chat.<type>.v1`）
+- Supabase 專案：`3types`（`ophpnzswebrmjmkrtmwe`），region: `ap-south-1`
+- AI 模型：**`gemini-flash-latest`**（⚠️ 非 `gemini-pro`，已於 2026 年停用）
+- 前端狀態：`localStorage` 單一 key（`eden.chat.v1`）
 - Session 管理：client-side generated session ID（`sess_<timestamp>_<random>`）
 - 所有 API route 使用 service role client bypass RLS，前端不直接查 Supabase
+- System prompt 從 `chat_prompt_settings` 表讀取（DB-driven），與 educational-platform 同架構
+- 知識庫從 `knowledge_docs` 表讀取（188 篇 TCM 文章，按體質分類）
+- 兩個 Vercel project 共用同一 Supabase：`educational-platform` + `edenchatbot-booking`
 
 ### 已知限制（v1 可接受）
 - Chat logging 是 fire-and-forget，失敗不影響回覆但可能丟失 log
-- Token 計算是估算值（字元數 / 4），非精確值
+- Token 計算是估算值（字元數 / 2），非精確值
 - Follow-up `overdue` 標記需手動或後續加 cron job
 - 未實作 streaming response（v1 用一次性 JSON 回覆）
+- 舊有 WordPress chatbot `/api/chat` 仍用廢棄的 `gemini-pro` 模型
+
+---
+
+## 14) AI 交接指引（Handoff Notes）
+
+### 如果交給其他 AI 助手跟進，請注意以下重點：
+
+#### 環境設定
+1. **只在 `EdenChatbotBooking/` 目錄工作**，絕對不要碰 `EDENCHATBOT/` 或 `ClinicBookingFlow/`
+2. 完整路徑：`/Users/chetchung/edenchatbot and booking system 2026/EdenChatbotBooking`
+3. Git push 後 Vercel 自動部署
+4. Supabase 專案 ID：`ophpnzswebrmjmkrtmwe`（名稱 `3type`）
+
+#### 核心架構理解
+1. **單一聊天室**：`/chat`，不再有 `/chat/depleting` 等子路由
+2. **體質自動判斷**：`resolveConstitution()` 從 DB 讀取，不要加回前端選擇
+3. **模式自動判斷**：`resolveMode()` 語意分析，不要加回用戶手動切換
+4. **DB-driven prompts**：system prompt 從 `chat_prompt_settings` 表讀取，知識庫從 `knowledge_docs` 表讀取
+5. **Gemini 模型**：必須用 `gemini-flash-latest`，其他名稱（gemini-pro, gemini-2.0-flash, gemini-3.0-flash）全部無效
+
+#### 關鍵表欄位注意
+- `profiles` 主鍵是 **`id`**（不是 `user_id`）
+- `staff_roles` 主鍵是 **`user_id`**
+- `patient_care_team` 複合主鍵 **`(patient_user_id, staff_user_id)`**
+- `patient_care_profile` 主鍵是 **`patient_user_id`**
+- `care_instructions` 欄位：`content_md`（不是 `instruction_text`）
+- `follow_up_plans` 欄位：`suggested_date`（不是 `plan_date`）
+
+#### 當前已部署可測試的 URL
+- 聊天室：`https://edenchatbot-booking.vercel.app/chat`
+- 醫師控制台：`https://edenchatbot-booking.vercel.app/doctor`
+- 登入：`https://edenchatbot-booking.vercel.app/login`
+
+#### 需要跟進的工作（按優先級）
+1. **聊天品質調校** — 測試 DB prompt + 知識庫注入效果，確認回覆是否準確引用醫師介口
+2. **B mode 預約整合** — 測試實際預約流程，確認 booking bridge 正常運作
+3. **醫師控制台測試** — 用 drleungeden@gmail.com 登入測試完整 CRUD
+4. **舊 WordPress chatbot 修復** — `/api/chat/route.ts` 需更新 Gemini 模型
+5. **Streaming response** — 改善聊天回覆速度
