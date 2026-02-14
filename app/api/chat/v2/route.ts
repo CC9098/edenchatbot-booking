@@ -98,52 +98,49 @@ async function fetchCareContext(userId: string): Promise<string> {
   // Fetch patient care profile
   const { data: profile } = await supabase
     .from('patient_care_profile')
-    .select('constitution_type, care_notes, primary_concerns')
-    .eq('user_id', userId)
+    .select('constitution, constitution_note')
+    .eq('patient_user_id', userId)
     .maybeSingle();
 
   if (profile) {
-    if (profile.constitution_type) {
-      lines.push(`病人體質分類：${profile.constitution_type}`);
+    if (profile.constitution) {
+      lines.push(`病人體質分類：${profile.constitution}`);
     }
-    if (profile.care_notes) {
-      lines.push(`照護備註：${profile.care_notes}`);
-    }
-    if (profile.primary_concerns) {
-      lines.push(`主要關注：${profile.primary_concerns}`);
+    if (profile.constitution_note) {
+      lines.push(`體質備註：${profile.constitution_note}`);
     }
   }
 
   // Fetch active care instructions
-  const now = new Date().toISOString();
+  const today = new Date().toISOString().split('T')[0];
   const { data: instructions } = await supabase
     .from('care_instructions')
-    .select('title, instruction_text')
+    .select('title, content_md')
     .eq('patient_user_id', userId)
     .eq('status', 'active')
-    .lte('start_date', now)
-    .or(`end_date.is.null,end_date.gte.${now}`)
+    .or(`start_date.is.null,start_date.lte.${today}`)
+    .or(`end_date.is.null,end_date.gte.${today}`)
     .limit(5);
 
   if (instructions && instructions.length > 0) {
     lines.push('目前照護指示：');
     for (const inst of instructions) {
-      lines.push(`- ${inst.title}: ${inst.instruction_text}`);
+      lines.push(`- ${inst.title}: ${inst.content_md}`);
     }
   }
 
   // Fetch next pending follow-up plan
   const { data: followUp } = await supabase
-    .from('follow_up_plan')
-    .select('plan_date, plan_notes, plan_type')
+    .from('follow_up_plans')
+    .select('suggested_date, reason')
     .eq('patient_user_id', userId)
     .eq('status', 'pending')
-    .order('plan_date', { ascending: true })
+    .order('suggested_date', { ascending: true })
     .limit(1)
     .maybeSingle();
 
   if (followUp) {
-    lines.push(`下次跟進：${followUp.plan_date}（${followUp.plan_type ?? '一般'}）— ${followUp.plan_notes ?? ''}`);
+    lines.push(`下次跟進：${followUp.suggested_date}${followUp.reason ? `（${followUp.reason}）` : ''}`);
   }
 
   return lines.length > 0 ? '\n\n【病人個人化照護資料】\n' + lines.join('\n') : '';
