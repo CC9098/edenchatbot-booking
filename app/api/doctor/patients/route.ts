@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
     // Fetch profiles
     let profileQuery = supabase
       .from("profiles")
-      .select("user_id, display_name")
-      .in("user_id", patientIds);
+      .select("id, display_name")
+      .in("id", patientIds);
 
     if (q) {
       profileQuery = profileQuery.ilike("display_name", `%${q}%`);
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     }
 
     // If search filter applied, narrow down patient IDs
-    const matchedIds = profiles ? profiles.map((p) => p.user_id) : [];
+    const matchedIds = profiles ? profiles.map((p) => p.id) : [];
 
     if (q && matchedIds.length === 0) {
       return NextResponse.json({ items: [], nextCursor: null });
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
       .order("suggested_date", { ascending: true });
 
     // Build lookup maps
-    const profileMap = new Map(profiles?.map((p) => [p.user_id, p]) || []);
+    const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
     const careMap = new Map(careProfiles?.map((c) => [c.patient_user_id, c]) || []);
     const followUpMap = new Map<string, string>();
     if (followUps) {
