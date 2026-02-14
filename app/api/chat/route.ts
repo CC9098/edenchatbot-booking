@@ -20,8 +20,8 @@ export async function POST(request: NextRequest) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    // 使用 gemini-pro 模型（稳定版本）
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    // Use current Gemini alias to avoid deprecated model failures.
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
     const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
     const doctorInfo = getPromptDoctorInfoLines().map((line) => `- ${line}`).join('\n');

@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { User, AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { createBrowserClient } from "@/lib/supabase-browser";
+import { clearChatCacheForUser } from "@/lib/chat-storage";
 
 interface AuthContextValue {
   user: User | null;
@@ -50,10 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    clearChatCacheForUser(user?.id);
     const supabase = createBrowserClient();
     await supabase.auth.signOut();
     setUser(null);
-  }, []);
+  }, [user]);
 
   return (
     <AuthContext.Provider value={{ user, loading, signOut }}>

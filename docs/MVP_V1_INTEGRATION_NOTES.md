@@ -22,9 +22,9 @@
 - 體質類型由 server 自動從用戶 profile 讀取（`patient_care_profile.constitution` → `profiles.constitution_type`）
 - 不再需要用戶選擇體質類型
 
-4. 單一本地記憶：
-- `localStorage key`: `eden.chat.v1`
-- `session key`: `eden.chat.session.v1`
+4. 本地記憶按用戶分隔：
+- `localStorage key`: `eden.chat.<userId>.v1`（兼容舊 key `eden.chat.v1`）
+- `session key`: `eden.chat.session.<userId>.v1`（兼容舊 key `eden.chat.session.v1`）
 
 5. 單一資料平台：
 - 目標：app data + chat logs + doctor console 全走 Supabase Postgres。
@@ -341,7 +341,7 @@ Server 行為契約：
 - [x] ~~三分型路由~~ → **單一聊天室 `/chat`**（2026-02-14 重構）
 - [x] 體質類型由 server 自動從用戶 profile 讀取
 - [x] ChatLayoutShell（簡潔 header，已移除側邊欄與底部 tab）
-- [x] ChatRoom 組件（無 `type` prop，單一 localStorage key）
+- [x] ChatRoom 組件（無 `type` prop，localStorage 改為 user-scoped key）
 - [x] ChatInputV2（自動調整高度 textarea）
 - [x] MessageList（訊息氣泡 + 模式徽章 + 時間戳）
 - [x] ModeIndicator（唯讀模式顯示，非用戶選擇）
@@ -483,7 +483,7 @@ Server 行為契約：
 - [ ] 醫師控制台 E2E 測試（drleungeden@gmail.com 登入 → 見 3 病人 → CRUD 操作）
 - [ ] RLS 權限驗證（跨帳戶隔離）
 - [ ] 現有 booking/cancel/reschedule 回歸測試
-- [ ] 舊有 `/api/chat`（WordPress chatbot）更新 Gemini 模型（仍用已廢棄的 `gemini-pro`）
+- [x] 舊有 `/api/chat`（WordPress chatbot）已更新為 `gemini-flash-latest`（2026-02-14）
 
 ### Phase 4 — 優化項目
 - [ ] Streaming response（目前是一次性 JSON 回覆，較慢）
@@ -521,7 +521,7 @@ Server 行為契約：
 ### 技術決定
 - Supabase 專案：`3types`（`ophpnzswebrmjmkrtmwe`），region: `ap-south-1`
 - AI 模型：**`gemini-flash-latest`**（⚠️ 非 `gemini-pro`，已於 2026 年停用）
-- 前端狀態：`localStorage` 單一 key（`eden.chat.v1`）
+- 前端狀態：`localStorage` 按用戶分隔 key（`eden.chat.<userId>.v1`）
 - Session 管理：client-side generated session ID（`sess_<timestamp>_<random>`）
 - 所有 API route 使用 service role client bypass RLS，前端不直接查 Supabase
 - System prompt 從 `chat_prompt_settings` 表讀取（DB-driven），與 educational-platform 同架構
@@ -533,7 +533,7 @@ Server 行為契約：
 - Token 計算是估算值（字元數 / 2），非精確值
 - Follow-up `overdue` 標記需手動或後續加 cron job
 - 未實作 streaming response（v1 用一次性 JSON 回覆）
-- 舊有 WordPress chatbot `/api/chat` 仍用廢棄的 `gemini-pro` 模型
+- 舊有 WordPress chatbot `/api/chat` 已改用 `gemini-flash-latest`
 
 ---
 
@@ -571,5 +571,4 @@ Server 行為契約：
 1. **聊天品質調校** — 測試 DB prompt + 知識庫注入效果，確認回覆是否準確引用醫師介口
 2. **B mode 預約整合** — 測試實際預約流程，確認 booking bridge 正常運作
 3. **醫師控制台測試** — 用 drleungeden@gmail.com 登入測試完整 CRUD
-4. **舊 WordPress chatbot 修復** — `/api/chat/route.ts` 需更新 Gemini 模型
-5. **Streaming response** — 改善聊天回覆速度
+4. **Streaming response** — 改善聊天回覆速度
