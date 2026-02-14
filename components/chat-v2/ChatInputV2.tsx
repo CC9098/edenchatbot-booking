@@ -1,0 +1,81 @@
+"use client";
+
+import { useState, useRef, useCallback, type KeyboardEvent } from "react";
+import { Send } from "lucide-react";
+
+type ChatInputV2Props = {
+  onSend: (text: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+};
+
+export function ChatInputV2({
+  onSend,
+  disabled = false,
+  placeholder = "輸入訊息...",
+}: ChatInputV2Props) {
+  const [text, setText] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleSend = useCallback(() => {
+    const trimmed = text.trim();
+    if (!trimmed || disabled) return;
+
+    onSend(trimmed);
+    setText("");
+
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+  }, [text, disabled, onSend]);
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    },
+    [handleSend]
+  );
+
+  const handleInput = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  }, []);
+
+  const canSend = text.trim().length > 0 && !disabled;
+
+  return (
+    <div className="mx-auto flex w-full max-w-2xl items-end gap-2 px-4 py-3">
+      <textarea
+        ref={textareaRef}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          handleInput();
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        disabled={disabled}
+        rows={1}
+        className="flex-1 resize-none rounded-xl border border-[#2d5016]/20 bg-[#f5f7f3] px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none transition focus:border-[#2d5016]/40 focus:ring-2 focus:ring-[#2d5016]/10 disabled:opacity-50"
+      />
+      <button
+        onClick={handleSend}
+        disabled={!canSend}
+        className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all ${
+          canSend
+            ? "bg-[#2d5016] text-white shadow-md hover:bg-[#3a6b1e] active:scale-95"
+            : "bg-gray-200 text-gray-400"
+        }`}
+        aria-label="送出訊息"
+      >
+        <Send className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
