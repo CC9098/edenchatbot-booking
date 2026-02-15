@@ -185,6 +185,10 @@
 7. `PATCH /api/doctor/follow-ups/:id`
 - Body: 允許更新 `status/suggestedDate/reason`
 
+8. `GET /api/doctor/patients/:patientUserId/audit-logs`
+- Query: `limit`（預設 30，最大 100）
+- Response: `items[]`（含 `actorUserId`, `actorDisplayName`, `entity`, `action`, `beforeJson`, `afterJson`, `createdAt`）
+
 ## 5.2 病人端讀取
 1. `GET /api/me/care-context`
 - Response:
@@ -208,7 +212,8 @@ Request:
 ```json
 {
   "sessionId": "string",
-  "messages": [{ "role": "user", "content": "..." }]
+  "messages": [{ "role": "user", "content": "..." }],
+  "stream": false
 }
 ```
 > **注意**：`type` 和 `mode` 已從 request body 移除。server 自動判斷。
@@ -221,6 +226,15 @@ Response:
   "type": "hoarding"
 }
 ```
+
+Streaming（feature-flag）：
+- 當 `CHAT_STREAMING_ENABLED=true` 且 request body `stream=true`，`/api/chat/v2` 回傳 `application/x-ndjson`。
+- Stream payload：
+  1. `meta`：初始 `mode` / `constitutionType`
+  2. `delta`：逐段回覆文字
+  3. `done`：完整 `reply` + token metrics
+  4. `error`：stream 錯誤訊息
+- 若 flag 關閉或客戶端未要求 stream，維持原本一次性 JSON 回覆（向後相容）。
 
 Server 行為契約：
 1. `mode` 由 `resolveMode()` 語意自動分析（非用戶選擇）。
@@ -251,6 +265,12 @@ Server 行為契約：
 - 這四個 endpoint 必須做 server-side schema validation。
 - 僅接受白名單欄位，不可透傳任意 payload。
 
+## 5.5 System Cron
+1. `GET /api/cron/follow-ups-overdue`
+- 用途：每日將 `status=pending` 且 `suggested_date < today` 的覆診計劃標記為 `overdue`
+- 安全：只接受 `Authorization: Bearer ${CRON_SECRET}`（不接受單靠 `x-vercel-cron` header）
+- Response: `{ ok, today, updatedCount, ranAt }`
+
 ## 6) 狀態轉移契約（follow-up）
 1. 醫師建立後預設 `pending`。
 2. 病人於 B mode 成功預約後，若日期接近建議日，更新為 `booked` 並寫入 `linked_booking_id`。
@@ -269,6 +289,12 @@ Server 行為契約：
 - `SUPABASE_SERVICE_ROLE_KEY`（server only）
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+## 新增（Phase 4）
+- `CHAT_STREAMING_ENABLED`（server-side，控制 `/api/chat/v2` streaming）
+- `NEXT_PUBLIC_CHAT_STREAMING_ENABLED`（client-side，控制 `/chat` 是否請求 streaming）
+- `CRON_SECRET`（保護 `/api/cron/booking-reminders` 及 `/api/cron/follow-ups-overdue`；production 必填）
+- `INTERNAL_CRON_SECRET`（僅 follow-ups-overdue 的 legacy fallback，已 deprecated）
 
 ## 既有（保留）
 - `GEMINI_API_KEY`（若改 AI Gateway 可後續淘汰）
@@ -496,11 +522,11 @@ Server 行為契約：
 - 2026-02-15 結果：`npm run test:e2e` 全部 6 項通過。
 
 ### Phase 4 — 優化項目
-- [ ] Streaming response（目前是一次性 JSON 回覆，較慢）
-- [ ] 更精準的 token 計算
-- [ ] Follow-up `overdue` 自動標記（cron job）
-- [ ] 醫師控制台增加 audit log 查閱 UI
-- [ ] 手機端 UI 優化（doctor console 表格在窄屏體驗待改善）
+- [x] Streaming response（feature-flag：`CHAT_STREAMING_ENABLED` + `NEXT_PUBLIC_CHAT_STREAMING_ENABLED`）
+- [x] 更精準的 token 計算（優先讀 Gemini usage metadata，fallback 為改良估算）
+- [x] Follow-up `overdue` 自動標記（`/api/cron/follow-ups-overdue` + `vercel.json` cron）
+- [x] 醫師控制台增加 audit log 查閱 UI（病人詳情頁新增 Audit 區塊）
+- [x] 手機端 UI 優化（doctor console modal/button/layout touch-friendly）
 
 ---
 
@@ -540,9 +566,9 @@ Server 行為契約：
 
 ### 已知限制（v1 可接受）
 - Chat logging 是 fire-and-forget，失敗不影響回覆但可能丟失 log
-- Token 計算是估算值（字元數 / 2），非精確值
-- Follow-up `overdue` 標記需手動或後續加 cron job
-- 未實作 streaming response（v1 用一次性 JSON 回覆）
+- Token 仍可能有估算誤差（若上游未返回 usage metadata 會走 fallback estimator）
+- Follow-up `overdue` 依賴 cron 正常執行（Vercel schedule / secret 設定需正確）
+- Streaming 預設關閉，需開啟 feature flag 才會生效
 - 舊有 WordPress chatbot `/api/chat` 已改用 `gemini-flash-latest`
 
 ---
@@ -581,4 +607,4 @@ Server 行為契約：
 1. **聊天品質調校** — 測試 DB prompt + 知識庫注入效果，確認回覆是否準確引用醫師介口
 2. **B mode 預約整合** — 測試實際預約流程，確認 booking bridge 正常運作
 3. **醫師控制台測試** — 用 drleungeden@gmail.com 登入測試完整 CRUD
-4. **Streaming response** — 改善聊天回覆速度
+4. **Cron 監控** — 確認 `follow-ups-overdue` 每日排程有執行並記錄成功次數

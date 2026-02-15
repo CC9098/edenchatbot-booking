@@ -76,11 +76,13 @@ export default function DoctorPatientsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold text-gray-900">病人列表</h1>
-        <p className="mt-1 text-sm text-gray-500">管理您的病人護理記錄</p>
+        <p className="mt-1 text-sm text-gray-500">
+          管理您的病人護理記錄{!loading && !error ? `（共 ${patients.length} 位）` : ""}
+        </p>
       </div>
 
       {/* Search */}
@@ -103,7 +105,7 @@ export default function DoctorPatientsPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="搜尋病人姓名..."
-          className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+          className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
         />
       </div>
 
@@ -181,12 +183,12 @@ export default function DoctorPatientsPage() {
           </div>
 
           {/* Mobile cards */}
-          <div className="sm:hidden space-y-2">
+          <div className="space-y-2 sm:hidden">
             {patients.map((p) => (
               <button
                 key={p.patientUserId}
                 onClick={() => router.push(`/doctor/patients/${p.patientUserId}`)}
-                className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 text-left transition-colors hover:bg-gray-50"
+                className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3.5 text-left transition-colors hover:bg-gray-50"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-gray-900 truncate">

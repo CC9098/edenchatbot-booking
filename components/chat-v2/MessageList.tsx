@@ -37,11 +37,12 @@ function formatTime(iso: string) {
 
 export function MessageList({ messages, loading }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const lastMessage = messages[messages.length - 1];
 
   // Auto-scroll to bottom on new messages or loading state change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, loading]);
+  }, [messages.length, lastMessage?.content, loading]);
 
   return (
     <div className="h-full overflow-y-auto px-4 py-4">

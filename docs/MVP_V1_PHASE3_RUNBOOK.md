@@ -101,3 +101,31 @@ Notes:
 - Playwright E2E passed (or documented skip/blocker reasons)
 - Manual QA checklist passed
 - No new build/runtime errors in Vercel logs
+
+## 6) Phase 3 Final Sign-off Checklist
+Use this checklist before declaring Phase 3 done.
+
+1. Local quality gate
+- [ ] `npm run phase3:smoke` passed
+
+2. API contract smoke
+- [ ] `RUN_HTTP_CHECKS=1 BASE_URL=http://localhost:3000 npm run phase3:smoke` passed
+
+3. Playwright automation
+- [ ] `npm run test:e2e` passed (or each skip has a documented reason)
+- [ ] `tests/booking-regression.spec.ts` passed (`7/7`)
+- [ ] `tests/booking-real-flow.spec.ts` passed in DRY_RUN mode
+- [ ] `tests/booking-real-flow.spec.ts` passed with `RUN_REAL_BOOKING=1` (if production-safe window approved)
+
+4. Manual quality sign-off
+- [ ] Chat quality report reviewed (accuracy, personalization/care-context, actionability, safety)
+- [ ] B-mode real booking run verified in Google Calendar + Gmail confirmation
+- [ ] Doctor console CRUD manually spot-checked after automation
+
+5. Operational checks
+- [ ] No new critical errors in Vercel logs
+- [ ] No secret leakage in Git diff (`.env.local` not committed)
+- [ ] Runbook and integration notes updated with latest outcomes
+
+6. Final decision
+- [ ] Mark Phase 3 as complete in release notes / tracker

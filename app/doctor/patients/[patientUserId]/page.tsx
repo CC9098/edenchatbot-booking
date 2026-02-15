@@ -46,6 +46,19 @@ interface PatientProfile {
   pendingFollowUps: FollowUp[];
 }
 
+interface AuditLogItem {
+  id: string;
+  actorUserId: string | null;
+  actorDisplayName: string | null;
+  patientUserId: string | null;
+  entity: string;
+  entityId: string | null;
+  action: string;
+  beforeJson: unknown;
+  afterJson: unknown;
+  createdAt: string;
+}
+
 /* ================================================================
    Constants / helpers
    ================================================================ */
@@ -115,6 +128,15 @@ function formatDate(dateStr: string | null | undefined): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function formatDateTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return "--";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "--";
+  const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${date} ${time}`;
+}
+
 function todayStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -137,12 +159,12 @@ function Modal({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-5 py-4 rounded-t-xl">
+      <div className="relative z-10 w-full max-h-[92vh] overflow-y-auto rounded-t-2xl bg-white shadow-xl sm:max-w-lg sm:rounded-xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b border-gray-100 bg-white px-4 py-4 sm:rounded-t-xl sm:px-5">
           <h3 className="text-base font-semibold text-gray-900">{title}</h3>
           <button
             onClick={onClose}
@@ -221,11 +243,11 @@ export default function PatientDetailPage() {
   if (!data) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Back link */}
       <button
         onClick={() => router.push("/doctor")}
-        className="inline-flex items-center gap-1 text-sm text-gray-500 transition-colors hover:text-[#2d5016]"
+        className="inline-flex items-center gap-1 rounded-md py-1 text-sm text-gray-500 transition-colors hover:text-[#2d5016]"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -253,6 +275,8 @@ export default function PatientDetailPage() {
         followUps={data.pendingFollowUps}
         onUpdated={fetchProfile}
       />
+
+      <AuditLogsSection patientUserId={patientUserId} />
     </div>
   );
 }
@@ -308,17 +332,17 @@ function ConstitutionSection({
 
   return (
     <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+      <div className="flex flex-col gap-2 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <h2 className="text-base font-semibold text-gray-900">體質評估</h2>
         <button
           onClick={openEdit}
-          className="rounded-md bg-[#2d5016]/10 px-3 py-1.5 text-xs font-medium text-[#2d5016] transition-colors hover:bg-[#2d5016]/20"
+          className="w-full rounded-md bg-[#2d5016]/10 px-3 py-2 text-xs font-medium text-[#2d5016] transition-colors hover:bg-[#2d5016]/20 sm:w-auto sm:py-1.5"
         >
           編輯
         </button>
       </div>
 
-      <div className="px-5 py-4 space-y-3">
+      <div className="space-y-3 px-4 py-4 sm:px-5">
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">體質分型:</span>
           {constitutionBadge(careProfile?.constitution || "unknown")}
@@ -369,18 +393,18 @@ function ConstitutionSection({
           {formError && (
             <p className="text-sm text-red-600">{formError}</p>
           )}
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:w-auto"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50"
+              className="w-full rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
             >
               {saving ? "儲存中..." : "儲存"}
             </button>
@@ -409,11 +433,11 @@ function InstructionsSection({
 
   return (
     <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+      <div className="flex flex-col gap-2 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <h2 className="text-base font-semibold text-gray-900">護理指引</h2>
         <button
           onClick={() => setShowAdd(true)}
-          className="rounded-md bg-[#2d5016] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#3d6b20]"
+          className="w-full rounded-md bg-[#2d5016] px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[#3d6b20] sm:w-auto sm:py-1.5"
         >
           + 新增指引
         </button>
@@ -576,7 +600,7 @@ function AddInstructionModal({
             placeholder="詳細描述..."
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">開始日期</label>
             <input
@@ -597,18 +621,18 @@ function AddInstructionModal({
           </div>
         </div>
         {formError && <p className="text-sm text-red-600">{formError}</p>}
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:w-auto"
           >
             取消
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50"
+            className="w-full rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
           >
             {saving ? "建立中..." : "建立"}
           </button>
@@ -710,7 +734,7 @@ function EditInstructionModal({
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">開始日期</label>
             <input
@@ -731,18 +755,18 @@ function EditInstructionModal({
           </div>
         </div>
         {formError && <p className="text-sm text-red-600">{formError}</p>}
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:w-auto"
           >
             取消
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50"
+            className="w-full rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
           >
             {saving ? "儲存中..." : "儲存"}
           </button>
@@ -770,11 +794,11 @@ function FollowUpsSection({
 
   return (
     <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+      <div className="flex flex-col gap-2 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <h2 className="text-base font-semibold text-gray-900">覆診計劃</h2>
         <button
           onClick={() => setShowAdd(true)}
-          className="rounded-md bg-[#2d5016] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#3d6b20]"
+          className="w-full rounded-md bg-[#2d5016] px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[#3d6b20] sm:w-auto sm:py-1.5"
         >
           + 新增覆診
         </button>
@@ -912,18 +936,18 @@ function AddFollowUpModal({
           />
         </div>
         {formError && <p className="text-sm text-red-600">{formError}</p>}
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:w-auto"
           >
             取消
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50"
+            className="w-full rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
           >
             {saving ? "建立中..." : "建立"}
           </button>
@@ -1017,23 +1041,157 @@ function EditFollowUpModal({
           />
         </div>
         {formError && <p className="text-sm text-red-600">{formError}</p>}
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:w-auto"
           >
             取消
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50"
+            className="w-full rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
           >
             {saving ? "儲存中..." : "儲存"}
           </button>
         </div>
       </form>
     </Modal>
+  );
+}
+
+/* ================================================================
+   Section D: Audit Logs
+   ================================================================ */
+
+const AUDIT_ACTION_STYLES: Record<string, string> = {
+  insert: "bg-emerald-100 text-emerald-700",
+  update: "bg-blue-100 text-blue-700",
+  delete: "bg-red-100 text-red-700",
+};
+
+function prettyJson(value: unknown): string {
+  if (value === null || value === undefined) return "null";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function renderActorName(log: AuditLogItem): string {
+  if (log.actorDisplayName && log.actorDisplayName.trim()) {
+    return log.actorDisplayName;
+  }
+  if (!log.actorUserId) return "system";
+  return `${log.actorUserId.slice(0, 8)}...`;
+}
+
+function AuditLogsSection({ patientUserId }: { patientUserId: string }) {
+  const [logs, setLogs] = useState<AuditLogItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/doctor/patients/${patientUserId}/audit-logs?limit=30`,
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+
+      const body = (await res.json()) as { items?: AuditLogItem[] };
+      setLogs(body.items || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "載入失敗");
+    } finally {
+      setLoading(false);
+    }
+  }, [patientUserId]);
+
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
+
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-2 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <h2 className="text-base font-semibold text-gray-900">操作紀錄（Audit Log）</h2>
+        <button
+          onClick={fetchLogs}
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:w-auto sm:py-1.5"
+        >
+          重新整理
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center px-5 py-10">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#2d5016] border-t-transparent" />
+        </div>
+      ) : error ? (
+        <div className="px-5 py-8 text-center">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+      ) : logs.length === 0 ? (
+        <div className="px-5 py-10 text-center">
+          <p className="text-sm text-gray-400">暫無操作紀錄</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {logs.map((log) => (
+            <div key={log.id} className="space-y-2 px-4 py-4 sm:px-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                    AUDIT_ACTION_STYLES[log.action] || "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {log.action}
+                </span>
+                <span className="text-sm font-medium text-gray-900">{log.entity}</span>
+                {log.entityId && (
+                  <span className="text-xs text-gray-500">#{log.entityId.slice(0, 8)}</span>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-500">
+                操作者：{renderActorName(log)} ・ 時間：{formatDateTime(log.createdAt)}
+              </p>
+
+              <details className="rounded-lg border border-gray-200 bg-gray-50/70 p-3">
+                <summary className="cursor-pointer text-xs font-medium text-gray-700">
+                  查看變更內容
+                </summary>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      before
+                    </p>
+                    <pre className="max-h-48 overflow-auto rounded-md bg-white p-2 text-[11px] text-gray-700 ring-1 ring-gray-200">
+                      {prettyJson(log.beforeJson)}
+                    </pre>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      after
+                    </p>
+                    <pre className="max-h-48 overflow-auto rounded-md bg-white p-2 text-[11px] text-gray-700 ring-1 ring-gray-200">
+                      {prettyJson(log.afterJson)}
+                    </pre>
+                  </div>
+                </div>
+              </details>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

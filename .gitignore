@@ -14,7 +14,12 @@
 /coverage
 /playwright-report/
 /test-results/
-/output/playwright/
+/output/
+
+# audio files
+*.aiff
+*.mp3
+*.wav
 
 # next.js
 /.next/

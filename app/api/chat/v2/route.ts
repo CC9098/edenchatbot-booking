@@ -20,6 +20,28 @@ interface ChatMessagePayload {
 interface RequestBody {
   sessionId: string;
   messages: ChatMessagePayload[];
+  stream?: boolean;
+}
+
+interface TokenUsageMetrics {
+  promptTokens: number;
+  completionTokens: number;
+  durationMs: number;
+  error?: string;
+}
+
+interface GeminiUsageMetadata {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  totalTokenCount?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Feature Flags
+// ---------------------------------------------------------------------------
+
+function isStreamingEnabled(): boolean {
+  return process.env.CHAT_STREAMING_ENABLED === 'true';
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +189,43 @@ async function fetchCareContext(userId: string): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
+// Token Metrics
+// ---------------------------------------------------------------------------
+
+function estimateTokens(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+
+  const cjkCount = (trimmed.match(/[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/g) || []).length;
+  const latinCount = (trimmed.match(/[A-Za-z0-9]/g) || []).length;
+  const symbolCount = Math.max(trimmed.length - cjkCount - latinCount, 0);
+
+  return Math.max(1, Math.ceil(cjkCount * 1.15 + latinCount / 3.8 + symbolCount / 2.2));
+}
+
+function resolveTokenMetrics(
+  usage: GeminiUsageMetadata | undefined,
+  promptText: string,
+  completionText: string,
+  durationMs: number,
+  error?: string,
+): TokenUsageMetrics {
+  return {
+    promptTokens: usage?.promptTokenCount ?? estimateTokens(promptText),
+    completionTokens: usage?.candidatesTokenCount ?? estimateTokens(completionText),
+    durationMs,
+    ...(error ? { error } : {}),
+  };
+}
+
+function getUsageMetadata(response: unknown): GeminiUsageMetadata | undefined {
+  if (!response || typeof response !== 'object') return undefined;
+  const maybeUsage = (response as { usageMetadata?: GeminiUsageMetadata }).usageMetadata;
+  if (!maybeUsage || typeof maybeUsage !== 'object') return undefined;
+  return maybeUsage;
+}
+
+// ---------------------------------------------------------------------------
 // Chat Logging
 // ---------------------------------------------------------------------------
 
@@ -175,6 +234,7 @@ async function logChatMessages(
   userContent: string,
   assistantContent: string,
   mode: ChatMode,
+  metrics: TokenUsageMetrics,
 ) {
   try {
     const supabase = createServiceClient();
@@ -193,14 +253,13 @@ async function logChatMessages(
       model_gear: mode,
     });
 
-    const estimatedPromptTokens = Math.ceil(userContent.length / 2);
-    const estimatedCompletionTokens = Math.ceil(assistantContent.length / 2);
-
     await supabase.from('chat_request_logs').insert({
       session_id: sessionId,
       model_id: 'gemini-flash-latest',
-      prompt_tokens: estimatedPromptTokens,
-      completion_tokens: estimatedCompletionTokens,
+      prompt_tokens: metrics.promptTokens,
+      completion_tokens: metrics.completionTokens,
+      duration_ms: metrics.durationMs,
+      ...(metrics.error ? { error: metrics.error } : {}),
     });
   } catch (error) {
     console.error('[chat/v2] Failed to log chat messages:', error);
@@ -320,9 +379,12 @@ async function buildSystemPrompt(
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+
   try {
     const body = (await request.json()) as RequestBody;
     const { sessionId, messages } = body;
+    const streamRequested = body.stream === true;
 
     if (!sessionId || typeof sessionId !== 'string') {
       return NextResponse.json(
@@ -384,12 +446,90 @@ export async function POST(request: NextRequest) {
 
     const fullPrompt = `${systemPrompt}\n\n【對話記錄】\n${conversationHistory}\n\nAI助手：`;
 
+    const streamEnabled = isStreamingEnabled();
+    if (streamRequested && streamEnabled) {
+      const encoder = new TextEncoder();
+
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          const push = (payload: Record<string, unknown>) => {
+            controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
+          };
+
+          (async () => {
+            let finalReply = '';
+            let usage: GeminiUsageMetadata | undefined;
+
+            try {
+              const result = await model.generateContentStream(fullPrompt);
+              push({ type: 'meta', mode, constitutionType: type });
+
+              for await (const chunk of result.stream) {
+                const text = chunk.text();
+                if (!text) continue;
+                finalReply += text;
+                push({ type: 'delta', text });
+              }
+
+              const finalResponse = await result.response;
+              usage = getUsageMetadata(finalResponse);
+
+              if (!finalReply) {
+                finalReply = finalResponse.text();
+              }
+
+              const durationMs = Date.now() - startTime;
+              const metrics = resolveTokenMetrics(usage, fullPrompt, finalReply, durationMs);
+              void logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, metrics);
+
+              push({
+                type: 'done',
+                reply: finalReply,
+                mode,
+                constitutionType: type,
+                promptTokens: metrics.promptTokens,
+                completionTokens: metrics.completionTokens,
+                durationMs: metrics.durationMs,
+              });
+              controller.close();
+            } catch (streamError) {
+              const message = streamError instanceof Error ? streamError.message : 'Unknown streaming error';
+              const durationMs = Date.now() - startTime;
+              const metrics = resolveTokenMetrics(usage, fullPrompt, finalReply, durationMs, message);
+              if (finalReply) {
+                void logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, metrics);
+              }
+
+              push({ type: 'error', error: message });
+              controller.close();
+            }
+          })().catch((unexpectedError) => {
+            const message = unexpectedError instanceof Error ? unexpectedError.message : 'Unknown error';
+            push({ type: 'error', error: message });
+            controller.close();
+          });
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'application/x-ndjson; charset=utf-8',
+          'Cache-Control': 'no-cache, no-transform',
+          Connection: 'keep-alive',
+        },
+      });
+    }
+
     const result = await model.generateContent(fullPrompt);
     const response = result.response;
     const reply = response.text();
 
+    const usage = getUsageMetadata(response);
+    const durationMs = Date.now() - startTime;
+    const metrics = resolveTokenMetrics(usage, fullPrompt, reply, durationMs);
+
     // Log messages (fire-and-forget)
-    logChatMessages(sessionId, latestUserMessage.content, reply, mode);
+    void logChatMessages(sessionId, latestUserMessage.content, reply, mode, metrics);
 
     return NextResponse.json({ reply, mode, type });
   } catch (error) {
