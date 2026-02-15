@@ -17,13 +17,20 @@ test("chat smoke + 基本對話流程", async ({ browser }) => {
       page.getByText("你好！我是醫天圓 AI 體質顧問", { exact: false })
     ).toBeVisible();
 
+    const input = page.getByPlaceholder("輸入你的健康問題...");
+    const sendButton = page.getByRole("button", { name: "送出訊息" });
+    await expect(input).toBeVisible();
+
     const prompt = "請用一句話介紹你可以幫我做咩。";
+    await input.fill(prompt);
+    await expect(sendButton).toBeEnabled();
+
     const responsePromise = page.waitForResponse(
-      (res) => res.url().includes("/api/chat/v2") && res.request().method() === "POST"
+      (res) => res.url().includes("/api/chat/v2") && res.request().method() === "POST",
+      { timeout: 45_000 }
     );
 
-    await page.getByPlaceholder("輸入你的健康問題...").fill(prompt);
-    await page.keyboard.press("Enter");
+    await sendButton.click();
     await expect(page.getByText(prompt)).toBeVisible();
 
     const response = await responsePromise;
