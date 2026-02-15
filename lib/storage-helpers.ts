@@ -22,7 +22,10 @@ export async function getMappingWithFallback(doctorId: string, clinicId: string)
                                                 };
                                 }
                 } catch (err) {
-                                console.error(`Failed to fetch schedule from DB for ${doctorId}-${clinicId}:`, err);
+                                const detail = err instanceof Error ? err.message : String(err);
+                                console.warn(
+                                                `Schedule DB lookup failed for ${doctorId}-${clinicId}; using static fallback. reason=${detail}`
+                                );
                 }
 
                 // 2. Fallback to static config
