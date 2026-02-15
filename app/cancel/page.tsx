@@ -4,6 +4,20 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
+const DISPLAY_TIMEZONE = 'Asia/Hong_Kong';
+const HK_DATE_FORMATTER = new Intl.DateTimeFormat('zh-HK', {
+                timeZone: DISPLAY_TIMEZONE,
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long',
+});
+const HK_TIME_FORMATTER = new Intl.DateTimeFormat('zh-HK', {
+                timeZone: DISPLAY_TIMEZONE,
+                hour: '2-digit',
+                minute: '2-digit',
+                hourCycle: 'h23',
+});
+
 function CancelBookingContent() {
                 const searchParams = useSearchParams();
                 const eventId = searchParams.get('eventId');
@@ -85,11 +99,14 @@ function CancelBookingContent() {
                                 );
                 }
 
-                // Parse booking details for display
+                // Parse booking details for display using Hong Kong timezone.
                 const summary = booking.summary || '諮詢服務';
-                const start = new Date(booking.start.dateTime);
-                const dateStr = start.toLocaleDateString('zh-HK', { month: 'long', day: 'numeric', weekday: 'long' });
-                const timeStr = start.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit' });
+                const startRaw = booking?.start?.dateTime || booking?.start?.date;
+                const start = startRaw ? new Date(startRaw) : null;
+                const dateStr = start ? HK_DATE_FORMATTER.format(start) : '--';
+                const timeStr = booking?.start?.dateTime && start
+                                ? HK_TIME_FORMATTER.format(start)
+                                : '--';
 
                 return (
                                 <div className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">

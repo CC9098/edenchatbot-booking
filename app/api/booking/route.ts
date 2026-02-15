@@ -6,7 +6,7 @@ import { createBooking, getFreeBusy, getEvent, deleteEvent, updateEvent } from '
 import { sendBookingConfirmationEmail } from '@/lib/gmail';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { bookingSchema } from '@/shared/types';
-import { getClinicAddress } from '@/shared/clinic-data';
+import { CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
 import { isSlotAvailableUtc } from '@/lib/booking-helpers';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
@@ -24,6 +24,57 @@ function formatUnknownError(error: unknown): string {
                                 return `${error.name}: ${error.message}`;
                 }
                 return String(error);
+}
+
+function parseLineValue(description: string, label: string): string {
+                const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const match = description.match(new RegExp(`${escaped}\\s*:\\s*(.+)`));
+                return match?.[1]?.trim() || '';
+}
+
+function buildRescheduleEmailPayload(
+                event: any,
+                date: string,
+                time: string,
+                eventId: string,
+                calendarId: string
+) {
+                const description = typeof event?.description === 'string' ? event.description : '';
+                const summary = typeof event?.summary === 'string' ? event.summary : '';
+
+                const patientName =
+                                parseLineValue(description, 'Patient / 病人') ||
+                                summary.split(' - ').slice(1).join(' - ').trim();
+                const patientEmail = parseLineValue(description, 'Email / 電郵');
+
+                const doctorMatch = description.match(/Doctor \/ 醫師:\s*(.+?)\s*\((.+?)\)/);
+                const clinicMatch = description.match(/Clinic \/ 診所:\s*(.+?)\s*\((.+?)\)/);
+
+                const doctorNameZh = doctorMatch?.[1]?.trim() || '';
+                const doctorName = doctorMatch?.[2]?.trim() || doctorNameZh;
+                const clinicNameZh = clinicMatch?.[1]?.trim() || '';
+                const clinicName = clinicMatch?.[2]?.trim() || clinicNameZh;
+
+                if (!patientName || !patientEmail || !doctorNameZh || !clinicNameZh) {
+                                return null;
+                }
+
+                const clinicId = CLINIC_ID_BY_NAME_ZH[clinicNameZh];
+                const clinicAddress = clinicId ? getClinicAddress(clinicId) : '';
+
+                return {
+                                patientName,
+                                patientEmail,
+                                doctorName,
+                                doctorNameZh,
+                                clinicName,
+                                clinicNameZh,
+                                clinicAddress,
+                                date,
+                                time,
+                                eventId,
+                                calendarId,
+                };
 }
 
 // Schema for rescheduling
@@ -194,6 +245,12 @@ export async function PATCH(request: NextRequest) {
                                 }
                                 const { eventId, calendarId, date, time, durationMinutes } = parsed.data;
 
+                                let existingEvent: any = null;
+                                const existingEventResult = await getEvent(calendarId, eventId);
+                                if (existingEventResult.success && existingEventResult.event) {
+                                                existingEvent = existingEventResult.event;
+                                }
+
                                 // Calculate start and end times
                                 const startDate = fromZonedTime(
                                                 `${date}T${time}:00`,
@@ -213,6 +270,22 @@ export async function PATCH(request: NextRequest) {
 
                                 if (!result.success) {
                                                 return NextResponse.json({ error: result.error || 'Failed to reschedule booking' }, { status: 500 });
+                                }
+
+                                // Best effort: send updated confirmation email after reschedule succeeds.
+                                if (existingEvent) {
+                                                const payload = buildRescheduleEmailPayload(existingEvent, date, time, eventId, calendarId);
+                                                if (payload) {
+                                                                try {
+                                                                                await sendBookingConfirmationEmail(payload);
+                                                                } catch (emailError) {
+                                                                                console.error(`Reschedule email sending failed: ${formatUnknownError(emailError)}`);
+                                                                }
+                                                } else {
+                                                                console.warn('Skip reschedule email: failed to parse event metadata for recipient/details.');
+                                                }
+                                } else {
+                                                console.warn('Skip reschedule email: original event lookup failed before update.');
                                 }
 
                                 return NextResponse.json({ success: true });

@@ -6,6 +6,19 @@ import { Loader2, AlertCircle, CheckCircle2, Calendar, Clock, ChevronRight, Chev
 import { CLINIC_ID_BY_NAME_ZH, DOCTOR_ID_BY_NAME_ZH } from '@/shared/clinic-data';
 
 const DAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
+const DISPLAY_TIMEZONE = 'Asia/Hong_Kong';
+const HK_DATE_FORMATTER = new Intl.DateTimeFormat('zh-HK', {
+                timeZone: DISPLAY_TIMEZONE,
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long',
+});
+const HK_TIME_FORMATTER = new Intl.DateTimeFormat('zh-HK', {
+                timeZone: DISPLAY_TIMEZONE,
+                hour: '2-digit',
+                minute: '2-digit',
+                hourCycle: 'h23',
+});
 
 function RescheduleBookingContent() {
                 const searchParams = useSearchParams();
@@ -203,10 +216,13 @@ function RescheduleBookingContent() {
                                 );
                 }
 
-                // Parse current booking time
-                const currentStart = new Date(booking.start.dateTime);
-                const currentDateStr = currentStart.toLocaleDateString('zh-HK', { month: 'long', day: 'numeric', weekday: 'long' });
-                const currentTimeStr = currentStart.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit' });
+                // Parse current booking time using Hong Kong timezone.
+                const currentStartRaw = booking?.start?.dateTime || booking?.start?.date;
+                const currentStart = currentStartRaw ? new Date(currentStartRaw) : null;
+                const currentDateStr = currentStart ? HK_DATE_FORMATTER.format(currentStart) : '--';
+                const currentTimeStr = booking?.start?.dateTime && currentStart
+                                ? HK_TIME_FORMATTER.format(currentStart)
+                                : '--';
 
                 return (
                                 <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
