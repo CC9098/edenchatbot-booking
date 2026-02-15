@@ -1,9 +1,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { fromZonedTime } from 'date-fns-tz';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { createBooking, getFreeBusy, getEvent, deleteEvent, updateEvent } from '@/lib/google-calendar';
-import { sendBookingConfirmationEmail } from '@/lib/gmail';
+import { sendBookingCancellationEmail, sendBookingConfirmationEmail } from '@/lib/gmail';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { bookingSchema } from '@/shared/types';
 import { CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
@@ -32,13 +32,7 @@ function parseLineValue(description: string, label: string): string {
                 return match?.[1]?.trim() || '';
 }
 
-function buildRescheduleEmailPayload(
-                event: any,
-                date: string,
-                time: string,
-                eventId: string,
-                calendarId: string
-) {
+function extractBookingEmailMetadata(event: any) {
                 const description = typeof event?.description === 'string' ? event.description : '';
                 const summary = typeof event?.summary === 'string' ? event.summary : '';
 
@@ -70,11 +64,60 @@ function buildRescheduleEmailPayload(
                                 clinicName,
                                 clinicNameZh,
                                 clinicAddress,
+                };
+}
+
+function buildRescheduleEmailPayload(
+                event: any,
+                date: string,
+                time: string,
+                eventId: string,
+                calendarId: string
+) {
+                const metadata = extractBookingEmailMetadata(event);
+                if (!metadata) {
+                                return null;
+                }
+
+                return {
+                                ...metadata,
                                 date,
                                 time,
                                 eventId,
                                 calendarId,
                 };
+}
+
+function buildCancellationEmailPayload(event: any) {
+                const metadata = extractBookingEmailMetadata(event);
+                if (!metadata) {
+                                return null;
+                }
+
+                const startDateTime = event?.start?.dateTime;
+                const startDate = event?.start?.date;
+
+                if (typeof startDateTime === 'string') {
+                                const start = new Date(startDateTime);
+                                if (Number.isNaN(start.getTime())) {
+                                                return null;
+                                }
+                                return {
+                                                ...metadata,
+                                                date: formatInTimeZone(start, HONG_KONG_TIMEZONE, 'yyyy-MM-dd'),
+                                                time: formatInTimeZone(start, HONG_KONG_TIMEZONE, 'HH:mm'),
+                                };
+                }
+
+                if (typeof startDate === 'string') {
+                                return {
+                                                ...metadata,
+                                                date: startDate,
+                                                time: '00:00',
+                                };
+                }
+
+                return null;
 }
 
 // Schema for rescheduling
@@ -224,10 +267,31 @@ export async function DELETE(request: NextRequest) {
                                 return NextResponse.json({ error: 'Missing eventId or calendarId' }, { status: 400 });
                 }
 
+                let existingEvent: any = null;
+                const existingEventResult = await getEvent(calendarId, eventId);
+                if (existingEventResult.success && existingEventResult.event) {
+                                existingEvent = existingEventResult.event;
+                }
+
                 const result = await deleteEvent(calendarId, eventId);
 
                 if (!result.success) {
                                 return NextResponse.json({ error: result.error || 'Failed to cancel booking' }, { status: 500 });
+                }
+
+                if (existingEvent) {
+                                const payload = buildCancellationEmailPayload(existingEvent);
+                                if (payload) {
+                                                try {
+                                                                await sendBookingCancellationEmail(payload);
+                                                } catch (emailError) {
+                                                                console.error(`Cancellation email sending failed: ${formatUnknownError(emailError)}`);
+                                                }
+                                } else {
+                                                console.warn('Skip cancellation email: failed to parse event metadata for recipient/details.');
+                                }
+                } else {
+                                console.warn('Skip cancellation email: original event lookup failed before delete.');
                 }
 
                 return NextResponse.json({ success: true });

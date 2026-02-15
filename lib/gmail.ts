@@ -30,6 +30,18 @@ interface ConsultationEmailData {
   reason: string;
 }
 
+interface CancellationEmailData {
+  patientName: string;
+  patientEmail: string;
+  doctorName: string;
+  doctorNameZh: string;
+  clinicName: string;
+  clinicNameZh: string;
+  clinicAddress: string;
+  date: string;
+  time: string;
+}
+
 function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
   const clinicInfoHtml = getClinicInfoHtmlSections();
   const googleCalendarStart = data.date.replace(/-/g, '') + 'T' + data.time.replace(':', '') + '00';
@@ -218,6 +230,142 @@ export async function sendBookingConfirmationEmail(data: ConfirmationEmailData):
       console.error('Gmail API Response Error:', error.response.data);
     }
     return { success: false, error: error.message || 'Failed to send email' };
+  }
+}
+
+function buildCancellationEmailHtml(data: CancellationEmailData): string {
+  const clinicInfoHtml = getClinicInfoHtmlSections();
+  const dateObj = new Date(data.date + 'T00:00:00');
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const dayName = days[dateObj.getDay()];
+  const monthName = months[dateObj.getMonth()];
+  const dateFormatted = `${dayName}, ${monthName} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, 'Noto Sans TC', sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 0; background-color: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background: #fff; }
+    .header { background-color: #b71c1c; padding: 24px; text-align: center; }
+    .header h1 { color: #fff; margin: 0; font-size: 24px; letter-spacing: 4px; }
+    .header p { color: #ffe9e9; margin: 4px 0 0; font-size: 13px; }
+    .content { padding: 32px 24px; }
+    .booking-card { background: #fff5f5; border: 1px solid #f4caca; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .booking-card table { width: 100%; border-collapse: collapse; }
+    .booking-card td { padding: 6px 0; vertical-align: top; }
+    .booking-card td:first-child { color: #888; width: 80px; font-size: 14px; }
+    .booking-card td:last-child { color: #333; font-size: 14px; }
+    .status { text-align: center; color: #b71c1c; font-size: 16px; font-weight: bold; margin: 20px 0; }
+    .whatsapp-link { display: inline-block; background: #25d366; color: #fff !important; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; margin: 10px 0; }
+    .divider { border: 0; border-top: 1px dashed #ccc; margin: 24px 0; }
+    .clinic-info { font-size: 13px; color: #555; line-height: 1.8; }
+    .clinic-info strong { color: #333; }
+    .footer { background: #f0f0f0; padding: 16px 24px; font-size: 12px; color: #888; text-align: center; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>醫 天 圓</h1>
+      <p>EDEN TCM CLINIC</p>
+    </div>
+    <div class="content">
+      <h2 style="margin-top:0;">取消預約確認</h2>
+      <p style="font-size:18px; font-weight:bold;">${data.patientName.toUpperCase()}</p>
+
+      <div class="booking-card">
+        <table>
+          <tr>
+            <td>已取消</td>
+            <td><strong>${data.doctorNameZh} ${data.doctorName}｜${data.clinicNameZh} ${data.clinicName}</strong></td>
+          </tr>
+          <tr>
+            <td>時段</td>
+            <td><strong>${dateFormatted} ${data.time}</strong></td>
+          </tr>
+          <tr>
+            <td>地址</td>
+            <td>${data.clinicAddress}</td>
+          </tr>
+        </table>
+      </div>
+
+      <p class="status">你的預約已成功取消。</p>
+
+      <p style="font-size:14px;">如需重新預約，請透過 WhatsApp 聯絡我們安排。</p>
+      <div style="text-align:center; margin: 16px 0;">
+        <a href="https://wa.me/85295909468" class="whatsapp-link">WhatsApp 聯絡我們</a>
+      </div>
+
+      <hr class="divider">
+
+      <div class="clinic-info">
+        ${clinicInfoHtml}
+      </div>
+    </div>
+    <div class="footer">
+      <p>【此電郵只作通知用途，請勿回覆此郵件。】</p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+export async function sendBookingCancellationEmail(
+  data: CancellationEmailData
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!data.patientEmail) {
+      return { success: false, error: 'No email address provided' };
+    }
+
+    const gmail = await getUncachableGmailClient();
+
+    const dateObj = new Date(data.date + 'T00:00:00');
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const dayName = days[dateObj.getDay()];
+    const monthName = months[dateObj.getMonth()];
+    const dateFormatted = `${dayName}, ${monthName} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
+
+    const subject = `取消確認: 與${data.doctorNameZh} ${data.doctorName}｜${data.clinicNameZh} ${data.clinicName} ${dateFormatted} ${data.time} 的預約`;
+    const htmlBody = buildCancellationEmailHtml(data);
+
+    const messageParts = [
+      `To: ${data.patientEmail}`,
+      `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      Buffer.from(htmlBody).toString('base64'),
+    ];
+
+    const rawMessage = Buffer.from(messageParts.join('\r\n'))
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: rawMessage,
+      },
+    });
+
+    console.log(`Cancellation email sent to ${data.patientEmail}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Detailed cancellation email error:', error);
+    if (error.response) {
+      console.error('Gmail API Response Error:', error.response.data);
+    }
+    return { success: false, error: error.message || 'Failed to send cancellation email' };
   }
 }
 
