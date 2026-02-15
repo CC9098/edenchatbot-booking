@@ -42,6 +42,37 @@ interface CancellationEmailData {
   time: string;
 }
 
+interface ReminderEmailData {
+  patientName: string;
+  patientEmail: string;
+  doctorName: string;
+  doctorNameZh: string;
+  clinicName: string;
+  clinicNameZh: string;
+  clinicAddress: string;
+  date: string;
+  time: string;
+  eventId: string;
+  calendarId: string;
+}
+
+function getBaseUrl(): string {
+  if (process.env.BASE_URL) {
+    return process.env.BASE_URL.replace(/\/$/, '');
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return 'http://localhost:3000';
+}
+
+function getBookingActionUrl(path: string, eventId: string, calendarId: string): string {
+  const searchParams = new URLSearchParams();
+  if (eventId) searchParams.append('eventId', eventId);
+  if (calendarId) searchParams.append('calendarId', calendarId);
+  return `${getBaseUrl()}${path}?${searchParams.toString()}`;
+}
+
 function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
   const clinicInfoHtml = getClinicInfoHtmlSections();
   const googleCalendarStart = data.date.replace(/-/g, '') + 'T' + data.time.replace(':', '') + '00';
@@ -64,24 +95,8 @@ function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
   const monthName = months[dateObj.getMonth()];
   const dateFormatted = `${dayName}, ${monthName} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
 
-  // Determine the Base URL for links
-  const baseUrl = process.env.BASE_URL
-    ? process.env.BASE_URL.replace(/\/$/, '')
-    : (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'http://localhost:3000'); // Default to Next.js port 3000
-
-  // Helper to construct full URL
-  const getUrl = (path: string, params: Record<string, string>) => {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value) searchParams.append(key, value);
-    });
-    return `${baseUrl}${path}?${searchParams.toString()}`;
-  };
-
-  const rescheduleUrl = getUrl('/reschedule', { eventId: data.eventId || '', calendarId: data.calendarId || '' });
-  const cancelUrl = getUrl('/cancel', { eventId: data.eventId || '', calendarId: data.calendarId || '' });
+  const rescheduleUrl = getBookingActionUrl('/reschedule', data.eventId || '', data.calendarId || '');
+  const cancelUrl = getBookingActionUrl('/cancel', data.eventId || '', data.calendarId || '');
 
   return `<!DOCTYPE html>
 <html>
@@ -366,6 +381,148 @@ export async function sendBookingCancellationEmail(
       console.error('Gmail API Response Error:', error.response.data);
     }
     return { success: false, error: error.message || 'Failed to send cancellation email' };
+  }
+}
+
+function buildReminderEmailHtml(data: ReminderEmailData): string {
+  const clinicInfoHtml = getClinicInfoHtmlSections();
+  const dateObj = new Date(data.date + 'T00:00:00');
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const dayName = days[dateObj.getDay()];
+  const monthName = months[dateObj.getMonth()];
+  const dateFormatted = `${dayName}, ${monthName} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
+
+  const rescheduleUrl = getBookingActionUrl('/reschedule', data.eventId, data.calendarId);
+  const cancelUrl = getBookingActionUrl('/cancel', data.eventId, data.calendarId);
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, 'Noto Sans TC', sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 0; background-color: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background: #fff; }
+    .header { background-color: #5c8d4d; padding: 24px; text-align: center; }
+    .header h1 { color: #fff; margin: 0; font-size: 24px; letter-spacing: 4px; }
+    .header p { color: #e0e0e0; margin: 4px 0 0; font-size: 13px; }
+    .content { padding: 32px 24px; }
+    .booking-card { background: #f8faf6; border: 1px solid #e0e8d8; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .booking-card table { width: 100%; border-collapse: collapse; }
+    .booking-card td { padding: 6px 0; vertical-align: top; }
+    .booking-card td:first-child { color: #888; width: 80px; font-size: 14px; }
+    .booking-card td:last-child { color: #333; font-size: 14px; }
+    .warning { margin: 18px 0; padding: 14px; border-radius: 8px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: 14px; }
+    .btn { display: inline-block; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; margin: 4px; font-size: 14px; }
+    .btn-green { background-color: #5c8d4d; color: #fff !important; }
+    .btn-red-outline { background-color: #fff; color: #d32f2f !important; border: 1px solid #d32f2f; }
+    .divider { border: 0; border-top: 1px dashed #ccc; margin: 24px 0; }
+    .clinic-info { font-size: 13px; color: #555; line-height: 1.8; }
+    .clinic-info strong { color: #333; }
+    .footer { background: #f0f0f0; padding: 16px 24px; font-size: 12px; color: #888; text-align: center; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>醫 天 圓</h1>
+      <p>EDEN TCM CLINIC</p>
+    </div>
+    <div class="content">
+      <h2 style="margin-top:0;">預約提醒（24 小時前）</h2>
+      <p style="font-size:18px; font-weight:bold;">${data.patientName.toUpperCase()}</p>
+
+      <div class="booking-card">
+        <table>
+          <tr>
+            <td>預約</td>
+            <td><strong>${data.doctorNameZh} ${data.doctorName}｜${data.clinicNameZh} ${data.clinicName}</strong></td>
+          </tr>
+          <tr>
+            <td>時段</td>
+            <td><strong>${dateFormatted} ${data.time}</strong></td>
+          </tr>
+          <tr>
+            <td>地址</td>
+            <td>${data.clinicAddress}</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="warning">
+        如你未能出席，請盡快提前取消或改期，方便診所安排，謝謝配合。
+      </div>
+
+      <div style="text-align:center; margin: 20px 0;">
+        <a href="${rescheduleUrl}" class="btn btn-green" target="_blank">重新預約 RESCHEDULE</a>
+        <a href="${cancelUrl}" class="btn btn-red-outline" target="_blank">取消預約 CANCEL</a>
+      </div>
+
+      <hr class="divider">
+
+      <div class="clinic-info">
+        ${clinicInfoHtml}
+      </div>
+    </div>
+    <div class="footer">
+      <p>【此電郵只作通知用途，請勿回覆此郵件。】</p>
+      <p>【如預約前 1 小時內需要更改，請直接聯絡診所。】</p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+export async function sendBookingReminderEmail(
+  data: ReminderEmailData
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!data.patientEmail) {
+      return { success: false, error: 'No email address provided' };
+    }
+
+    const gmail = await getUncachableGmailClient();
+
+    const dateObj = new Date(data.date + 'T00:00:00');
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const dayName = days[dateObj.getDay()];
+    const monthName = months[dateObj.getMonth()];
+    const dateFormatted = `${dayName}, ${monthName} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
+
+    const subject = `預約提醒（24小時後）: 與${data.doctorNameZh} ${data.doctorName}｜${data.clinicNameZh} ${data.clinicName} ${dateFormatted} ${data.time}`;
+    const htmlBody = buildReminderEmailHtml(data);
+
+    const messageParts = [
+      `To: ${data.patientEmail}`,
+      `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      Buffer.from(htmlBody).toString('base64')
+    ];
+
+    const rawMessage = Buffer.from(messageParts.join('\r\n'))
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw: rawMessage },
+    });
+
+    console.log(`Reminder email sent to ${data.patientEmail}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Detailed reminder email error:', error);
+    if (error.response) {
+      console.error('Gmail API Response Error:', error.response.data);
+    }
+    return { success: false, error: error.message || 'Failed to send reminder email' };
   }
 }
 

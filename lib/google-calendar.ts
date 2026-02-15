@@ -226,3 +226,77 @@ export async function updateEvent(
     };
   }
 }
+
+export async function listEventsInRange(
+  calendarId: string,
+  timeMin: Date,
+  timeMax: Date
+): Promise<{ success: boolean; events: any[]; error?: string }> {
+  try {
+    const calendar = await getUncachableGoogleCalendarClient();
+    const events: any[] = [];
+    let pageToken: string | undefined;
+
+    do {
+      const response = await calendar.events.list({
+        calendarId,
+        timeMin: timeMin.toISOString(),
+        timeMax: timeMax.toISOString(),
+        singleEvents: true,
+        showDeleted: false,
+        orderBy: 'startTime',
+        maxResults: 2500,
+        pageToken,
+      });
+
+      if (response.data.items) {
+        events.push(...response.data.items);
+      }
+      pageToken = response.data.nextPageToken || undefined;
+    } while (pageToken);
+
+    return { success: true, events };
+  } catch (error: any) {
+    console.error(`Failed to list calendar events for ${calendarId}:`, error);
+    return {
+      success: false,
+      events: [],
+      error: error.message || 'Failed to list events',
+    };
+  }
+}
+
+export async function patchEventPrivateMetadata(
+  calendarId: string,
+  eventId: string,
+  privateMetadata: Record<string, string>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const calendar = await getUncachableGoogleCalendarClient();
+    const existing = await calendar.events.get({
+      calendarId,
+      eventId,
+    });
+
+    const existingPrivate = existing.data.extendedProperties?.private || {};
+    const mergedPrivate = { ...existingPrivate, ...privateMetadata };
+
+    await calendar.events.patch({
+      calendarId,
+      eventId,
+      requestBody: {
+        extendedProperties: {
+          private: mergedPrivate,
+        },
+      },
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error(`Failed to patch event metadata for ${calendarId}/${eventId}:`, error);
+    return {
+      success: false,
+      error: error.message || 'Failed to patch event metadata',
+    };
+  }
+}
