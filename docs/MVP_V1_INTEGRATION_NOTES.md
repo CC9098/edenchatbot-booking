@@ -480,10 +480,20 @@ Server 行為契約：
 ### Phase 3 — 下一步待做
 - [ ] 聊天 prompt 品質調校：測試 DB prompt 是否正確注入知識庫內容
 - [ ] B mode 實際預約測試（需 Google Calendar API credentials）
-- [ ] 醫師控制台 E2E 測試（drleungeden@gmail.com 登入 → 見 3 病人 → CRUD 操作）
-- [ ] RLS 權限驗證（跨帳戶隔離）
+- [x] 醫師控制台 E2E 測試（2026-02-15 已用 Playwright 跑通 CRUD）
+- [x] RLS 權限驗證（2026-02-15 已驗證跨帳戶 `403`）
 - [ ] 現有 booking/cancel/reschedule 回歸測試
 - [x] 舊有 `/api/chat`（WordPress chatbot）已更新為 `gemini-flash-latest`（2026-02-14）
+
+### Playwright E2E 帳號初始化（2026-02-15）
+- 問題：doctor 帳號原本只有 Google OAuth identity，password flow 會回 `invalid_credentials`。
+- 解法：在 Supabase Auth 為測試帳號建立/更新 email+password，並 `email_confirm=true`。
+- 測試用 credentials（本機 `.env.local`）：
+  - `E2E_DOCTOR_EMAIL` / `E2E_DOCTOR_PASSWORD`
+  - `E2E_PATIENT_EMAIL` / `E2E_PATIENT_PASSWORD`
+  - `E2E_UNRELATED_EMAIL` / `E2E_UNRELATED_PASSWORD`
+- 注意：`.env.local` 不可入 Git；只提交 `.env.example` 空白 template。
+- 2026-02-15 結果：`npm run test:e2e` 全部 6 項通過。
 
 ### Phase 4 — 優化項目
 - [ ] Streaming response（目前是一次性 JSON 回覆，較慢）

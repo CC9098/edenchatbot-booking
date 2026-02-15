@@ -42,7 +42,7 @@ function getStorageKey(supabaseUrl: string): string {
 function buildAuthCookie(
   supabaseUrl: string,
   session: SupabaseSignInResponse
-): AuthCookie {
+): AuthCookie[] {
   const payload = {
     access_token: session.access_token,
     refresh_token: session.refresh_token,
@@ -57,13 +57,24 @@ function buildAuthCookie(
   const raw = JSON.stringify(payload);
   const encoded = `base64-${toBase64Url(raw)}`;
 
-  return {
-    name: getStorageKey(supabaseUrl),
-    value: encoded,
-  };
+  const key = getStorageKey(supabaseUrl);
+  const chunkSize = 3000;
+
+  if (encoded.length <= chunkSize) {
+    return [{ name: key, value: encoded }];
+  }
+
+  const chunks: AuthCookie[] = [];
+  for (let i = 0; i < encoded.length; i += chunkSize) {
+    chunks.push({
+      name: `${key}.${chunks.length}`,
+      value: encoded.slice(i, i + chunkSize),
+    });
+  }
+  return chunks;
 }
 
-async function signInWithPassword(role: E2ERole): Promise<AuthCookie> {
+async function signInWithPassword(role: E2ERole): Promise<AuthCookie[]> {
   const { email, password } = getRoleCredentials(role);
   const { url, anonKey } = getSupabaseConfig();
   const api = await playwrightRequest.newContext();
@@ -98,25 +109,23 @@ export async function createAuthenticatedContext(
   browser: Browser,
   role: E2ERole
 ): Promise<BrowserContext> {
-  const cookie = await signInWithPassword(role);
+  const cookies = await signInWithPassword(role);
   const baseURL = getBaseUrl();
   const base = new URL(baseURL);
 
   return browser.newContext({
     baseURL,
     storageState: {
-      cookies: [
-        {
-          name: cookie.name,
-          value: cookie.value,
-          domain: base.hostname,
-          path: "/",
-          httpOnly: false,
-          secure: base.protocol === "https:",
-          sameSite: "Lax",
-          expires: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30,
-        },
-      ],
+      cookies: cookies.map((cookie) => ({
+        name: cookie.name,
+        value: cookie.value,
+        domain: base.hostname,
+        path: "/",
+        httpOnly: false,
+        secure: base.protocol === "https:",
+        sameSite: "Lax",
+        expires: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30,
+      })),
       origins: [],
     },
   });
@@ -125,12 +134,13 @@ export async function createAuthenticatedContext(
 export async function createAuthenticatedApiContext(
   role: E2ERole
 ): Promise<APIRequestContext> {
-  const cookie = await signInWithPassword(role);
+  const cookies = await signInWithPassword(role);
+  const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
 
   return playwrightRequest.newContext({
     baseURL: getBaseUrl(),
     extraHTTPHeaders: {
-      Cookie: `${cookie.name}=${cookie.value}`,
+      Cookie: cookieHeader,
     },
   });
 }

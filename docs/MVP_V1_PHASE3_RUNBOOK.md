@@ -56,8 +56,48 @@ Checks:
 5. Booking regression
 - Verify existing `/api/booking`, `/cancel`, `/reschedule` flows still work.
 
-## 4) Expected release gate for Phase 3 complete
+## 4) Playwright E2E (Phase 3 automation)
+Run from project root:
+
+```bash
+npm run test:e2e
+```
+
+Optional:
+
+```bash
+npm run test:e2e:headed
+npm run test:e2e:report
+```
+
+### Covered specs
+- `tests/chat.smoke.spec.ts` (`/chat` smoke + basic conversation)
+- `tests/embed.smoke.spec.ts` (`/embed` widget open/close smoke)
+- `tests/doctor.auth.spec.ts` (`/doctor` auth guard + post-login flow)
+- `tests/doctor.crud.spec.ts` (doctor console CRUD: constitution/instructions/follow-ups)
+- `tests/rls-isolation.spec.ts` (cross-account access should return `403`)
+
+### Required E2E env vars (real test accounts, no mock data)
+Set these in `.env.local` or shell before running:
+
+```bash
+E2E_BASE_URL=https://edenchatbot-booking.vercel.app
+E2E_DOCTOR_EMAIL=
+E2E_DOCTOR_PASSWORD=
+E2E_PATIENT_EMAIL=
+E2E_PATIENT_PASSWORD=
+E2E_UNRELATED_EMAIL=
+E2E_UNRELATED_PASSWORD=
+```
+
+Notes:
+- Without role credentials above, role-based specs are auto-skipped with explicit messages.
+- `/doctor` unauth redirect and `/embed` smoke can still run without credentials.
+- Current E2E auth path uses Supabase password sign-in for automation reliability (UI login remains Google OAuth).
+
+## 5) Expected release gate for Phase 3 complete
 - Local Gate passed
 - API Contract Smoke passed
+- Playwright E2E passed (or documented skip/blocker reasons)
 - Manual QA checklist passed
 - No new build/runtime errors in Vercel logs
