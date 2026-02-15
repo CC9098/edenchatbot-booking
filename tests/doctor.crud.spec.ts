@@ -38,10 +38,10 @@ test("Doctor Console CRUD（constitution / instructions / follow-ups）", async 
     await page.getByRole("button", { name: "建立" }).click();
     await expect(page.getByText(`指引 ${marker}`)).toBeVisible();
 
-    const instructionRow = instructionsSection.locator("div", {
-      has: page.getByText(`指引 ${marker}`),
+    const instructionRow = instructionsSection.locator("div.px-5.py-4", {
+      has: page.getByText(`指引 ${marker}`, { exact: true }),
     });
-    await instructionRow.getByRole("button", { name: "編輯" }).click();
+    await instructionRow.first().getByRole("button", { name: "編輯" }).click();
     await expect(page.getByText("編輯護理指引")).toBeVisible();
     await page
       .locator("textarea")
@@ -64,10 +64,10 @@ test("Doctor Console CRUD（constitution / instructions / follow-ups）", async 
     await page.getByRole("button", { name: "建立" }).click();
     await expect(page.getByText(`覆診 ${marker}`)).toBeVisible();
 
-    const followRow = followSection.locator("div", {
-      has: page.getByText(`覆診 ${marker}`),
+    const followRow = followSection.locator("div.px-5.py-4", {
+      has: page.getByText(`覆診 ${marker}`, { exact: true }),
     });
-    await followRow.getByRole("button", { name: "編輯" }).click();
+    await followRow.first().getByRole("button", { name: "編輯" }).click();
     await expect(page.getByText("編輯覆診計劃")).toBeVisible();
     await page
       .locator("textarea")

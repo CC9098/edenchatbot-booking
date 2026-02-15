@@ -11,6 +11,21 @@ import { isSlotAvailableUtc } from '@/lib/booking-helpers';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
+function formatZodIssues(error: z.ZodError) {
+                return error.issues.map((issue) => ({
+                                code: issue.code,
+                                path: issue.path.join('.'),
+                                message: issue.message,
+                }));
+}
+
+function formatUnknownError(error: unknown): string {
+                if (error instanceof Error) {
+                                return `${error.name}: ${error.message}`;
+                }
+                return String(error);
+}
+
 // Schema for rescheduling
 const rescheduleSchema = z.object({
                 eventId: z.string(),
@@ -23,7 +38,14 @@ const rescheduleSchema = z.object({
 export async function POST(request: NextRequest) {
                 try {
                                 const body = await request.json();
-                                const bookingData = bookingSchema.parse(body);
+                                const parsed = bookingSchema.safeParse(body);
+                                if (!parsed.success) {
+                                                return NextResponse.json(
+                                                                { error: 'Invalid input', details: formatZodIssues(parsed.error) },
+                                                                { status: 400 }
+                                                );
+                                }
+                                const bookingData = parsed.data;
 
                                 // Get Calendar ID
                                 // Note: We duplicate getMappingWithFallback here to avoid circular imports if extracted incorrectly,
@@ -118,10 +140,7 @@ export async function POST(request: NextRequest) {
                                 return NextResponse.json({ success: true, bookingId: calResult.eventId });
 
                 } catch (error) {
-                                console.error('Booking API Error:', error);
-                                if (error instanceof z.ZodError) {
-                                                return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 });
-                                }
+                                console.error(`Booking API Error: ${formatUnknownError(error)}`);
                                 return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
                 }
 }
@@ -166,7 +185,14 @@ export async function DELETE(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
                 try {
                                 const body = await request.json();
-                                const { eventId, calendarId, date, time, durationMinutes } = rescheduleSchema.parse(body);
+                                const parsed = rescheduleSchema.safeParse(body);
+                                if (!parsed.success) {
+                                                return NextResponse.json(
+                                                                { error: 'Invalid input', details: formatZodIssues(parsed.error) },
+                                                                { status: 400 }
+                                                );
+                                }
+                                const { eventId, calendarId, date, time, durationMinutes } = parsed.data;
 
                                 // Calculate start and end times
                                 const startDate = fromZonedTime(
@@ -192,10 +218,7 @@ export async function PATCH(request: NextRequest) {
                                 return NextResponse.json({ success: true });
 
                 } catch (error) {
-                                console.error('Reschedule API Error:', error);
-                                if (error instanceof z.ZodError) {
-                                                return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 });
-                                }
+                                console.error(`Reschedule API Error: ${formatUnknownError(error)}`);
                                 return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
                 }
 }
