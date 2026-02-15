@@ -56,6 +56,12 @@ interface ReminderEmailData {
   calendarId: string;
 }
 
+const CLINIC_WHATSAPP_CONTACTS = [
+  { label: '佐敦診所', phoneDisplay: '+852 6733 3801', phoneDigits: '85267333801' },
+  { label: '中環診所', phoneDisplay: '+852 6733 3234', phoneDigits: '85267333234' },
+  { label: '荃灣診所', phoneDisplay: '+852 6097 7363', phoneDigits: '85260977363' },
+] as const;
+
 function getBaseUrl(): string {
   if (process.env.BASE_URL) {
     return process.env.BASE_URL.replace(/\/$/, '');
@@ -73,8 +79,18 @@ function getBookingActionUrl(path: string, eventId: string, calendarId: string):
   return `${getBaseUrl()}${path}?${searchParams.toString()}`;
 }
 
+function buildClinicWhatsappLinksHtml(): string {
+  return CLINIC_WHATSAPP_CONTACTS.map((contact) => {
+    const link = `https://api.whatsapp.com/send/?phone=${contact.phoneDigits}&text&type=phone_number&app_absent=0`;
+    return `<div style="margin: 8px 0;">
+      <a href="${link}" class="whatsapp-link" target="_blank">${contact.label} WhatsApp：${contact.phoneDisplay}</a>
+    </div>`;
+  }).join('\n');
+}
+
 function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
   const clinicInfoHtml = getClinicInfoHtmlSections();
+  const clinicWhatsappLinksHtml = buildClinicWhatsappLinksHtml();
   const googleCalendarStart = data.date.replace(/-/g, '') + 'T' + data.time.replace(':', '') + '00';
   const [h, m] = data.time.split(':').map(Number);
   const endMinutes = h * 60 + m + 15;
@@ -159,7 +175,7 @@ function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
       <p style="font-size:14px;">如有任何疑問或查詢，請按此連結，<br>以 WHATSAPP 信息傳送各分店診所姑娘溝通，姑娘樂意回答你的不同查詢。</p>
       
       <div style="text-align:center; margin: 16px 0;">
-        <a href="https://wa.me/85295909468" class="whatsapp-link">WhatsApp 聯絡我們</a>
+        ${clinicWhatsappLinksHtml}
       </div>
       
       <hr class="divider">
@@ -250,6 +266,7 @@ export async function sendBookingConfirmationEmail(data: ConfirmationEmailData):
 
 function buildCancellationEmailHtml(data: CancellationEmailData): string {
   const clinicInfoHtml = getClinicInfoHtmlSections();
+  const clinicWhatsappLinksHtml = buildClinicWhatsappLinksHtml();
   const dateObj = new Date(data.date + 'T00:00:00');
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -311,9 +328,9 @@ function buildCancellationEmailHtml(data: CancellationEmailData): string {
 
       <p class="status">你的預約已成功取消。</p>
 
-      <p style="font-size:14px;">如需重新預約，請透過 WhatsApp 聯絡我們安排。</p>
+      <p style="font-size:14px;">如需重新預約，請透過以下 WhatsApp 聯絡相關診所安排。</p>
       <div style="text-align:center; margin: 16px 0;">
-        <a href="https://wa.me/85295909468" class="whatsapp-link">WhatsApp 聯絡我們</a>
+        ${clinicWhatsappLinksHtml}
       </div>
 
       <hr class="divider">
@@ -386,6 +403,7 @@ export async function sendBookingCancellationEmail(
 
 function buildReminderEmailHtml(data: ReminderEmailData): string {
   const clinicInfoHtml = getClinicInfoHtmlSections();
+  const clinicWhatsappLinksHtml = buildClinicWhatsappLinksHtml();
   const dateObj = new Date(data.date + 'T00:00:00');
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -452,6 +470,11 @@ function buildReminderEmailHtml(data: ReminderEmailData): string {
 
       <div class="warning">
         如你未能出席，請盡快提前取消或改期，方便診所安排，謝謝配合。
+      </div>
+
+      <p style="font-size:14px; margin-top: 4px;">如需協助，請透過以下 WhatsApp 聯絡診所：</p>
+      <div style="text-align:center; margin: 12px 0 20px 0;">
+        ${clinicWhatsappLinksHtml}
       </div>
 
       <div style="text-align:center; margin: 20px 0;">
