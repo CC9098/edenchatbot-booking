@@ -62,6 +62,12 @@ const CLINIC_WHATSAPP_CONTACTS = [
   { label: '荃灣診所', phoneDisplay: '+852 6097 7363', phoneDigits: '85260977363' },
 ] as const;
 
+const CLINIC_GOOGLE_MAP_BY_NAME_ZH: Record<string, string> = {
+  荃灣: 'https://maps.app.goo.gl/i18v8oYQAoG65XM66?g_st=ic',
+  佐敦: 'https://maps.app.goo.gl/2pH44Tx6QQcWpn538?g_st=ic',
+  中環: 'https://maps.app.goo.gl/G3S73hfG6qk5o3cs8?g_st=ic',
+};
+
 function getBaseUrl(): string {
   if (process.env.BASE_URL) {
     return process.env.BASE_URL.replace(/\/$/, '');
@@ -88,9 +94,20 @@ function buildClinicWhatsappLinksHtml(): string {
   }).join('\n');
 }
 
+function buildClinicGoogleMapHtml(clinicNameZh: string): string {
+  const mapUrl = CLINIC_GOOGLE_MAP_BY_NAME_ZH[clinicNameZh];
+  if (!mapUrl) return '';
+
+  return `<div style="margin: 16px 0; font-size: 14px;">
+    <strong>Google Map（${clinicNameZh}）</strong><br>
+    <a href="${mapUrl}" style="color:#5c8d4d;" target="_blank">${mapUrl}</a>
+  </div>`;
+}
+
 function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
   const clinicInfoHtml = getClinicInfoHtmlSections();
   const clinicWhatsappLinksHtml = buildClinicWhatsappLinksHtml();
+  const clinicGoogleMapHtml = buildClinicGoogleMapHtml(data.clinicNameZh);
   const googleCalendarStart = data.date.replace(/-/g, '') + 'T' + data.time.replace(':', '') + '00';
   const [h, m] = data.time.split(':').map(Number);
   const endMinutes = h * 60 + m + 15;
@@ -182,6 +199,7 @@ function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
       
       <div class="clinic-info">
         ${clinicInfoHtml}
+        ${clinicGoogleMapHtml}
         
         <p>🔗 附上診所路綫圖，方便你參考：<br>
         <a href="https://www.edenclinic.hk/eden/關於我們/診所地址及聯絡方法/" style="color:#5c8d4d;">https://www.edenclinic.hk/eden/關於我們/診所地址及聯絡方法/</a></p>
@@ -267,6 +285,7 @@ export async function sendBookingConfirmationEmail(data: ConfirmationEmailData):
 function buildCancellationEmailHtml(data: CancellationEmailData): string {
   const clinicInfoHtml = getClinicInfoHtmlSections();
   const clinicWhatsappLinksHtml = buildClinicWhatsappLinksHtml();
+  const clinicGoogleMapHtml = buildClinicGoogleMapHtml(data.clinicNameZh);
   const dateObj = new Date(data.date + 'T00:00:00');
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -337,6 +356,7 @@ function buildCancellationEmailHtml(data: CancellationEmailData): string {
 
       <div class="clinic-info">
         ${clinicInfoHtml}
+        ${clinicGoogleMapHtml}
       </div>
     </div>
     <div class="footer">
@@ -404,6 +424,7 @@ export async function sendBookingCancellationEmail(
 function buildReminderEmailHtml(data: ReminderEmailData): string {
   const clinicInfoHtml = getClinicInfoHtmlSections();
   const clinicWhatsappLinksHtml = buildClinicWhatsappLinksHtml();
+  const clinicGoogleMapHtml = buildClinicGoogleMapHtml(data.clinicNameZh);
   const dateObj = new Date(data.date + 'T00:00:00');
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -486,6 +507,7 @@ function buildReminderEmailHtml(data: ReminderEmailData): string {
 
       <div class="clinic-info">
         ${clinicInfoHtml}
+        ${clinicGoogleMapHtml}
       </div>
     </div>
     <div class="footer">
