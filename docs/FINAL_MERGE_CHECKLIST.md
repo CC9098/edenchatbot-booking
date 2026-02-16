@@ -13,15 +13,15 @@
 - [x] Unified lesson progress APIs added:
   - `GET/POST /api/me/lesson-progress`
   - `PATCH/DELETE /api/me/lesson-progress/[lessonId]`
-- [x] Optional canonical host redirect middleware added (`PRIMARY_HOST`, `REDIRECT_HOSTS`)
+- [x] Single-domain strategy adopted (keep one canonical app URL only)
 - [x] Seed content inserted into Supabase (2 articles, 1 course, 3 lessons)
 
 ## Still required outside code (Vercel/domain operations)
-- [ ] In Vercel project env, set:
-  - `PRIMARY_HOST=edenchatbot-booking.vercel.app`
-  - `REDIRECT_HOSTS=educational-platform-mocha-alpha.vercel.app`
-- [ ] Redeploy and verify 308 redirects from old educational host
-- [ ] Point custom domain DNS/CNAME to the canonical app if needed
+- [ ] Keep only one production URL:
+  - `https://edenchatbot-booking.vercel.app/`
+- [ ] Disable/remove old educational deployment URL:
+  - `https://educational-platform-mocha-alpha.vercel.app/`
+- [ ] Ensure `BASE_URL` in Vercel env is set to canonical URL
 - [ ] Confirm OAuth callback domain list includes canonical host
 
 ## Validation checklist after deploy
