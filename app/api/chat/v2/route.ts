@@ -652,64 +652,62 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // For B mode (booking), enable function calling
-    const tools = mode === 'B' ? [{ functionDeclarations: BOOKING_FUNCTIONS }] : undefined;
+    // For B mode (booking), use chat with function calling
+    // For other modes, use simple generateContent
+    let reply: string;
 
-    let result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-      ...(tools ? { tools } : {}),
-    });
-
-    let response = result.response;
-
-    // Handle function calls (may require multiple rounds)
-    let functionCallRounds = 0;
-    const MAX_FUNCTION_ROUNDS = 5;
-
-    while (
-      functionCallRounds < MAX_FUNCTION_ROUNDS &&
-      response.candidates?.[0]?.content?.parts?.some((part: any) => part.functionCall)
-    ) {
-      functionCallRounds++;
-
-      const functionCall = response.candidates[0].content.parts.find(
-        (part: any) => part.functionCall
-      )?.functionCall;
-
-      if (!functionCall) break;
-
-      const functionName = functionCall.name;
-      const functionArgs = functionCall.args || {};
-
-      console.log(`[chat/v2] Function call round ${functionCallRounds}:`, functionName, functionArgs);
-
-      // Execute the function
-      const functionResult = await handleFunctionCall(functionName, functionArgs);
-
-      // Send function result back to Gemini
-      result = await model.generateContent({
-        contents: [
-          { role: 'user', parts: [{ text: fullPrompt }] },
-          { role: 'model', parts: [{ functionCall }] },
-          {
-            role: 'user',
-            parts: [
-              {
-                functionResponse: {
-                  name: functionName,
-                  response: functionResult,
-                },
-              },
-            ],
-          },
-        ],
-        ...(tools ? { tools } : {}),
+    if (mode === 'B') {
+      // Use chat API for function calling support
+      const chat = model.startChat({
+        tools: [{ functionDeclarations: BOOKING_FUNCTIONS }],
       });
 
-      response = result.response;
-    }
+      let result = await chat.sendMessage(fullPrompt);
+      let response = result.response;
 
-    const reply = response.text();
+      // Handle function calls (may require multiple rounds)
+      let functionCallRounds = 0;
+      const MAX_FUNCTION_ROUNDS = 5;
+
+      while (
+        functionCallRounds < MAX_FUNCTION_ROUNDS &&
+        response.candidates?.[0]?.content?.parts?.some((part: any) => part.functionCall)
+      ) {
+        functionCallRounds++;
+
+        const functionCall = response.candidates[0].content.parts.find(
+          (part: any) => part.functionCall
+        )?.functionCall;
+
+        if (!functionCall) break;
+
+        const functionName = functionCall.name;
+        const functionArgs = functionCall.args || {};
+
+        console.log(`[chat/v2] Function call round ${functionCallRounds}:`, functionName, functionArgs);
+
+        // Execute the function
+        const functionResult = await handleFunctionCall(functionName, functionArgs);
+
+        // Send function result back to Gemini
+        result = await chat.sendMessage([
+          {
+            functionResponse: {
+              name: functionName,
+              response: functionResult,
+            },
+          },
+        ]);
+
+        response = result.response;
+      }
+
+      reply = response.text();
+    } else {
+      // Simple mode without function calling
+      const result = await model.generateContent(fullPrompt);
+      reply = result.response.text();
+    }
 
     const usage = getUsageMetadata(response);
     const durationMs = Date.now() - startTime;
