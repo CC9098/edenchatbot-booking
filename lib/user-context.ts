@@ -19,6 +19,16 @@ export interface UserContext {
   totalVisits: number;
 }
 
+function parseDateOnlyToUtc(dateStr: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
 /**
  * Gather complete user context for intelligent conversation
  * Includes: constitution, care instructions, follow-up plans, booking history
@@ -179,9 +189,12 @@ ${userContext.activeInstructions.map((i) => `- ${i.title}：${i.content}`).join(
 export function getDaysUntilFollowUp(userContext: UserContext | null): number | null {
   if (!userContext?.nextFollowUp) return null;
 
-  const today = new Date();
-  const followUpDate = new Date(userContext.nextFollowUp.date);
-  const diffTime = followUpDate.getTime() - today.getTime();
+  const followUpDate = parseDateOnlyToUtc(userContext.nextFollowUp.date);
+  if (!followUpDate) return null;
+
+  const now = new Date();
+  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const diffTime = followUpDate.getTime() - todayUtc.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   return diffDays;
