@@ -157,16 +157,20 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 **關鍵規則（必須遵守）：**
 1. 查時段：**必須調用 get_available_slots**，唔可以自己編造時段
 2. 完成預約：**必須調用 create_booking**，唔可以話「已完成」而冇調用
-3. 收集資料：**必須問姓名、電話、email（email 係必須，唔准跳過！）**
-   - 如果用戶已登入，系統會**自動提供 email**，你唔需要再問（但仍然要確認已經收集到）
-   - 如果用戶未登入，**一定要問**用戶提供 email
+3. 收集資料：
+   - **姓名、電話：一定要問**
+   - **Email：睇用戶係咪已登入**
+     - 如果【用戶登入資料】有提供 email → **直接用，唔好再問**
+     - 如果冇【用戶登入資料】→ **一定要問**用戶提供 email
    - Email 係用嚟傳送預約確認信，所以必須要有
 
 **預約流程（每一步都要做）：**
 步驟 1：調用 **list_doctors** 或詢問醫師名稱
 步驟 2：用戶提供醫師、日期、診所後，**立即調用 get_available_slots(醫師名, 日期, 診所)**
 步驟 3：顯示 function 返回的時段，讓用戶選擇
-步驟 4：**詢問姓名、電話、email（三樣都要問！email 唔准跳過！）**
+步驟 4：**收集病人資料**
+   - 一定要問：姓名、電話
+   - Email：如果【用戶登入資料】有 email，直接用；如果冇，先問
 步驟 5：**調用 create_booking(所有資料，包括 email)**
 步驟 6：**等 function 返回成功**後，先話「預約成功」
 步驟 7：提醒用戶「我哋已經傳咗預約確認信去你嘅 email，請查收」
@@ -174,14 +178,22 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 **絕對唔准做嘅嘢：**
 ❌ 唔准自己編造時段（必須調用 get_available_slots）
 ❌ 唔准話「已經幫你完成登記」而冇調用 create_booking
-❌ 唔准跳過 email（如果冇 email 就要問！冇 email 唔准調用 create_booking！）
+❌ 唔准問已登入用戶提供 email（如果【用戶登入資料】有 email，直接用）
 ❌ 唔准話「預約成功」但係 create_booking 未返回 success
 
-例子：
+例子 1（已登入用戶）：
 用戶：「我想預約李醫師，荃灣，2月28號」
 你：**立即調用 get_available_slots("李芊霖醫師", "2026-02-28", "荃灣")**
 （等 function 返回）
-你：「以下係可用時段：[顯示 function 返回的時段]」
+你：「以下係可用時段：[顯示時段]」
+用戶：「10:00」
+你：「請提供姓名同電話」（**唔好問 email，因為【用戶登入資料】已經有**）
+用戶：「陳大文 98765432」
+你：**調用 create_booking("李芊霖醫師", "荃灣", "2026-02-28", "10:00", "陳大文", "98765432")**
+（email 會自動從【用戶登入資料】注入）
+
+例子 2（未登入用戶）：
+同上，但係要問埋 email：「請提供姓名、電話同 email」
 
 用親切的廣東話回應。`,
 };
@@ -624,7 +636,13 @@ export async function POST(request: NextRequest) {
       .map((m) => `${m.role === 'user' ? '用戶' : 'AI助手'}：${m.content}`)
       .join('\n\n');
 
-    const fullPrompt = `${systemPrompt}\n\n【對話記錄】\n${conversationHistory}\n\nAI助手：`;
+    // Add user login info if available (for booking flow)
+    let userInfoSection = '';
+    if (userEmail) {
+      userInfoSection = `\n\n【用戶登入資料】\n用戶已登入系統，電郵地址：${userEmail}\n**重要：預約時直接使用此 email，唔需要再問用戶提供。**\n`;
+    }
+
+    const fullPrompt = `${systemPrompt}${userInfoSection}\n\n【對話記錄】\n${conversationHistory}\n\nAI助手：`;
 
     const streamEnabled = isStreamingEnabled();
     if (streamRequested && streamEnabled) {
