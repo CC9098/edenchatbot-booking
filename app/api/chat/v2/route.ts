@@ -14,6 +14,7 @@ import {
   updateSymptom,
   listSymptoms,
 } from '@/lib/symptom-conversation-helpers';
+import { buildContentReferenceContext } from '@/lib/content-service';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -695,6 +696,7 @@ function buildFallbackPrompt(
   type: ConstitutionType,
   mode: ChatMode,
   careContext: string,
+  contentContext: string,
 ): string {
   const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
   const doctorInfo = getPromptDoctorInfoLines().map((line) => `- ${line}`).join('\n');
@@ -708,6 +710,7 @@ ${FALLBACK_MODE_PROMPTS[mode]}
 【用戶體質背景】
 ${FALLBACK_CONSTITUTION_CONTEXT[type]}
 ${careContext}
+${contentContext}
 
 【診所資訊】
 ${clinicInfo}
@@ -732,6 +735,7 @@ async function buildSystemPrompt(
   type: ConstitutionType,
   mode: ChatMode,
   careContext: string,
+  contentContext: string,
 ): Promise<string> {
   if (mode === 'B') {
     return buildBookingSystemPrompt(careContext);
@@ -763,7 +767,7 @@ async function buildSystemPrompt(
   }
 
   if (!settings) {
-    return buildFallbackPrompt(type, mode, careContext);
+    return buildFallbackPrompt(type, mode, careContext, contentContext);
   }
 
   const knowledgeEntries = (docs || [])
@@ -788,6 +792,10 @@ async function buildSystemPrompt(
 
   if (careContext) {
     systemPrompt += careContext;
+  }
+
+  if (contentContext) {
+    systemPrompt += contentContext;
   }
 
   return systemPrompt;
@@ -833,6 +841,7 @@ export async function POST(request: NextRequest) {
     // Resolve constitution type from user profile (auto-detect)
     let type: ConstitutionType = 'depleting'; // default for unauthenticated
     let careContext = '';
+    let contentContext = '';
     let userEmail: string | undefined;
     let userId: string | undefined;
 
@@ -848,8 +857,12 @@ export async function POST(request: NextRequest) {
       // Not authenticated — continue with defaults
     }
 
+    if (mode !== 'B') {
+      contentContext = await buildContentReferenceContext(latestUserMessage.content, 4);
+    }
+
     // Build system prompt (DB-driven with fallback)
-    let systemPrompt = await buildSystemPrompt(type, mode, careContext);
+    let systemPrompt = await buildSystemPrompt(type, mode, careContext, contentContext);
     if (userId && mode !== 'B') {
       // G modes also need explicit symptom logging behavior guidance.
       systemPrompt += `\n\n${SYMPTOM_RECORDING_GUIDANCE}`;
