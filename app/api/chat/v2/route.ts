@@ -293,7 +293,6 @@ const BOOKING_FUNCTIONS = [
     parameters: {
       type: SchemaType.OBJECT,
       properties: {},
-      required: [],
     },
   },
   {
