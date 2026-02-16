@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import MarkdownContent from "@/components/content/MarkdownContent";
 import {
   getPublishedCourseBySlug,
   getPublishedLessonByCourseAndSlug,
@@ -71,9 +72,10 @@ export default async function CourseLessonPage({ params }: PageProps) {
           ) : null}
         </div>
 
-        <div className="rounded-xl bg-slate-50 p-4 text-sm leading-7 whitespace-pre-wrap text-slate-700 sm:text-base">
-          {lesson.contentMd}
-        </div>
+        <MarkdownContent
+          content={lesson.contentMd}
+          className="rounded-xl bg-slate-50 p-4 text-sm sm:text-base"
+        />
 
         <div className="flex flex-wrap gap-3">
           <Link

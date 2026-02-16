@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPublishedArticleBySlug } from "@/lib/content-service";
+import MarkdownContent from "@/components/content/MarkdownContent";
 
 interface PageProps {
   params: { slug: string };
@@ -65,9 +66,10 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           ) : null}
         </div>
 
-        <div className="rounded-xl bg-slate-50 p-4 text-sm leading-7 whitespace-pre-wrap text-slate-700 sm:text-base">
-          {article.contentMd}
-        </div>
+        <MarkdownContent
+          content={article.contentMd}
+          className="rounded-xl bg-slate-50 p-4 text-sm sm:text-base"
+        />
 
         <div className="flex flex-wrap gap-3">
           <Link
