@@ -210,7 +210,7 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 用親切的廣東話回應。`,
 };
 
-function buildBookingSystemPrompt(): string {
+function buildBookingSystemPrompt(careContext: string): string {
   const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
   const doctorInfo = getPromptDoctorInfoLines().map((line) => `- ${line}`).join('\n');
   const whatsappInfo = getWhatsappContactLines().map((line) => `- ${line}`).join('\n');
@@ -254,6 +254,7 @@ https://edentcm.as.me/schedule.php
 2. 當用戶「詢問」症狀原因時（例如「頭痛點算好」），唔好急住記錄，先提供建議
 3. 症狀記錄後，自然提及「我幫你記錄低咗，醫師睇症時會參考」
 4. 如果用戶話症狀好返，call update_symptom 更新狀態
+${careContext}
 `;
 }
 
@@ -308,6 +309,30 @@ async function fetchCareContext(userId: string): Promise<string> {
 
   if (followUp) {
     lines.push(`下次跟進：${followUp.suggested_date}${followUp.reason ? `（${followUp.reason}）` : ''}`);
+  }
+
+  const twoWeeksAgo = new Date();
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+  const twoWeeksAgoStr = twoWeeksAgo.toISOString().split('T')[0];
+
+  const { data: symptoms } = await supabase
+    .from('symptom_logs')
+    .select('id, category, description, severity, status, started_at, ended_at')
+    .eq('patient_user_id', userId)
+    .or(`status.eq.active,ended_at.gte.${twoWeeksAgoStr}`)
+    .order('started_at', { ascending: false })
+    .limit(10);
+
+  if (symptoms && symptoms.length > 0) {
+    lines.push('近期症狀記錄（更新狀態時請使用對應 ID）：');
+    for (const symptom of symptoms) {
+      const datePart = symptom.ended_at
+        ? `${symptom.started_at}→${symptom.ended_at}`
+        : `${symptom.started_at} 至今`;
+      const severityPart = symptom.severity ? ` 嚴重度${symptom.severity}/5` : '';
+      const descPart = symptom.description ? `：${symptom.description}` : '';
+      lines.push(`- [ID: ${symptom.id}] ${symptom.category}（${datePart}，${symptom.status}）${severityPart}${descPart}`);
+    }
   }
 
   return lines.length > 0 ? '\n\n【病人個人化照護資料】\n' + lines.join('\n') : '';
@@ -539,7 +564,7 @@ const SYMPTOM_FUNCTIONS: FunctionDeclaration[] = [
         },
         status: {
           type: SchemaType.STRING,
-          description: '篩選狀態：active（進行中）、resolved（已好）、all（全部）。默認 all。',
+          description: '篩選狀態：active（進行中）、resolved（已好）、recurring（反覆）、all（全部）。默認 all。',
         },
         limit: {
           type: SchemaType.INTEGER,
@@ -614,6 +639,21 @@ async function handleFunctionCall(
   }
 }
 
+function resolveFunctionTools(
+  mode: ChatMode,
+  userId?: string,
+): { functionDeclarations: FunctionDeclaration[] }[] | undefined {
+  if (mode === 'B') {
+    return [{ functionDeclarations: [...BOOKING_FUNCTIONS, ...SYMPTOM_FUNCTIONS] }];
+  }
+
+  if (userId) {
+    return [{ functionDeclarations: SYMPTOM_FUNCTIONS }];
+  }
+
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Build System Prompt (DB-driven with fallback)
 // ---------------------------------------------------------------------------
@@ -661,7 +701,7 @@ async function buildSystemPrompt(
   careContext: string,
 ): Promise<string> {
   if (mode === 'B') {
-    return buildBookingSystemPrompt();
+    return buildBookingSystemPrompt(careContext);
   }
 
   const supabase = createServiceClient();
@@ -802,8 +842,10 @@ export async function POST(request: NextRequest) {
 
     const fullPrompt = `${systemPrompt}${userInfoSection}\n\n【對話記錄】\n${conversationHistory}\n\nAI助手：`;
 
+    const tools = resolveFunctionTools(mode, userId);
+
     const streamEnabled = isStreamingEnabled();
-    if (streamRequested && streamEnabled) {
+    if (streamRequested && streamEnabled && !tools) {
       const encoder = new TextEncoder();
 
       const stream = new ReadableStream<Uint8Array>({
@@ -874,17 +916,6 @@ export async function POST(request: NextRequest) {
           Connection: 'keep-alive',
         },
       });
-    }
-
-    // Determine which function calling tools to enable
-    let tools: { functionDeclarations: FunctionDeclaration[] }[] | undefined;
-
-    if (mode === 'B') {
-      // B mode: Both booking and symptom functions
-      tools = [{ functionDeclarations: [...BOOKING_FUNCTIONS, ...SYMPTOM_FUNCTIONS] }];
-    } else if (userId) {
-      // G1/G2/G3 modes: Only symptom functions (and only if logged in)
-      tools = [{ functionDeclarations: SYMPTOM_FUNCTIONS }];
     }
 
     // Use chat API for function calling, or generateContent for simple mode

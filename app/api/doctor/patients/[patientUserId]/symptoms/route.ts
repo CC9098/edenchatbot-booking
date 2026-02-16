@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, requireStaffRole, requirePatientAccess, AuthError } from "@/lib/auth-helpers";
 import { createServiceClient } from "@/lib/supabase";
 
+const VALID_STATUS_FILTERS = new Set(["all", "active", "resolved", "recurring"]);
+
+function parsePositiveInt(value: string | null, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return parsed;
+}
+
 /**
  * GET /api/doctor/patients/[patientUserId]/symptoms
  * View symptom logs for a specific patient (doctor/staff access only)
@@ -21,10 +30,14 @@ export async function GET(
     await requirePatientAccess(user.id, patientUserId);
 
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status") || "all"; // 'active' | 'resolved' | 'all'
-    const category = searchParams.get("category");
-    const limit = parseInt(searchParams.get("limit") || "30", 10);
-    const offset = parseInt(searchParams.get("offset") || "0", 10);
+    const status = (searchParams.get("status") || "all").trim(); // 'active' | 'resolved' | 'recurring' | 'all'
+    const category = searchParams.get("category")?.trim();
+    const limit = Math.min(parsePositiveInt(searchParams.get("limit"), 30), 100);
+    const offset = parsePositiveInt(searchParams.get("offset"), 0);
+
+    if (!VALID_STATUS_FILTERS.has(status)) {
+      return NextResponse.json({ error: "Invalid status filter" }, { status: 400 });
+    }
 
     const supabase = createServiceClient();
 

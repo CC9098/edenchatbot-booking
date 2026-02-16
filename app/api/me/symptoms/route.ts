@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { createServiceClient } from "@/lib/supabase";
 
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const VALID_STATUS_FILTERS = new Set(["all", "active", "resolved", "recurring"]);
+
+function parsePositiveInt(value: string | null, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return parsed;
+}
+
 /**
  * GET /api/me/symptoms
  * List patient's own symptom logs with optional filters
@@ -14,10 +24,14 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status") || "all"; // 'active' | 'resolved' | 'all'
-    const category = searchParams.get("category");
-    const limit = parseInt(searchParams.get("limit") || "20", 10);
-    const offset = parseInt(searchParams.get("offset") || "0", 10);
+    const status = (searchParams.get("status") || "all").trim(); // 'active' | 'resolved' | 'recurring' | 'all'
+    const category = searchParams.get("category")?.trim();
+    const limit = Math.min(parsePositiveInt(searchParams.get("limit"), 20), 100);
+    const offset = parsePositiveInt(searchParams.get("offset"), 0);
+
+    if (!VALID_STATUS_FILTERS.has(status)) {
+      return NextResponse.json({ error: "Invalid status filter" }, { status: 400 });
+    }
 
     const supabase = createServiceClient();
 
@@ -83,7 +97,7 @@ export async function POST(request: NextRequest) {
     const { category, description, severity, startedAt, endedAt } = body;
 
     // Validate required fields
-    if (!category || typeof category !== "string") {
+    if (typeof category !== "string" || !category.trim()) {
       return NextResponse.json({ error: "category is required" }, { status: 400 });
     }
 
@@ -92,18 +106,37 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate date format
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(startedAt)) {
+    if (!DATE_REGEX.test(startedAt)) {
       return NextResponse.json({ error: "startedAt must be a valid date string (YYYY-MM-DD)" }, { status: 400 });
     }
 
-    if (endedAt !== undefined && typeof endedAt === "string" && endedAt !== "" && !dateRegex.test(endedAt)) {
-      return NextResponse.json({ error: "endedAt must be a valid date string (YYYY-MM-DD)" }, { status: 400 });
+    const normalizedEndedAt =
+      endedAt === undefined || endedAt === null || endedAt === "" ? undefined : endedAt;
+
+    if (normalizedEndedAt !== undefined) {
+      if (typeof normalizedEndedAt !== "string" || !DATE_REGEX.test(normalizedEndedAt)) {
+        return NextResponse.json({ error: "endedAt must be a valid date string (YYYY-MM-DD)" }, { status: 400 });
+      }
+      if (normalizedEndedAt < startedAt) {
+        return NextResponse.json({ error: "endedAt cannot be earlier than startedAt" }, { status: 400 });
+      }
     }
 
     // Validate severity
-    if (severity !== undefined && (typeof severity !== "number" || severity < 1 || severity > 5)) {
+    if (
+      severity !== undefined &&
+      severity !== null &&
+      (!Number.isInteger(severity) || severity < 1 || severity > 5)
+    ) {
       return NextResponse.json({ error: "severity must be between 1 and 5" }, { status: 400 });
+    }
+
+    if (
+      description !== undefined &&
+      description !== null &&
+      typeof description !== "string"
+    ) {
+      return NextResponse.json({ error: "description must be a string" }, { status: 400 });
     }
 
     const supabase = createServiceClient();
@@ -111,21 +144,21 @@ export async function POST(request: NextRequest) {
     const insertData: Record<string, unknown> = {
       patient_user_id: user.id,
       category: category.trim(),
-      status: endedAt ? "resolved" : "active",
+      status: normalizedEndedAt ? "resolved" : "active",
       started_at: startedAt,
       logged_via: "manual", // Logged via API (not chatbot)
     };
 
-    if (description) {
+    if (typeof description === "string" && description.trim()) {
       insertData.description = description.trim();
     }
 
-    if (severity) {
+    if (severity !== undefined && severity !== null) {
       insertData.severity = severity;
     }
 
-    if (endedAt) {
-      insertData.ended_at = endedAt;
+    if (normalizedEndedAt) {
+      insertData.ended_at = normalizedEndedAt;
     }
 
     const { data: inserted, error: insertError } = await supabase

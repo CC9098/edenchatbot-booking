@@ -6,9 +6,9 @@
  */
 
 import { createServiceClient } from '@/lib/supabase';
-import { fromZonedTime } from 'date-fns-tz';
 
-const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const VALID_STATUSES = new Set(['active', 'resolved', 'recurring']);
 
 // ---------------------------------------------------------------------------
 // 1. Log Symptom
@@ -16,10 +16,10 @@ const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
 export interface LogSymptomRequest {
   category: string;
-  description?: string;
-  severity?: number; // 1-5
+  description?: string | null;
+  severity?: number | null; // 1-5
   startedAt: string; // YYYY-MM-DD
-  endedAt?: string;  // YYYY-MM-DD
+  endedAt?: string | null;  // YYYY-MM-DD
 }
 
 /**
@@ -35,7 +35,7 @@ export async function logSymptom(
 }> {
   try {
     // Validate required fields
-    if (!request.category || typeof request.category !== 'string') {
+    if (!request.category || typeof request.category !== 'string' || !request.category.trim()) {
       return { success: false, error: '症狀類別為必填' };
     }
 
@@ -44,20 +44,37 @@ export async function logSymptom(
     }
 
     // Validate date format
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(request.startedAt)) {
+    if (!DATE_REGEX.test(request.startedAt)) {
       return { success: false, error: '開始日期格式無效，請使用 YYYY-MM-DD' };
     }
 
-    if (request.endedAt && !dateRegex.test(request.endedAt)) {
-      return { success: false, error: '結束日期格式無效，請使用 YYYY-MM-DD' };
+    const normalizedEndedAt =
+      request.endedAt === undefined || request.endedAt === null || request.endedAt === ''
+        ? undefined
+        : request.endedAt;
+
+    if (normalizedEndedAt !== undefined) {
+      if (typeof normalizedEndedAt !== 'string' || !DATE_REGEX.test(normalizedEndedAt)) {
+        return { success: false, error: '結束日期格式無效，請使用 YYYY-MM-DD' };
+      }
+      if (normalizedEndedAt < request.startedAt) {
+        return { success: false, error: '結束日期不可早於開始日期' };
+      }
     }
 
     // Validate severity
-    if (request.severity !== undefined) {
-      if (typeof request.severity !== 'number' || request.severity < 1 || request.severity > 5) {
+    if (request.severity !== undefined && request.severity !== null) {
+      if (!Number.isInteger(request.severity) || request.severity < 1 || request.severity > 5) {
         return { success: false, error: '嚴重程度必須介於 1-5 之間' };
       }
+    }
+
+    if (
+      request.description !== undefined &&
+      request.description !== null &&
+      typeof request.description !== 'string'
+    ) {
+      return { success: false, error: '症狀描述格式無效' };
     }
 
     const supabase = createServiceClient();
@@ -71,16 +88,16 @@ export async function logSymptom(
       logged_via: 'chat',
     };
 
-    if (request.description) {
+    if (typeof request.description === 'string' && request.description.trim()) {
       insertData.description = request.description.trim();
     }
 
-    if (request.severity) {
+    if (request.severity !== undefined && request.severity !== null) {
       insertData.severity = request.severity;
     }
 
-    if (request.endedAt) {
-      insertData.ended_at = request.endedAt;
+    if (normalizedEndedAt) {
+      insertData.ended_at = normalizedEndedAt;
       insertData.status = 'resolved'; // If ended_at is provided, mark as resolved
     }
 
@@ -131,10 +148,10 @@ export async function logSymptom(
 
 export interface UpdateSymptomRequest {
   symptomId: string;
-  endedAt?: string;    // YYYY-MM-DD
+  endedAt?: string | null;    // YYYY-MM-DD
   status?: 'resolved' | 'recurring' | 'active';
-  severity?: number;   // 1-5
-  description?: string;
+  severity?: number | null;   // 1-5
+  description?: string | null;
 }
 
 /**
@@ -175,11 +192,17 @@ export async function updateSymptom(
     const updateData: Record<string, unknown> = {};
 
     if (request.endedAt !== undefined) {
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (request.endedAt && !dateRegex.test(request.endedAt)) {
-        return { success: false, error: '結束日期格式無效，請使用 YYYY-MM-DD' };
+      if (request.endedAt === null || request.endedAt === '') {
+        updateData.ended_at = null;
+      } else {
+        if (typeof request.endedAt !== 'string' || !DATE_REGEX.test(request.endedAt)) {
+          return { success: false, error: '結束日期格式無效，請使用 YYYY-MM-DD' };
+        }
+        if (request.endedAt < existing.started_at) {
+          return { success: false, error: '結束日期不可早於開始日期' };
+        }
+        updateData.ended_at = request.endedAt;
       }
-      updateData.ended_at = request.endedAt || null;
 
       // If endedAt is provided and status not explicitly set, mark as resolved
       if (request.endedAt && !request.status) {
@@ -188,22 +211,41 @@ export async function updateSymptom(
     }
 
     if (request.status !== undefined) {
+      if (typeof request.status !== 'string' || !VALID_STATUSES.has(request.status)) {
+        return { success: false, error: '無效的症狀狀態' };
+      }
       updateData.status = request.status;
     }
 
     if (request.severity !== undefined) {
-      if (typeof request.severity !== 'number' || request.severity < 1 || request.severity > 5) {
+      if (request.severity === null) {
+        updateData.severity = null;
+      } else if (!Number.isInteger(request.severity) || request.severity < 1 || request.severity > 5) {
         return { success: false, error: '嚴重程度必須介於 1-5 之間' };
+      } else {
+        updateData.severity = request.severity;
       }
-      updateData.severity = request.severity;
     }
 
     if (request.description !== undefined) {
-      updateData.description = request.description ? request.description.trim() : null;
+      if (request.description !== null && typeof request.description !== 'string') {
+        return { success: false, error: '症狀描述格式無效' };
+      }
+      updateData.description =
+        typeof request.description === 'string' ? request.description.trim() || null : null;
     }
 
     if (Object.keys(updateData).length === 0) {
       return { success: false, error: '沒有需要更新的資料' };
+    }
+
+    const nextStatus = (updateData.status as string | undefined) ?? existing.status;
+    const nextEndedAt =
+      Object.prototype.hasOwnProperty.call(updateData, 'ended_at')
+        ? (updateData.ended_at as string | null)
+        : existing.ended_at;
+    if (nextStatus === 'active' && nextEndedAt) {
+      return { success: false, error: '進行中症狀不能有結束日期，請先將 endedAt 設為 null' };
     }
 
     // Update symptom log
@@ -251,7 +293,7 @@ export async function updateSymptom(
 
 export interface ListSymptomsRequest {
   category?: string;
-  status?: 'active' | 'resolved' | 'all';
+  status?: 'active' | 'resolved' | 'recurring' | 'all';
   limit?: number;
 }
 
@@ -287,11 +329,20 @@ export async function listSymptoms(
       .eq('patient_user_id', userId);
 
     // Apply filters
-    if (request.category) {
-      query = query.eq('category', request.category);
+    if (request.category !== undefined) {
+      if (typeof request.category !== 'string') {
+        return { success: false, error: 'category 格式無效' };
+      }
+      const category = request.category.trim();
+      if (category) {
+        query = query.eq('category', category);
+      }
     }
 
     if (request.status && request.status !== 'all') {
+      if (!VALID_STATUSES.has(request.status)) {
+        return { success: false, error: 'status 參數無效' };
+      }
       query = query.eq('status', request.status);
     }
 
@@ -299,7 +350,17 @@ export async function listSymptoms(
     query = query.order('started_at', { ascending: false });
 
     // Limit results
-    const limit = request.limit && request.limit > 0 ? Math.min(request.limit, 50) : 10;
+    let limit = 10;
+    if (request.limit !== undefined) {
+      const parsedLimit =
+        typeof request.limit === 'number'
+          ? request.limit
+          : Number.parseInt(String(request.limit), 10);
+      if (!Number.isFinite(parsedLimit) || parsedLimit <= 0) {
+        return { success: false, error: 'limit 必須為正整數' };
+      }
+      limit = Math.min(Math.floor(parsedLimit), 50);
+    }
     query = query.limit(limit);
 
     const { data, error: fetchError } = await query;

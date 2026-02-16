@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { createServiceClient } from "@/lib/supabase";
 
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const VALID_STATUSES = new Set(["active", "resolved", "recurring"]);
+
 /**
  * PATCH /api/me/symptoms/[id]
  * Update an existing symptom log (e.g., mark as resolved, update severity)
@@ -43,7 +46,7 @@ export async function PATCH(
     const updateData: Record<string, unknown> = {};
 
     if (status !== undefined) {
-      if (!["active", "resolved", "recurring"].includes(status)) {
+      if (typeof status !== "string" || !VALID_STATUSES.has(status)) {
         return NextResponse.json({ error: "Invalid status value" }, { status: 400 });
       }
       updateData.status = status;
@@ -53,9 +56,11 @@ export async function PATCH(
       if (endedAt === null || endedAt === "") {
         updateData.ended_at = null;
       } else {
-        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-        if (!dateRegex.test(endedAt)) {
+        if (typeof endedAt !== "string" || !DATE_REGEX.test(endedAt)) {
           return NextResponse.json({ error: "endedAt must be a valid date string (YYYY-MM-DD)" }, { status: 400 });
+        }
+        if (endedAt < existing.started_at) {
+          return NextResponse.json({ error: "endedAt cannot be earlier than startedAt" }, { status: 400 });
         }
         updateData.ended_at = endedAt;
 
@@ -69,7 +74,7 @@ export async function PATCH(
     if (severity !== undefined) {
       if (severity === null) {
         updateData.severity = null;
-      } else if (typeof severity !== "number" || severity < 1 || severity > 5) {
+      } else if (!Number.isInteger(severity) || severity < 1 || severity > 5) {
         return NextResponse.json({ error: "severity must be between 1 and 5" }, { status: 400 });
       } else {
         updateData.severity = severity;
@@ -77,11 +82,26 @@ export async function PATCH(
     }
 
     if (description !== undefined) {
-      updateData.description = description ? description.trim() : null;
+      if (description !== null && typeof description !== "string") {
+        return NextResponse.json({ error: "description must be a string" }, { status: 400 });
+      }
+      updateData.description = typeof description === "string" ? description.trim() || null : null;
     }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
+
+    const nextStatus = (updateData.status as string | undefined) ?? existing.status;
+    const nextEndedAt =
+      Object.prototype.hasOwnProperty.call(updateData, "ended_at")
+        ? (updateData.ended_at as string | null)
+        : existing.ended_at;
+    if (nextStatus === "active" && nextEndedAt) {
+      return NextResponse.json(
+        { error: "active status cannot have endedAt. Set endedAt to null first." },
+        { status: 400 }
+      );
     }
 
     // Update symptom log
