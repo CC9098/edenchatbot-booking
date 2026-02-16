@@ -697,12 +697,15 @@ export async function POST(request: NextRequest) {
         const functionResult = await handleFunctionCall(functionName, functionArgs);
 
         // Send function result back to Gemini
-        result = await chat.sendMessage({
+        result = await chat.sendMessage([{
           functionResponse: {
             name: functionName,
-            response: functionResult,
+            response: {
+              name: functionName,
+              content: functionResult,
+            },
           },
-        });
+        }]);
 
         response = result.response;
       }
