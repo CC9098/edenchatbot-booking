@@ -152,21 +152,36 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
   G1: '用簡短方式回答（2-3句），然後問一個引導問題，例如「想知多啲關於呢方面嘅原理嗎？」',
   G2: '提供詳細嘅理論原理說明，包括中醫理論基礎，用段落方式解釋。',
   G3: '以教練模式進行深入引導式對話。先理解用戶情況，提問引導反思，給予個人化建議。用同理心回應。',
-  B: `你係醫天圓預約助手。你**必須**使用提供的 functions 來完成預約，唔可以只係對話。
+  B: `你係醫天圓預約助手。你**必須**使用提供的 functions 來完成預約。**絕對唔可以**假裝完成預約或者話「已經幫你完成登記」而冇真正調用 functions。
 
-**重要：當用戶提供咗醫師名同日期，你**必須立即**調用 get_available_slots function 查詢可用時段。**
+**關鍵規則（必須遵守）：**
+1. 查時段：**必須調用 get_available_slots**，唔可以自己編造時段
+2. 完成預約：**必須調用 create_booking**，唔可以話「已完成」而冇調用
+3. 收集資料：**必須問姓名、電話、email（email 係必須，唔准跳過！）**
+   - 如果用戶已登入，系統會**自動提供 email**，你唔需要再問（但仍然要確認已經收集到）
+   - 如果用戶未登入，**一定要問**用戶提供 email
+   - Email 係用嚟傳送預約確認信，所以必須要有
 
-預約流程：
-1. 如果用戶未講想約邊位醫師，**立即調用 list_doctors** 顯示所有醫師
-2. 當用戶講咗醫師名（例如「李醫師」或「李芊霖醫師」）同日期（或建議日期），**立即調用 get_available_slots(醫師名, 日期, 診所)** 查詢可用時段
-3. 將可用時段列出俾用戶選擇
-4. 用戶選擇時段後，詢問姓名和電話
-5. **調用 create_booking** 完成預約
-6. 確認預約成功
+**預約流程（每一步都要做）：**
+步驟 1：調用 **list_doctors** 或詢問醫師名稱
+步驟 2：用戶提供醫師、日期、診所後，**立即調用 get_available_slots(醫師名, 日期, 診所)**
+步驟 3：顯示 function 返回的時段，讓用戶選擇
+步驟 4：**詢問姓名、電話、email（三樣都要問！email 唔准跳過！）**
+步驟 5：**調用 create_booking(所有資料，包括 email)**
+步驟 6：**等 function 返回成功**後，先話「預約成功」
+步驟 7：提醒用戶「我哋已經傳咗預約確認信去你嘅 email，請查收」
+
+**絕對唔准做嘅嘢：**
+❌ 唔准自己編造時段（必須調用 get_available_slots）
+❌ 唔准話「已經幫你完成登記」而冇調用 create_booking
+❌ 唔准跳過 email（如果冇 email 就要問！冇 email 唔准調用 create_booking！）
+❌ 唔准話「預約成功」但係 create_booking 未返回 success
 
 例子：
 用戶：「我想預約李醫師，荃灣，2月28號」
-你：**立即調用 get_available_slots("李芊霖醫師", "2026-02-28", "荃灣")**，然後顯示可用時段
+你：**立即調用 get_available_slots("李芊霖醫師", "2026-02-28", "荃灣")**
+（等 function 返回）
+你：「以下係可用時段：[顯示 function 返回的時段]」
 
 用親切的廣東話回應。`,
 };
@@ -372,7 +387,7 @@ const BOOKING_FUNCTIONS: FunctionDeclaration[] = [
         },
         email: {
           type: SchemaType.STRING,
-          description: '病人電郵地址（可選）',
+          description: '病人電郵地址（必須提供，用於傳送預約確認信）',
         },
         notes: {
           type: SchemaType.STRING,
@@ -390,7 +405,8 @@ const BOOKING_FUNCTIONS: FunctionDeclaration[] = [
 
 async function handleFunctionCall(
   functionName: string,
-  functionArgs: object
+  functionArgs: object,
+  userEmail?: string
 ): Promise<object> {
   console.log(`[chat/v2] Calling function: ${functionName}`, functionArgs);
 
@@ -413,7 +429,13 @@ async function handleFunctionCall(
     }
 
     case 'create_booking': {
-      const result = await createConversationalBooking(args as any);
+      // Inject user email if not provided by AI and user is logged in
+      const bookingArgs = { ...args };
+      if (!bookingArgs.email && userEmail) {
+        bookingArgs.email = userEmail;
+        console.log(`[chat/v2] Injected logged-in user email: ${userEmail}`);
+      }
+      const result = await createConversationalBooking(bookingArgs as any);
       return result;
     }
 
@@ -570,12 +592,14 @@ export async function POST(request: NextRequest) {
     // Resolve constitution type from user profile (auto-detect)
     let type: ConstitutionType = 'depleting'; // default for unauthenticated
     let careContext = '';
+    let userEmail: string | undefined;
 
     try {
       const user = await getCurrentUser();
       if (user) {
         type = await resolveConstitution(user.id);
         careContext = await fetchCareContext(user.id);
+        userEmail = user.email; // Extract user email for booking
       }
     } catch {
       // Not authenticated — continue with defaults
@@ -712,7 +736,7 @@ export async function POST(request: NextRequest) {
         console.log(`[chat/v2] Function call round ${functionCallRounds}:`, functionName, functionArgs);
 
         // Execute the function
-        const functionResult = await handleFunctionCall(functionName, functionArgs);
+        const functionResult = await handleFunctionCall(functionName, functionArgs, userEmail);
 
         // Send function result back to Gemini
         result = await chat.sendMessage([{

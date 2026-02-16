@@ -11,6 +11,7 @@ import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
 import { getFreeBusy } from './google-calendar';
 import { fromZonedTime } from 'date-fns-tz';
 import { createBooking } from './google-calendar';
+import { sendBookingConfirmationEmail } from './gmail';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const DEFAULT_DURATION_MINUTES = 15;
@@ -284,8 +285,29 @@ export async function createConversationalBooking(
       };
     }
 
-    // Note: Email confirmation will be sent by the booking API
-    // For now, we'll handle email in a separate step if needed
+    // Send email confirmation if email is provided
+    if (request.email) {
+      const clinicAddress = getClinicAddress(clinic.nameZh);
+
+      const emailResult = await sendBookingConfirmationEmail({
+        patientName: request.patientName,
+        patientEmail: request.email,
+        doctorName: doctor.nameEn,
+        doctorNameZh: doctor.nameZh,
+        clinicName: clinic.nameEn,
+        clinicNameZh: clinic.nameZh,
+        clinicAddress: clinicAddress,
+        date: request.date,
+        time: request.time,
+        eventId: result.eventId,
+        calendarId: mapping.calendarId,
+      });
+
+      if (!emailResult.success) {
+        console.error('[createConversationalBooking] Failed to send email:', emailResult.error);
+        // Don't fail the booking if email fails - booking is already created
+      }
+    }
 
     return {
       success: true,
