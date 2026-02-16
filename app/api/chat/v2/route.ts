@@ -4,6 +4,11 @@ import { createServiceClient } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { getPromptClinicInfoLines, getWhatsappContactLines } from '@/shared/clinic-data';
 import { getPromptDoctorInfoLines } from '@/shared/clinic-schedule-data';
+import {
+  listBookableDoctors,
+  getAvailableTimeSlots,
+  createConversationalBooking,
+} from '@/lib/booking-conversation-helpers';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -129,7 +134,18 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
   G1: '用簡短方式回答（2-3句），然後問一個引導問題，例如「想知多啲關於呢方面嘅原理嗎？」',
   G2: '提供詳細嘅理論原理說明，包括中醫理論基礎，用段落方式解釋。',
   G3: '以教練模式進行深入引導式對話。先理解用戶情況，提問引導反思，給予個人化建議。用同理心回應。',
-  B: '你係預約助手。幫助用戶查詢及安排診所預約。引導用戶到預約系統：https://edentcm.as.me/schedule.php 或 WhatsApp: +852 2338 2028',
+  B: `你係醫天圓預約助手。你可以直接幫用戶完成預約，步驟如下：
+
+1. 首先詢問用戶想約哪位醫師（如果不確定，先調用 list_doctors 顯示所有醫師）
+2. 詢問用戶想約哪一天（YYYY-MM-DD 格式，例如 2026-02-20）
+3. 詢問想去哪間診所（中環/佐敦/荃灣）
+4. 調用 get_available_slots 查詢該醫師當天的可用時段
+5. 讓用戶選擇時段
+6. 詢問用戶姓名和電話
+7. 調用 create_booking 完成預約
+8. 確認預約成功
+
+用親切、有溫度的廣東話與用戶對話。記得每一步都要等用戶回覆先好繼續下一步。`,
 };
 
 // ---------------------------------------------------------------------------
@@ -263,6 +279,122 @@ async function logChatMessages(
     });
   } catch (error) {
     console.error('[chat/v2] Failed to log chat messages:', error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Function Calling Definitions for Booking
+// ---------------------------------------------------------------------------
+
+const BOOKING_FUNCTIONS = [
+  {
+    name: 'list_doctors',
+    description: '列出所有可預約的醫師及其時間表',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'get_available_slots',
+    description: '查詢某位醫師在某個診所的可用時段',
+    parameters: {
+      type: 'object',
+      properties: {
+        doctorNameZh: {
+          type: 'string',
+          description: '醫師中文名稱（例如：陳家富醫師、李芊霖醫師）',
+        },
+        date: {
+          type: 'string',
+          description: '預約日期，格式為 YYYY-MM-DD（例如：2026-02-20）',
+        },
+        clinicNameZh: {
+          type: 'string',
+          description: '診所中文名稱（例如：中環、佐敦、荃灣）。如果不提供，會返回該醫師所有可用的診所',
+        },
+      },
+      required: ['doctorNameZh', 'date'],
+    },
+  },
+  {
+    name: 'create_booking',
+    description: '為病人創建預約',
+    parameters: {
+      type: 'object',
+      properties: {
+        doctorNameZh: {
+          type: 'string',
+          description: '醫師中文名稱',
+        },
+        clinicNameZh: {
+          type: 'string',
+          description: '診所中文名稱',
+        },
+        date: {
+          type: 'string',
+          description: '預約日期，格式為 YYYY-MM-DD',
+        },
+        time: {
+          type: 'string',
+          description: '預約時間，格式為 HH:mm（24小時制）',
+        },
+        patientName: {
+          type: 'string',
+          description: '病人姓名',
+        },
+        phone: {
+          type: 'string',
+          description: '病人電話號碼',
+        },
+        email: {
+          type: 'string',
+          description: '病人電郵地址（可選）',
+        },
+        notes: {
+          type: 'string',
+          description: '備註（可選）',
+        },
+      },
+      required: ['doctorNameZh', 'clinicNameZh', 'date', 'time', 'patientName', 'phone'],
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Function Call Handler
+// ---------------------------------------------------------------------------
+
+async function handleFunctionCall(
+  functionName: string,
+  functionArgs: Record<string, unknown>
+): Promise<unknown> {
+  console.log(`[chat/v2] Calling function: ${functionName}`, functionArgs);
+
+  switch (functionName) {
+    case 'list_doctors': {
+      const result = await listBookableDoctors();
+      return result;
+    }
+
+    case 'get_available_slots': {
+      const { doctorNameZh, date, clinicNameZh } = functionArgs;
+      const result = await getAvailableTimeSlots(
+        doctorNameZh as string,
+        date as string,
+        clinicNameZh as string | undefined
+      );
+      return result;
+    }
+
+    case 'create_booking': {
+      const result = await createConversationalBooking(functionArgs as any);
+      return result;
+    }
+
+    default:
+      return { error: `Unknown function: ${functionName}` };
   }
 }
 
@@ -520,8 +652,63 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const result = await model.generateContent(fullPrompt);
-    const response = result.response;
+    // For B mode (booking), enable function calling
+    const tools = mode === 'B' ? [{ functionDeclarations: BOOKING_FUNCTIONS }] : undefined;
+
+    let result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+      ...(tools ? { tools } : {}),
+    });
+
+    let response = result.response;
+
+    // Handle function calls (may require multiple rounds)
+    let functionCallRounds = 0;
+    const MAX_FUNCTION_ROUNDS = 5;
+
+    while (
+      functionCallRounds < MAX_FUNCTION_ROUNDS &&
+      response.candidates?.[0]?.content?.parts?.some((part: any) => part.functionCall)
+    ) {
+      functionCallRounds++;
+
+      const functionCall = response.candidates[0].content.parts.find(
+        (part: any) => part.functionCall
+      )?.functionCall;
+
+      if (!functionCall) break;
+
+      const functionName = functionCall.name;
+      const functionArgs = functionCall.args || {};
+
+      console.log(`[chat/v2] Function call round ${functionCallRounds}:`, functionName, functionArgs);
+
+      // Execute the function
+      const functionResult = await handleFunctionCall(functionName, functionArgs);
+
+      // Send function result back to Gemini
+      result = await model.generateContent({
+        contents: [
+          { role: 'user', parts: [{ text: fullPrompt }] },
+          { role: 'model', parts: [{ functionCall }] },
+          {
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  name: functionName,
+                  response: functionResult,
+                },
+              },
+            ],
+          },
+        ],
+        ...(tools ? { tools } : {}),
+      });
+
+      response = result.response;
+    }
+
     const reply = response.text();
 
     const usage = getUsageMetadata(response);
