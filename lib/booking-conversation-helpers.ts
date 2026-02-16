@@ -28,10 +28,10 @@ export interface DoctorInfo {
 /**
  * List all doctors that have active booking schedules
  */
-export async function listBookableDoctors(): Promise<DoctorInfo[]> {
+export async function listBookableDoctors(): Promise<{ doctors: DoctorInfo[] }> {
   const doctors = getBookableDoctors();
 
-  return doctors.map(doctor => {
+  const doctorList = doctors.map(doctor => {
     const scheduleSummary = getDoctorScheduleSummaryByNameZh(doctor.nameZh) || '暫無時間表';
     return {
       nameZh: doctor.nameZh,
@@ -39,6 +39,9 @@ export async function listBookableDoctors(): Promise<DoctorInfo[]> {
       scheduleSummary,
     };
   });
+
+  // IMPORTANT: Gemini API requires response to be an object, not an array
+  return { doctors: doctorList };
 }
 
 // ---------------------------------------------------------------------------
