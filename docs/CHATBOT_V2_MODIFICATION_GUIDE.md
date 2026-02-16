@@ -1,12 +1,13 @@
-# Chatbot v2 修改說明書（Prompt + Mode）
+# Chatbot v2 修改說明書（Prompt + Mode + Symptom Logging）
 
 最後更新：2026-02-16
 
 ## 1) TL;DR（先答你最關心）
 
-- `B mode`（預約模式）目前是 **code-driven**，不讀 Supabase prompt。
-- `G1/G2/G3` 目前是 **Supabase-driven 優先**（`chat_prompt_settings` + `knowledge_docs`），沒有資料才 fallback 到 code 內建 prompt。
+- `B mode`（預約模式）目前是 **code-driven**，不讀 Supabase prompt。**新增：B mode 同時支持 booking + symptom functions**。
+- `G1/G2/G3` 目前是 **Supabase-driven 優先**（`chat_prompt_settings` + `knowledge_docs`），沒有資料才 fallback 到 code 內建 prompt。**新增：G1/G2/G3 支持 symptom functions（需登入）**。
 - `/chat` 頁面用的是 `/api/chat/v2`；舊 widget 仍可能打 `/api/chat`（另一套邏輯）。
+- **新功能（2026-02-16）：症狀記錄 (Symptom Logging)** - 病人可透過對話記錄症狀，醫師可在 dashboard 查看。
 
 ## 2) 系統路徑總覽
 
@@ -20,8 +21,10 @@
 - `app/api/chat/v2/route.ts`
   - `resolveMode(messages)`：判斷 `G1/G2/G3/B`
   - `buildSystemPrompt(type, mode, careContext)`：決定 prompt 來源
-  - `mode === 'B'`：走 function calling（`list_doctors/get_available_slots/create_booking`）
-  - `mode !== 'B'`：一般 `generateContent`
+  - **Function Calling 策略**：
+    - `mode === 'B'`：booking + symptom functions
+    - `mode !== 'B' && userId`：symptom functions only
+    - `!userId`：no function calling（simple generateContent）
 
 ### 預約 function 實作
 
@@ -29,6 +32,13 @@
   - `listBookableDoctors`
   - `getAvailableTimeSlots`
   - `createConversationalBooking`
+
+### 症狀記錄 function 實作（新增 2026-02-16）
+
+- `lib/symptom-conversation-helpers.ts`
+  - `logSymptom`：記錄新症狀
+  - `updateSymptom`：更新症狀狀態（標記已好返）
+  - `listSymptoms`：查詢症狀歷史
 
 ## 3) Prompt 來源優先次序（最重要）
 
@@ -91,6 +101,8 @@
 | G1/G2/G3 語氣與內容 | Supabase `chat_prompt_settings` | DB 即時生效（同 type 相關） |
 | G1/G2/G3 知識內容 | Supabase `knowledge_docs` | `sort_order` 決定注入次序 |
 | 判斷入 B/G1/G2/G3 規則 | `resolveMode()` + keyword 常量 | Code 改動 |
+| **症狀記錄功能（新）** | `SYMPTOM_FUNCTIONS` + `handleFunctionCall()` + `lib/symptom-conversation-helpers.ts` | **2026-02-16 新增** |
+| **症狀 AI 記錄邏輯** | `buildBookingSystemPrompt()` 症狀指引部分 | **Prompt engineering** |
 
 ## 6) Supabase 修改範例（G 模式）
 
@@ -198,3 +210,183 @@ values ('hoarding', '痰濕飲食重點', '內容...', 20, true, true);
 
 - 調整 `BOOKING_KEYWORDS / CANCEL_KEYWORDS / G2_KEYWORDS / G3_KEYWORDS`
 - 微調「最近 5 則對話」和長度閾值
+
+---
+
+## 11) 症狀記錄功能（Symptom Logging）- 新增 2026-02-16
+
+### 11.1 功能概述
+
+**目的**：讓病人透過對話記錄身體症狀，醫師可查看症狀歷史。
+
+**使用場景**：
+- 病人：「我今日頭痛」→ AI 自動記錄症狀
+- 病人：「我3月1號第一日嚟經期，3月6號完」→ AI 記錄症狀 + 日期範圍
+- 病人：「我頭痛好返了」→ AI 更新症狀狀態為 resolved
+- 醫師：在 dashboard 查看病人症狀記錄
+
+### 11.2 Function Calling 架構
+
+**SYMPTOM_FUNCTIONS**（3個）：
+1. `log_symptom` - 記錄新症狀
+2. `update_symptom` - 更新症狀（標記已好返）
+3. `list_my_symptoms` - 查詢症狀歷史
+
+**Mode-specific 啟用策略**：
+```typescript
+if (mode === 'B') {
+  // B mode: 預約 + 症狀 functions
+  tools = [{ functionDeclarations: [...BOOKING_FUNCTIONS, ...SYMPTOM_FUNCTIONS] }];
+} else if (userId) {
+  // G1/G2/G3: 只有症狀 functions（需登入）
+  tools = [{ functionDeclarations: SYMPTOM_FUNCTIONS }];
+} else {
+  // 未登入：無 function calling
+  tools = undefined;
+}
+```
+
+**為什麼咁設計**：
+- B mode 可以同時處理預約 + 記錄症狀（例如：「我想預約睇頭痛」）
+- G1/G2/G3 可以記錄症狀但唔會誤觸 booking functions
+- 未登入用戶無法記錄症狀（因為冇 user_id）
+
+### 11.3 Database Schema
+
+**Table**: `symptom_logs`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| patient_user_id | uuid | FK to auth.users |
+| category | text | 症狀類別（頭痛、經期、失眠等） |
+| description | text | 詳細描述 |
+| severity | smallint (1-5) | 嚴重程度 |
+| status | symptom_status | active / resolved / recurring |
+| started_at | date | 開始日期 |
+| ended_at | date | 結束日期（NULL = 進行中） |
+| logged_via | text | chat / manual |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+**RLS Policies**:
+- 病人可 CRUD 自己嘅症狀
+- 醫師可查看 care team 病人嘅症狀（read-only）
+- Admin 全權限
+
+### 11.4 API Routes
+
+**病人端**：
+- `GET /api/me/symptoms` - 列出自己嘅症狀
+- `POST /api/me/symptoms` - 手動新增症狀
+- `PATCH /api/me/symptoms/[id]` - 更新症狀
+- `DELETE /api/me/symptoms/[id]` - 刪除症狀
+
+**醫師端**：
+- `GET /api/doctor/patients/[patientUserId]/symptoms` - 查看病人症狀（read-only）
+
+**Profile API 整合**：
+- `GET /api/doctor/patients/[patientUserId]/profile` 已加入 `recentSymptoms` 欄位
+
+### 11.5 AI Prompt 指引
+
+**加入位置**：`buildBookingSystemPrompt()`（B mode）
+
+```
+【症狀記錄功能】
+你具備幫用戶記錄身體症狀的功能。注意以下原則：
+1. 當用戶「描述」自己的症狀時（例如「我今日頭痛」「我最近失眠」），call log_symptom 記錄
+2. 當用戶「詢問」症狀原因時（例如「頭痛點算好」），唔好急住記錄，先提供建議
+3. 症狀記錄後，自然提及「我幫你記錄低咗，醫師睇症時會參考」
+4. 如果用戶話症狀好返，call update_symptom 更新狀態
+```
+
+**User Context 注入**：
+- `lib/user-context.ts` 會 fetch 近 2 週嘅症狀
+- 注入到 prompt 顯示：進行中症狀 + 最近好返嘅症狀
+- 包含 symptom ID（AI 需要 ID 去 call update_symptom）
+
+### 11.6 醫師 Dashboard UI
+
+**位置**：`app/doctor/patients/[patientUserId]/page.tsx`
+
+**新增 Component**：`SymptomsSection`
+- 顯示最近 30 天症狀
+- Status badge（active=紅, resolved=綠, recurring=橙）
+- Severity bar（1-5 視覺化色條）
+- 日期範圍顯示
+- logged_via 指示器（💬 AI對話記錄）
+- **Read-only**（醫師只能查看，唔能修改）
+
+### 11.7 修改症狀功能常見需求
+
+| 需求 | 應改位置 | 備註 |
+|------|---------|------|
+| 改症狀分類選項 | `SYMPTOM_FUNCTIONS[0].parameters.properties.category.description` | 提供 AI 建議分類 |
+| 改 AI 記錄邏輯 | `buildBookingSystemPrompt()` 症狀記錄指引部分 | Prompt engineering |
+| 改嚴重程度判斷 | `SYMPTOM_FUNCTIONS[0].parameters.properties.severity.description` | 1-5 定義 |
+| 新增症狀欄位 | 1) Migration 加欄位<br>2) `symptom-conversation-helpers.ts` 更新<br>3) Function declarations 更新 | 需改多處 |
+| 改醫師 UI 顯示 | `app/doctor/patients/[patientUserId]/page.tsx` SymptomsSection | 前端 component |
+
+### 11.8 測試症狀記錄
+
+**對話測試**：
+```
+用戶：「我今日頭痛好辛苦」
+預期：AI call log_symptom({ category: "頭痛", startedAt: "2026-02-16", severity: 4 })
+
+用戶：「我頭痛好返了」
+預期：AI call update_symptom({ symptomId: "xxx", status: "resolved", endedAt: "2026-02-16" })
+
+用戶：「我之前記錄咗啲咩症狀？」
+預期：AI call list_my_symptoms({})
+```
+
+**Database 驗證**：
+```sql
+-- 查看症狀記錄
+SELECT * FROM symptom_logs
+WHERE patient_user_id = 'user-id-here'
+ORDER BY started_at DESC;
+
+-- 查看 audit log
+SELECT * FROM audit_logs
+WHERE entity = 'symptom_logs'
+ORDER BY created_at DESC LIMIT 10;
+```
+
+### 11.9 常見問題
+
+**Q: 未登入用戶可以記錄症狀嗎？**
+A: 不可以。症狀 functions 只在 `userId` 存在時啟用。未登入用戶會收到「需要登入才能記錄症狀」錯誤。
+
+**Q: B mode 會唔會因為有症狀 functions 而分心？**
+A: 不會。Prompt 已明確指示「只在用戶描述症狀時記錄，唔會主動問症狀」。
+
+**Q: 症狀記錄會影響 AI 建議嗎？**
+A: 會。`user-context.ts` 會將近期症狀注入 prompt，令 AI 建議更個人化。
+
+**Q: 醫師可以修改病人記錄嘅症狀嗎？**
+A: 不可以。醫師只有 read-only 權限，保持數據真實性。
+
+**Q: 點樣手動執行 migration？**
+A: 去 Supabase Dashboard → SQL Editor → 執行 `supabase/migrations/20260216192246_add_symptom_logs.sql`
+
+---
+
+## 12) 總結：完整 Function Calling Map
+
+| Mode | Booking Functions | Symptom Functions | 條件 |
+|------|------------------|-------------------|------|
+| B | ✅ | ✅ | 所有用戶 |
+| G1/G2/G3 | ❌ | ✅ | 需登入 |
+| 未登入任何 mode | ❌ | ❌ | - |
+
+**檔案修改總覽**（2026-02-16 症狀功能）：
+- ✅ `supabase/migrations/20260216192246_add_symptom_logs.sql` - Schema
+- ✅ `lib/symptom-conversation-helpers.ts` - Function implementations
+- ✅ `app/api/me/symptoms/**` - Patient API routes
+- ✅ `app/api/doctor/patients/[id]/symptoms/**` - Doctor API routes
+- ✅ `app/api/chat/v2/route.ts` - Function calling integration
+- ✅ `lib/user-context.ts` - Context injection
+- ✅ `app/doctor/patients/[id]/page.tsx` - Doctor UI

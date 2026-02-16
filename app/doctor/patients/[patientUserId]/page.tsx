@@ -40,10 +40,23 @@ interface FollowUp {
   updatedAt: string;
 }
 
+interface SymptomLog {
+  id: string;
+  category: string;
+  description: string | null;
+  severity: number | null;
+  status: string;
+  startedAt: string;
+  endedAt: string | null;
+  loggedVia: string;
+  createdAt: string;
+}
+
 interface PatientProfile {
   careProfile: CareProfile | null;
   activeInstructions: CareInstruction[];
   pendingFollowUps: FollowUp[];
+  recentSymptoms: SymptomLog[];
 }
 
 interface AuditLogItem {
@@ -93,6 +106,12 @@ const FOLLOW_UP_STATUS_OPTIONS = [
   { value: "cancelled", label: "已取消", color: "bg-gray-100 text-gray-600" },
 ];
 
+const SYMPTOM_STATUS_OPTIONS = [
+  { value: "active", label: "進行中", color: "bg-red-100 text-red-800" },
+  { value: "resolved", label: "已好返", color: "bg-green-100 text-green-800" },
+  { value: "recurring", label: "反覆出現", color: "bg-orange-100 text-orange-800" },
+];
+
 function constitutionBadge(value: string) {
   const opt = CONSTITUTION_OPTIONS.find((o) => o.value === value) || CONSTITUTION_OPTIONS[4];
   return (
@@ -119,6 +138,32 @@ function followUpStatusBadge(value: string) {
     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${opt.color}`}>
       {opt.label}
     </span>
+  );
+}
+
+function symptomStatusBadge(value: string) {
+  const opt = SYMPTOM_STATUS_OPTIONS.find((o) => o.value === value);
+  if (!opt) return <span className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600">{value}</span>;
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${opt.color}`}>
+      {opt.label}
+    </span>
+  );
+}
+
+function severityBar(severity: number | null) {
+  if (!severity) return null;
+  const colors = ["bg-gray-300", "bg-yellow-400", "bg-orange-400", "bg-red-400", "bg-red-600"];
+  return (
+    <div className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((level) => (
+        <div
+          key={level}
+          className={`h-2 w-4 rounded-sm ${level <= severity ? colors[severity - 1] : "bg-gray-200"}`}
+        />
+      ))}
+      <span className="ml-1 text-xs text-gray-500">{severity}/5</span>
+    </div>
   );
 }
 
@@ -276,6 +321,11 @@ export default function PatientDetailPage() {
         patientUserId={patientUserId}
         followUps={data.pendingFollowUps}
         onUpdated={fetchProfile}
+      />
+
+      {/* Section D: Symptoms */}
+      <SymptomsSection
+        symptoms={data.recentSymptoms}
       />
 
       <AuditLogsSection patientUserId={patientUserId} />
@@ -1065,7 +1115,68 @@ function EditFollowUpModal({
 }
 
 /* ================================================================
-   Section D: Audit Logs
+   Section D: Symptoms
+   ================================================================ */
+
+function SymptomsSection({
+  symptoms,
+}: {
+  symptoms: SymptomLog[];
+}) {
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-2 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <h2 className="text-base font-semibold text-gray-900">症狀記錄</h2>
+        <div className="text-xs text-gray-500">
+          最近 30 天（病人自行記錄）
+        </div>
+      </div>
+
+      <div className="divide-y divide-gray-100">
+        {symptoms.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <p className="text-sm text-gray-400">暫無症狀記錄</p>
+          </div>
+        ) : (
+          symptoms.map((symptom) => (
+            <div key={symptom.id} className="px-5 py-4">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {symptomStatusBadge(symptom.status)}
+                  <span className="text-sm font-medium text-gray-900">{symptom.category}</span>
+                  {symptom.loggedVia === "chat" && (
+                    <span className="text-xs text-gray-400">💬 AI對話記錄</span>
+                  )}
+                </div>
+
+                {symptom.description && (
+                  <p className="text-sm text-gray-600">{symptom.description}</p>
+                )}
+
+                {symptom.severity && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">嚴重程度:</span>
+                    {severityBar(symptom.severity)}
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-400">
+                  {symptom.startedAt}
+                  {symptom.endedAt && ` → ${symptom.endedAt}`}
+                  {!symptom.endedAt && symptom.status === "active" && " → 進行中"}
+                  {" ・ "}記錄於 {formatDate(symptom.createdAt)}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* ================================================================
+   Section E: Audit Logs
    ================================================================ */
 
 const AUDIT_ACTION_STYLES: Record<string, string> = {

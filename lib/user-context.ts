@@ -17,6 +17,15 @@ export interface UserContext {
     clinicName: string;
   } | null;
   totalVisits: number;
+  recentSymptoms: Array<{
+    id: string;
+    category: string;
+    description: string | null;
+    severity: number | null;
+    status: string;
+    startedAt: string;
+    endedAt: string | null;
+  }>;
 }
 
 function parseDateOnlyToUtc(dateStr: string): Date | null {
@@ -64,7 +73,20 @@ export async function gatherUserContext(userId: string): Promise<UserContext> {
     .limit(1)
     .maybeSingle();
 
-  // 4. Booking history (from chat_sessions or a dedicated bookings table)
+  // 4. Recent symptoms (last 2 weeks, active or recently resolved)
+  const twoWeeksAgo = new Date();
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+  const twoWeeksAgoStr = twoWeeksAgo.toISOString().split('T')[0];
+
+  const { data: symptoms } = await supabase
+    .from('symptom_logs')
+    .select('id, category, description, severity, status, started_at, ended_at')
+    .eq('patient_user_id', userId)
+    .or(`status.eq.active,ended_at.gte.${twoWeeksAgoStr}`)
+    .order('started_at', { ascending: false })
+    .limit(10);
+
+  // 5. Booking history (from chat_sessions or a dedicated bookings table)
   // NOTE: This is a simplified version. In production, you'd query actual booking records.
   // For now, we'll check if there's any chat_messages with booking-related content.
   const { data: chatSessions, count: sessionCount } = await supabase
@@ -114,6 +136,16 @@ export async function gatherUserContext(userId: string): Promise<UserContext> {
       : null,
     lastBooking,
     totalVisits,
+    recentSymptoms:
+      symptoms?.map((s) => ({
+        id: s.id,
+        category: s.category,
+        description: s.description,
+        severity: s.severity,
+        status: s.status,
+        startedAt: s.started_at,
+        endedAt: s.ended_at,
+      })) || [],
   };
 }
 
@@ -163,6 +195,26 @@ ${userContext.nextFollowUp ? `- 醫師建議覆診：${userContext.nextFollowUp.
 
 ${userContext.activeInstructions.length > 0 ? `【醫師設定的護理指引】
 ${userContext.activeInstructions.map((i) => `- ${i.title}：${i.content}`).join('\n')}` : ''}
+
+${userContext.recentSymptoms.length > 0 ? `【用戶近期症狀記錄】
+${(() => {
+  const activeSymptoms = userContext.recentSymptoms.filter(s => s.status === 'active');
+  const resolvedSymptoms = userContext.recentSymptoms.filter(s => s.status === 'resolved');
+  let symptomsText = '';
+  if (activeSymptoms.length > 0) {
+    symptomsText += '進行中：\n';
+    activeSymptoms.forEach(s => {
+      symptomsText += `- ${s.category}（${s.startedAt} 至今）${s.severity ? ` 嚴重度${s.severity}/5` : ''}${s.description ? `：${s.description}` : ''} [ID: ${s.id}]\n`;
+    });
+  }
+  if (resolvedSymptoms.length > 0) {
+    symptomsText += '最近好返嘅：\n';
+    resolvedSymptoms.forEach(s => {
+      symptomsText += `- ${s.category}（${s.startedAt}→${s.endedAt || '?'}）\n`;
+    });
+  }
+  return symptomsText;
+})()}` : ''}
 
 【對話指引 - 舊客戶智能引導】
 1. ✅ 不要再問「你是第一次診症嗎？」（他是舊客戶）

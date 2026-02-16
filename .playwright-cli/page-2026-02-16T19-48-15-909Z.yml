@@ -1,0 +1,15 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e4]: 醫天圓小助手 | Chatbot Widget
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]: 醫
+      - heading "醫天圓" [level=1] [ref=e9]
+      - paragraph [ref=e10]: Eden TCM Clinic
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - heading "登入帳號" [level=2] [ref=e13]
+        - paragraph [ref=e14]: 使用 Google 帳號登入以繼續
+      - button "使用 Google 登入" [ref=e15]:
+        - img [ref=e16]
+        - text: 使用 Google 登入
+    - paragraph [ref=e21]: © 2026 醫天圓中醫診所

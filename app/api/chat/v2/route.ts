@@ -9,6 +9,11 @@ import {
   getAvailableTimeSlots,
   createConversationalBooking,
 } from '@/lib/booking-conversation-helpers';
+import {
+  logSymptom,
+  updateSymptom,
+  listSymptoms,
+} from '@/lib/symptom-conversation-helpers';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -241,7 +246,15 @@ ${clinicInfo}
 ${whatsappInfo}
 
 【預約連結】
-https://edentcm.as.me/schedule.php`;
+https://edentcm.as.me/schedule.php
+
+【症狀記錄功能】
+你具備幫用戶記錄身體症狀的功能。注意以下原則：
+1. 當用戶「描述」自己的症狀時（例如「我今日頭痛」「我最近失眠」），call log_symptom 記錄
+2. 當用戶「詢問」症狀原因時（例如「頭痛點算好」），唔好急住記錄，先提供建議
+3. 症狀記錄後，自然提及「我幫你記錄低咗，醫師睇症時會參考」
+4. 如果用戶話症狀好返，call update_symptom 更新狀態
+`;
 }
 
 // ---------------------------------------------------------------------------
@@ -458,13 +471,94 @@ const BOOKING_FUNCTIONS: FunctionDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Function Calling Definitions for Symptoms
+// ---------------------------------------------------------------------------
+
+const SYMPTOM_FUNCTIONS: FunctionDeclaration[] = [
+  {
+    name: 'log_symptom',
+    description: '記錄用戶的身體症狀。當用戶「描述」症狀時使用（例如「我今日頭痛」「我最近失眠」）。不要用於「詢問」症狀原因。',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        category: {
+          type: SchemaType.STRING,
+          description: '症狀類別（例如：頭痛、經期、失眠、胃痛、腰痛、咳嗽、鼻敏感、濕疹）',
+        },
+        description: {
+          type: SchemaType.STRING,
+          description: '症狀的詳細描述（用戶原話或摘要）',
+        },
+        severity: {
+          type: SchemaType.INTEGER,
+          description: '嚴重程度 1-5（1=輕微偶爾 2=輕度但注意到 3=中度影響日常 4=嚴重影響生活 5=非常嚴重需就醫）。如果用戶沒有明確說，根據描述推斷。',
+        },
+        startedAt: {
+          type: SchemaType.STRING,
+          description: '症狀開始日期，格式 YYYY-MM-DD。如果用戶說「今日」就用今天日期。',
+        },
+        endedAt: {
+          type: SchemaType.STRING,
+          description: '症狀結束日期，格式 YYYY-MM-DD。如果仍然持續則不提供。',
+        },
+      },
+      required: ['category', 'startedAt'],
+    },
+  },
+  {
+    name: 'update_symptom',
+    description: '更新症狀狀態，通常是標記症狀已結束。當用戶說「我頭痛好返了」「經期完了」時使用。',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        symptomId: {
+          type: SchemaType.STRING,
+          description: '症狀ID（從之前的對話記錄中獲取）',
+        },
+        endedAt: {
+          type: SchemaType.STRING,
+          description: '症狀結束日期，格式 YYYY-MM-DD',
+        },
+        status: {
+          type: SchemaType.STRING,
+          description: '新狀態：resolved（已好）或 recurring（反覆出現）',
+        },
+      },
+      required: ['symptomId'],
+    },
+  },
+  {
+    name: 'list_my_symptoms',
+    description: '查詢用戶的症狀記錄歷史。當用戶問「我之前有咩症狀」「我上次頭痛係幾時」時使用。',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        category: {
+          type: SchemaType.STRING,
+          description: '篩選特定類別的症狀（可選）',
+        },
+        status: {
+          type: SchemaType.STRING,
+          description: '篩選狀態：active（進行中）、resolved（已好）、all（全部）。默認 all。',
+        },
+        limit: {
+          type: SchemaType.INTEGER,
+          description: '返回數量上限，默認 10',
+        },
+      },
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
 // Function Call Handler
 // ---------------------------------------------------------------------------
 
 async function handleFunctionCall(
   functionName: string,
   functionArgs: object,
-  userEmail?: string
+  userEmail?: string,
+  userId?: string
 ): Promise<object> {
   console.log(`[chat/v2] Calling function: ${functionName}`, functionArgs);
 
@@ -494,6 +588,24 @@ async function handleFunctionCall(
         console.log(`[chat/v2] Injected logged-in user email: ${userEmail}`);
       }
       const result = await createConversationalBooking(bookingArgs as any);
+      return result;
+    }
+
+    case 'log_symptom': {
+      if (!userId) return { success: false, error: '需要登入才能記錄症狀' };
+      const result = await logSymptom(userId, args as any);
+      return result;
+    }
+
+    case 'update_symptom': {
+      if (!userId) return { success: false, error: '需要登入才能更新症狀' };
+      const result = await updateSymptom(userId, args as any);
+      return result;
+    }
+
+    case 'list_my_symptoms': {
+      if (!userId) return { success: false, error: '需要登入才能查看症狀記錄' };
+      const result = await listSymptoms(userId, args as any);
       return result;
     }
 
@@ -649,10 +761,12 @@ export async function POST(request: NextRequest) {
     let type: ConstitutionType = 'depleting'; // default for unauthenticated
     let careContext = '';
     let userEmail: string | undefined;
+    let userId: string | undefined;
 
     try {
       const user = await getCurrentUser();
       if (user) {
+        userId = user.id;
         type = await resolveConstitution(user.id);
         careContext = await fetchCareContext(user.id);
         userEmail = user.email; // Extract user email for booking
@@ -762,16 +876,24 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // For B mode (booking), use chat with function calling
-    // For other modes, use simple generateContent
+    // Determine which function calling tools to enable
+    let tools: { functionDeclarations: FunctionDeclaration[] }[] | undefined;
+
+    if (mode === 'B') {
+      // B mode: Both booking and symptom functions
+      tools = [{ functionDeclarations: [...BOOKING_FUNCTIONS, ...SYMPTOM_FUNCTIONS] }];
+    } else if (userId) {
+      // G1/G2/G3 modes: Only symptom functions (and only if logged in)
+      tools = [{ functionDeclarations: SYMPTOM_FUNCTIONS }];
+    }
+
+    // Use chat API for function calling, or generateContent for simple mode
     let reply: string;
     let finalResponse: any;
 
-    if (mode === 'B') {
+    if (tools) {
       // Use chat API for function calling support
-      const chat = model.startChat({
-        tools: [{ functionDeclarations: BOOKING_FUNCTIONS }],
-      });
+      const chat = model.startChat({ tools });
 
       let result = await chat.sendMessage(fullPrompt);
       let response = result.response;
@@ -798,7 +920,7 @@ export async function POST(request: NextRequest) {
         console.log(`[chat/v2] Function call round ${functionCallRounds}:`, functionName, functionArgs);
 
         // Execute the function
-        const functionResult = await handleFunctionCall(functionName, functionArgs, userEmail);
+        const functionResult = await handleFunctionCall(functionName, functionArgs, userEmail, userId);
 
         // Send function result back to Gemini
         result = await chat.sendMessage([{
@@ -814,7 +936,7 @@ export async function POST(request: NextRequest) {
       reply = response.text();
       finalResponse = response;
     } else {
-      // Simple mode without function calling
+      // No function calling tools - use simple generateContent
       const result = await model.generateContent(fullPrompt);
       finalResponse = result.response;
       reply = finalResponse.text();

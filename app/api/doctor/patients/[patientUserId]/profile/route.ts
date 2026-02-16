@@ -56,6 +56,24 @@ export async function GET(
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 
+    // Fetch recent symptoms (last 30 days or active)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+    const { data: symptoms, error: symptomsError } = await supabase
+      .from("symptom_logs")
+      .select("id, category, description, severity, status, started_at, ended_at, logged_via, created_at")
+      .eq("patient_user_id", patientUserId)
+      .or(`status.eq.active,started_at.gte.${thirtyDaysAgoStr}`)
+      .order("started_at", { ascending: false })
+      .limit(10);
+
+    if (symptomsError) {
+      console.error("[GET patient profile] symptoms error:", symptomsError.message);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+
     return NextResponse.json({
       careProfile: careProfile
         ? {
@@ -88,6 +106,17 @@ export async function GET(
         createdBy: f.created_by,
         createdAt: f.created_at,
         updatedAt: f.updated_at,
+      })),
+      recentSymptoms: (symptoms || []).map((s) => ({
+        id: s.id,
+        category: s.category,
+        description: s.description,
+        severity: s.severity,
+        status: s.status,
+        startedAt: s.started_at,
+        endedAt: s.ended_at,
+        loggedVia: s.logged_via,
+        createdAt: s.created_at,
       })),
     });
   } catch (err) {
