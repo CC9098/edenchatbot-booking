@@ -72,7 +72,7 @@ function CancelBookingContent() {
                 if (loading) {
                                 return (
                                                 <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
-                                                                <Loader2 className="h-8 w-8 animate-spin text-[#2d5016]" />
+                                                                <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                                                 <p className="text-slate-600">正在載入預約資料...</p>
                                                 </div>
                                 );
@@ -131,7 +131,7 @@ function CancelBookingContent() {
 
                                                                 <div>
                                                                                 <p className="text-xs font-semibold tracking-wider text-slate-500">狀態</p>
-                                                                                <p className="inline-flex rounded-full bg-[#e8f5e0] px-2 py-0.5 text-xs font-medium text-[#2d5016]">
+                                                                                <p className="inline-flex rounded-full bg-primary-light px-2 py-0.5 text-xs font-medium text-primary">
                                                                                                 已確認
                                                                                 </p>
                                                                 </div>
@@ -171,7 +171,7 @@ function CancelBookingContent() {
 export default function CancelPage() {
                 return (
                                 <main className="min-h-screen bg-slate-50 px-4 py-12 md:py-20">
-                                                <Suspense fallback={<div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#2d5016]" /></div>}>
+                                                <Suspense fallback={<div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
                                                                 <CancelBookingContent />
                                                 </Suspense>
                                 </main>

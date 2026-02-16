@@ -36,7 +36,7 @@ export function ChatOptions({ options, onSelect, primaryColor }: ChatOptionsProp
                 e.currentTarget.style.backgroundColor = '';
                 e.currentTarget.style.color = '';
               }}
-              className="relative z-10 rounded-xl border-2 border-[#2d5016] bg-white px-3 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 hover:bg-[#2d5016] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2d5016] active:scale-95 active:bg-[#2d5016] active:text-white"
+              className="relative z-10 rounded-xl border-2 border-primary bg-white px-3 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 hover:bg-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary active:scale-95 active:bg-primary active:text-white"
               style={{
                 color: primaryColor,
                 touchAction: 'manipulation',

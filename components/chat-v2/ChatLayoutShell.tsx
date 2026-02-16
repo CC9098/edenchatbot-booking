@@ -8,10 +8,10 @@ function Header() {
   const { user, signOut } = useAuth();
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-[#2d5016]/10 bg-white px-4 sm:px-6">
+    <header className="flex h-14 items-center justify-between border-b border-primary/10 bg-white px-4 sm:px-6">
       <div className="flex items-center gap-3">
-        <Leaf className="h-5 w-5 text-[#2d5016]" />
-        <h1 className="text-sm font-bold text-[#2d5016]">
+        <Leaf className="h-5 w-5 text-primary" />
+        <h1 className="text-sm font-bold text-primary">
           醫天圓 AI 諮詢
         </h1>
       </div>

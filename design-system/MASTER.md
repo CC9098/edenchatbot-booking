@@ -49,12 +49,14 @@
 ### 使用規範
 
 **✅ 允許使用**：
-- 主要按鈕：`bg-[#2d5016] hover:bg-[#1f3810]`
-- 主標題：`text-[#2d5016]`
-- Loading Spinner：`text-[#2d5016]`
-- 品牌 Badge：`bg-[#e8f5e0] text-[#2d5016]`
-- 邊框：`border-[#2d5016]` 或 `border-[#e8f5e0]`
-- 焦點狀態：`focus:ring-[#2d5016]`
+- 主要按鈕：`bg-primary hover:bg-primary-hover`
+- 主標題：`text-primary`
+- Loading Spinner：`text-primary`
+- 品牌 Badge：`bg-primary-light text-primary`
+- 邊框：`border-primary` 或 `border-primary-light`
+- 焦點狀態：`focus:ring-primary`
+
+**⚠️ 使用 Tailwind 變數，唔好 hardcode `#2d5016`**
 
 **❌ 禁止使用**：
 - 唔好用 `emerald-*` 系列（已統一改為品牌色）
@@ -82,10 +84,10 @@
 
 | 類型 | Tailwind Class | 用途 |
 |------|----------------|------|
-| **主要 CTA** | `bg-[#2d5016] hover:bg-[#1f3810] text-white rounded-xl px-4 py-3` | 主要操作：預約、確認、提交 |
+| **主要 CTA** | `bg-primary hover:bg-primary-hover text-white rounded-xl px-4 py-3` | 主要操作：預約、確認、提交 |
 | **次要按鈕** | `border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl px-4 py-3` | 次要操作：取消、返回 |
 | **危險按鈕** | `bg-red-600 hover:bg-red-700 text-white rounded-xl px-4 py-3` | 刪除、取消預約 |
-| **文字按鈕** | `text-[#2d5016] hover:underline` | 內聯連結 |
+| **文字按鈕** | `text-primary hover:underline` | 內聯連結 |
 
 ### 卡片
 
@@ -99,8 +101,9 @@
 
 | 類型 | Tailwind Class |
 |------|----------------|
-| **品牌 Badge** | `bg-[#e8f5e0] text-[#2d5016] rounded-full px-3 py-1 text-xs font-semibold` |
+| **品牌 Badge** | `bg-primary-light text-primary rounded-full px-3 py-1 text-xs font-semibold` |
 | **狀態 Badge** | `bg-green-100 text-green-800 rounded-full px-2 py-0.5 text-xs font-medium` |
+| **Chat Mode Badge** | `bg-primary-light text-primary` (G1), `bg-primary-light/60 text-primary/80` (G2) |
 
 ### 輸入框
 

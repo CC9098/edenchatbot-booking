@@ -107,14 +107,14 @@ export default function DoctorPatientsPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="搜尋病人姓名..."
-          className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+          className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </div>
 
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#2d5016] border-t-transparent" />
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       ) : error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-8 text-center">
@@ -156,7 +156,7 @@ export default function DoctorPatientsPage() {
                   <tr
                     key={p.patientUserId}
                     onClick={() => router.push(`/doctor/patients/${p.patientUserId}`)}
-                    className="cursor-pointer transition-colors hover:bg-[#2d5016]/[0.03]"
+                    className="cursor-pointer transition-colors hover:bg-primary/[0.03]"
                   >
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {p.displayName || "未設定姓名"}

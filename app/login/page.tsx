@@ -25,14 +25,14 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f5f9f2] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-primary-pale px-4">
       <div className="w-full max-w-sm space-y-8">
         {/* Branding */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#2d5016] text-white text-2xl font-bold">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary text-white text-2xl font-bold">
             醫
           </div>
-          <h1 className="text-2xl font-bold text-[#2d5016]">醫天圓</h1>
+          <h1 className="text-2xl font-bold text-primary">醫天圓</h1>
           <p className="text-sm text-gray-500">Eden TCM Clinic</p>
         </div>
 
@@ -91,8 +91,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#f5f9f2]">
-          <div className="w-6 h-6 border-2 border-[#2d5016] border-t-transparent rounded-full animate-spin" />
+        <div className="min-h-screen flex items-center justify-center bg-primary-pale">
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       }
     >

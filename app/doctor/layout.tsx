@@ -11,15 +11,15 @@ function DoctorHeader() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[#2d5016]/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <header className="sticky top-0 z-40 border-b border-primary/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
         {/* Left: brand + nav */}
         <div className="flex items-center gap-4 sm:gap-6">
           <Link
             href="/doctor"
-            className="flex items-center gap-2 text-[#2d5016] font-bold text-base sm:text-lg shrink-0"
+            className="flex items-center gap-2 text-primary font-bold text-base sm:text-lg shrink-0"
           >
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#2d5016] text-white text-sm font-bold">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white text-sm font-bold">
               醫
             </span>
             <span className="hidden sm:inline">醫天圓 醫師控制台</span>
@@ -31,8 +31,8 @@ function DoctorHeader() {
               href="/doctor"
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                 pathname === "/doctor"
-                  ? "bg-[#2d5016]/10 text-[#2d5016]"
-                  : "text-gray-600 hover:text-[#2d5016] hover:bg-[#2d5016]/5"
+                  ? "bg-primary/10 text-primary"
+                  : "text-gray-600 hover:text-primary hover:bg-primary/5"
               }`}
             >
               病人列表

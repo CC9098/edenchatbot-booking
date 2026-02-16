@@ -62,14 +62,14 @@ export function ChatInputV2({
         placeholder={placeholder}
         disabled={disabled}
         rows={1}
-        className="flex-1 resize-none rounded-xl border border-[#2d5016]/20 bg-[#f5f7f3] px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none transition focus:border-[#2d5016]/40 focus:ring-2 focus:ring-[#2d5016]/10 disabled:opacity-50"
+        className="flex-1 resize-none rounded-xl border border-primary/20 bg-[#f5f7f3] px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10 disabled:opacity-50"
       />
       <button
         onClick={handleSend}
         disabled={!canSend}
         className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all ${
           canSend
-            ? "bg-[#2d5016] text-white shadow-md hover:bg-[#3a6b1e] active:scale-95"
+            ? "bg-primary text-white shadow-md hover:bg-primary-hover active:scale-95"
             : "bg-gray-200 text-gray-400"
         }`}
         aria-label="送出訊息"

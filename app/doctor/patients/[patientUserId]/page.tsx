@@ -223,7 +223,7 @@ export default function PatientDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#2d5016] border-t-transparent" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
@@ -249,7 +249,7 @@ export default function PatientDetailPage() {
       {/* Back link */}
       <button
         onClick={() => router.push("/doctor")}
-        className="inline-flex items-center gap-1 rounded-md py-1 text-sm text-gray-500 transition-colors hover:text-[#2d5016]"
+        className="inline-flex items-center gap-1 rounded-md py-1 text-sm text-gray-500 transition-colors hover:text-primary"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -338,7 +338,7 @@ function ConstitutionSection({
         <h2 className="text-base font-semibold text-gray-900">體質評估</h2>
         <button
           onClick={openEdit}
-          className="w-full rounded-md bg-[#2d5016]/10 px-3 py-2 text-xs font-medium text-[#2d5016] transition-colors hover:bg-[#2d5016]/20 sm:w-auto sm:py-1.5"
+          className="w-full rounded-md bg-primary/10 px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/20 sm:w-auto sm:py-1.5"
         >
           編輯
         </button>
@@ -375,7 +375,7 @@ function ConstitutionSection({
             <select
               value={constitution}
               onChange={(e) => setConstitution(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             >
               {CONSTITUTION_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -388,7 +388,7 @@ function ConstitutionSection({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={3}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               placeholder="輸入體質備註..."
             />
           </div>
@@ -406,7 +406,7 @@ function ConstitutionSection({
             <button
               type="submit"
               disabled={saving}
-              className="w-full rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
+              className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
             >
               {saving ? "儲存中..." : "儲存"}
             </button>
@@ -439,7 +439,7 @@ function InstructionsSection({
         <h2 className="text-base font-semibold text-gray-900">護理指引</h2>
         <button
           onClick={() => setShowAdd(true)}
-          className="w-full rounded-md bg-[#2d5016] px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[#3d6b20] sm:w-auto sm:py-1.5"
+          className="w-full rounded-md bg-primary px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[#3d6b20] sm:w-auto sm:py-1.5"
         >
           + 新增指引
         </button>
@@ -575,7 +575,7 @@ function AddInstructionModal({
           <select
             value={instructionType}
             onChange={(e) => setInstructionType(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
             {INSTRUCTION_TYPE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -588,7 +588,7 @@ function AddInstructionModal({
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             placeholder="例: 忌食辛辣"
           />
         </div>
@@ -598,7 +598,7 @@ function AddInstructionModal({
             value={contentMd}
             onChange={(e) => setContentMd(e.target.value)}
             rows={4}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             placeholder="詳細描述..."
           />
         </div>
@@ -609,7 +609,7 @@ function AddInstructionModal({
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
           <div>
@@ -618,7 +618,7 @@ function AddInstructionModal({
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
         </div>
@@ -634,7 +634,7 @@ function AddInstructionModal({
           <button
             type="submit"
             disabled={saving}
-            className="w-full rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
+            className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
           >
             {saving ? "建立中..." : "建立"}
           </button>
@@ -711,7 +711,7 @@ function EditInstructionModal({
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
             {INSTRUCTION_STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -724,7 +724,7 @@ function EditInstructionModal({
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div>
@@ -733,7 +733,7 @@ function EditInstructionModal({
             value={contentMd}
             onChange={(e) => setContentMd(e.target.value)}
             rows={4}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -743,7 +743,7 @@ function EditInstructionModal({
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
           <div>
@@ -752,7 +752,7 @@ function EditInstructionModal({
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
         </div>
@@ -768,7 +768,7 @@ function EditInstructionModal({
           <button
             type="submit"
             disabled={saving}
-            className="w-full rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
+            className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
           >
             {saving ? "儲存中..." : "儲存"}
           </button>
@@ -800,7 +800,7 @@ function FollowUpsSection({
         <h2 className="text-base font-semibold text-gray-900">覆診計劃</h2>
         <button
           onClick={() => setShowAdd(true)}
-          className="w-full rounded-md bg-[#2d5016] px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[#3d6b20] sm:w-auto sm:py-1.5"
+          className="w-full rounded-md bg-primary px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[#3d6b20] sm:w-auto sm:py-1.5"
         >
           + 新增覆診
         </button>
@@ -924,7 +924,7 @@ function AddFollowUpModal({
             type="date"
             value={suggestedDate}
             onChange={(e) => setSuggestedDate(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div>
@@ -933,7 +933,7 @@ function AddFollowUpModal({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={3}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             placeholder="例: 療程第二次覆診..."
           />
         </div>
@@ -949,7 +949,7 @@ function AddFollowUpModal({
           <button
             type="submit"
             disabled={saving}
-            className="w-full rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
+            className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
           >
             {saving ? "建立中..." : "建立"}
           </button>
@@ -1017,7 +1017,7 @@ function EditFollowUpModal({
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
             {FOLLOW_UP_STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -1030,7 +1030,7 @@ function EditFollowUpModal({
             type="date"
             value={suggestedDate}
             onChange={(e) => setSuggestedDate(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div>
@@ -1039,7 +1039,7 @@ function EditFollowUpModal({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={3}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#2d5016] focus:outline-none focus:ring-1 focus:ring-[#2d5016]"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         {formError && <p className="text-sm text-red-600">{formError}</p>}
@@ -1054,7 +1054,7 @@ function EditFollowUpModal({
           <button
             type="submit"
             disabled={saving}
-            className="w-full rounded-lg bg-[#2d5016] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
+            className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
           >
             {saving ? "儲存中..." : "儲存"}
           </button>
@@ -1135,7 +1135,7 @@ function AuditLogsSection({ patientUserId }: { patientUserId: string }) {
 
       {loading ? (
         <div className="flex items-center justify-center px-5 py-10">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#2d5016] border-t-transparent" />
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       ) : error ? (
         <div className="px-5 py-8 text-center">

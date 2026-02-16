@@ -100,6 +100,11 @@ ${doctorInfo}
 - 時間表網頁：https://www.edenclinic.hk/timetable/
 ${whatsappInfo}
 
+【地址與地圖回覆規則】
+- 當用戶要求診所地址或地圖時，只可使用「診所資訊」段落內提供的地址與 Google 地圖連結。
+- 必須直接提供完整可點擊 URL。
+- 禁止提供示意連結、臨時編造連結，或叫用戶自行搜尋作為主要答案。
+
 重要提示：具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。`;
 
     // Inject intelligent guidance based on user context

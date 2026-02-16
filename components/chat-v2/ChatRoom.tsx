@@ -381,7 +381,7 @@ export function ChatRoom() {
   return (
     <div className="flex h-full flex-col">
       {/* Mode indicator bar */}
-      <div className="flex items-center justify-between border-b border-[#2d5016]/10 bg-white px-4 py-2">
+      <div className="flex items-center justify-between border-b border-primary/10 bg-white px-4 py-2">
         <ModeIndicator currentMode={mode} />
         <button
           onClick={handleClearChat}
@@ -397,7 +397,7 @@ export function ChatRoom() {
       </div>
 
       {/* Input area */}
-      <div className="border-t border-[#2d5016]/10 bg-white">
+      <div className="border-t border-primary/10 bg-white">
         <ChatInputV2
           onSend={handleSend}
           disabled={loading}
