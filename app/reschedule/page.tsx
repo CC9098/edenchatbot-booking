@@ -175,7 +175,7 @@ function RescheduleBookingContent() {
                 if (loading) {
                                 return (
                                                 <div className="flex min-h-[50vh] items-center justify-center">
-                                                                <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                                                                <Loader2 className="h-8 w-8 animate-spin text-[#2d5016]" />
                                                 </div>
                                 );
                 }
@@ -192,14 +192,14 @@ function RescheduleBookingContent() {
 
                 if (step === 'success') {
                                 return (
-                                                <div className="mx-auto mt-10 max-w-md rounded-xl border border-emerald-100 bg-emerald-50 p-8 text-center">
-                                                                <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-emerald-600" />
-                                                                <h2 className="mb-2 text-2xl font-bold text-emerald-800">改期成功！</h2>
-                                                                <p className="text-emerald-700">你的預約已更新。</p>
-                                                                <div className="mt-6 rounded-lg bg-white/60 p-4 text-left text-sm text-emerald-900">
+                                                <div className="mx-auto mt-10 max-w-md rounded-xl border border-green-100 bg-green-50 p-8 text-center">
+                                                                <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-[#2d5016]" />
+                                                                <h2 className="mb-2 text-2xl font-bold text-green-800">改期成功！</h2>
+                                                                <p className="text-green-700">你的預約已更新。</p>
+                                                                <div className="mt-6 rounded-lg bg-white/60 p-4 text-left text-sm text-green-900">
                                                                                 <p><strong>新預約時間：</strong> {selectedDate} {selectedTime}</p>
                                                                 </div>
-                                                                <p className="mt-6 text-sm text-emerald-600">你將於稍後收到確認電郵。</p>
+                                                                <p className="mt-6 text-sm text-[#2d5016]">你將於稍後收到確認電郵。</p>
                                                 </div>
                                 );
                 }
@@ -263,7 +263,7 @@ function RescheduleBookingContent() {
                                                                                                                 <button
                                                                                                                                 key={d.dateStr}
                                                                                                                                 onClick={() => handleDateSelect(d.dateStr)}
-                                                                                                                                className="flex flex-col items-center justify-center rounded-lg border border-slate-200 p-3 transition hover:border-[#2d5016] hover:bg-emerald-50"
+                                                                                                                                className="flex flex-col items-center justify-center rounded-lg border border-slate-200 p-3 transition hover:border-[#2d5016] hover:bg-[#e8f5e0]"
                                                                                                                 >
                                                                                                                                 <span className="text-xs font-medium text-slate-500">{d.dayName}</span>
                                                                                                                                 <span className="text-lg font-bold text-slate-800">{d.display}</span>
@@ -282,7 +282,7 @@ function RescheduleBookingContent() {
 
                                                                                 {checkingSlots ? (
                                                                                                 <div className="flex justify-center py-8">
-                                                                                                                <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                                                                                                                <Loader2 className="h-8 w-8 animate-spin text-[#2d5016]" />
                                                                                                 </div>
                                                                                 ) : slotError ? (
                                                                                                 <div className="rounded-lg bg-amber-50 p-4 text-center text-amber-800">
@@ -298,7 +298,7 @@ function RescheduleBookingContent() {
                                                                                                                                 <button
                                                                                                                                                 key={time}
                                                                                                                                                 onClick={() => { setSelectedTime(time); setStep('confirm'); }}
-                                                                                                                                                className="rounded-lg border border-emerald-100 bg-emerald-50 py-2 font-medium text-emerald-800 transition hover:bg-emerald-100 hover:shadow-sm"
+                                                                                                                                                className="rounded-lg border border-green-100 bg-green-50 py-2 font-medium text-green-800 transition hover:bg-[#d1ead1] hover:shadow-sm"
                                                                                                                                 >
                                                                                                                                                 {time}
                                                                                                                                 </button>
@@ -330,9 +330,9 @@ function RescheduleBookingContent() {
                                                                                                                 <ChevronRight className="h-6 w-6 rotate-90 text-slate-400 sm:rotate-0" />
                                                                                                 </div>
 
-                                                                                                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-                                                                                                                <p className="mb-1 text-xs font-bold text-emerald-600">新預約</p>
-                                                                                                                <div className="flex items-center gap-2 text-lg font-bold text-emerald-800">
+                                                                                                <div className="rounded-xl border border-green-200 bg-[#e8f5e0] p-4 shadow-sm">
+                                                                                                                <p className="mb-1 text-xs font-bold text-[#2d5016]">新預約</p>
+                                                                                                                <div className="flex items-center gap-2 text-lg font-bold text-green-800">
                                                                                                                                 <Calendar className="h-5 w-5" />
                                                                                                                                 <span>{selectedDate}</span>
                                                                                                                                 <Clock className="h-5 w-5" />
@@ -358,7 +358,7 @@ function RescheduleBookingContent() {
 export default function ReschedulePage() {
                 return (
                                 <main className="min-h-screen bg-slate-50 px-4 py-12 md:py-20">
-                                                <Suspense fallback={<div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>}>
+                                                <Suspense fallback={<div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#2d5016]" /></div>}>
                                                                 <RescheduleBookingContent />
                                                 </Suspense>
                                 </main>

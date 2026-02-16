@@ -1,8 +1,24 @@
 @import "tailwindcss";
 
 :root {
+  /* Base colors */
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Brand colors - Eden TCM Clinic */
+  --primary: #2d5016;
+  --primary-hover: #1f3810;
+  --primary-light: #e8f5e0;
+  --primary-pale: #f5f9f2;
+
+  /* Semantic colors */
+  --success: #10b981;
+  --error: #ef4444;
+  --warning: #f59e0b;
+
+  /* Neutral colors */
+  --surface: #f8fafc;
+  --border: #e2e8f0;
 }
 
 @theme inline {

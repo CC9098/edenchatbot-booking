@@ -72,7 +72,7 @@ function CancelBookingContent() {
                 if (loading) {
                                 return (
                                                 <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
-                                                                <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                                                                <Loader2 className="h-8 w-8 animate-spin text-[#2d5016]" />
                                                                 <p className="text-slate-600">正在載入預約資料...</p>
                                                 </div>
                                 );
@@ -90,11 +90,11 @@ function CancelBookingContent() {
 
                 if (cancelled) {
                                 return (
-                                                <div className="mx-auto max-w-md rounded-xl border border-emerald-100 bg-emerald-50 p-8 text-center">
-                                                                <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-emerald-600" />
-                                                                <h2 className="mb-2 text-2xl font-bold text-emerald-800">預約已取消</h2>
-                                                                <p className="text-emerald-700">你的預約已成功取消。</p>
-                                                                <p className="mt-4 text-sm text-emerald-600">你現在可以關閉此視窗。</p>
+                                                <div className="mx-auto max-w-md rounded-xl border border-green-100 bg-green-50 p-8 text-center">
+                                                                <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-green-600" />
+                                                                <h2 className="mb-2 text-2xl font-bold text-green-800">預約已取消</h2>
+                                                                <p className="text-green-700">你的預約已成功取消。</p>
+                                                                <p className="mt-4 text-sm text-green-600">你現在可以關閉此視窗。</p>
                                                 </div>
                                 );
                 }
@@ -131,7 +131,7 @@ function CancelBookingContent() {
 
                                                                 <div>
                                                                                 <p className="text-xs font-semibold tracking-wider text-slate-500">狀態</p>
-                                                                                <p className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                                                                <p className="inline-flex rounded-full bg-[#e8f5e0] px-2 py-0.5 text-xs font-medium text-[#2d5016]">
                                                                                                 已確認
                                                                                 </p>
                                                                 </div>
@@ -171,7 +171,7 @@ function CancelBookingContent() {
 export default function CancelPage() {
                 return (
                                 <main className="min-h-screen bg-slate-50 px-4 py-12 md:py-20">
-                                                <Suspense fallback={<div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>}>
+                                                <Suspense fallback={<div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#2d5016]" /></div>}>
                                                                 <CancelBookingContent />
                                                 </Suspense>
                                 </main>
