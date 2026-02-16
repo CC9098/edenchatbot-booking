@@ -1,4 +1,5 @@
 import ChatWidget from '@/components/ChatWidget';
+import Link from 'next/link';
 
 export default function Home() {
   return (
@@ -15,6 +16,26 @@ export default function Home() {
             點擊右下角的浮動圓點即可開啟「醫天圓小助手」。它提供收費、診所資訊、預約、醫師時間表、表單諮詢，並預留 AI
             回答通道，為診所網站帶來即時互動體驗。
           </p>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/articles"
+              className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-hover"
+            >
+              閱讀健康文章
+            </Link>
+            <Link
+              href="/courses"
+              className="inline-flex items-center rounded-xl border border-primary/20 bg-white px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary-light"
+            >
+              進入電子課程
+            </Link>
+            <Link
+              href="/booking"
+              className="inline-flex items-center rounded-xl border border-primary/20 bg-white px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary-light"
+            >
+              立即預約 / AI 諮詢
+            </Link>
+          </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-primary-light bg-white/80 p-4 shadow-sm backdrop-blur">
               <p className="text-sm font-semibold text-primary">決策樹邏輯</p>
