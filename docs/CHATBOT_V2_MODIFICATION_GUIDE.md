@@ -1,6 +1,6 @@
 # Chatbot v2 修改說明書（Prompt + Mode + Symptom Logging）
 
-最後更新：2026-02-16
+最後更新：2026-02-16（hotfix: symptom logging prompt + validation + function-calling flow）
 
 ## 1) TL;DR（先答你最關心）
 
@@ -25,6 +25,9 @@
     - `mode === 'B'`：booking + symptom functions
     - `mode !== 'B' && userId`：symptom functions only
     - `!userId`：no function calling（simple generateContent）
+  - **Streaming 與 Function Calling**：
+    - 有 tools（booking/symptom）時，會走 non-stream chat API，確保 function calling 正常執行
+    - 只有無 tools 時先走 streaming generateContent
 
 ### 預約 function 實作
 
@@ -44,13 +47,13 @@
 
 ### 3.1 B mode（預約）
 
-`buildSystemPrompt()` 一開始就 `if (mode === 'B') return buildBookingSystemPrompt();`
+`buildSystemPrompt()` 一開始就 `if (mode === 'B') return buildBookingSystemPrompt(careContext);`
 
 意思：
 - 不查 Supabase `chat_prompt_settings`
 - 不查 Supabase `knowledge_docs`
-- 不注入 `careContext`
-- 完全用 code 內文（`FALLBACK_MODE_PROMPTS.B` + `buildBookingSystemPrompt()`）
+- 會注入 `careContext`（包括護理指示、follow-up、近期症狀 ID）
+- 完全用 code 內文（`FALLBACK_MODE_PROMPTS.B` + `buildBookingSystemPrompt(careContext)`）
 
 ### 3.2 G1/G2/G3（健康對話）
 
@@ -95,14 +98,14 @@
 
 | 需求 | 應改位置 | 備註 |
 |---|---|---|
-| B mode 唔好講體質建議 | `FALLBACK_MODE_PROMPTS.B` + `buildBookingSystemPrompt()` | Code 改動，非 Supabase |
+| B mode 唔好講體質建議 | `FALLBACK_MODE_PROMPTS.B` + `buildBookingSystemPrompt(careContext)` | Code 改動，非 Supabase |
 | B mode 問題太多（一次3條） | 同上 | 在 prompt 明確「一次只問一條」 |
 | B mode 醫師/時段流程 | `BOOKING_FUNCTIONS` + `handleFunctionCall()` + `lib/booking-conversation-helpers.ts` | Function calling 層 |
 | G1/G2/G3 語氣與內容 | Supabase `chat_prompt_settings` | DB 即時生效（同 type 相關） |
 | G1/G2/G3 知識內容 | Supabase `knowledge_docs` | `sort_order` 決定注入次序 |
 | 判斷入 B/G1/G2/G3 規則 | `resolveMode()` + keyword 常量 | Code 改動 |
 | **症狀記錄功能（新）** | `SYMPTOM_FUNCTIONS` + `handleFunctionCall()` + `lib/symptom-conversation-helpers.ts` | **2026-02-16 新增** |
-| **症狀 AI 記錄邏輯** | `buildBookingSystemPrompt()` 症狀指引部分 | **Prompt engineering** |
+| **症狀 AI 記錄邏輯** | `SYMPTOM_RECORDING_GUIDANCE` + `buildBookingSystemPrompt(careContext)` + G mode prompt append | **Prompt engineering** |
 
 ## 6) Supabase 修改範例（G 模式）
 
@@ -156,7 +159,7 @@ values ('hoarding', '痰濕飲食重點', '內容...', 20, true, true);
 ### 7.1 改 B mode prompt
 
 - 改 `FALLBACK_MODE_PROMPTS.B`（行為規則）
-- 改 `buildBookingSystemPrompt()`（包裝說明、診所資訊、節奏規則）
+- 改 `buildBookingSystemPrompt(careContext)`（包裝說明、診所資訊、節奏規則）
 
 ### 7.2 改預約工具規格
 
@@ -290,7 +293,10 @@ if (mode === 'B') {
 
 ### 11.5 AI Prompt 指引
 
-**加入位置**：`buildBookingSystemPrompt()`（B mode）
+**加入位置**：
+- `SYMPTOM_RECORDING_GUIDANCE`（共用指引）
+- `buildBookingSystemPrompt(careContext)`（B mode）
+- `mode !== 'B' && userId` 時，`systemPrompt` 會額外 append 同一段指引（G1/G2/G3）
 
 ```
 【症狀記錄功能】
@@ -301,10 +307,10 @@ if (mode === 'B') {
 4. 如果用戶話症狀好返，call update_symptom 更新狀態
 ```
 
-**User Context 注入**：
-- `lib/user-context.ts` 會 fetch 近 2 週嘅症狀
-- 注入到 prompt 顯示：進行中症狀 + 最近好返嘅症狀
-- 包含 symptom ID（AI 需要 ID 去 call update_symptom）
+**User Context 注入（v2 實際路徑）**：
+- `app/api/chat/v2/route.ts` 內 `fetchCareContext()` 會 fetch 近 2 週嘅症狀
+- 注入到 prompt 顯示：進行中/近期症狀 + symptom ID
+- AI 可直接用該 ID 去 call `update_symptom`
 
 ### 11.6 醫師 Dashboard UI
 
@@ -323,7 +329,7 @@ if (mode === 'B') {
 | 需求 | 應改位置 | 備註 |
 |------|---------|------|
 | 改症狀分類選項 | `SYMPTOM_FUNCTIONS[0].parameters.properties.category.description` | 提供 AI 建議分類 |
-| 改 AI 記錄邏輯 | `buildBookingSystemPrompt()` 症狀記錄指引部分 | Prompt engineering |
+| 改 AI 記錄邏輯 | `SYMPTOM_RECORDING_GUIDANCE`（共用於 B + G 已登入） | Prompt engineering |
 | 改嚴重程度判斷 | `SYMPTOM_FUNCTIONS[0].parameters.properties.severity.description` | 1-5 定義 |
 | 新增症狀欄位 | 1) Migration 加欄位<br>2) `symptom-conversation-helpers.ts` 更新<br>3) Function declarations 更新 | 需改多處 |
 | 改醫師 UI 顯示 | `app/doctor/patients/[patientUserId]/page.tsx` SymptomsSection | 前端 component |
@@ -364,7 +370,10 @@ A: 不可以。症狀 functions 只在 `userId` 存在時啟用。未登入用�
 A: 不會。Prompt 已明確指示「只在用戶描述症狀時記錄，唔會主動問症狀」。
 
 **Q: 症狀記錄會影響 AI 建議嗎？**
-A: 會。`user-context.ts` 會將近期症狀注入 prompt，令 AI 建議更個人化。
+A: 會。`chat/v2` 的 `fetchCareContext()` 會將近期症狀（含 ID）注入 prompt，令 AI 建議更個人化並可更新狀態。
+
+**Q: 開咗 streaming 會唔會令症狀/預約 function 失效？**
+A: 現時唔會。當有 function tools 可用時，server 會自動改用 non-stream function-calling flow。
 
 **Q: 醫師可以修改病人記錄嘅症狀嗎？**
 A: 不可以。醫師只有 read-only 權限，保持數據真實性。
@@ -388,5 +397,5 @@ A: 去 Supabase Dashboard → SQL Editor → 執行 `supabase/migrations/2026021
 - ✅ `app/api/me/symptoms/**` - Patient API routes
 - ✅ `app/api/doctor/patients/[id]/symptoms/**` - Doctor API routes
 - ✅ `app/api/chat/v2/route.ts` - Function calling integration
-- ✅ `lib/user-context.ts` - Context injection
+- ✅ `app/api/chat/v2/route.ts` (`fetchCareContext`) - Context injection
 - ✅ `app/doctor/patients/[id]/page.tsx` - Doctor UI
