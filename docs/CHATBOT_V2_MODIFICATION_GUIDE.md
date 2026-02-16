@@ -1,11 +1,12 @@
 # Chatbot v2 修改說明書（Prompt + Mode + Symptom Logging）
 
-最後更新：2026-02-16（hotfix: symptom logging prompt + validation + function-calling flow）
+最後更新：2026-02-16（hotfix: symptom logging + hybrid semantic mode router）
 
 ## 1) TL;DR（先答你最關心）
 
 - `B mode`（預約模式）目前是 **code-driven**，不讀 Supabase prompt。**新增：B mode 同時支持 booking + symptom functions**。
 - `G1/G2/G3` 目前是 **Supabase-driven 優先**（`chat_prompt_settings` + `knowledge_docs`），沒有資料才 fallback 到 code 內建 prompt。**新增：G1/G2/G3 支持 symptom functions（需登入）**。
+- `Mode` 判斷改為 **Hybrid**：先 rule-based（keyword + length），只有邊界 case 先走 semantic router；低信心/超時自動 fallback 規則結果。
 - `/chat` 頁面用的是 `/api/chat/v2`；舊 widget 仍可能打 `/api/chat`（另一套邏輯）。
 - **新功能（2026-02-16）：症狀記錄 (Symptom Logging)** - 病人可透過對話記錄症狀，醫師可在 dashboard 查看。
 
@@ -19,7 +20,8 @@
 ### 後端主邏輯
 
 - `app/api/chat/v2/route.ts`
-  - `resolveMode(messages)`：判斷 `G1/G2/G3/B`
+  - `resolveModeByRules(messages)`：rule-based 初判 `G1/G2/G3/B`
+  - `resolveModeWithRouter(messages, model)`：邊界 case 才 call semantic router，最後決策 mode
   - `buildSystemPrompt(type, mode, careContext)`：決定 prompt 來源
   - **Function Calling 策略**：
     - `mode === 'B'`：booking + symptom functions
@@ -75,11 +77,11 @@
 - `chat_prompt_settings.system_prompt` 欄位目前 **未被 v2 使用**（v2讀的是 `prompt_md` / `gear_g*_md` / `extra_instructions_md`）。
 - 只改 `enabled` 可能不夠，v2 對 `knowledge_docs` 同時檢查 `enabled` 和 `is_active`。
 
-## 4) Mode 判斷規則（resolveMode）
+## 4) Mode 判斷規則（Hybrid: Rules + Semantic Router）
 
 檔案：`app/api/chat/v2/route.ts`
 
-### 4.1 判斷順序
+### 4.1 Rule-based 初判順序
 
 1. 看最近 5 則對話有無 booking intent（`BOOKING_KEYWORDS`）
 2. 如果有，且最新訊息無明確取消字眼（`CANCEL_KEYWORDS`），直接留在 `B`
@@ -88,11 +90,21 @@
 5. 否則若命中 `G2_KEYWORDS`，入 `G2`
 6. 其他預設 `G1`
 
-### 4.2 你應該改邊度
+### 4.2 Semantic Router 觸發與決策閘門
+
+- 只在邊界情況觸發（例如：最近有 booking intent 但最新訊息唔明確、G2/G3 訊號重疊、接近長度閾值）
+- 明確 booking/cancel keyword 會直接用 rules（避免多一次 call）
+- router 輸出嚴格 JSON：`mode + confidence + reasons`
+- `confidence >= CHAT_V2_SEMANTIC_ROUTER_CONFIDENCE`（預設 0.75）先覆蓋 rules
+- 低信心、invalid JSON、timeout（預設 350ms）都 fallback 規則 mode
+
+### 4.3 你應該改邊度
 
 - 想更易入 B mode：加 `BOOKING_KEYWORDS`
 - 想更易退出 B mode：加 `CANCEL_KEYWORDS`
 - 想減少誤入 G3：調整 `lower.length > 150` 門檻或 `G3_KEYWORDS`
+- 想調 semantic 覆蓋力度：改 `CHAT_V2_SEMANTIC_ROUTER_CONFIDENCE`
+- 想優先速度：改 `CHAT_V2_SEMANTIC_ROUTER_TIMEOUT_MS` 或關閉 `CHAT_V2_SEMANTIC_ROUTER_ENABLED`
 
 ## 5) 「我要改乜，去邊改」對照表
 
@@ -103,7 +115,7 @@
 | B mode 醫師/時段流程 | `BOOKING_FUNCTIONS` + `handleFunctionCall()` + `lib/booking-conversation-helpers.ts` | Function calling 層 |
 | G1/G2/G3 語氣與內容 | Supabase `chat_prompt_settings` | DB 即時生效（同 type 相關） |
 | G1/G2/G3 知識內容 | Supabase `knowledge_docs` | `sort_order` 決定注入次序 |
-| 判斷入 B/G1/G2/G3 規則 | `resolveMode()` + keyword 常量 | Code 改動 |
+| 判斷入 B/G1/G2/G3 規則 | `resolveModeByRules()` + `resolveModeWithRouter()` + keyword 常量 | Code 改動 |
 | **症狀記錄功能（新）** | `SYMPTOM_FUNCTIONS` + `handleFunctionCall()` + `lib/symptom-conversation-helpers.ts` | **2026-02-16 新增** |
 | **症狀 AI 記錄邏輯** | `SYMPTOM_RECORDING_GUIDANCE` + `buildBookingSystemPrompt(careContext)` + G mode prompt append | **Prompt engineering** |
 

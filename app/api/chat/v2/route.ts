@@ -47,8 +47,46 @@ interface GeminiUsageMetadata {
   totalTokenCount?: number;
 }
 
+type GeminiModel = ReturnType<GoogleGenerativeAI['getGenerativeModel']>;
+
+interface ModeRuleSignals {
+  latestLength: number;
+  hasLatestBookingKeyword: boolean;
+  hasRecentBookingIntent: boolean;
+  explicitCancel: boolean;
+  hasLatestG2Keyword: boolean;
+  hasLatestG3Keyword: boolean;
+}
+
+interface ModeRuleResolution {
+  mode: ChatMode;
+  signals: ModeRuleSignals;
+}
+
+interface SemanticRouterDecision {
+  mode: ChatMode;
+  confidence: number;
+  reasons: string[];
+}
+
+type ModeDecisionSource = 'rules' | 'semantic' | 'rules_fallback';
+
+interface ModeDecision {
+  mode: ChatMode;
+  ruleMode: ChatMode;
+  source: ModeDecisionSource;
+  routerAttempted: boolean;
+  routerMode?: ChatMode;
+  routerConfidence?: number;
+  routerReasons?: string[];
+  routerError?: string;
+}
+
 const EXPLICIT_DATE_REGEX = /\b\d{4}-\d{2}-\d{2}\b/;
 const TODAY_KEYWORDS = ['今日', '今天', '而家', '依家', '宜家', 'today', 'now'];
+const CHAT_MODES: ChatMode[] = ['G1', 'G2', 'G3', 'B'];
+const CANCEL_KEYWORDS = ['不用', '唔使', '取消', '算了', '改日', '唔約', '唔想約'];
+const MODE_ROUTER_CONTEXT_MESSAGE_COUNT = 6;
 
 // ---------------------------------------------------------------------------
 // Feature Flags
@@ -56,6 +94,22 @@ const TODAY_KEYWORDS = ['今日', '今天', '而家', '依家', '宜家', 'today
 
 function isStreamingEnabled(): boolean {
   return process.env.CHAT_STREAMING_ENABLED === 'true';
+}
+
+function isSemanticModeRouterEnabled(): boolean {
+  return process.env.CHAT_V2_SEMANTIC_ROUTER_ENABLED !== 'false';
+}
+
+function getSemanticModeRouterConfidenceThreshold(): number {
+  const raw = Number(process.env.CHAT_V2_SEMANTIC_ROUTER_CONFIDENCE ?? '0.75');
+  if (!Number.isFinite(raw)) return 0.75;
+  return Math.max(0, Math.min(1, raw));
+}
+
+function getSemanticModeRouterTimeoutMs(): number {
+  const raw = Number(process.env.CHAT_V2_SEMANTIC_ROUTER_TIMEOUT_MS ?? '350');
+  if (!Number.isFinite(raw) || raw <= 0) return 350;
+  return Math.round(raw);
 }
 
 function getTodayInHongKong(): string {
@@ -93,7 +147,11 @@ const G3_KEYWORDS = [
   '困擾', '一直', '成日', '唔知點算', '幫我分析', '教我', 'coach',
 ];
 
-function resolveMode(messages: ChatMessagePayload[]): ChatMode {
+function isChatMode(value: unknown): value is ChatMode {
+  return typeof value === 'string' && CHAT_MODES.includes(value as ChatMode);
+}
+
+function resolveModeByRules(messages: ChatMessagePayload[]): ModeRuleResolution {
   const latestMessage = messages[messages.length - 1]?.content || '';
   const lower = latestMessage.toLowerCase();
 
@@ -104,29 +162,215 @@ function resolveMode(messages: ChatMessagePayload[]): ChatMode {
     return BOOKING_KEYWORDS.some(kw => msgLower.includes(kw.toLowerCase()));
   });
 
-  // Explicit cancellation keywords
-  const CANCEL_KEYWORDS = ['不用', '唔使', '取消', '算了', '改日', '唔約', '唔想約'];
-  const explicitCancel = CANCEL_KEYWORDS.some(kw => lower.includes(kw));
+  const signals: ModeRuleSignals = {
+    latestLength: lower.length,
+    hasLatestBookingKeyword: BOOKING_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase())),
+    hasRecentBookingIntent,
+    explicitCancel: CANCEL_KEYWORDS.some((kw) => lower.includes(kw)),
+    hasLatestG2Keyword: G2_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase())),
+    hasLatestG3Keyword: G3_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase())),
+  };
 
   // If there's recent booking intent and no explicit cancellation, stay in B mode
-  if (hasRecentBookingIntent && !explicitCancel) {
-    return 'B';
+  if (signals.hasRecentBookingIntent && !signals.explicitCancel) {
+    return { mode: 'B', signals };
   }
 
   // Check for explicit booking keywords in latest message
-  if (BOOKING_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()))) {
-    return 'B';
+  if (signals.hasLatestBookingKeyword) {
+    return { mode: 'B', signals };
   }
 
-  if (lower.length > 150 || G3_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()))) {
-    return 'G3';
+  if (signals.latestLength > 150 || signals.hasLatestG3Keyword) {
+    return { mode: 'G3', signals };
   }
 
-  if (G2_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()))) {
-    return 'G2';
+  if (signals.hasLatestG2Keyword) {
+    return { mode: 'G2', signals };
   }
 
-  return 'G1';
+  return { mode: 'G1', signals };
+}
+
+function shouldRunSemanticModeRouter(signals: ModeRuleSignals): boolean {
+  // Keep explicit booking/cancel deterministic to avoid unnecessary latency.
+  if (signals.hasLatestBookingKeyword || signals.explicitCancel) return false;
+
+  if (signals.hasRecentBookingIntent) return true;
+  if (signals.hasLatestG2Keyword && signals.hasLatestG3Keyword) return true;
+
+  // Borderline long prompts around the G3 threshold are the main ambiguity zone.
+  return signals.latestLength >= 120 && signals.latestLength <= 220;
+}
+
+function buildSemanticRouterPrompt(
+  messages: ChatMessagePayload[],
+  ruleMode: ChatMode,
+): string {
+  const compactConversation = messages
+    .slice(-MODE_ROUTER_CONTEXT_MESSAGE_COUNT)
+    .map((msg, index) => `${index + 1}. ${msg.role.toUpperCase()}: ${msg.content}`)
+    .join('\n');
+
+  return `你係 Eden Chatbot v2 的 mode router。你只可以輸出 JSON，禁止任何額外文字。
+
+請只判斷「下一個回覆」應該使用邊個 mode：
+- B: 預約/改期/取消/醫師時段/診所流程
+- G1: 一般簡短健康問答
+- G2: 要求原理、原因、較詳細解釋
+- G3: 深度教練式引導、長篇複雜分析、持續困擾
+
+目前規則引擎預判 mode：${ruleMode}
+
+輸出格式（嚴格）：
+{"mode":"B|G1|G2|G3","confidence":0.0,"reasons":["tag1","tag2"]}
+
+要求：
+- confidence 必須是 0 到 1 的數字
+- reasons 使用短標籤（最多 3 個）
+- 只輸出一個 JSON object
+
+最近對話：
+${compactConversation}`;
+}
+
+function extractFirstJsonObject(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    return trimmed;
+  }
+
+  const match = trimmed.match(/\{[\s\S]*\}/);
+  return match?.[0] ?? null;
+}
+
+function parseSemanticRouterDecision(raw: string): SemanticRouterDecision | null {
+  const jsonPayload = extractFirstJsonObject(raw);
+  if (!jsonPayload) return null;
+
+  try {
+    const parsed = JSON.parse(jsonPayload) as {
+      mode?: unknown;
+      confidence?: unknown;
+      reasons?: unknown;
+    };
+
+    if (!isChatMode(parsed.mode)) return null;
+
+    const numericConfidence = typeof parsed.confidence === 'number'
+      ? parsed.confidence
+      : Number(parsed.confidence);
+    if (!Number.isFinite(numericConfidence)) return null;
+
+    const reasons = Array.isArray(parsed.reasons)
+      ? parsed.reasons.filter((item): item is string => typeof item === 'string').slice(0, 3)
+      : [];
+
+    return {
+      mode: parsed.mode,
+      confidence: Math.max(0, Math.min(1, numericConfidence)),
+      reasons,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function runSemanticModeRouter(
+  model: GeminiModel,
+  messages: ChatMessagePayload[],
+  ruleMode: ChatMode,
+  timeoutMs: number,
+): Promise<SemanticRouterDecision> {
+  const routerPrompt = buildSemanticRouterPrompt(messages, ruleMode);
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => {
+        reject(new Error(`semantic_router_timeout_${timeoutMs}ms`));
+      }, timeoutMs);
+    });
+
+    const result = await Promise.race([
+      model.generateContent(routerPrompt),
+      timeoutPromise,
+    ]);
+
+    const parsed = parseSemanticRouterDecision(result.response.text());
+    if (!parsed) {
+      throw new Error('semantic_router_invalid_json');
+    }
+
+    return parsed;
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+}
+
+async function resolveModeWithRouter(
+  messages: ChatMessagePayload[],
+  model: GeminiModel,
+): Promise<ModeDecision> {
+  const ruleResolution = resolveModeByRules(messages);
+  const ruleMode = ruleResolution.mode;
+
+  if (!isSemanticModeRouterEnabled()) {
+    return {
+      mode: ruleMode,
+      ruleMode,
+      source: 'rules',
+      routerAttempted: false,
+    };
+  }
+
+  if (!shouldRunSemanticModeRouter(ruleResolution.signals)) {
+    return {
+      mode: ruleMode,
+      ruleMode,
+      source: 'rules',
+      routerAttempted: false,
+    };
+  }
+
+  const threshold = getSemanticModeRouterConfidenceThreshold();
+  const timeoutMs = getSemanticModeRouterTimeoutMs();
+
+  try {
+    const semanticDecision = await runSemanticModeRouter(model, messages, ruleMode, timeoutMs);
+
+    if (semanticDecision.confidence >= threshold) {
+      return {
+        mode: semanticDecision.mode,
+        ruleMode,
+        source: 'semantic',
+        routerAttempted: true,
+        routerMode: semanticDecision.mode,
+        routerConfidence: semanticDecision.confidence,
+        routerReasons: semanticDecision.reasons,
+      };
+    }
+
+    return {
+      mode: ruleMode,
+      ruleMode,
+      source: 'rules_fallback',
+      routerAttempted: true,
+      routerMode: semanticDecision.mode,
+      routerConfidence: semanticDecision.confidence,
+      routerReasons: semanticDecision.reasons,
+      routerError: `low_confidence_below_${threshold}`,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'semantic_router_unknown_error';
+    return {
+      mode: ruleMode,
+      ruleMode,
+      source: 'rules_fallback',
+      routerAttempted: true,
+      routerError: errorMessage,
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -835,8 +1079,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Detect mode from message content
-    const mode = resolveMode(messages);
+    // Call Gemini
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'GEMINI_API_KEY is not configured.' },
+        { status: 500 },
+      );
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+
+    const modeDecision = await resolveModeWithRouter(messages, model);
+    const mode = modeDecision.mode;
+    console.log('[chat/v2] Mode decision:', modeDecision);
 
     // Resolve constitution type from user profile (auto-detect)
     let type: ConstitutionType = 'depleting'; // default for unauthenticated
@@ -867,18 +1124,6 @@ export async function POST(request: NextRequest) {
       // G modes also need explicit symptom logging behavior guidance.
       systemPrompt += `\n\n${SYMPTOM_RECORDING_GUIDANCE}`;
     }
-
-    // Call Gemini
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'GEMINI_API_KEY is not configured.' },
-        { status: 500 },
-      );
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
     const conversationHistory = messages
       .map((m) => `${m.role === 'user' ? '用戶' : 'AI助手'}：${m.content}`)
