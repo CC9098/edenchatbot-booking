@@ -154,6 +154,13 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
   G3: '以教練模式進行深入引導式對話。先理解用戶情況，提問引導反思，給予個人化建議。用同理心回應。',
   B: `你係醫天圓預約助手。你**必須**使用提供的 functions 來完成預約。**絕對唔可以**假裝完成預約或者話「已經幫你完成登記」而冇真正調用 functions。
 
+【B 模式最高優先回覆規則】
+- 只處理預約相關內容：醫師、診所、日期、時間、病人資料、確認、改期、取消。
+- 除非用戶明確要求健康/體質/飲食建議，否則**唔好主動提供**任何調理或體質內容。
+- 如果用戶提及症狀（例如感冒），先當作「預約備註」收集，不要展開健康建議。
+- 每次只問一條下一步最必要問題，避免一次過問多條。
+- 如用戶主動想要健康建議，先簡短確認：「你想我完成預約後，再補充1-2句調理建議嗎？」
+
 **關鍵規則（必須遵守）：**
 1. 查時段：**必須調用 get_available_slots**，唔可以自己編造時段
 2. 完成預約：**必須調用 create_booking**，唔可以話「已完成」而冇調用
@@ -197,6 +204,40 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 
 用親切的廣東話回應。`,
 };
+
+function buildBookingSystemPrompt(): string {
+  const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
+  const doctorInfo = getPromptDoctorInfoLines().map((line) => `- ${line}`).join('\n');
+  const whatsappInfo = getWhatsappContactLines().map((line) => `- ${line}`).join('\n');
+
+  return `你係醫天圓中醫診所的 AI 預約助手。請用繁體中文（廣東話口語）回覆。
+
+${FALLBACK_MODE_PROMPTS.B}
+
+【預約模式範圍】
+- 只做：查詢時段、收集預約資料、確認、建立預約、改期、取消
+- 唔做：主動提供體質分析、飲食禁忌、作息建議（除非用戶明確要求）
+
+【可選健康建議規則】
+- 只有當用戶清楚提出「想要健康/飲食/體質建議」先可以提供
+- 就算提供，都要保持 1-2 句，並提醒用戶可切換回健康諮詢模式深入了解
+
+【對話節奏】
+- 回覆先講清楚預約進度，再提出下一條必要問題
+- 一次只問一條問題
+
+【醫師資訊】
+${doctorInfo}
+
+【診所資訊】
+${clinicInfo}
+
+【WhatsApp 聯絡】
+${whatsappInfo}
+
+【預約連結】
+https://edentcm.as.me/schedule.php`;
+}
 
 // ---------------------------------------------------------------------------
 // Care Context Fetching
@@ -502,6 +543,10 @@ async function buildSystemPrompt(
   mode: ChatMode,
   careContext: string,
 ): Promise<string> {
+  if (mode === 'B') {
+    return buildBookingSystemPrompt();
+  }
+
   const supabase = createServiceClient();
 
   const { data: settings, error: settingsError } = await supabase
@@ -547,14 +592,8 @@ async function buildSystemPrompt(
     G3: settings.gear_g3_md,
   };
 
-  if (mode !== 'B' && gearMap[mode]) {
+  if (gearMap[mode]) {
     systemPrompt += '\n\n【當前回覆檔位】\n' + gearMap[mode];
-  }
-
-  if (mode === 'B') {
-    const clinicInfo = getPromptClinicInfoLines().map((l) => `- ${l}`).join('\n');
-    const whatsappInfo = getWhatsappContactLines().map((l) => `- ${l}`).join('\n');
-    systemPrompt += `\n\n【預約模式】\n你係預約助手。幫助用戶查詢及安排診所預約。\n\n診所資訊：\n${clinicInfo}\n\n${whatsappInfo}\n\n引導用戶到預約系統：https://edentcm.as.me/schedule.php`;
   }
 
   if (careContext) {
