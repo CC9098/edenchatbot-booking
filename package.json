@@ -13,7 +13,9 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "import:finished-articles": "tsx ./scripts/import-finished-articles.ts",
+    "migrate:legacy-content": "tsx ./scripts/migrate-legacy-content.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
