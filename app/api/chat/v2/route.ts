@@ -46,12 +46,33 @@ interface GeminiUsageMetadata {
   totalTokenCount?: number;
 }
 
+const EXPLICIT_DATE_REGEX = /\b\d{4}-\d{2}-\d{2}\b/;
+const TODAY_KEYWORDS = ['今日', '今天', '而家', '依家', '宜家', 'today', 'now'];
+
 // ---------------------------------------------------------------------------
 // Feature Flags
 // ---------------------------------------------------------------------------
 
 function isStreamingEnabled(): boolean {
   return process.env.CHAT_STREAMING_ENABLED === 'true';
+}
+
+function getTodayInHongKong(): string {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Hong_Kong',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+
+  return formatter.format(new Date());
+}
+
+function shouldForceTodayDate(userMessage: string): boolean {
+  const lower = userMessage.toLowerCase();
+  const hasTodayKeyword = TODAY_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()));
+  if (!hasTodayKeyword) return false;
+  return !EXPLICIT_DATE_REGEX.test(userMessage);
 }
 
 // ---------------------------------------------------------------------------
@@ -210,6 +231,14 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 用親切的廣東話回應。`,
 };
 
+const SYMPTOM_RECORDING_GUIDANCE = `【症狀記錄功能】
+你具備幫用戶記錄身體症狀的功能。注意以下原則：
+1. 當用戶「描述」自己的症狀時（例如「我今日頭痛」「我最近失眠」），先 call log_symptom 記錄，再回覆
+2. 回覆時先自然提及「我幫你記錄低咗，醫師睇症時會參考」，再提供 1-2 句安全建議
+3. 當用戶「詢問」症狀原因時（例如「頭痛點算好」），先回答，再按語境決定是否建議記錄
+4. 如果用戶話症狀好返，call update_symptom 更新狀態
+5. 如果用戶問歷史記錄，call list_my_symptoms`;
+
 function buildBookingSystemPrompt(careContext: string): string {
   const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
   const doctorInfo = getPromptDoctorInfoLines().map((line) => `- ${line}`).join('\n');
@@ -248,12 +277,7 @@ ${whatsappInfo}
 【預約連結】
 https://edentcm.as.me/schedule.php
 
-【症狀記錄功能】
-你具備幫用戶記錄身體症狀的功能。注意以下原則：
-1. 當用戶「描述」自己的症狀時（例如「我今日頭痛」「我最近失眠」），call log_symptom 記錄
-2. 當用戶「詢問」症狀原因時（例如「頭痛點算好」），唔好急住記錄，先提供建議
-3. 症狀記錄後，自然提及「我幫你記錄低咗，醫師睇症時會參考」
-4. 如果用戶話症狀好返，call update_symptom 更新狀態
+${SYMPTOM_RECORDING_GUIDANCE}
 ${careContext}
 `;
 }
@@ -583,7 +607,8 @@ async function handleFunctionCall(
   functionName: string,
   functionArgs: object,
   userEmail?: string,
-  userId?: string
+  userId?: string,
+  latestUserMessage?: string,
 ): Promise<object> {
   console.log(`[chat/v2] Calling function: ${functionName}`, functionArgs);
 
@@ -618,13 +643,21 @@ async function handleFunctionCall(
 
     case 'log_symptom': {
       if (!userId) return { success: false, error: '需要登入才能記錄症狀' };
-      const result = await logSymptom(userId, args as any);
+      const symptomArgs = { ...args };
+      if (latestUserMessage && shouldForceTodayDate(latestUserMessage)) {
+        symptomArgs.startedAt = getTodayInHongKong();
+      }
+      const result = await logSymptom(userId, symptomArgs as any);
       return result;
     }
 
     case 'update_symptom': {
       if (!userId) return { success: false, error: '需要登入才能更新症狀' };
-      const result = await updateSymptom(userId, args as any);
+      const symptomArgs = { ...args };
+      if (latestUserMessage && shouldForceTodayDate(latestUserMessage)) {
+        symptomArgs.endedAt = getTodayInHongKong();
+      }
+      const result = await updateSymptom(userId, symptomArgs as any);
       return result;
     }
 
@@ -816,7 +849,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Build system prompt (DB-driven with fallback)
-    const systemPrompt = await buildSystemPrompt(type, mode, careContext);
+    let systemPrompt = await buildSystemPrompt(type, mode, careContext);
+    if (userId && mode !== 'B') {
+      // G modes also need explicit symptom logging behavior guidance.
+      systemPrompt += `\n\n${SYMPTOM_RECORDING_GUIDANCE}`;
+    }
 
     // Call Gemini
     const apiKey = process.env.GEMINI_API_KEY;
@@ -840,7 +877,9 @@ export async function POST(request: NextRequest) {
       userInfoSection = `\n\n【用戶登入資料】\n用戶已登入系統，電郵地址：${userEmail}\n**重要：預約時直接使用此 email，唔需要再問用戶提供。**\n`;
     }
 
-    const fullPrompt = `${systemPrompt}${userInfoSection}\n\n【對話記錄】\n${conversationHistory}\n\nAI助手：`;
+    const todayInHk = getTodayInHongKong();
+    const dateGuardrailSection = `\n\n【當前日期（香港時間）】\n今天是 ${todayInHk}。\n當用戶講「今日／今天／而家／依家／today／now」而無提供具體日期時，症狀記錄日期必須用 ${todayInHk}（YYYY-MM-DD）。`;
+    const fullPrompt = `${systemPrompt}${userInfoSection}${dateGuardrailSection}\n\n【對話記錄】\n${conversationHistory}\n\nAI助手：`;
 
     const tools = resolveFunctionTools(mode, userId);
 
@@ -951,7 +990,13 @@ export async function POST(request: NextRequest) {
         console.log(`[chat/v2] Function call round ${functionCallRounds}:`, functionName, functionArgs);
 
         // Execute the function
-        const functionResult = await handleFunctionCall(functionName, functionArgs, userEmail, userId);
+        const functionResult = await handleFunctionCall(
+          functionName,
+          functionArgs,
+          userEmail,
+          userId,
+          latestUserMessage.content,
+        );
 
         // Send function result back to Gemini
         result = await chat.sendMessage([{
