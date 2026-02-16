@@ -35,6 +35,28 @@ function formatTime(iso: string) {
   }
 }
 
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+
+function renderMessageContent(content: string, isUser: boolean) {
+  return content.split(URL_REGEX).map((part, index) => {
+    if (!part.match(URL_REGEX)) return part;
+
+    return (
+      <a
+        key={`${part}-${index}`}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`underline decoration-1 underline-offset-2 ${
+          isUser ? "text-white/95" : "text-primary hover:text-primary-hover"
+        }`}
+      >
+        {part}
+      </a>
+    );
+  });
+}
+
 export function MessageList({ messages, loading }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastMessage = messages[messages.length - 1];
@@ -82,7 +104,7 @@ export function MessageList({ messages, loading }: MessageListProps) {
                   }`}
                 >
                   <p className="whitespace-pre-wrap break-words">
-                    {msg.content}
+                    {renderMessageContent(msg.content, isUser)}
                   </p>
                 </div>
 

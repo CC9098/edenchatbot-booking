@@ -484,6 +484,11 @@ const SYMPTOM_RECORDING_GUIDANCE = `【症狀記錄功能】
 4. 如果用戶話症狀好返，call update_symptom 更新狀態
 5. 如果用戶問歷史記錄，call list_my_symptoms`;
 
+const OUTPUT_FORMAT_RULES = `【輸出格式規則（必須遵守）】
+- 禁止使用 Markdown 星號格式（包括 *、**、***）。
+- 禁止輸出任何星號字元 *。
+- 需要強調時，請用自然語句、全形標點或換行，不要用星號。`;
+
 function buildBookingSystemPrompt(careContext: string): string {
   const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
   const doctorInfo = getPromptDoctorInfoLines().map((line) => `- ${line}`).join('\n');
@@ -642,6 +647,11 @@ function getUsageMetadata(response: unknown): GeminiUsageMetadata | undefined {
   const maybeUsage = (response as { usageMetadata?: GeminiUsageMetadata }).usageMetadata;
   if (!maybeUsage || typeof maybeUsage !== 'object') return undefined;
   return maybeUsage;
+}
+
+function sanitizeAssistantReply(text: string): string {
+  if (!text) return text;
+  return text.replace(/\*/g, '');
 }
 
 // ---------------------------------------------------------------------------
@@ -1124,6 +1134,7 @@ export async function POST(request: NextRequest) {
       // G modes also need explicit symptom logging behavior guidance.
       systemPrompt += `\n\n${SYMPTOM_RECORDING_GUIDANCE}`;
     }
+    systemPrompt += `\n\n${OUTPUT_FORMAT_RULES}`;
 
     const conversationHistory = messages
       .map((m) => `${m.role === 'user' ? '用戶' : 'AI助手'}：${m.content}`)
@@ -1163,7 +1174,7 @@ export async function POST(request: NextRequest) {
                 const text = chunk.text();
                 if (!text) continue;
                 finalReply += text;
-                push({ type: 'delta', text });
+                push({ type: 'delta', text: sanitizeAssistantReply(text) });
               }
 
               const finalResponse = await result.response;
@@ -1172,6 +1183,8 @@ export async function POST(request: NextRequest) {
               if (!finalReply) {
                 finalReply = finalResponse.text();
               }
+
+              finalReply = sanitizeAssistantReply(finalReply);
 
               const durationMs = Date.now() - startTime;
               const metrics = resolveTokenMetrics(usage, fullPrompt, finalReply, durationMs);
@@ -1275,6 +1288,8 @@ export async function POST(request: NextRequest) {
       finalResponse = result.response;
       reply = finalResponse.text();
     }
+
+    reply = sanitizeAssistantReply(reply);
 
     const usage = getUsageMetadata(finalResponse);
     const durationMs = Date.now() - startTime;
