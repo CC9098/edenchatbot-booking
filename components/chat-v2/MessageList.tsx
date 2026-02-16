@@ -17,7 +17,7 @@ type MessageListProps = {
 };
 
 const MODE_BADGES: Record<ChatMode, { label: string; color: string }> = {
-  G1: { label: "簡答", color: "bg-emerald-100 text-emerald-700" },
+  G1: { label: "簡答", color: "bg-[#e8f5e0] text-[#2d5016]" },
   G2: { label: "詳答", color: "bg-blue-100 text-blue-700" },
   G3: { label: "教練", color: "bg-purple-100 text-purple-700" },
   B: { label: "預約", color: "bg-amber-100 text-amber-700" },
