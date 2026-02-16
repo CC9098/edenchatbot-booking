@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 
 import { getGoogleAuthClient } from './google-auth';
 import { getClinicInfoHtmlSections } from '@/shared/clinic-data';
+import { getPublicBaseUrl } from '@/lib/public-url';
 
 async function getUncachableGmailClient() {
   const auth = await getGoogleAuthClient();
@@ -69,13 +70,7 @@ const CLINIC_GOOGLE_MAP_BY_NAME_ZH: Record<string, string> = {
 };
 
 function getBaseUrl(): string {
-  if (process.env.BASE_URL) {
-    return process.env.BASE_URL.replace(/\/$/, '');
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  return 'http://localhost:3000';
+  return getPublicBaseUrl();
 }
 
 function getBookingActionUrl(path: string, eventId: string, calendarId: string): string {

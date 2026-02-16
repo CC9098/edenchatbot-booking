@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase";
+import { buildPublicUrl } from "@/lib/public-url";
 
 export interface ArticleCardItem {
   id: string;
@@ -424,7 +425,7 @@ export async function buildContentReferenceContext(
       candidates.push({
         kind: "文章",
         title: article.title,
-        url: `/articles/${article.slug}`,
+        url: buildPublicUrl(`/articles/${article.slug}`),
         summary: summarizeText(article.excerpt || article.content_md || article.title),
         publishedAt: toIsoString(article.published_at),
         score: score + 1,
@@ -439,7 +440,7 @@ export async function buildContentReferenceContext(
       candidates.push({
         kind: "課程",
         title: course.title,
-        url: `/courses/${course.slug}`,
+        url: buildPublicUrl(`/courses/${course.slug}`),
         summary: summarizeText(course.description_md || course.title),
         publishedAt: toIsoString(course.published_at),
         score,
@@ -457,7 +458,7 @@ export async function buildContentReferenceContext(
       candidates.push({
         kind: "課堂",
         title: `${course.title}｜${lesson.title}`,
-        url: `/courses/${course.slug}/lessons/${lesson.slug}`,
+        url: buildPublicUrl(`/courses/${course.slug}/lessons/${lesson.slug}`),
         summary: summarizeText(lesson.content_md || lesson.title),
         publishedAt: toIsoString(lesson.published_at),
         score: score + 2,

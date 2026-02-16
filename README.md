@@ -23,6 +23,8 @@ Booking system backend and frontend for Eden TCM Clinic (醫天圓).
 | `GOOGLE_CLIENT_SECRET` | OAuth2 Client Secret |
 | `GOOGLE_REFRESH_TOKEN` | OAuth2 Refresh Token (offline access) |
 | `BASE_URL` | **Domain of your deployed app**. e.g. `https://your-project.vercel.app` |
+| `PRIMARY_HOST` | Canonical host for merged app (optional). e.g. `edenchatbot-booking.vercel.app` |
+| `REDIRECT_HOSTS` | Comma-separated old hosts to 308-redirect to `PRIMARY_HOST` (optional) |
 
 ### URL Resolution Logic
 The system determines the public URL in this order:
@@ -38,11 +40,15 @@ The system determines the public URL in this order:
 2.  Add all Environment Variables in Vercel Project Settings.
 3.  Deploy.
 4.  **After deployment, copy your Vercel domain and set it as `BASE_URL` in the Environment Variables, then Redeploy.** This ensures email links point to the correct domain.
+5.  (Optional) Set `PRIMARY_HOST` + `REDIRECT_HOSTS` to unify multiple domains into one canonical host.
 
 ## Project Structure
 -   `app/api/booking`: Handles Booking creation (POST), retrieval (GET), cancellation (DELETE), rescheduling (PATCH).
 -   `app/api/availability`: Handles time slot checks.
+-   `app/api/articles`, `app/api/courses`: Public content APIs for educational content migration/integration.
+-   `app/api/me/lesson-progress`: Unified lesson progress APIs for logged-in users.
 -   `app/cancel`: Cancellation page in existing app.
 -   `app/reschedule`: Rescheduling page in existing app.
+-   `app/articles`, `app/courses`, `app/booking`: Unified content + booking entry routes.
 -   `lib/gmail.ts`: Email generation logic.
 -   `lib/google-calendar.ts`: Google Calendar API wrapper.
