@@ -17,7 +17,9 @@
 - [x] Seed content inserted into Supabase (2 articles, 1 course, 3 lessons)
 
 ## Still required outside code (Vercel/domain operations)
-- [ ] In Vercel project env, set `PRIMARY_HOST` and `REDIRECT_HOSTS`
+- [ ] In Vercel project env, set:
+  - `PRIMARY_HOST=edenchatbot-booking.vercel.app`
+  - `REDIRECT_HOSTS=educational-platform-mocha-alpha.vercel.app`
 - [ ] Redeploy and verify 308 redirects from old educational host
 - [ ] Point custom domain DNS/CNAME to the canonical app if needed
 - [ ] Confirm OAuth callback domain list includes canonical host
