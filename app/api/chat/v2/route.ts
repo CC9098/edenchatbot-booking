@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth-helpers';
@@ -291,7 +291,7 @@ const BOOKING_FUNCTIONS = [
     name: 'list_doctors',
     description: '列出所有可預約的醫師及其時間表',
     parameters: {
-      type: 'object',
+      type: SchemaType.OBJECT,
       properties: {},
       required: [],
     },
@@ -300,18 +300,18 @@ const BOOKING_FUNCTIONS = [
     name: 'get_available_slots',
     description: '查詢某位醫師在某個診所的可用時段',
     parameters: {
-      type: 'object',
+      type: SchemaType.OBJECT,
       properties: {
         doctorNameZh: {
-          type: 'string',
+          type: SchemaType.STRING,
           description: '醫師中文名稱（例如：陳家富醫師、李芊霖醫師）',
         },
         date: {
-          type: 'string',
+          type: SchemaType.STRING,
           description: '預約日期，格式為 YYYY-MM-DD（例如：2026-02-20）',
         },
         clinicNameZh: {
-          type: 'string',
+          type: SchemaType.STRING,
           description: '診所中文名稱（例如：中環、佐敦、荃灣）。如果不提供，會返回該醫師所有可用的診所',
         },
       },
@@ -322,38 +322,38 @@ const BOOKING_FUNCTIONS = [
     name: 'create_booking',
     description: '為病人創建預約',
     parameters: {
-      type: 'object',
+      type: SchemaType.OBJECT,
       properties: {
         doctorNameZh: {
-          type: 'string',
+          type: SchemaType.STRING,
           description: '醫師中文名稱',
         },
         clinicNameZh: {
-          type: 'string',
+          type: SchemaType.STRING,
           description: '診所中文名稱',
         },
         date: {
-          type: 'string',
+          type: SchemaType.STRING,
           description: '預約日期，格式為 YYYY-MM-DD',
         },
         time: {
-          type: 'string',
+          type: SchemaType.STRING,
           description: '預約時間，格式為 HH:mm（24小時制）',
         },
         patientName: {
-          type: 'string',
+          type: SchemaType.STRING,
           description: '病人姓名',
         },
         phone: {
-          type: 'string',
+          type: SchemaType.STRING,
           description: '病人電話號碼',
         },
         email: {
-          type: 'string',
+          type: SchemaType.STRING,
           description: '病人電郵地址（可選）',
         },
         notes: {
-          type: 'string',
+          type: SchemaType.STRING,
           description: '備註（可選）',
         },
       },
