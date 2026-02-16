@@ -79,6 +79,15 @@ function compactWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function normalizeSlugInput(value: string): string {
+  if (!value) return value;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function summarizeText(value: string, maxLength = 120): string {
   const normalized = compactWhitespace(value);
   if (normalized.length <= maxLength) return normalized;
@@ -186,11 +195,12 @@ export async function listPublishedCourses(limit = 12): Promise<CourseCardItem[]
 
 export async function getPublishedArticleBySlug(slug: string): Promise<ArticleDetail | null> {
   try {
+    const normalizedSlug = normalizeSlugInput(slug);
     const supabase = createServiceClient();
     const { data, error } = await supabase
       .from("articles")
       .select("id, slug, title, excerpt, content_md, cover_image_url, tags, published_at")
-      .eq("slug", slug)
+      .eq("slug", normalizedSlug)
       .eq("is_active", true)
       .not("published_at", "is", null)
       .lte("published_at", new Date().toISOString())
@@ -221,11 +231,12 @@ export async function getPublishedArticleBySlug(slug: string): Promise<ArticleDe
 
 export async function getPublishedCourseBySlug(slug: string): Promise<CourseDetail | null> {
   try {
+    const normalizedSlug = normalizeSlugInput(slug);
     const supabase = createServiceClient();
     const { data, error } = await supabase
       .from("courses")
       .select("id, slug, title, description_md, cover_image_url, level, published_at")
-      .eq("slug", slug)
+      .eq("slug", normalizedSlug)
       .eq("is_active", true)
       .not("published_at", "is", null)
       .lte("published_at", new Date().toISOString())
@@ -324,6 +335,7 @@ export async function getPublishedLessonByCourseAndSlug(
   lessonSlug: string
 ): Promise<CourseLessonItem | null> {
   try {
+    const normalizedLessonSlug = normalizeSlugInput(lessonSlug);
     const supabase = createServiceClient();
     const { data, error } = await supabase
       .from("course_lessons")
@@ -331,7 +343,7 @@ export async function getPublishedLessonByCourseAndSlug(
         "id, course_id, module_id, slug, title, content_md, video_url, duration_minutes, sort_order, published_at"
       )
       .eq("course_id", courseId)
-      .eq("slug", lessonSlug)
+      .eq("slug", normalizedLessonSlug)
       .eq("is_active", true)
       .not("published_at", "is", null)
       .lte("published_at", new Date().toISOString())
