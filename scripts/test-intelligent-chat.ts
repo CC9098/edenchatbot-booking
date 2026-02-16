@@ -40,6 +40,7 @@ async function testNewPatient() {
     nextFollowUp: null,
     lastBooking: null,
     totalVisits: 0,
+    recentSymptoms: [],
   };
 
   const prompt = buildIntelligentPrompt(BASE_PROMPT, userContext);
@@ -77,6 +78,7 @@ async function testExistingPatient() {
       clinicName: '中環診所',
     },
     totalVisits: 3,
+    recentSymptoms: [],
   };
 
   const daysUntil = getDaysUntilFollowUp(userContext);
