@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType, type FunctionDeclaration } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth-helpers';
@@ -286,7 +286,7 @@ async function logChatMessages(
 // Function Calling Definitions for Booking
 // ---------------------------------------------------------------------------
 
-const BOOKING_FUNCTIONS = [
+const BOOKING_FUNCTIONS: FunctionDeclaration[] = [
   {
     name: 'list_doctors',
     description: '列出所有可預約的醫師及其時間表',
@@ -367,9 +367,11 @@ const BOOKING_FUNCTIONS = [
 
 async function handleFunctionCall(
   functionName: string,
-  functionArgs: Record<string, unknown>
-): Promise<unknown> {
+  functionArgs: object
+): Promise<object> {
   console.log(`[chat/v2] Calling function: ${functionName}`, functionArgs);
+
+  const args = functionArgs as Record<string, unknown>;
 
   switch (functionName) {
     case 'list_doctors': {
@@ -378,7 +380,7 @@ async function handleFunctionCall(
     }
 
     case 'get_available_slots': {
-      const { doctorNameZh, date, clinicNameZh } = functionArgs;
+      const { doctorNameZh, date, clinicNameZh } = args;
       const result = await getAvailableTimeSlots(
         doctorNameZh as string,
         date as string,
@@ -388,7 +390,7 @@ async function handleFunctionCall(
     }
 
     case 'create_booking': {
-      const result = await createConversationalBooking(functionArgs as any);
+      const result = await createConversationalBooking(args as any);
       return result;
     }
 
@@ -654,6 +656,7 @@ export async function POST(request: NextRequest) {
     // For B mode (booking), use chat with function calling
     // For other modes, use simple generateContent
     let reply: string;
+    let finalResponse: any;
 
     if (mode === 'B') {
       // Use chat API for function calling support
@@ -702,13 +705,15 @@ export async function POST(request: NextRequest) {
       }
 
       reply = response.text();
+      finalResponse = response;
     } else {
       // Simple mode without function calling
       const result = await model.generateContent(fullPrompt);
-      reply = result.response.text();
+      finalResponse = result.response;
+      reply = finalResponse.text();
     }
 
-    const usage = getUsageMetadata(response);
+    const usage = getUsageMetadata(finalResponse);
     const durationMs = Date.now() - startTime;
     const metrics = resolveTokenMetrics(usage, fullPrompt, reply, durationMs);
 
