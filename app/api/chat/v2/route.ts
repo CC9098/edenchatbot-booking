@@ -66,9 +66,27 @@ const G3_KEYWORDS = [
   '困擾', '一直', '成日', '唔知點算', '幫我分析', '教我', 'coach',
 ];
 
-function resolveMode(latestUserMessage: string): ChatMode {
-  const lower = latestUserMessage.toLowerCase();
+function resolveMode(messages: ChatMessagePayload[]): ChatMode {
+  const latestMessage = messages[messages.length - 1]?.content || '';
+  const lower = latestMessage.toLowerCase();
 
+  // Check recent conversation history (last 5 messages) for booking intent
+  const recentMessages = messages.slice(-5);
+  const hasRecentBookingIntent = recentMessages.some(msg => {
+    const msgLower = msg.content.toLowerCase();
+    return BOOKING_KEYWORDS.some(kw => msgLower.includes(kw.toLowerCase()));
+  });
+
+  // Explicit cancellation keywords
+  const CANCEL_KEYWORDS = ['不用', '唔使', '取消', '算了', '改日', '唔約', '唔想約'];
+  const explicitCancel = CANCEL_KEYWORDS.some(kw => lower.includes(kw));
+
+  // If there's recent booking intent and no explicit cancellation, stay in B mode
+  if (hasRecentBookingIntent && !explicitCancel) {
+    return 'B';
+  }
+
+  // Check for explicit booking keywords in latest message
   if (BOOKING_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()))) {
     return 'B';
   }
@@ -547,7 +565,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Detect mode from message content
-    const mode = resolveMode(latestUserMessage.content);
+    const mode = resolveMode(messages);
 
     // Resolve constitution type from user profile (auto-detect)
     let type: ConstitutionType = 'depleting'; // default for unauthenticated
@@ -700,10 +718,7 @@ export async function POST(request: NextRequest) {
         result = await chat.sendMessage([{
           functionResponse: {
             name: functionName,
-            response: {
-              name: functionName,
-              content: functionResult,
-            },
+            response: functionResult,
           },
         }]);
 
