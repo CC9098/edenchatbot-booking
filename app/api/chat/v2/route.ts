@@ -443,7 +443,11 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 1. 查時段：**必須調用 get_available_slots**，唔可以自己編造時段
 2. 完成預約：**必須調用 create_booking**，唔可以話「已完成」而冇調用
 3. 查本人預約紀錄：當用戶問「我預約咗幾時／我有咩預約」時，**必須調用 list_my_bookings**
-4. 收集資料：
+4. 用戶要求取消/改期已有預約時，優先引導：
+   - 先去預約確認電郵內，撳「取消預約 CANCEL」或「改期 RESCHEDULE」連結
+   - 如果搵唔到電郵、連結失效，或者需要人工協助，先提供對應診所 WhatsApp
+   - 唔好提供「預約網站 https://edentcm.as.me/schedule.php」作為取消/改期指引
+5. 收集資料：
    - **姓名、電話：一定要問**
    - **首診/覆診：一定要問**（visitType = first 或 followup）
    - **收據需求：一定要問**（needReceipt = no / yes_insurance / yes_not_insurance）
@@ -478,6 +482,7 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 ❌ 用戶問預約紀錄時，唔准靠估或者只叫對方自行查 email（除非 list_my_bookings 返回失敗/需要登入）
 ❌ 唔准問已登入用戶提供 email（如果【用戶登入資料】有 email，直接用）
 ❌ 唔准話「預約成功」但係 create_booking 未返回 success
+❌ 用戶要求取消/改期時，唔准叫對方去預約網站 schedule.php，應先引導用預約確認電郵連結，再提供 WhatsApp 後備
 
 例子 1（已登入用戶）：
 用戶：「我想預約李醫師，荃灣，2月28號」
@@ -546,8 +551,9 @@ ${clinicInfo}
 【WhatsApp 聯絡】
 ${whatsappInfo}
 
-【預約連結】
-https://edentcm.as.me/schedule.php
+【預約連結使用規則】
+- 新預約、查可用時段、一般預約入口：可提供 https://edentcm.as.me/schedule.php
+- 取消/改期：唔好提供以上連結；應先引導用戶去預約確認電郵內嘅取消/改期連結，之後先提供 WhatsApp 作後備
 
 ${SYMPTOM_RECORDING_GUIDANCE}
 ${careContext}
