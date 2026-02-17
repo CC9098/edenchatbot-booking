@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, SchemaType, type FunctionDeclaration } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createServiceClient } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { getPromptClinicInfoLines, getWhatsappContactLines } from '@/shared/clinic-data';
@@ -28,11 +29,16 @@ interface ChatMessagePayload {
   content: string;
 }
 
-interface RequestBody {
-  sessionId: string;
-  messages: ChatMessagePayload[];
-  stream?: boolean;
-}
+const CHAT_MESSAGE_SCHEMA = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
+});
+
+const CHAT_REQUEST_SCHEMA = z.object({
+  sessionId: z.string().min(1, 'sessionId is required'),
+  messages: z.array(CHAT_MESSAGE_SCHEMA).min(1, 'messages must not be empty'),
+  stream: z.boolean().optional(),
+});
 
 interface TokenUsageMetrics {
   promptTokens: number;
@@ -654,6 +660,18 @@ function sanitizeAssistantReply(text: string): string {
   return text.replace(/\*/g, '');
 }
 
+function formatValidationIssues(error: z.ZodError): Array<{ path: string; message: string }> {
+  return error.issues.map((issue) => ({
+    path: issue.path.join('.'),
+    message: issue.message,
+  }));
+}
+
+const STREAM_ERROR_MESSAGE = 'Streaming request failed.';
+const INTERNAL_ERROR_MESSAGE = 'Failed to generate AI response.';
+const INVALID_JSON_MESSAGE = 'Request body must be valid JSON.';
+const INVALID_PAYLOAD_MESSAGE = 'Invalid request payload.';
+
 // ---------------------------------------------------------------------------
 // Chat Logging
 // ---------------------------------------------------------------------------
@@ -1063,28 +1081,36 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   try {
-    const body = (await request.json()) as RequestBody;
+    let jsonBody: unknown;
+    try {
+      jsonBody = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: INVALID_JSON_MESSAGE, code: 'CHAT_V2_INVALID_JSON' },
+        { status: 400 },
+      );
+    }
+
+    const parsedBody = CHAT_REQUEST_SCHEMA.safeParse(jsonBody);
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        {
+          error: INVALID_PAYLOAD_MESSAGE,
+          code: 'CHAT_V2_INVALID_PAYLOAD',
+          details: formatValidationIssues(parsedBody.error),
+        },
+        { status: 400 },
+      );
+    }
+
+    const body = parsedBody.data;
     const { sessionId, messages } = body;
     const streamRequested = body.stream === true;
-
-    if (!sessionId || typeof sessionId !== 'string') {
-      return NextResponse.json(
-        { error: 'sessionId is required.' },
-        { status: 400 },
-      );
-    }
-
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json(
-        { error: 'messages array is required and must not be empty.' },
-        { status: 400 },
-      );
-    }
 
     const latestUserMessage = [...messages].reverse().find((m) => m.role === 'user');
     if (!latestUserMessage) {
       return NextResponse.json(
-        { error: 'No user message found in messages array.' },
+        { error: INVALID_PAYLOAD_MESSAGE, code: 'CHAT_V2_NO_USER_MESSAGE' },
         { status: 400 },
       );
     }
@@ -1208,12 +1234,21 @@ export async function POST(request: NextRequest) {
                 void logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, metrics);
               }
 
-              push({ type: 'error', error: message });
+              push({
+                type: 'error',
+                error: STREAM_ERROR_MESSAGE,
+                code: 'CHAT_V2_STREAM_FAILED',
+              });
               controller.close();
             }
           })().catch((unexpectedError) => {
             const message = unexpectedError instanceof Error ? unexpectedError.message : 'Unknown error';
-            push({ type: 'error', error: message });
+            console.error('[chat/v2] Unexpected streaming wrapper error:', message);
+            push({
+              type: 'error',
+              error: STREAM_ERROR_MESSAGE,
+              code: 'CHAT_V2_STREAM_FAILED',
+            });
             controller.close();
           });
         },
@@ -1303,8 +1338,8 @@ export async function POST(request: NextRequest) {
     console.error('[chat/v2] Error:', error);
     return NextResponse.json(
       {
-        error: 'Failed to generate AI response.',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        error: INTERNAL_ERROR_MESSAGE,
+        code: 'CHAT_V2_INTERNAL_ERROR',
       },
       { status: 500 },
     );

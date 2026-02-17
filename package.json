@@ -15,17 +15,23 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "import:finished-articles": "tsx ./scripts/import-finished-articles.ts",
-    "migrate:legacy-content": "tsx ./scripts/migrate-legacy-content.ts"
+    "migrate:legacy-content": "tsx ./scripts/migrate-legacy-content.ts",
+    "mcp:github": "tsx ./mcp/github-server/index.ts",
+    "typecheck:mcp:github": "tsc -p ./mcp/github-server/tsconfig.json --pretty false",
+    "setup:mcp:oauth": "bash ./scripts/setup-mcp-github-oauth.sh"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@neondatabase/serverless": "^0.9.0",
+    "@octokit/rest": "^22.0.1",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
     "date-fns": "^3.6.0",
     "date-fns-tz": "^3.1.3",
     "drizzle-orm": "^0.30.7",
     "drizzle-zod": "^0.5.1",
+    "express": "^5.2.1",
     "framer-motion": "^11.0.24",
     "googleapis": "^171.4.0",
     "lucide-react": "^0.363.0",
@@ -40,6 +46,7 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.0.0",
+    "@types/express": "^5.0.6",
     "@types/node": "^20.12.2",
     "@types/react": "^18.2.73",
     "@types/react-dom": "^18.2.23",

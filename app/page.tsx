@@ -21,6 +21,15 @@ export default async function Home() {
   return (
     <main className="relative min-h-screen bg-primary-pale text-slate-800">
       <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 pb-24 pt-16 sm:px-10 sm:pb-32 sm:pt-20">
+        <div className="flex justify-end">
+          <Link
+            href="/login"
+            className="inline-flex items-center rounded-lg border border-primary/20 bg-white px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary-light"
+          >
+            會員 / 醫師登入
+          </Link>
+        </div>
+
         <section className="rounded-3xl border border-primary/15 bg-white/85 p-6 shadow-sm sm:p-8">
           <div className="max-w-4xl space-y-6">
             <p className="inline-flex items-center rounded-full bg-primary-light px-3 py-1 text-xs font-semibold text-primary">
