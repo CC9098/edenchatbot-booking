@@ -10,6 +10,10 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function isTruthy(v: string | undefined): boolean {
+  return v === "1" || v?.toLowerCase() === "true";
+}
+
 export async function POST(req: NextRequest) {
   if (!isOAuthModeEnabled()) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
@@ -27,10 +31,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unsupported_grant_type" }, { status: 400 });
   }
 
-  if (
-    clientId !== (process.env.MCP_OAUTH_CLIENT_ID || "") ||
-    clientSecret !== (process.env.MCP_OAUTH_CLIENT_SECRET || "")
-  ) {
+  const configuredClientId = process.env.MCP_OAUTH_CLIENT_ID || "";
+  const configuredClientSecret = process.env.MCP_OAUTH_CLIENT_SECRET || "";
+  const allowAnyClientId = isTruthy(process.env.MCP_OAUTH_ALLOW_ANY_CLIENT_ID);
+
+  if (clientSecret !== configuredClientSecret) {
+    return NextResponse.json({ error: "invalid_client" }, { status: 401 });
+  }
+
+  if (!allowAnyClientId && configuredClientId && clientId !== configuredClientId) {
     return NextResponse.json({ error: "invalid_client" }, { status: 401 });
   }
 
