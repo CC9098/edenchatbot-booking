@@ -6,6 +6,38 @@ import { createBrowserClient } from "@/lib/supabase-browser";
 
 type EmailAuthMode = "signin" | "signup";
 
+function mapSignUpError(message: string): string {
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("email rate limit") ||
+    normalized.includes("over_email_send_rate_limit") ||
+    normalized.includes("rate limit")
+  ) {
+    return "確認信發送太頻密，請約 60 秒後再試。";
+  }
+
+  if (normalized.includes("password")) {
+    return "密碼格式未符合要求，請使用更強密碼後再試。";
+  }
+
+  return "註冊失敗，請稍後再試。";
+}
+
+function mapResendError(message: string): string {
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("email rate limit") ||
+    normalized.includes("over_email_send_rate_limit") ||
+    normalized.includes("rate limit")
+  ) {
+    return "確認信發送太頻密，請稍候再重發。";
+  }
+
+  return "重發確認信失敗，請稍後再試。";
+}
+
 function LoginForm() {
   const searchParams = useSearchParams();
   const authError = searchParams.get("error") === "auth";
@@ -15,6 +47,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleGoogleLogin() {
@@ -65,6 +98,7 @@ function LoginForm() {
         setErrorMessage("電郵或密碼不正確，請再試一次。");
       } else {
         setSuccessMessage("登入成功，正在跳轉...");
+        setPendingConfirmationEmail(null);
       }
       setLoading(false);
       return;
@@ -73,22 +107,65 @@ function LoginForm() {
     const { data, error } = await supabase.auth.signUp({
       email: trimmedEmail,
       password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+      },
     });
 
     if (error) {
       console.error("Email sign-up error:", error.message);
-      setErrorMessage("註冊失敗，請稍後再試。");
+      setErrorMessage(mapSignUpError(error.message));
+      setLoading(false);
+      return;
+    }
+
+    // Supabase may return an obfuscated "success" for repeated signup.
+    // In this case identities is empty and no new confirmation mail is sent.
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      setErrorMessage(
+        "此電郵可能已經註冊。請直接用「電郵登入」；如果之前用 Google 開戶，請用 Google 登入。"
+      );
+      setPendingConfirmationEmail(null);
       setLoading(false);
       return;
     }
 
     if (!data.session) {
-      setSuccessMessage("註冊成功，請到電郵收取驗證信後再登入。");
+      setSuccessMessage("註冊成功，請到電郵收取確認信後完成驗證。");
+      setPendingConfirmationEmail(trimmedEmail);
       setLoading(false);
       return;
     }
 
     setSuccessMessage("註冊成功，已自動登入。");
+    setPendingConfirmationEmail(null);
+    setLoading(false);
+  }
+
+  async function handleResendConfirmationEmail() {
+    if (!pendingConfirmationEmail) return;
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoading(true);
+
+    const supabase = createBrowserClient();
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: pendingConfirmationEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+      },
+    });
+
+    if (error) {
+      console.error("Resend confirmation error:", error.message);
+      setErrorMessage(mapResendError(error.message));
+      setLoading(false);
+      return;
+    }
+
+    setSuccessMessage("確認信已重新發送，請檢查收件箱及垃圾郵件。");
     setLoading(false);
   }
 
@@ -118,6 +195,7 @@ function LoginForm() {
                 setActiveMethod("google");
                 setErrorMessage(null);
                 setSuccessMessage(null);
+                setPendingConfirmationEmail(null);
               }}
               className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                 activeMethod === "google"
@@ -133,6 +211,7 @@ function LoginForm() {
                 setActiveMethod("email");
                 setErrorMessage(null);
                 setSuccessMessage(null);
+                setPendingConfirmationEmail(null);
               }}
               className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                 activeMethod === "email"
@@ -154,6 +233,17 @@ function LoginForm() {
             <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
               {successMessage}
             </div>
+          )}
+
+          {activeMethod === "email" && emailAuthMode === "signup" && pendingConfirmationEmail && (
+            <button
+              type="button"
+              onClick={handleResendConfirmationEmail}
+              disabled={loading}
+              className="w-full rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "重發中..." : "重新發送確認信"}
+            </button>
           )}
 
           {activeMethod === "google" ? (
@@ -192,6 +282,7 @@ function LoginForm() {
                     setEmailAuthMode("signin");
                     setErrorMessage(null);
                     setSuccessMessage(null);
+                    setPendingConfirmationEmail(null);
                   }}
                   className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                     emailAuthMode === "signin"
@@ -207,6 +298,7 @@ function LoginForm() {
                     setEmailAuthMode("signup");
                     setErrorMessage(null);
                     setSuccessMessage(null);
+                    setPendingConfirmationEmail(null);
                   }}
                   className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                     emailAuthMode === "signup"
