@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { deleteEvent } from "@/lib/google-calendar";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { markBookingIntakeCancelledByEvent } from "@/lib/booking-intake-storage";
 
 // ── Whitelist schema ────────────────────────────────────────────────
 const bridgeCancelSchema = z
@@ -37,6 +38,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: result.error || "Failed to cancel booking" },
         { status: 500 }
+      );
+    }
+
+    const intakeCancelSync = await markBookingIntakeCancelledByEvent({
+      googleEventId: eventId,
+      calendarId,
+    });
+    if (!intakeCancelSync.success) {
+      console.warn(
+        `[chat/booking/cancel] booking_intake sync warning: ${intakeCancelSync.error}`
       );
     }
 

@@ -8,6 +8,10 @@ import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { bookingSchema } from '@/shared/types';
 import { CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
 import { isSlotAvailableUtc } from '@/lib/booking-helpers';
+import {
+                markBookingIntakeCancelledByEvent,
+                markBookingIntakeRescheduledByEvent,
+} from '@/lib/booking-intake-storage';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
@@ -279,6 +283,14 @@ export async function DELETE(request: NextRequest) {
                                 return NextResponse.json({ error: result.error || 'Failed to cancel booking' }, { status: 500 });
                 }
 
+                const intakeCancelSync = await markBookingIntakeCancelledByEvent({
+                                googleEventId: eventId,
+                                calendarId,
+                });
+                if (!intakeCancelSync.success) {
+                                console.warn(`booking_intake cancel sync warning: ${intakeCancelSync.error}`);
+                }
+
                 if (existingEvent) {
                                 const payload = buildCancellationEmailPayload(existingEvent);
                                 if (payload) {
@@ -334,6 +346,17 @@ export async function PATCH(request: NextRequest) {
 
                                 if (!result.success) {
                                                 return NextResponse.json({ error: result.error || 'Failed to reschedule booking' }, { status: 500 });
+                                }
+
+                                const intakeRescheduleSync = await markBookingIntakeRescheduledByEvent({
+                                                googleEventId: eventId,
+                                                calendarId,
+                                                appointmentDate: date,
+                                                appointmentTime: time,
+                                                durationMinutes,
+                                });
+                                if (!intakeRescheduleSync.success) {
+                                                console.warn(`booking_intake reschedule sync warning: ${intakeRescheduleSync.error}`);
                                 }
 
                                 // Best effort: send updated confirmation email after reschedule succeeds.

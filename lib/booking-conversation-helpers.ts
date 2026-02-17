@@ -6,15 +6,153 @@
  */
 
 import { getBookableDoctors, getDoctorScheduleSummaryByNameZh } from '@/shared/clinic-schedule-data';
-import { DOCTOR_BY_NAME_ZH, DOCTOR_ID_BY_NAME_ZH, CLINIC_BY_ID, CLINIC_ID_BY_NAME_ZH, PHYSICAL_CLINIC_IDS, getClinicAddress } from '@/shared/clinic-data';
+import { DOCTOR_BY_NAME_ZH, CLINIC_BY_ID, CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
 import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
 import { getFreeBusy } from './google-calendar';
 import { fromZonedTime } from 'date-fns-tz';
-import { createBooking } from './google-calendar';
+import { createBooking, deleteEvent } from './google-calendar';
 import { sendBookingConfirmationEmail } from './gmail';
+import { z } from 'zod';
+import {
+  createPendingBookingIntake,
+  markBookingIntakeConfirmed,
+  markBookingIntakeFailed,
+  type BookingGender,
+  type BookingPickupType,
+  type BookingReceiptType,
+  type BookingVisitType,
+} from './booking-intake-storage';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const DEFAULT_DURATION_MINUTES = 15;
+
+const RECEIPT_LABELS: Record<BookingReceiptType, string> = {
+  no: '不用',
+  yes_insurance: '是，保險索償',
+  yes_not_insurance: '是，但非保險',
+};
+
+const PICKUP_LABELS: Record<BookingPickupType, string> = {
+  none: '不需要',
+  lalamove: 'Lalamove',
+  sfexpress: '順豐 SF Express',
+  clinic_pickup: '診所自取',
+};
+
+const GENDER_LABELS: Record<BookingGender, string> = {
+  male: '男 Male',
+  female: '女 Female',
+  other: '其他 Other',
+};
+
+const conversationalBookingSchema = z
+  .object({
+    doctorNameZh: z.string().trim().min(1, '請提供醫師名稱'),
+    clinicNameZh: z.string().trim().min(1, '請提供診所名稱'),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式需為 YYYY-MM-DD'),
+    time: z.string().regex(/^\d{2}:\d{2}$/, '時間格式需為 HH:mm'),
+    patientName: z.string().trim().min(2, '請提供病人姓名'),
+    phone: z.string().trim().min(8, '請提供有效電話號碼'),
+    email: z.string().trim().email('請提供有效電郵地址'),
+    visitType: z.enum(['first', 'followup'], {
+      errorMap: () => ({ message: '請先選擇首診或覆診' }),
+    }),
+    needReceipt: z.enum(['no', 'yes_insurance', 'yes_not_insurance'], {
+      errorMap: () => ({ message: '請先選擇收據需求' }),
+    }),
+    medicationPickup: z.enum(['none', 'lalamove', 'sfexpress', 'clinic_pickup'], {
+      errorMap: () => ({ message: '請先選擇取藥方法' }),
+    }),
+    idCard: z.string().trim().optional(),
+    dob: z.string().trim().optional(),
+    gender: z.enum(['male', 'female', 'other']).optional(),
+    allergies: z.string().trim().optional(),
+    medications: z.string().trim().optional(),
+    symptoms: z.string().trim().optional(),
+    referralSource: z.string().trim().optional(),
+    notes: z.string().trim().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.visitType !== 'first') return;
+
+    const requiredFields: Array<{
+      key: keyof typeof value;
+      message: string;
+    }> = [
+      { key: 'idCard', message: '首診需要身份證資料' },
+      { key: 'dob', message: '首診需要出生日期' },
+      { key: 'gender', message: '首診需要性別資料' },
+      { key: 'allergies', message: '首診需要過敏史資料' },
+      { key: 'medications', message: '首診需要現正服用藥物資料' },
+      { key: 'symptoms', message: '首診需要主要症狀資料' },
+      { key: 'referralSource', message: '首診需要得知來源資料' },
+    ];
+
+    for (const field of requiredFields) {
+      const rawValue = value[field.key];
+      if (typeof rawValue === 'string' && rawValue.trim().length > 0) {
+        continue;
+      }
+      if (rawValue) continue;
+
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [field.key],
+        message: field.message,
+      });
+    }
+  });
+
+export type BookingRequest = z.infer<typeof conversationalBookingSchema>;
+
+export interface BookingCreationContext {
+  userId?: string;
+  sessionId?: string;
+}
+
+function toSafeText(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function buildStructuredBookingNotes(request: BookingRequest): string {
+  const base = [
+    request.visitType === 'first' ? '[首診]' : '[覆診]',
+    `Receipt: ${RECEIPT_LABELS[request.needReceipt]}`,
+    `取藥方法: ${PICKUP_LABELS[request.medicationPickup]}`,
+  ];
+
+  if (request.visitType === 'first') {
+    base.push(
+      `ID: ${request.idCard}`,
+      `DOB: ${request.dob}`,
+      `Gender: ${request.gender ? GENDER_LABELS[request.gender] : 'N/A'}`,
+      `Allergies: ${request.allergies}`,
+      `Medications: ${request.medications}`,
+      `Symptoms: ${request.symptoms}`,
+      `Referral: ${request.referralSource}`,
+    );
+  }
+
+  const extraNotes = toSafeText(request.notes);
+  if (extraNotes) {
+    base.push(`User Notes: ${extraNotes}`);
+  }
+
+  return base.join(' | ');
+}
+
+function formatBookingValidationError(error: z.ZodError): string {
+  const firstIssue = error.issues[0];
+  if (!firstIssue) {
+    return '預約資料未齊，請補充資料後再試。';
+  }
+  const field = firstIssue.path.join('.');
+  if (!field) {
+    return firstIssue.message;
+  }
+  return `資料未齊（${field}）：${firstIssue.message}`;
+}
 
 // ---------------------------------------------------------------------------
 // 1. List Bookable Doctors
@@ -185,71 +323,79 @@ export async function getAvailableTimeSlots(
 // 3. Create Booking
 // ---------------------------------------------------------------------------
 
-export interface BookingRequest {
-  doctorNameZh: string;
-  clinicNameZh: string;
-  date: string; // YYYY-MM-DD
-  time: string; // HH:mm
-  patientName: string;
-  phone: string;
-  email?: string;
-  notes?: string;
-}
-
 /**
- * Create a booking for the patient
+ * Create a booking for the patient.
+ * Workflow: Supabase intake (pending) -> Google Calendar -> Supabase intake (confirmed)
  */
 export async function createConversationalBooking(
-  request: BookingRequest
+  request: BookingRequest,
+  context?: BookingCreationContext
 ): Promise<{
   success: boolean;
   bookingId?: string;
   error?: string;
 }> {
   try {
+    const parsed = conversationalBookingSchema.safeParse(request);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: formatBookingValidationError(parsed.error),
+      };
+    }
+    const bookingData = parsed.data;
+
     // Validate doctor
-    const doctor = DOCTOR_BY_NAME_ZH[request.doctorNameZh];
+    const doctor = DOCTOR_BY_NAME_ZH[bookingData.doctorNameZh];
     if (!doctor) {
-      return { success: false, error: `找不到醫師：${request.doctorNameZh}` };
+      return { success: false, error: `找不到醫師：${bookingData.doctorNameZh}` };
     }
 
     // Validate clinic
-    const clinicId = CLINIC_ID_BY_NAME_ZH[request.clinicNameZh];
+    const clinicId = CLINIC_ID_BY_NAME_ZH[bookingData.clinicNameZh];
     if (!clinicId) {
-      return { success: false, error: `找不到診所：${request.clinicNameZh}` };
+      return { success: false, error: `找不到診所：${bookingData.clinicNameZh}` };
     }
 
     const clinic = CLINIC_BY_ID[clinicId];
     if (!clinic) {
-      return { success: false, error: `找不到診所：${request.clinicNameZh}` };
+      return { success: false, error: `找不到診所：${bookingData.clinicNameZh}` };
     }
 
     // Find calendar mapping
     const mapping = CALENDAR_MAPPINGS.find(
-      m => m.doctorId === doctor.id && m.clinicId === clinicId && m.isActive
+      (m) => m.doctorId === doctor.id && m.clinicId === clinicId && m.isActive
     );
 
     if (!mapping) {
-      return { success: false, error: `${request.doctorNameZh} 在 ${request.clinicNameZh} 沒有可預約時段` };
+      return {
+        success: false,
+        error: `${bookingData.doctorNameZh} 在 ${bookingData.clinicNameZh} 沒有可預約時段`,
+      };
     }
 
     // Calculate start and end times
     const startDate = fromZonedTime(
-      `${request.date}T${request.time}:00`,
+      `${bookingData.date}T${bookingData.time}:00`,
       HONG_KONG_TIMEZONE
     );
 
     if (isNaN(startDate.getTime())) {
-      return { success: false, error: '無效的日期或時間' };
+      return { success: false, error: "無效的日期或時間" };
     }
 
-    const endDate = new Date(startDate.getTime() + DEFAULT_DURATION_MINUTES * 60000);
+    const endDate = new Date(
+      startDate.getTime() + DEFAULT_DURATION_MINUTES * 60000
+    );
 
     // Re-check availability to prevent race conditions
-    const requestDateUtc = fromZonedTime(`${request.date}T00:00:00`, HONG_KONG_TIMEZONE);
+    const requestDateUtc = fromZonedTime(
+      `${bookingData.date}T00:00:00`,
+      HONG_KONG_TIMEZONE
+    );
     const busySlots = await getFreeBusy(mapping.calendarId, requestDateUtc);
 
-    const isStillAvailable = !busySlots.some(busy => {
+    const isStillAvailable = !busySlots.some((busy) => {
       return (
         (startDate >= busy.start && startDate < busy.end) ||
         (endDate > busy.start && endDate <= busy.end) ||
@@ -260,7 +406,45 @@ export async function createConversationalBooking(
     if (!isStillAvailable) {
       return {
         success: false,
-        error: '呢個時段啱啱俾人預約咗，請揀另一個時段',
+        error: "呢個時段啱啱俾人預約咗，請揀另一個時段",
+      };
+    }
+
+    const notes = buildStructuredBookingNotes(bookingData);
+
+    // Persist intake first. If this fails, stop before writing Google Calendar.
+    const intakeCreate = await createPendingBookingIntake({
+      source: "chat_v2",
+      userId: context?.userId,
+      sessionId: context?.sessionId,
+      doctorId: doctor.id,
+      doctorNameZh: doctor.nameZh,
+      clinicId: clinic.id,
+      clinicNameZh: clinic.nameZh,
+      appointmentDate: bookingData.date,
+      appointmentTime: bookingData.time,
+      durationMinutes: DEFAULT_DURATION_MINUTES,
+      patientName: bookingData.patientName,
+      phone: bookingData.phone,
+      email: bookingData.email,
+      visitType: bookingData.visitType as BookingVisitType,
+      needReceipt: bookingData.needReceipt as BookingReceiptType,
+      medicationPickup: bookingData.medicationPickup as BookingPickupType,
+      idCard: toSafeText(bookingData.idCard),
+      dob: toSafeText(bookingData.dob),
+      gender: bookingData.gender,
+      allergies: toSafeText(bookingData.allergies),
+      medications: toSafeText(bookingData.medications),
+      symptoms: toSafeText(bookingData.symptoms),
+      referralSource: toSafeText(bookingData.referralSource),
+      notes,
+      bookingPayload: bookingData,
+    });
+
+    if (!intakeCreate.success || !intakeCreate.intakeId) {
+      return {
+        success: false,
+        error: "暫時未能儲存預約表單，請稍後再試。",
       };
     }
 
@@ -272,41 +456,71 @@ export async function createConversationalBooking(
       clinicNameZh: clinic.nameZh,
       startTime: startDate,
       endTime: endDate,
-      patientName: request.patientName,
-      phone: request.phone,
-      email: request.email,
-      notes: request.notes,
+      patientName: bookingData.patientName,
+      phone: bookingData.phone,
+      email: bookingData.email,
+      notes,
     });
 
     if (!result.success || !result.eventId) {
+      await markBookingIntakeFailed({
+        intakeId: intakeCreate.intakeId,
+        reason: result.error || "Failed to create booking in calendar",
+      });
       return {
         success: false,
-        error: result.error || '創建預約失敗',
+        error: result.error || "創建預約失敗",
       };
     }
 
-    // Send email confirmation if email is provided
-    if (request.email) {
-      const clinicAddress = getClinicAddress(clinic.nameZh);
+    // Link intake record to Google event. If this fails, try to rollback event creation.
+    const intakeConfirm = await markBookingIntakeConfirmed({
+      intakeId: intakeCreate.intakeId,
+      googleEventId: result.eventId,
+      calendarId: mapping.calendarId,
+    });
 
-      const emailResult = await sendBookingConfirmationEmail({
-        patientName: request.patientName,
-        patientEmail: request.email,
-        doctorName: doctor.nameEn,
-        doctorNameZh: doctor.nameZh,
-        clinicName: clinic.nameEn,
-        clinicNameZh: clinic.nameZh,
-        clinicAddress: clinicAddress,
-        date: request.date,
-        time: request.time,
-        eventId: result.eventId,
-        calendarId: mapping.calendarId,
+    if (!intakeConfirm.success) {
+      const rollback = await deleteEvent(mapping.calendarId, result.eventId);
+      await markBookingIntakeFailed({
+        intakeId: intakeCreate.intakeId,
+        reason: `Confirm sync failed: ${intakeConfirm.error || "unknown error"}`,
       });
 
-      if (!emailResult.success) {
-        console.error('[createConversationalBooking] Failed to send email:', emailResult.error);
-        // Don't fail the booking if email fails - booking is already created
+      if (!rollback.success) {
+        return {
+          success: false,
+          error: "預約同步失敗，請立即聯絡診所確認預約狀態。",
+        };
       }
+
+      return {
+        success: false,
+        error: "系統同步失敗，預約未完成，請再試一次。",
+      };
+    }
+
+    // Send email confirmation (best effort)
+    const clinicAddress = getClinicAddress(clinic.nameZh);
+    const emailResult = await sendBookingConfirmationEmail({
+      patientName: bookingData.patientName,
+      patientEmail: bookingData.email,
+      doctorName: doctor.nameEn,
+      doctorNameZh: doctor.nameZh,
+      clinicName: clinic.nameEn,
+      clinicNameZh: clinic.nameZh,
+      clinicAddress: clinicAddress,
+      date: bookingData.date,
+      time: bookingData.time,
+      eventId: result.eventId,
+      calendarId: mapping.calendarId,
+    });
+
+    if (!emailResult.success) {
+      console.error(
+        "[createConversationalBooking] Failed to send email:",
+        emailResult.error
+      );
     }
 
     return {
@@ -314,10 +528,10 @@ export async function createConversationalBooking(
       bookingId: result.eventId,
     };
   } catch (error) {
-    console.error('[createConversationalBooking] Error:', error);
+    console.error("[createConversationalBooking] Error:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : '創建預約時發生錯誤',
+      error: error instanceof Error ? error.message : "創建預約時發生錯誤",
     };
   }
 }

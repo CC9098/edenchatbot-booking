@@ -3,6 +3,7 @@ import { z } from "zod";
 import { fromZonedTime } from "date-fns-tz";
 import { updateEvent } from "@/lib/google-calendar";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { markBookingIntakeRescheduledByEvent } from "@/lib/booking-intake-storage";
 
 // ── Whitelist schema ────────────────────────────────────────────────
 const bridgeRescheduleSchema = z
@@ -59,6 +60,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: result.error || "Failed to reschedule booking" },
         { status: 500 }
+      );
+    }
+
+    const intakeRescheduleSync = await markBookingIntakeRescheduledByEvent({
+      googleEventId: eventId,
+      calendarId,
+      appointmentDate: date,
+      appointmentTime: time,
+      durationMinutes,
+    });
+    if (!intakeRescheduleSync.success) {
+      console.warn(
+        `[chat/booking/reschedule] booking_intake sync warning: ${intakeRescheduleSync.error}`
       );
     }
 

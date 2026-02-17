@@ -443,18 +443,29 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 2. 完成預約：**必須調用 create_booking**，唔可以話「已完成」而冇調用
 3. 收集資料：
    - **姓名、電話：一定要問**
+   - **首診/覆診：一定要問**（visitType = first 或 followup）
+   - **收據需求：一定要問**（needReceipt = no / yes_insurance / yes_not_insurance）
+   - **取藥方法：一定要問**（medicationPickup = none / lalamove / sfexpress / clinic_pickup）
    - **Email：睇用戶係咪已登入**
      - 如果【用戶登入資料】有提供 email → **直接用，唔好再問**
      - 如果冇【用戶登入資料】→ **一定要問**用戶提供 email
    - Email 係用嚟傳送預約確認信，所以必須要有
+   - **如果 visitType = first（首診）**，必須再收集：
+     - idCard, dob, gender, allergies, medications, symptoms, referralSource
+   - call create_booking 時，enum 欄位必須用以下代碼：
+     - visitType: first / followup
+     - needReceipt: no / yes_insurance / yes_not_insurance
+     - medicationPickup: none / lalamove / sfexpress / clinic_pickup
+     - gender: male / female / other
 
 **預約流程（每一步都要做）：**
 步驟 1：調用 **list_doctors** 或詢問醫師名稱
 步驟 2：用戶提供醫師、日期、診所後，**立即調用 get_available_slots(醫師名, 日期, 診所)**
 步驟 3：顯示 function 返回的時段，讓用戶選擇
 步驟 4：**收集病人資料**
-   - 一定要問：姓名、電話
+   - 一定要問：姓名、電話、首診/覆診、收據需求、取藥方法
    - Email：如果【用戶登入資料】有 email，直接用；如果冇，先問
+   - 若首診：再問身份證、生日、性別、過敏史、現服藥物、主要症狀、得知來源
 步驟 5：**調用 create_booking(所有資料，包括 email)**
 步驟 6：**等 function 返回成功**後，先話「預約成功」
 步驟 7：提醒用戶「我哋已經傳咗預約確認信去你嘅 email，請查收」
@@ -782,12 +793,62 @@ const BOOKING_FUNCTIONS: FunctionDeclaration[] = [
           type: SchemaType.STRING,
           description: '病人電郵地址（必須提供，用於傳送預約確認信）',
         },
+        visitType: {
+          type: SchemaType.STRING,
+          description: '診症類型：first（首診）或 followup（覆診）',
+        },
+        needReceipt: {
+          type: SchemaType.STRING,
+          description: '收據需求：no / yes_insurance / yes_not_insurance',
+        },
+        medicationPickup: {
+          type: SchemaType.STRING,
+          description: '取藥方法：none / lalamove / sfexpress / clinic_pickup',
+        },
+        idCard: {
+          type: SchemaType.STRING,
+          description: '身份證資料（首診必填）',
+        },
+        dob: {
+          type: SchemaType.STRING,
+          description: '出生日期（首診必填）',
+        },
+        gender: {
+          type: SchemaType.STRING,
+          description: '性別：male / female / other（首診必填）',
+        },
+        allergies: {
+          type: SchemaType.STRING,
+          description: '過敏史（首診必填）',
+        },
+        medications: {
+          type: SchemaType.STRING,
+          description: '現服用藥物（首診必填）',
+        },
+        symptoms: {
+          type: SchemaType.STRING,
+          description: '主要症狀（首診必填）',
+        },
+        referralSource: {
+          type: SchemaType.STRING,
+          description: '得知來源（首診必填）',
+        },
         notes: {
           type: SchemaType.STRING,
           description: '備註（可選）',
         },
       },
-      required: ['doctorNameZh', 'clinicNameZh', 'date', 'time', 'patientName', 'phone'],
+      required: [
+        'doctorNameZh',
+        'clinicNameZh',
+        'date',
+        'time',
+        'patientName',
+        'phone',
+        'visitType',
+        'needReceipt',
+        'medicationPickup',
+      ],
     },
   },
 ];
@@ -881,6 +942,7 @@ async function handleFunctionCall(
   functionArgs: object,
   userEmail?: string,
   userId?: string,
+  sessionId?: string,
   latestUserMessage?: string,
 ): Promise<object> {
   console.log(`[chat/v2] Calling function: ${functionName}`, functionArgs);
@@ -910,7 +972,10 @@ async function handleFunctionCall(
         bookingArgs.email = userEmail;
         console.log(`[chat/v2] Injected logged-in user email: ${userEmail}`);
       }
-      const result = await createConversationalBooking(bookingArgs as any);
+      const result = await createConversationalBooking(bookingArgs as any, {
+        userId,
+        sessionId,
+      });
       return result;
     }
 
@@ -1301,6 +1366,7 @@ export async function POST(request: NextRequest) {
           functionArgs,
           userEmail,
           userId,
+          sessionId,
           latestUserMessage.content,
         );
 
