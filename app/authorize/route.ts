@@ -5,10 +5,6 @@ import { encodeOAuthState, isOAuthModeEnabled } from "@/lib/mcp/github-core";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function isTruthy(v: string | undefined): boolean {
-  return v === "1" || v?.toLowerCase() === "true";
-}
-
 function isRedirectUriAllowed(uri: string): boolean {
   const raw = process.env.MCP_OAUTH_ALLOWED_REDIRECT_ORIGINS ?? "";
   const allowed = raw
@@ -43,12 +39,6 @@ export async function GET(req: NextRequest) {
 
   if (responseType !== "code") {
     return new NextResponse("Unsupported response_type", { status: 400 });
-  }
-
-  const configuredClientId = process.env.MCP_OAUTH_CLIENT_ID || "";
-  const allowAnyClientId = isTruthy(process.env.MCP_OAUTH_ALLOW_ANY_CLIENT_ID);
-  if (!allowAnyClientId && configuredClientId && clientId !== configuredClientId) {
-    return new NextResponse("Invalid client_id", { status: 401 });
   }
 
   if (!redirectUri || !isRedirectUriAllowed(redirectUri)) {
