@@ -9,6 +9,7 @@ import {
   listBookableDoctors,
   getAvailableTimeSlots,
   createConversationalBooking,
+  listMyBookings,
 } from '@/lib/booking-conversation-helpers';
 import {
   logSymptom,
@@ -441,7 +442,8 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 **關鍵規則（必須遵守）：**
 1. 查時段：**必須調用 get_available_slots**，唔可以自己編造時段
 2. 完成預約：**必須調用 create_booking**，唔可以話「已完成」而冇調用
-3. 收集資料：
+3. 查本人預約紀錄：當用戶問「我預約咗幾時／我有咩預約」時，**必須調用 list_my_bookings**
+4. 收集資料：
    - **姓名、電話：一定要問**
    - **首診/覆診：一定要問**（visitType = first 或 followup）
    - **收據需求：一定要問**（needReceipt = no / yes_insurance / yes_not_insurance）
@@ -473,6 +475,7 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 **絕對唔准做嘅嘢：**
 ❌ 唔准自己編造時段（必須調用 get_available_slots）
 ❌ 唔准話「已經幫你完成登記」而冇調用 create_booking
+❌ 用戶問預約紀錄時，唔准靠估或者只叫對方自行查 email（除非 list_my_bookings 返回失敗/需要登入）
 ❌ 唔准問已登入用戶提供 email（如果【用戶登入資料】有 email，直接用）
 ❌ 唔准話「預約成功」但係 create_booking 未返回 success
 
@@ -516,7 +519,7 @@ function buildBookingSystemPrompt(careContext: string): string {
 ${FALLBACK_MODE_PROMPTS.B}
 
 【預約模式範圍】
-- 只做：查詢時段、收集預約資料、確認、建立預約、改期、取消
+- 只做：查詢時段、收集預約資料、確認、建立預約、改期、取消、查本人預約紀錄
 - 唔做：主動提供體質分析、飲食禁忌、作息建議（除非用戶明確要求）
 
 【可選健康建議規則】
@@ -760,6 +763,19 @@ const BOOKING_FUNCTIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: 'list_my_bookings',
+    description: '查詢目前登入用戶的預約紀錄（優先返回未來預約）',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        limit: {
+          type: SchemaType.INTEGER,
+          description: '返回未來預約的數量上限（1-10，預設 5）',
+        },
+      },
+    },
+  },
+  {
     name: 'create_booking',
     description: '為病人創建預約',
     parameters: {
@@ -975,6 +991,22 @@ async function handleFunctionCall(
       const result = await createConversationalBooking(bookingArgs as any, {
         userId,
         sessionId,
+      });
+      return result;
+    }
+
+    case 'list_my_bookings': {
+      if (!userId) return { success: false, error: '需要登入才能查看預約紀錄' };
+
+      const limitArg = args.limit;
+      const parsedLimit =
+        typeof limitArg === 'number' && Number.isFinite(limitArg)
+          ? Math.floor(limitArg)
+          : undefined;
+
+      const result = await listMyBookings(userId, {
+        userEmail,
+        limit: parsedLimit,
       });
       return result;
     }

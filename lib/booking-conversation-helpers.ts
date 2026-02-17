@@ -12,6 +12,7 @@ import { getFreeBusy } from './google-calendar';
 import { fromZonedTime } from 'date-fns-tz';
 import { createBooking, deleteEvent } from './google-calendar';
 import { sendBookingConfirmationEmail } from './gmail';
+import { createServiceClient } from './supabase';
 import { z } from 'zod';
 import {
   createPendingBookingIntake,
@@ -25,6 +26,9 @@ import {
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const DEFAULT_DURATION_MINUTES = 15;
+const MAX_LIST_BOOKINGS_LIMIT = 10;
+const DEFAULT_LIST_BOOKINGS_LIMIT = 5;
+const DEFAULT_RECENT_BOOKINGS_LIMIT = 3;
 
 const RECEIPT_LABELS: Record<BookingReceiptType, string> = {
   no: '不用',
@@ -164,6 +168,76 @@ export interface DoctorInfo {
   scheduleSummary: string;
 }
 
+export interface MyBookingInfo {
+  intakeId: string;
+  status: string;
+  doctorNameZh: string;
+  clinicNameZh: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  googleEventId: string | null;
+  calendarId: string | null;
+}
+
+interface RawBookingIntakeRow {
+  id: string;
+  status: string;
+  doctor_name_zh: string;
+  clinic_name_zh: string;
+  appointment_date: string;
+  appointment_time: string;
+  google_event_id: string | null;
+  calendar_id: string | null;
+}
+
+interface ListMyBookingsOptions {
+  userEmail?: string;
+  limit?: number;
+  recentLimit?: number;
+}
+
+function getTodayInHongKongDate(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: HONG_KONG_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function clampPositiveInteger(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  const normalized = Math.floor(value);
+  if (normalized <= 0) return fallback;
+  return Math.min(normalized, MAX_LIST_BOOKINGS_LIMIT);
+}
+
+function mapBookingRow(row: RawBookingIntakeRow): MyBookingInfo {
+  return {
+    intakeId: row.id,
+    status: row.status,
+    doctorNameZh: row.doctor_name_zh,
+    clinicNameZh: row.clinic_name_zh,
+    appointmentDate: row.appointment_date,
+    appointmentTime: row.appointment_time,
+    googleEventId: row.google_event_id,
+    calendarId: row.calendar_id,
+  };
+}
+
+function isRawBookingIntakeRow(value: unknown): value is RawBookingIntakeRow {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as Record<string, unknown>;
+  return (
+    typeof row.id === 'string' &&
+    typeof row.status === 'string' &&
+    typeof row.doctor_name_zh === 'string' &&
+    typeof row.clinic_name_zh === 'string' &&
+    typeof row.appointment_date === 'string' &&
+    typeof row.appointment_time === 'string'
+  );
+}
+
 /**
  * List all doctors that have active booking schedules
  */
@@ -181,6 +255,142 @@ export async function listBookableDoctors(): Promise<{ doctors: DoctorInfo[] }> 
 
   // IMPORTANT: Gemini API requires response to be an object, not an array
   return { doctors: doctorList };
+}
+
+// ---------------------------------------------------------------------------
+// 1.5 List My Bookings
+// ---------------------------------------------------------------------------
+
+/**
+ * List a user's upcoming bookings and recent booking history.
+ * Primary lookup is user_id. If there are no user_id matches, fallback to
+ * legacy records booked by the same email where user_id is null.
+ */
+export async function listMyBookings(
+  userId: string,
+  options?: ListMyBookingsOptions
+): Promise<{
+  success: boolean;
+  upcomingBookings?: MyBookingInfo[];
+  recentBookings?: MyBookingInfo[];
+  usedEmailFallback?: boolean;
+  error?: string;
+}> {
+  try {
+    const supabase = createServiceClient();
+    const today = getTodayInHongKongDate();
+    const fallbackEmail = options?.userEmail?.trim();
+    const bookingLimit = clampPositiveInteger(
+      options?.limit ?? DEFAULT_LIST_BOOKINGS_LIMIT,
+      DEFAULT_LIST_BOOKINGS_LIMIT
+    );
+    const recentLimit = clampPositiveInteger(
+      options?.recentLimit ?? DEFAULT_RECENT_BOOKINGS_LIMIT,
+      DEFAULT_RECENT_BOOKINGS_LIMIT
+    );
+
+    const selectFields = [
+      'id',
+      'status',
+      'doctor_name_zh',
+      'clinic_name_zh',
+      'appointment_date',
+      'appointment_time',
+      'google_event_id',
+      'calendar_id',
+    ].join(', ');
+
+    const upcomingByUser = await supabase
+      .from('booking_intake')
+      .select(selectFields)
+      .eq('user_id', userId)
+      .in('status', ['pending', 'confirmed'])
+      .gte('appointment_date', today)
+      .order('appointment_date', { ascending: true })
+      .order('appointment_time', { ascending: true })
+      .limit(bookingLimit);
+
+    if (upcomingByUser.error) {
+      return { success: false, error: upcomingByUser.error.message };
+    }
+
+    let usedEmailFallback = false;
+    const upcomingByUserData = (upcomingByUser.data || []) as unknown[];
+    let upcomingRows = upcomingByUserData.filter(isRawBookingIntakeRow);
+
+    if (upcomingRows.length === 0 && fallbackEmail) {
+      const upcomingByEmail = await supabase
+        .from('booking_intake')
+        .select(selectFields)
+        .is('user_id', null)
+        .eq('email', fallbackEmail)
+        .in('status', ['pending', 'confirmed'])
+        .gte('appointment_date', today)
+        .order('appointment_date', { ascending: true })
+        .order('appointment_time', { ascending: true })
+        .limit(bookingLimit);
+
+      if (upcomingByEmail.error) {
+        return { success: false, error: upcomingByEmail.error.message };
+      }
+
+      const upcomingByEmailData = (upcomingByEmail.data || []) as unknown[];
+      upcomingRows = upcomingByEmailData.filter(isRawBookingIntakeRow);
+      usedEmailFallback = upcomingRows.length > 0;
+    }
+
+    let recentRows: RawBookingIntakeRow[] = [];
+
+    const recentByUser = await supabase
+      .from('booking_intake')
+      .select(selectFields)
+      .eq('user_id', userId)
+      .in('status', ['confirmed', 'cancelled'])
+      .lt('appointment_date', today)
+      .order('appointment_date', { ascending: false })
+      .order('appointment_time', { ascending: false })
+      .limit(recentLimit);
+
+    if (recentByUser.error) {
+      return { success: false, error: recentByUser.error.message };
+    }
+
+    const recentByUserData = (recentByUser.data || []) as unknown[];
+    recentRows = recentByUserData.filter(isRawBookingIntakeRow);
+
+    if (recentRows.length === 0 && usedEmailFallback && fallbackEmail) {
+      const recentByEmail = await supabase
+        .from('booking_intake')
+        .select(selectFields)
+        .is('user_id', null)
+        .eq('email', fallbackEmail)
+        .in('status', ['confirmed', 'cancelled'])
+        .lt('appointment_date', today)
+        .order('appointment_date', { ascending: false })
+        .order('appointment_time', { ascending: false })
+        .limit(recentLimit);
+
+      if (recentByEmail.error) {
+        return { success: false, error: recentByEmail.error.message };
+      }
+
+      const recentByEmailData = (recentByEmail.data || []) as unknown[];
+      recentRows = recentByEmailData.filter(isRawBookingIntakeRow);
+    }
+
+    return {
+      success: true,
+      upcomingBookings: upcomingRows.map(mapBookingRow),
+      recentBookings: recentRows.map(mapBookingRow),
+      usedEmailFallback,
+    };
+  } catch (error) {
+    console.error('[listMyBookings] Error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '查詢預約紀錄時發生錯誤',
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
