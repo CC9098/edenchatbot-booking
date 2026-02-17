@@ -44,6 +44,7 @@ export async function createPendingBookingIntake(
   try {
     const supabase = createServiceClient();
     const now = new Date().toISOString();
+    const normalizedEmail = input.email.trim().toLowerCase();
 
     const payload = {
       source: input.source ?? "chat_v2",
@@ -59,7 +60,7 @@ export async function createPendingBookingIntake(
       duration_minutes: input.durationMinutes,
       patient_name: input.patientName,
       phone: input.phone,
-      email: input.email,
+      email: normalizedEmail,
       visit_type: input.visitType,
       need_receipt: input.needReceipt,
       medication_pickup: input.medicationPickup,

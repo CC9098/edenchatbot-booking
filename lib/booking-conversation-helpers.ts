@@ -9,8 +9,8 @@ import { getBookableDoctors, getDoctorScheduleSummaryByNameZh } from '@/shared/c
 import { DOCTOR_BY_NAME_ZH, CLINIC_BY_ID, CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
 import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
 import { getFreeBusy } from './google-calendar';
-import { fromZonedTime } from 'date-fns-tz';
-import { createBooking, deleteEvent } from './google-calendar';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { createBooking, deleteEvent, listEventsInRange } from './google-calendar';
 import { sendBookingConfirmationEmail } from './gmail';
 import { createServiceClient } from './supabase';
 import { z } from 'zod';
@@ -29,6 +29,8 @@ const DEFAULT_DURATION_MINUTES = 15;
 const MAX_LIST_BOOKINGS_LIMIT = 10;
 const DEFAULT_LIST_BOOKINGS_LIMIT = 5;
 const DEFAULT_RECENT_BOOKINGS_LIMIT = 3;
+const CALENDAR_LOOKBACK_DAYS = 180;
+const CALENDAR_LOOKAHEAD_DAYS = 365;
 
 const RECEIPT_LABELS: Record<BookingReceiptType, string> = {
   no: '不用',
@@ -196,6 +198,20 @@ interface ListMyBookingsOptions {
   recentLimit?: number;
 }
 
+interface CalendarEventLike {
+  id?: string | null;
+  status?: string | null;
+  summary?: string | null;
+  description?: string | null;
+  start?: {
+    dateTime?: string | null;
+    date?: string | null;
+  } | null;
+  attendees?: Array<{
+    email?: string | null;
+  }> | null;
+}
+
 function getTodayInHongKongDate(): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: HONG_KONG_TIMEZONE,
@@ -238,6 +254,151 @@ function isRawBookingIntakeRow(value: unknown): value is RawBookingIntakeRow {
   );
 }
 
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function parseLineValue(description: string, label: string): string {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = description.match(new RegExp(`${escaped}\\s*:\\s*(.+)`));
+  return match?.[1]?.trim() || '';
+}
+
+function extractEventDateAndTime(event: CalendarEventLike): { date: string; time: string } | null {
+  const dateTime = event.start?.dateTime;
+  if (typeof dateTime === 'string' && dateTime.trim()) {
+    const start = new Date(dateTime);
+    if (Number.isNaN(start.getTime())) return null;
+    return {
+      date: formatInTimeZone(start, HONG_KONG_TIMEZONE, 'yyyy-MM-dd'),
+      time: formatInTimeZone(start, HONG_KONG_TIMEZONE, 'HH:mm'),
+    };
+  }
+
+  const date = event.start?.date;
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { date, time: '00:00' };
+  }
+
+  return null;
+}
+
+function extractEventEmail(event: CalendarEventLike): string | null {
+  const description = typeof event.description === 'string' ? event.description : '';
+  const emailFromDescription = parseLineValue(description, 'Email / 電郵');
+  if (emailFromDescription) return normalizeEmail(emailFromDescription);
+
+  if (Array.isArray(event.attendees)) {
+    const matched = event.attendees.find(
+      (attendee) => typeof attendee?.email === 'string' && attendee.email.trim().length > 0
+    );
+    if (matched?.email) return normalizeEmail(matched.email);
+  }
+
+  return null;
+}
+
+function extractDoctorNameZh(event: CalendarEventLike): string {
+  const description = typeof event.description === 'string' ? event.description : '';
+  const doctorMatch = description.match(/Doctor \/ 醫師:\s*(.+?)\s*\((.+?)\)/);
+  if (doctorMatch?.[1]) return doctorMatch[1].trim();
+  return '醫師資料未提供';
+}
+
+function extractClinicNameZh(event: CalendarEventLike): string {
+  const description = typeof event.description === 'string' ? event.description : '';
+  const clinicMatch = description.match(/Clinic \/ 診所:\s*(.+?)\s*\((.+?)\)/);
+  if (clinicMatch?.[1]) return clinicMatch[1].trim();
+  return '診所資料未提供';
+}
+
+async function listBookingsFromCalendarByEmail(
+  email: string,
+  today: string,
+  bookingLimit: number,
+  recentLimit: number
+): Promise<{ upcomingRows: RawBookingIntakeRow[]; recentRows: RawBookingIntakeRow[] }> {
+  const normalizedEmail = normalizeEmail(email);
+  const activeCalendarIds = Array.from(
+    new Set(
+      CALENDAR_MAPPINGS.filter((mapping) => mapping.isActive && mapping.calendarId)
+        .map((mapping) => mapping.calendarId)
+    )
+  );
+
+  if (activeCalendarIds.length === 0) {
+    return { upcomingRows: [], recentRows: [] };
+  }
+
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - CALENDAR_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+  const windowEnd = new Date(now.getTime() + CALENDAR_LOOKAHEAD_DAYS * 24 * 60 * 60 * 1000);
+
+  const listResults = await Promise.all(
+    activeCalendarIds.map(async (calendarId) => ({
+      calendarId,
+      result: await listEventsInRange(calendarId, windowStart, windowEnd),
+    }))
+  );
+
+  const allRows: RawBookingIntakeRow[] = [];
+  const seen = new Set<string>();
+
+  for (const { calendarId, result } of listResults) {
+    if (!result.success) continue;
+    for (const event of (result.events || []) as CalendarEventLike[]) {
+      if (event?.status === 'cancelled') continue;
+
+      const eventEmail = extractEventEmail(event);
+      if (!eventEmail || eventEmail !== normalizedEmail) continue;
+
+      const eventDateTime = extractEventDateAndTime(event);
+      if (!eventDateTime) continue;
+
+      const rawEventId =
+        typeof event.id === 'string' && event.id.trim().length > 0 ? event.id.trim() : '';
+      const dedupeKey = rawEventId ? `${calendarId}:${rawEventId}` : '';
+      if (dedupeKey && seen.has(dedupeKey)) continue;
+      if (dedupeKey) seen.add(dedupeKey);
+
+      const syntheticId = rawEventId
+        ? `gcal:${calendarId}:${rawEventId}`
+        : `gcal:${calendarId}:${eventDateTime.date}:${eventDateTime.time}:${allRows.length + 1}`;
+
+      allRows.push({
+        id: syntheticId,
+        status: 'confirmed',
+        doctor_name_zh: extractDoctorNameZh(event),
+        clinic_name_zh: extractClinicNameZh(event),
+        appointment_date: eventDateTime.date,
+        appointment_time: eventDateTime.time,
+        google_event_id: rawEventId || null,
+        calendar_id: calendarId,
+      });
+    }
+  }
+
+  const upcomingRows = allRows
+    .filter((row) => row.appointment_date >= today)
+    .sort((a, b) =>
+      a.appointment_date === b.appointment_date
+        ? a.appointment_time.localeCompare(b.appointment_time)
+        : a.appointment_date.localeCompare(b.appointment_date)
+    )
+    .slice(0, bookingLimit);
+
+  const recentRows = allRows
+    .filter((row) => row.appointment_date < today)
+    .sort((a, b) =>
+      a.appointment_date === b.appointment_date
+        ? b.appointment_time.localeCompare(a.appointment_time)
+        : b.appointment_date.localeCompare(a.appointment_date)
+    )
+    .slice(0, recentLimit);
+
+  return { upcomingRows, recentRows };
+}
+
 /**
  * List all doctors that have active booking schedules
  */
@@ -264,7 +425,7 @@ export async function listBookableDoctors(): Promise<{ doctors: DoctorInfo[] }> 
 /**
  * List a user's upcoming bookings and recent booking history.
  * Primary lookup is user_id. If there are no user_id matches, fallback to
- * legacy records booked by the same email where user_id is null.
+ * records booked with the same email (case-insensitive).
  */
 export async function listMyBookings(
   userId: string,
@@ -322,8 +483,7 @@ export async function listMyBookings(
       const upcomingByEmail = await supabase
         .from('booking_intake')
         .select(selectFields)
-        .is('user_id', null)
-        .eq('email', fallbackEmail)
+        .ilike('email', fallbackEmail)
         .in('status', ['pending', 'confirmed'])
         .gte('appointment_date', today)
         .order('appointment_date', { ascending: true })
@@ -336,7 +496,9 @@ export async function listMyBookings(
 
       const upcomingByEmailData = (upcomingByEmail.data || []) as unknown[];
       upcomingRows = upcomingByEmailData.filter(isRawBookingIntakeRow);
-      usedEmailFallback = upcomingRows.length > 0;
+      if (upcomingRows.length > 0) {
+        usedEmailFallback = true;
+      }
     }
 
     let recentRows: RawBookingIntakeRow[] = [];
@@ -358,12 +520,11 @@ export async function listMyBookings(
     const recentByUserData = (recentByUser.data || []) as unknown[];
     recentRows = recentByUserData.filter(isRawBookingIntakeRow);
 
-    if (recentRows.length === 0 && usedEmailFallback && fallbackEmail) {
+    if (recentRows.length === 0 && fallbackEmail) {
       const recentByEmail = await supabase
         .from('booking_intake')
         .select(selectFields)
-        .is('user_id', null)
-        .eq('email', fallbackEmail)
+        .ilike('email', fallbackEmail)
         .in('status', ['confirmed', 'cancelled'])
         .lt('appointment_date', today)
         .order('appointment_date', { ascending: false })
@@ -376,6 +537,23 @@ export async function listMyBookings(
 
       const recentByEmailData = (recentByEmail.data || []) as unknown[];
       recentRows = recentByEmailData.filter(isRawBookingIntakeRow);
+      if (recentRows.length > 0) {
+        usedEmailFallback = true;
+      }
+    }
+
+    if (fallbackEmail && upcomingRows.length === 0 && recentRows.length === 0) {
+      const calendarFallback = await listBookingsFromCalendarByEmail(
+        fallbackEmail,
+        today,
+        bookingLimit,
+        recentLimit
+      );
+      if (calendarFallback.upcomingRows.length > 0 || calendarFallback.recentRows.length > 0) {
+        upcomingRows = calendarFallback.upcomingRows;
+        recentRows = calendarFallback.recentRows;
+        usedEmailFallback = true;
+      }
     }
 
     return {
