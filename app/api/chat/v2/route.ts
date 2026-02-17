@@ -507,7 +507,9 @@ const SYMPTOM_RECORDING_GUIDANCE = `【症狀記錄功能】
 const OUTPUT_FORMAT_RULES = `【輸出格式規則（必須遵守）】
 - 禁止使用 Markdown 星號格式（包括 *、**、***）。
 - 禁止輸出任何星號字元 *。
-- 需要強調時，請用自然語句、全形標點或換行，不要用星號。`;
+- 需要強調時，請用自然語句、全形標點或換行，不要用星號。
+- 禁止提供「吸幾拍/呼幾拍/做幾多分鐘/做幾多次」等固定數字式身心練習指令，避免故弄玄虛或假精準。
+- 除非用戶明確要求呼吸練習，否則不要主動建議呼吸訓練；若涉及急症紅旗（例如呼吸困難），仍要優先提示即時求助。`;
 
 function buildBookingSystemPrompt(careContext: string): string {
   const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
