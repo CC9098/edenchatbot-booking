@@ -49,14 +49,16 @@ export async function GET(req: NextRequest) {
     return new NextResponse("PKCE S256 is required", { status: 400 });
   }
 
-  const mcpBase = process.env.MCP_PUBLIC_BASE_URL || "http://localhost:3333";
+  const mcpBase = (process.env.MCP_PUBLIC_BASE_URL || "http://localhost:3333").trim();
+  const githubOAuthClientId = (process.env.GITHUB_OAUTH_CLIENT_ID || "").trim();
+  const githubOAuthScopes = (process.env.GITHUB_OAUTH_SCOPES || "repo read:user").trim();
   const githubAuthUrl = new URL(
-    process.env.GITHUB_AUTH_URL || "https://github.com/login/oauth/authorize",
+    (process.env.GITHUB_AUTH_URL || "https://github.com/login/oauth/authorize").trim(),
   );
 
-  githubAuthUrl.searchParams.set("client_id", process.env.GITHUB_OAUTH_CLIENT_ID || "");
+  githubAuthUrl.searchParams.set("client_id", githubOAuthClientId);
   githubAuthUrl.searchParams.set("redirect_uri", `${new URL(mcpBase).origin}/oauth/github/callback`);
-  githubAuthUrl.searchParams.set("scope", process.env.GITHUB_OAUTH_SCOPES || "repo read:user");
+  githubAuthUrl.searchParams.set("scope", githubOAuthScopes);
   githubAuthUrl.searchParams.set(
     "state",
     encodeOAuthState({

@@ -24,24 +24,27 @@ export async function GET(req: NextRequest) {
     return new NextResponse("OAuth state invalid or expired", { status: 400 });
   }
 
-  const baseUrl = process.env.MCP_PUBLIC_BASE_URL || "http://localhost:3333";
+  const baseUrl = (process.env.MCP_PUBLIC_BASE_URL || "http://localhost:3333").trim();
+  const githubOauthClientId = (process.env.GITHUB_OAUTH_CLIENT_ID || "").trim();
+  const githubOauthClientSecret = (process.env.GITHUB_OAUTH_CLIENT_SECRET || "").trim();
+  const githubTokenUrl = (
+    process.env.GITHUB_TOKEN_URL || "https://github.com/login/oauth/access_token"
+  ).trim();
+  const githubApiBaseUrl = (process.env.GITHUB_API_BASE_URL || "https://api.github.com").trim();
 
-  const tokenResponse = await fetch(
-    process.env.GITHUB_TOKEN_URL || "https://github.com/login/oauth/access_token",
-    {
+  const tokenResponse = await fetch(githubTokenUrl, {
       method: "POST",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({
-        client_id: process.env.GITHUB_OAUTH_CLIENT_ID || "",
-        client_secret: process.env.GITHUB_OAUTH_CLIENT_SECRET || "",
+        client_id: githubOauthClientId,
+        client_secret: githubOauthClientSecret,
         code: githubCode,
         redirect_uri: `${new URL(baseUrl).origin}/oauth/github/callback`,
       }),
-    },
-  );
+    });
 
   if (!tokenResponse.ok) {
     return new NextResponse("GitHub token exchange failed", { status: 500 });
@@ -52,7 +55,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse("No GitHub access token returned", { status: 500 });
   }
 
-  const meResponse = await fetch(`${process.env.GITHUB_API_BASE_URL || "https://api.github.com"}/user`, {
+  const meResponse = await fetch(`${githubApiBaseUrl}/user`, {
     headers: {
       Authorization: `Bearer ${tokenJson.access_token}`,
       Accept: "application/vnd.github+json",

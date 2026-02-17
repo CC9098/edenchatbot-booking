@@ -27,9 +27,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unsupported_grant_type" }, { status: 400 });
   }
 
-  const configuredClientSecret = process.env.MCP_OAUTH_CLIENT_SECRET || "";
+  const configuredClientSecret = (process.env.MCP_OAUTH_CLIENT_SECRET || "").trim();
 
-  if (clientSecret !== configuredClientSecret) {
+  if (clientSecret.trim() !== configuredClientSecret) {
     return NextResponse.json({ error: "invalid_client" }, { status: 401 });
   }
 
