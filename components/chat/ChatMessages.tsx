@@ -20,8 +20,34 @@ export function ChatMessages({ messages, linkify, primaryColor }: ChatMessagesPr
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleFeedback = useCallback((id: string, type: 'up' | 'down') => {
-    setFeedback(prev => ({ ...prev, [id]: prev[id] === type ? null : type }));
-  }, []);
+    setFeedback(prev => {
+      const next = { ...prev, [id]: prev[id] === type ? null : type };
+
+      // Only submit when actively selecting (not deselecting)
+      if (next[id] !== null) {
+        const idx = messages.findIndex(m => m.id === id);
+        const rated = messages[idx];
+        // Collect up to 10 previous messages as context
+        const contextMessages = messages
+          .slice(Math.max(0, idx - 10), idx)
+          .map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }));
+
+        fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            feedback_type: type,
+            source: 'widget_v1',
+            message_text: rated.text,
+            message_index: idx,
+            context_messages: contextMessages,
+          }),
+        }).catch(() => { /* silent fail — feedback is best-effort */ });
+      }
+
+      return next;
+    });
+  }, [messages]);
 
   const handleCopy = useCallback(async (id: string, text: string) => {
     try {

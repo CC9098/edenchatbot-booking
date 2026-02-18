@@ -393,7 +393,7 @@ export function ChatRoom() {
 
       {/* Messages area */}
       <div className="flex-1 overflow-hidden">
-        <MessageList messages={messages} loading={loading} />
+        <MessageList messages={messages} loading={loading} sessionId={sessionId} />
       </div>
 
       {/* Input area */}

@@ -14,6 +14,7 @@ export type ChatMessage = {
 type MessageListProps = {
   messages: ChatMessage[];
   loading?: boolean;
+  sessionId?: string;
 };
 
 const MODE_BADGES: Record<ChatMode, { label: string; color: string }> = {
@@ -59,7 +60,7 @@ function renderMessageContent(content: string, isUser: boolean) {
 
 type FeedbackState = Record<number, "up" | "down" | null>;
 
-export function MessageList({ messages, loading }: MessageListProps) {
+export function MessageList({ messages, loading, sessionId }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastMessage = messages[messages.length - 1];
   const [feedback, setFeedback] = useState<FeedbackState>({});
@@ -70,9 +71,38 @@ export function MessageList({ messages, loading }: MessageListProps) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, lastMessage?.content, loading]);
 
-  const handleFeedback = useCallback((idx: number, type: "up" | "down") => {
-    setFeedback((prev) => ({ ...prev, [idx]: prev[idx] === type ? null : type }));
-  }, []);
+  const handleFeedback = useCallback(
+    (idx: number, type: "up" | "down") => {
+      setFeedback((prev) => {
+        const next = { ...prev, [idx]: prev[idx] === type ? null : type };
+
+        // Submit to API only when actively selecting (not deselecting)
+        if (next[idx] !== null) {
+          const rated = messages[idx];
+          const contextMessages = messages
+            .slice(Math.max(0, idx - 10), idx)
+            .map((m) => ({ role: m.role, content: m.content }));
+
+          fetch("/api/feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              feedback_type: type,
+              source: "chat_v2",
+              message_text: rated.content,
+              message_index: idx,
+              message_mode: rated.mode ?? null,
+              context_messages: contextMessages,
+              session_id: sessionId ?? null,
+            }),
+          }).catch(() => { /* silent fail — feedback is best-effort */ });
+        }
+
+        return next;
+      });
+    },
+    [messages, sessionId],
+  );
 
   const handleCopy = useCallback(async (idx: number, text: string) => {
     try {
