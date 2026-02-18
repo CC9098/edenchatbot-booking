@@ -106,6 +106,7 @@ const CANCEL_KEYWORDS = ['不用', '唔使', '取消', '算了', '改日', '唔�
 const G2_BOOKING_NUDGE_KEYWORDS = ['預約', '約診', '睇醫師', '見醫師', '面診', 'book', 'booking', '安排睇症'];
 const G2_MIN_SENTENCES_BETWEEN_BOOKING_NUDGES = 6;
 const MODE_ROUTER_CONTEXT_MESSAGE_COUNT = 6;
+const RECENT_USER_INTENT_WINDOW = 3;
 
 // ---------------------------------------------------------------------------
 // Feature Flags
@@ -226,16 +227,23 @@ function isLatestUserG2OptInReply(messages: ChatMessagePayload[]): boolean {
   return isG2DeepDiveOfferMessage(previousAssistant.content);
 }
 
+function hasRecentUserBookingIntent(messages: ChatMessagePayload[]): boolean {
+  const recentUserMessages = messages
+    .filter((msg) => msg.role === 'user')
+    .slice(-RECENT_USER_INTENT_WINDOW);
+
+  return recentUserMessages.some((msg) => {
+    const msgLower = msg.content.toLowerCase();
+    return BOOKING_KEYWORDS.some((kw) => msgLower.includes(kw.toLowerCase()));
+  });
+}
+
 function resolveModeByRules(messages: ChatMessagePayload[]): ModeRuleResolution {
   const latestMessage = messages[messages.length - 1]?.content || '';
   const lower = latestMessage.toLowerCase();
 
-  // Check recent conversation history (last 5 messages) for booking intent
-  const recentMessages = messages.slice(-5);
-  const hasRecentBookingIntent = recentMessages.some(msg => {
-    const msgLower = msg.content.toLowerCase();
-    return BOOKING_KEYWORDS.some(kw => msgLower.includes(kw.toLowerCase()));
-  });
+  // Only keep booking stickiness from recent user turns, not assistant nudges.
+  const hasRecentBookingIntent = hasRecentUserBookingIntent(messages);
   const hasLatestG2OptInReply = isLatestUserG2OptInReply(messages);
 
   const signals: ModeRuleSignals = {
