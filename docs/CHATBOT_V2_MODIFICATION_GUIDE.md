@@ -1,6 +1,6 @@
 # Chatbot v2 修改說明書（Prompt + Mode + Symptom Logging）
 
-最後更新：2026-02-16（hotfix: symptom logging + hybrid semantic mode router）
+最後更新：2026-02-18（hotfix: B-mode 黏性修正 + mode/speed 優化建議）
 
 ## 1) TL;DR（先答你最關心）
 
@@ -83,12 +83,16 @@
 
 ### 4.1 Rule-based 初判順序
 
-1. 看最近 5 則對話有無 booking intent（`BOOKING_KEYWORDS`）
+1. 看最近 `RECENT_USER_INTENT_WINDOW=3` 則「user 訊息」有無 booking intent（`BOOKING_KEYWORDS`）
 2. 如果有，且最新訊息無明確取消字眼（`CANCEL_KEYWORDS`），直接留在 `B`
 3. 否則若最新訊息含 booking keyword，也入 `B`
 4. 否則若訊息長度 > 150 或命中 `G3_KEYWORDS`，入 `G3`
 5. 否則若命中 `G2_KEYWORDS`，入 `G2`
 6. 其他預設 `G1`
+
+補充（2026-02-18 修正）：
+- 早前版本會把 assistant 訊息一併納入 recent booking intent，容易導致 B mode 黏性過高。
+- 現在只看 recent user turns，assistant 主動提「預約」不再單獨鎖住 `B`。
 
 ### 4.2 Semantic Router 觸發與決策閘門
 
@@ -224,7 +228,7 @@ values ('hoarding', '痰濕飲食重點', '內容...', 20, true, true);
 ### 問題：模式判斷飄忽
 
 - 調整 `BOOKING_KEYWORDS / CANCEL_KEYWORDS / G2_KEYWORDS / G3_KEYWORDS`
-- 微調「最近 5 則對話」和長度閾值
+- 微調 `RECENT_USER_INTENT_WINDOW`（只計 user turns）和長度閾值
 
 ---
 
@@ -411,3 +415,53 @@ A: 去 Supabase Dashboard → SQL Editor → 執行 `supabase/migrations/2026021
 - ✅ `app/api/chat/v2/route.ts` - Function calling integration
 - ✅ `app/api/chat/v2/route.ts` (`fetchCareContext`) - Context injection
 - ✅ `app/doctor/patients/[id]/page.tsx` - Doctor UI
+
+---
+
+## 13) 軍師角度：Mode + Speed 集思廣益（2026-02-18）
+
+目標：在不犧牲 mode 正確率下，優先壓低平均回覆時間與尾延遲（P95/P99）。
+
+### 13.1 策略原則（先快後準，再求最準）
+
+1. 先用 deterministic 規則短路，再決定是否需要 semantic。
+2. 優先做「不增加額外 LLM call」的改進。
+3. prompt 與輸出長度治理要和 mode 路由同時做，避免只快判斷但慢生成。
+
+### 13.2 建議優先級（按效益/風險）
+
+| 優先級 | 建議 | 速度影響 | 風險 |
+|---|---|---|---|
+| P0 | `task-intent override`：遇到改寫/摘要/翻譯/JSON/字數限制時，直接走 G 模式 | 正向（減少誤入 B + 減少不必要語義判斷） | 低 |
+| P0 | 中英簡繁同義詞正規化（預約/预约/book/appointment 等） | 近乎零成本（本地字串） | 低 |
+| P0 | 收緊 semantic 觸發條件（只在真正邊界 case） | 正向（減少 router call 次數） | 低到中 |
+| P0 | B mode 回覆長度硬限制（預設短答 + 每輪只問一條） | 顯著正向（completion tokens 下降） | 低 |
+| P1 | B mode 輕量狀態機（collect/confirm/submit） | 中度正向（減少重覆問答） | 中 |
+| P1 | 根據真實流量分段 threshold（而非全域固定 0.75） | 情境性正向 | 中 |
+
+### 13.3 Speed-First 實作清單（可直接落地）
+
+1. 新增 `NON_BOOKING_TASK_PATTERNS`（改寫/摘要/翻譯/JSON/字數）並在 rules 最前面短路。
+2. 新增 `normalizeIntentText` 對照表（繁/簡/英）供 keyword match 共用。
+3. `shouldRunSemanticModeRouter` 加一層 gate：若命中 non-booking task，直接不跑 semantic。
+4. B mode prompt 增加硬規則：「最多 2-4 句、一次只問一條、禁止重覆診所介紹」。
+5. log 新增觀測欄位：`routerAttempted`, `source`, `promptTokens`, `completionTokens`, `duration_ms`（按 mode 分桶看 P50/P95）。
+
+### 13.4 量化驗收（避免只憑感覺）
+
+上線前後都要跑同一題庫（繁/簡/英）並比較：
+
+- 準確：`mode hit rate`、`B 誤入率`、`non-booking 任務污染率`
+- 速度：`duration_ms`（P50/P95/P99）、`completion_tokens`
+- 穩定：`rules_fallback` 比率、semantic timeout 比率
+
+建議門檻：
+- `B 誤入率` 下降 >= 30%
+- 非預約任務 `completion_tokens` 下降 >= 20%
+- 整體 P95 延遲不升，理想下降 >= 10%
+
+### 13.5 反模式（要避免）
+
+1. 為了準確率再加一層 LLM classifier（通常會直接拉高延遲）。
+2. 在 B mode prompt 堆長文規則（token 成本高，且容易重覆）。
+3. 只調 threshold 不看真實錯誤分佈（容易「修一邊壞另一邊」）。

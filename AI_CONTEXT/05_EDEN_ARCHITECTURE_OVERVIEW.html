@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eden 系統架構總覽</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --bg2: #0f1628;
+    --card: #131c35;
+    --border: #1e2d52;
+    --accent1: #3d7fff;
+    --accent2: #00d4aa;
+    --accent3: #ff6b6b;
+    --accent4: #f5a623;
+    --accent5: #b06bff;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --text3: #64748b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans HK', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  header {
+    text-align: center;
+    padding: 48px 24px 32px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #0d1530 0%, var(--bg) 100%);
+  }
+
+  header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--accent1), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+
+  header p {
+    color: var(--text2);
+    font-size: 0.9rem;
+    font-weight: 300;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    padding: 24px 32px 0;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .tab {
+    padding: 10px 20px;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text2);
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    transition: all 0.2s;
+  }
+
+  .tab:hover { color: var(--text); background: var(--card); }
+
+  .tab.active {
+    color: var(--text);
+    background: var(--card);
+    border-color: var(--border);
+    border-bottom-color: var(--card);
+    margin-bottom: -1px;
+  }
+
+  .tab-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+  }
+
+  .panel { display: none; padding: 32px; }
+  .panel.active { display: block; }
+
+  .flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .flow-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .node {
+    position: relative;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    text-align: center;
+    min-width: 140px;
+    max-width: 220px;
+    line-height: 1.5;
+    border: 1.5px solid transparent;
+    cursor: default;
+    transition: transform 0.15s, box-shadow 0.15s;
+    z-index: 1;
+  }
+
+  .node:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+
+  .node-blue { background: rgba(61,127,255,0.12); border-color: var(--accent1); color: #93b8ff; }
+  .node-green { background: rgba(0,212,170,0.1); border-color: var(--accent2); color: #5ee8cc; }
+  .node-red { background: rgba(255,107,107,0.1); border-color: var(--accent3); color: #ff9999; }
+  .node-yellow { background: rgba(245,166,35,0.1); border-color: var(--accent4); color: #ffd07a; }
+  .node-purple { background: rgba(176,107,255,0.1); border-color: var(--accent5); color: #d4a5ff; }
+  .node-gray { background: rgba(100,116,139,0.12); border-color: #475569; color: #94a3b8; }
+
+  .node-diamond {
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    border-radius: 0;
+    padding: 28px 24px;
+    min-width: 160px;
+  }
+
+  .node-round { border-radius: 999px; }
+
+  .node-badge {
+    position: absolute;
+    top: -8px; right: -8px;
+    background: var(--accent3);
+    color: white;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 99px;
+  }
+
+  .arrow-down {
+    width: 2px;
+    height: 28px;
+    background: linear-gradient(180deg, var(--border), var(--border));
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .arrow-down::after {
+    content: '';
+    position: absolute;
+    bottom: -6px; left: -4px;
+    border: 5px solid transparent;
+    border-top-color: var(--border);
+    border-bottom: none;
+  }
+
+  .arrow-right {
+    width: 40px; height: 2px;
+    background: var(--border);
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .arrow-right::after {
+    content: '';
+    position: absolute;
+    right: -6px; top: -4px;
+    border: 5px solid transparent;
+    border-left-color: var(--border);
+    border-right: none;
+  }
+
+  .arrow-label {
+    font-size: 0.7rem;
+    color: var(--text3);
+    padding: 2px 8px;
+    background: var(--bg2);
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .arrow-down-labeled {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 32px 0 20px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-title .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .card-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .chip {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .chip-B { background: rgba(245,166,35,0.2); color: #ffd07a; border: 1px solid var(--accent4); }
+  .chip-G1 { background: rgba(0,212,170,0.15); color: #5ee8cc; border: 1px solid var(--accent2); }
+  .chip-G2 { background: rgba(61,127,255,0.15); color: #93b8ff; border: 1px solid var(--accent1); }
+  .chip-G3 { background: rgba(176,107,255,0.15); color: #d4a5ff; border: 1px solid var(--accent5); }
+
+  .rule-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .rule-table th {
+    background: var(--bg2);
+    color: var(--text2);
+    font-weight: 600;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 2px solid var(--border);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .rule-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: top;
+  }
+  .rule-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .priority-badge {
+    display: inline-block;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 24px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: var(--border);
+    color: var(--text2);
+    flex-shrink: 0;
+  }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: var(--text2);
+  }
+
+  .legend-box {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    border: 1.5px solid;
+  }
+
+  .page-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+  }
+
+  .page-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 0.8rem;
+  }
+
+  .page-card .path {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--accent2);
+    margin-bottom: 6px;
+  }
+
+  .page-card .desc {
+    color: var(--text2);
+    font-size: 0.75rem;
+  }
+
+  .connector-line {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 4px 0;
+  }
+
+  .multi-branch {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    justify-content: center;
+    margin: 4px 0;
+  }
+
+  .branch-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .horizontal-bar {
+    height: 2px;
+    background: var(--border);
+    position: relative;
+  }
+
+  .flow-group {
+    background: rgba(255,255,255,0.02);
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin: 8px 0;
+  }
+
+  .flow-group-label {
+    font-size: 0.7rem;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  .keyword-pill {
+    display: inline-block;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 0.73rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text2);
+    margin: 3px;
+  }
+
+  .highlight-box {
+    background: rgba(61,127,255,0.08);
+    border: 1px solid rgba(61,127,255,0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 0.82rem;
+    color: #93b8ff;
+    margin: 12px 0;
+  }
+
+  .warn-box {
+    background: rgba(255,107,107,0.08);
+    border: 1px solid rgba(255,107,107,0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 0.82rem;
+    color: #ff9999;
+    margin: 12px 0;
+  }
+
+  @media (max-width: 768px) {
+    .grid3, .grid4 { grid-template-columns: 1fr; }
+    .grid2 { grid-template-columns: 1fr; }
+    .panel { padding: 16px; }
+    header h1 { font-size: 1.4rem; }
+    .tabs { padding: 16px 16px 0; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚕ Eden 系統架構總覽</h1>
+  <p>EdenChatbotBooking · Next.js 14 · Supabase · Google Calendar · Gemini AI</p>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('chat-mode', event)">
+    <span class="tab-dot" style="background:#3d7fff"></span>Chat Mode 判定
+  </div>
+  <div class="tab" onclick="showTab('user-flow', event)">
+    <span class="tab-dot" style="background:#00d4aa"></span>用戶主流程
+  </div>
+  <div class="tab" onclick="showTab('booking-flow', event)">
+    <span class="tab-dot" style="background:#f5a623"></span>預約完整流程
+  </div>
+  <div class="tab" onclick="showTab('pages', event)">
+    <span class="tab-dot" style="background:#b06bff"></span>頁面架構
+  </div>
+  <div class="tab" onclick="showTab('data-flow', event)">
+    <span class="tab-dot" style="background:#ff6b6b"></span>資料流
+  </div>
+  <div class="tab" onclick="showTab('roles', event)">
+    <span class="tab-dot" style="background:#94a3b8"></span>角色職責
+  </div>
+</div>
+
+<div class="panel active" id="tab-chat-mode">
+
+  <div class="section-title">
+    <div class="dot" style="background:var(--accent1)"></div>
+    Chat Mode 判定流水線
+  </div>
+
+  <div class="highlight-box">
+    💡 核心原則：Rule Engine 永遠先行，Semantic Router 只係有條件覆蓋。
+  </div>
+
+  <div style="max-width:600px; margin: 0 auto;">
+    <div class="flow">
+
+      <div class="node node-blue">
+        📥 收到用戶訊息
+      </div>
+
+      <div class="arrow-down"></div>
+
+      <div class="node node-purple">
+        ⚙️ Rule Engine<br>
+        <small style="font-size:0.72rem; opacity:0.8">resolveModeByRules()</small>
+      </div>
+
+      <div class="arrow-down"></div>
+
+      <div style="position:relative; display:flex; flex-direction:column; align-items:center;">
+        <div class="node node-yellow" style="border-radius:8px; padding:14px 28px;">
+          🔀 需要 Semantic Router？
+        </div>
+      </div>
+
+      <div style="display:flex; width:100%; justify-content:center; margin:0; gap:80px;">
+        <div class="branch-line" style="align-items:flex-end">
+          <div style="width:2px; height:32px; background:var(--border)"></div>
+          <div style="display:flex; align-items:center; gap:8px; margin:4px 0">
+            <div class="arrow-label">否</div>
+          </div>
+          <div class="node node-gray" style="min-width:120px">
+            Final = ruleMode
+          </div>
+        </div>
+        <div class="branch-line" style="align-items:flex-start">
+          <div style="width:2px; height:32px; background:var(--border)"></div>
+          <div style="display:flex; align-items:center; gap:8px; margin:4px 0">
+            <div class="arrow-label">係</div>
+          </div>
+          <div class="node node-purple" style="min-width:130px">
+            🤖 Semantic Router<br>
+            <small style="font-size:0.7rem">返回 mode + confidence</small>
+          </div>
+          <div style="width:2px; height:20px; background:var(--border)"></div>
+          <div class="node node-yellow" style="min-width:130px; border-radius:8px">
+            confidence ≥ 0.75？
+          </div>
+          <div style="display:flex; gap:40px;">
+            <div class="branch-line">
+              <div style="width:2px; height:24px; background:var(--border)"></div>
+              <div class="arrow-label">是</div>
+              <div style="width:2px; height:16px; background:var(--border)"></div>
+              <div class="node node-green" style="min-width:110px; font-size:0.75rem">
+                Final = semantic mode
+              </div>
+            </div>
+            <div class="branch-line">
+              <div style="width:2px; height:24px; background:var(--border)"></div>
+              <div class="arrow-label">否 / timeout</div>
+              <div style="width:2px; height:16px; background:var(--border)"></div>
+              <div class="node node-gray" style="min-width:110px; font-size:0.75rem">
+                Fallback = ruleMode
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:48px">
+    <div class="dot" style="background:var(--accent4)"></div>
+    Rule Engine 優先序（由高到低，命中即 return）
+  </div>
+
+  <table class="rule-table">
+    <thead>
+      <tr>
+        <th>優先</th>
+        <th>條件</th>
+        <th>結果</th>
+        <th>說明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="priority-badge" style="background:rgba(245,166,35,0.3); color:#ffd07a">1</span></td>
+        <td><code style="font-size:0.75rem; color:#93b8ff">hasRecentBookingIntent && !explicitCancel</code></td>
+        <td><span class="chip chip-B">B</span></td>
+        <td style="color:var(--text2); font-size:0.78rem">最近 3 個 user turns 有預約語境</td>
+      </tr>
+      <tr>
+        <td><span class="priority-badge" style="background:rgba(245,166,35,0.2); color:#ffd07a">2</span></td>
+        <td><code style="font-size:0.75rem; color:#93b8ff">hasLatestBookingKeyword</code></td>
+        <td><span class="chip chip-B">B</span></td>
+        <td style="color:var(--text2); font-size:0.78rem">最新句有預約語意</td>
+      </tr>
+      <tr>
+        <td><span class="priority-badge">3</span></td>
+        <td><code style="font-size:0.75rem; color:#93b8ff">hasLatestG2OptInReply</code></td>
+        <td><span class="chip chip-G2">G2</span></td>
+        <td style="color:var(--text2); font-size:0.78rem">用戶短答「好/要」接住 assistant 邀請</td>
+      </tr>
+      <tr>
+        <td><span class="priority-badge">4</span></td>
+        <td><code style="font-size:0.75rem; color:#93b8ff">latestLength &gt; 150 || hasLatestG3Keyword</code></td>
+        <td><span class="chip chip-G3">G3</span></td>
+        <td style="color:var(--text2); font-size:0.78rem">長描述或深度困擾詞</td>
+      </tr>
+      <tr>
+        <td><span class="priority-badge">5</span></td>
+        <td><code style="font-size:0.75rem; color:#93b8ff">hasLatestG2Keyword</code></td>
+        <td><span class="chip chip-G2">G2</span></td>
+        <td style="color:var(--text2); font-size:0.78rem">要求原理/詳細解釋</td>
+      </tr>
+      <tr>
+        <td><span class="priority-badge">6</span></td>
+        <td style="color:var(--text3)">else（默認）</td>
+        <td><span class="chip chip-G1">G1</span></td>
+        <td style="color:var(--text2); font-size:0.78rem">一般健康短問答</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title" style="margin-top:40px">
+    <div class="dot" style="background:var(--accent2)"></div>
+    關鍵詞速查
+  </div>
+
+  <div class="grid3">
+    <div class="card">
+      <div class="card-title"><span class="chip chip-B">B</span> Booking Keywords</div>
+      <div>
+        <span class="keyword-pill">預約</span>
+        <span class="keyword-pill">約診</span>
+        <span class="keyword-pill">book</span>
+        <span class="keyword-pill">改期</span>
+        <span class="keyword-pill">取消預約</span>
+        <span class="keyword-pill">reschedule</span>
+        <span class="keyword-pill">cancel</span>
+        <span class="keyword-pill">邊日有空</span>
+        <span class="keyword-pill">幾時有得睇</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="chip chip-G2">G2</span> G2 Keywords</div>
+      <div>
+        <span class="keyword-pill">點解</span>
+        <span class="keyword-pill">原理</span>
+        <span class="keyword-pill">理論</span>
+        <span class="keyword-pill">詳細</span>
+        <span class="keyword-pill">解釋</span>
+        <span class="keyword-pill">explain</span>
+        <span class="keyword-pill">why</span>
+        <span class="keyword-pill">想知多啲</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="chip chip-G3">G3</span> G3 Keywords</div>
+      <div>
+        <span class="keyword-pill">困擾</span>
+        <span class="keyword-pill">一直</span>
+        <span class="keyword-pill">成日</span>
+        <span class="keyword-pill">唔知點算</span>
+        <span class="keyword-pill">幫我分析</span>
+        <span class="keyword-pill">教我</span>
+        <span class="keyword-pill">coach</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="warn-box" style="margin-top:24px">
+    ⚠️ 2026-02-18 修正：<code>hasRecentBookingIntent</code> 只看最近 <strong>3 個 user turns</strong>，assistant 自己提及「預約」<strong>不再</strong>造成 B 模式鎖定。
+  </div>
+
+</div>
+
+<div class="panel" id="tab-user-flow">
+
+  <div class="section-title">
+    <div class="dot" style="background:var(--accent2)"></div>
+    病人主流程（由首頁到完成）
+  </div>
+
+  <div style="max-width:700px; margin: 0 auto;">
+    <div class="flow">
+
+      <div class="node node-green node-round" style="min-width:180px">
+        🏠 首頁 <code style="font-size:0.72rem">/</code>
+      </div>
+
+      <div class="arrow-down"></div>
+
+      <div style="display:flex; gap:48px; align-items:flex-start; justify-content:center">
+
+        <div class="branch-line">
+          <div class="node node-blue" style="min-width:130px">
+            📰 文章列表<br><code style="font-size:0.7rem">/articles</code>
+          </div>
+          <div class="arrow-down"></div>
+          <div class="node node-blue" style="min-width:130px">
+            📄 文章詳情<br><code style="font-size:0.7rem">/articles/[slug]</code>
+          </div>
+        </div>
+
+        <div class="branch-line">
+          <div class="node node-purple" style="min-width:130px">
+            🎓 課程列表<br><code style="font-size:0.7rem">/courses</code>
+          </div>
+          <div class="arrow-down"></div>
+          <div class="node node-purple" style="min-width:130px">
+            🎬 課堂詳情<br><code style="font-size:0.7rem">/courses/.../lessons/...</code>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="margin:4px 0; text-align:center; color:var(--text3); font-size:0.75rem">↓ 兩個入口都可進入</div>
+
+      <div style="display:flex; gap:48px; justify-content:center; margin:8px 0">
+        <div class="branch-line">
+          <div class="node node-yellow" style="min-width:140px">
+            🤖 AI 諮詢<br><code style="font-size:0.7rem">/chat</code>
+          </div>
+        </div>
+        <div class="branch-line">
+          <div class="node node-green" style="min-width:140px">
+            📅 預約<br><code style="font-size:0.7rem">/booking</code>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin:4px 0; text-align:center; color:var(--text3); font-size:0.75rem">↓ /chat 可直接跳去 /booking</div>
+
+      <div class="node node-blue" style="min-width:200px">
+        ✅ 預約成功<br>
+        <small style="font-size:0.72rem; color:#93b8ff">收到確認電郵（含改期/取消連結）</small>
+      </div>
+
+      <div class="arrow-down"></div>
+
+      <div style="display:flex; gap:48px; justify-content:center; margin:8px 0">
+        <div class="branch-line">
+          <div class="node node-yellow" style="min-width:120px">
+            🔄 改期<br><code style="font-size:0.7rem">/reschedule</code>
+          </div>
+        </div>
+        <div class="branch-line">
+          <div class="node node-red" style="min-width:120px">
+            ❌ 取消<br><code style="font-size:0.7rem">/cancel</code>
+          </div>
+        </div>
+        <div class="branch-line">
+          <div class="node node-green" style="min-width:120px">
+            👨‍⚕️ 準時到診
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:48px">
+    <div class="dot" style="background:var(--accent5)"></div>
+    後台流程（醫師/管理者）
+  </div>
+
+  <div style="max-width:600px; margin: 0 auto;">
+    <div class="flow">
+      <div class="node node-gray node-round">
+        🔐 登入 <code style="font-size:0.72rem">/login</code>
+      </div>
+      <div class="arrow-down"></div>
+      <div style="display:flex; gap:48px; justify-content:center; margin:8px 0">
+        <div class="branch-line">
+          <div class="node node-purple" style="min-width:150px">
+            👨‍⚕️ 醫師控制台<br><code style="font-size:0.7rem">/doctor</code>
+          </div>
+          <div class="arrow-down"></div>
+          <div class="node node-purple" style="min-width:150px; font-size:0.78rem">
+            病人詳情<br>體質評估 / 護理指引<br>覆診計劃
+          </div>
+        </div>
+        <div class="branch-line">
+          <div class="node node-blue" style="min-width:150px">
+            ✏️ 內容管理<br><code style="font-size:0.7rem">/doctor/content/articles</code>
+          </div>
+          <div class="arrow-down"></div>
+          <div class="node node-blue" style="min-width:150px; font-size:0.78rem">
+            新增/編輯草稿<br>→ 發佈<br>→ 公開顯示
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="panel" id="tab-booking-flow">
+
+  <div class="section-title">
+    <div class="dot" style="background:var(--accent4)"></div>
+    預約完整流程（B-Mode Chat-v2）
+  </div>
+
+  <div style="max-width:680px; margin: 0 auto;">
+    <div class="flow">
+
+      <div class="node node-yellow node-round" style="min-width:200px">
+        💬 用戶輸入預約請求<br>
+        <small style="font-size:0.72rem; opacity:0.8">Chat v2 · B-Mode 確認</small>
+      </div>
+      <div class="arrow-down"></div>
+
+      <div class="flow-group" style="width:100%; max-width:500px">
+        <div class="flow-group-label">📋 收集必填資料（Booking Intake）</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.78rem; color:var(--text2)">
+          <div>✦ 姓名</div>
+          <div>✦ 電話</div>
+          <div>✦ 電郵</div>
+          <div>✦ 首診/覆診</div>
+          <div>✦ 醫師選擇</div>
+          <div>✦ 診所分店</div>
+          <div>✦ 首診額外資料 →</div>
+          <div style="font-size:0.73rem; color:var(--text3)">身份證 / 出生日期 / 性別 / 敏感史 / 目前用藥 / 主要症狀</div>
+        </div>
+      </div>
+
+      <div class="arrow-down"></div>
+
+      <div class="node node-blue" style="min-width:200px">
+        📡 查詢可用時段<br>
+        <small style="font-size:0.72rem; color:#93b8ff">POST /api/availability</small>
+      </div>
+      <div class="arrow-down"></div>
+
+      <div class="node node-blue" style="min-width:200px">
+        📅 Google Calendar 查 busy slots
+      </div>
+      <div class="arrow-down"></div>
+
+      <div class="node node-yellow" style="border-radius:8px; min-width:200px">
+        有空位？
+      </div>
+
+      <div style="display:flex; gap:64px; justify-content:center; margin:8px 0;">
+        <div class="branch-line">
+          <div class="arrow-label">有</div>
+          <div style="width:2px; height:20px; background:var(--border)"></div>
+          <div class="node node-green" style="min-width:140px">
+            🔒 鎖定時段<br>建立預約事件
+          </div>
+          <div style="width:2px; height:16px; background:var(--border)"></div>
+          <div class="node node-green" style="min-width:140px; font-size:0.78rem">
+            ✅ 寫入 booking_intake<br>同步 Supabase
+          </div>
+          <div style="width:2px; height:16px; background:var(--border)"></div>
+          <div class="node node-green" style="min-width:140px; font-size:0.78rem">
+            📧 發確認電郵<br>（含改期/取消連結）
+          </div>
+        </div>
+        <div class="branch-line">
+          <div class="arrow-label">無</div>
+          <div style="width:2px; height:20px; background:var(--border)"></div>
+          <div class="node node-red" style="min-width:140px; font-size:0.78rem">
+            ⚠️ 提示無位<br>請改揀其他時段
+          </div>
+          <div style="width:2px; height:16px; background:var(--border)"></div>
+          <div style="font-size:0.75rem; color:var(--text3); margin:4px 0">↑ 返回揀時段</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:48px">
+    <div class="dot" style="background:var(--accent2)"></div>
+    改期 / 取消流程
+  </div>
+
+  <div style="display:flex; gap:24px; max-width:680px; margin: 0 auto;">
+    <div class="card" style="flex:1">
+      <div class="card-title">🔄 改期</div>
+      <div class="flow" style="gap:4px">
+        <div class="node node-blue" style="width:100%; font-size:0.78rem">病人點擊電郵改期連結<br><code>/reschedule</code></div>
+        <div class="arrow-down"></div>
+        <div class="node node-blue" style="width:100%; font-size:0.78rem">重新查可用時段</div>
+        <div class="arrow-down"></div>
+        <div class="node node-blue" style="width:100%; font-size:0.78rem">揀新時段</div>
+        <div class="arrow-down"></div>
+        <div class="node node-green" style="width:100%; font-size:0.78rem">✅ 更新 Google Calendar<br>更新 booking_intake 狀態</div>
+        <div class="arrow-down"></div>
+        <div class="node node-green" style="width:100%; font-size:0.78rem">📧 發新確認電郵</div>
+      </div>
+    </div>
+    <div class="card" style="flex:1">
+      <div class="card-title">❌ 取消</div>
+      <div class="flow" style="gap:4px">
+        <div class="node node-red" style="width:100%; font-size:0.78rem">病人點擊電郵取消連結<br><code>/cancel</code></div>
+        <div class="arrow-down"></div>
+        <div class="node node-red" style="width:100%; font-size:0.78rem">確認取消操作</div>
+        <div class="arrow-down"></div>
+        <div class="node node-green" style="width:100%; font-size:0.78rem">✅ 刪除 Google Calendar 事件<br>釋放時段</div>
+        <div class="arrow-down"></div>
+        <div class="node node-green" style="width:100%; font-size:0.78rem">更新 booking_intake → cancelled</div>
+        <div class="arrow-down"></div>
+        <div class="node node-gray" style="width:100%; font-size:0.78rem">📧 發取消確認電郵</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="warn-box" style="max-width:680px; margin: 24px auto 0">
+    🔒 高風險規則：創建預約前必須先確認 Google Calendar 無撞期；絕不在 function call 成功前聲稱預約成功。
+  </div>
+
+</div>
+
+<div class="panel" id="tab-pages">
+
+  <div class="section-title">
+    <div class="dot" style="background:var(--accent5)"></div>
+    全站頁面一覽
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-box" style="background:rgba(0,212,170,0.15); border-color:var(--accent2)"></div> 公開頁面</div>
+    <div class="legend-item"><div class="legend-box" style="background:rgba(176,107,255,0.15); border-color:var(--accent5)"></div> 後台頁面</div>
+    <div class="legend-item"><div class="legend-box" style="background:rgba(61,127,255,0.15); border-color:var(--accent1)"></div> 功能頁面</div>
+  </div>
+
+  <div class="grid4">
+    <div class="page-card" style="border-color:rgba(0,212,170,0.3)">
+      <div class="path">/</div>
+      <div style="font-weight:600; margin-bottom:4px">首頁</div>
+      <div class="desc">文章/課程/聊天/預約入口</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(0,212,170,0.3)">
+      <div class="path">/articles</div>
+      <div style="font-weight:600; margin-bottom:4px">文章列表</div>
+      <div class="desc">篩選/搜尋文章</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(0,212,170,0.3)">
+      <div class="path">/articles/[slug]</div>
+      <div style="font-weight:600; margin-bottom:4px">文章詳情</div>
+      <div class="desc">支援中文 slug 路由</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(0,212,170,0.3)">
+      <div class="path">/courses</div>
+      <div style="font-weight:600; margin-bottom:4px">課程列表</div>
+      <div class="desc">所有公開課程</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(0,212,170,0.3)">
+      <div class="path">/courses/[slug]</div>
+      <div style="font-weight:600; margin-bottom:4px">課程詳情</div>
+      <div class="desc">課程介紹 + 課堂列表</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(0,212,170,0.3)">
+      <div class="path">/courses/.../lessons/...</div>
+      <div style="font-weight:600; margin-bottom:4px">課堂詳情</div>
+      <div class="desc">課程內容 + 進度追蹤</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(61,127,255,0.3)">
+      <div class="path">/chat</div>
+      <div style="font-weight:600; margin-bottom:4px">AI 諮詢</div>
+      <div class="desc">Gemini · G1/G2/G3/B 模式</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(61,127,255,0.3)">
+      <div class="path">/booking</div>
+      <div style="font-weight:600; margin-bottom:4px">預約</div>
+      <div class="desc">選醫師時段填資料</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(61,127,255,0.3)">
+      <div class="path">/cancel</div>
+      <div style="font-weight:600; margin-bottom:4px">取消預約</div>
+      <div class="desc">透過電郵連結進入</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(61,127,255,0.3)">
+      <div class="path">/reschedule</div>
+      <div style="font-weight:600; margin-bottom:4px">改期</div>
+      <div class="desc">透過電郵連結進入</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(61,127,255,0.3)">
+      <div class="path">/embed</div>
+      <div style="font-weight:600; margin-bottom:4px">嵌入式 Chatbot</div>
+      <div class="desc">浮動入口 · 可嵌入外部</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(61,127,255,0.3)">
+      <div class="path">/login</div>
+      <div style="font-weight:600; margin-bottom:4px">登入</div>
+      <div class="desc">Google OAuth</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(176,107,255,0.3)">
+      <div class="path">/doctor</div>
+      <div style="font-weight:600; margin-bottom:4px">醫師控制台</div>
+      <div class="desc">病人列表</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(176,107,255,0.3)">
+      <div class="path">/doctor/patients/[id]</div>
+      <div style="font-weight:600; margin-bottom:4px">病人詳情</div>
+      <div class="desc">體質/護理/覆診/Audit</div>
+    </div>
+    <div class="page-card" style="border-color:rgba(176,107,255,0.3)">
+      <div class="path">/doctor/content/articles</div>
+      <div style="font-weight:600; margin-bottom:4px">文章管理 CMS</div>
+      <div class="desc">新增/編輯/發佈文章</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="panel" id="tab-data-flow">
+
+  <div class="section-title">
+    <div class="dot" style="background:var(--accent3)"></div>
+    資料流架構
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">📱 前端 Pages</div>
+      <div class="flow" style="gap:6px">
+        <div class="node node-blue" style="width:100%; font-size:0.78rem">/ · /articles · /courses · 詳情頁</div>
+        <div class="arrow-down"></div>
+        <div class="node node-green" style="width:100%; font-size:0.78rem">lib/content-service.ts</div>
+        <div class="arrow-down"></div>
+        <div class="node node-purple" style="width:100%; font-size:0.78rem">Supabase Tables<br>articles · courses · modules · lessons</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">🛠 後台 Admin</div>
+      <div class="flow" style="gap:6px">
+        <div class="node node-purple" style="width:100%; font-size:0.78rem">/doctor/content/articles</div>
+        <div class="arrow-down"></div>
+        <div class="node node-blue" style="width:100%; font-size:0.78rem">API /api/doctor/content/articles*</div>
+        <div class="arrow-down"></div>
+        <div class="node node-yellow" style="width:100%; font-size:0.78rem">Auth Check<br>getCurrentUser + requireStaffRole</div>
+        <div class="arrow-down"></div>
+        <div class="node node-purple" style="width:100%; font-size:0.78rem">Supabase Tables<br>staff_roles · articles</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:32px">
+    <div class="dot" style="background:var(--accent1)"></div>
+    核心 API 路由
+  </div>
+
+  <table class="rule-table">
+    <thead>
+      <tr>
+        <th>路由</th>
+        <th>方法</th>
+        <th>功能</th>
+        <th>關鍵整合</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code style="color:#93b8ff">/api/chat</code></td>
+        <td><span style="color:var(--accent2); font-size:0.75rem">POST</span></td>
+        <td style="color:var(--text2); font-size:0.78rem">舊版/簡單 chatbot</td>
+        <td style="font-size:0.75rem; color:var(--text3)">Gemini</td>
+      </tr>
+      <tr>
+        <td><code style="color:#93b8ff">/api/chat/v2</code></td>
+        <td><span style="color:var(--accent2); font-size:0.75rem">POST</span></td>
+        <td style="color:var(--text2); font-size:0.78rem">主 AI 對話 · B/G1/G2/G3 模式</td>
+        <td style="font-size:0.75rem; color:var(--text3)">Gemini · Supabase · Function calling</td>
+      </tr>
+      <tr>
+        <td><code style="color:#93b8ff">/api/availability</code></td>
+        <td><span style="color:var(--accent2); font-size:0.75rem">POST</span></td>
+        <td style="color:var(--text2); font-size:0.78rem">查可用預約時段</td>
+        <td style="font-size:0.75rem; color:var(--text3)">Google Calendar · doctor_schedules · holidays</td>
+      </tr>
+      <tr>
+        <td><code style="color:#93b8ff">/api/booking</code></td>
+        <td><span style="color:var(--accent4); font-size:0.75rem">POST · GET · DELETE · PATCH</span></td>
+        <td style="color:var(--text2); font-size:0.78rem">建立/查詢/取消/改期預約</td>
+        <td style="font-size:0.75rem; color:var(--text3)">Google Calendar · Supabase · Gmail</td>
+      </tr>
+      <tr>
+        <td><code style="color:#93b8ff">/api/consultation</code></td>
+        <td><span style="color:var(--accent2); font-size:0.75rem">POST</span></td>
+        <td style="color:var(--text2); font-size:0.78rem">諮詢表單提交</td>
+        <td style="font-size:0.75rem; color:var(--text3)">Gmail</td>
+      </tr>
+      <tr>
+        <td><code style="color:#93b8ff">/api/me/lesson-progress</code></td>
+        <td><span style="color:var(--accent2); font-size:0.75rem">GET · PUT</span></td>
+        <td style="color:var(--text2); font-size:0.78rem">課堂學習進度</td>
+        <td style="font-size:0.75rem; color:var(--text3)">Supabase · user_lesson_progress</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title" style="margin-top:32px">
+    <div class="dot" style="background:var(--accent5)"></div>
+    Supabase 資料表速覽
+  </div>
+
+  <div class="grid3">
+    <div class="card">
+      <div class="card-title" style="color:var(--accent4)">📅 預約相關</div>
+      <div style="font-size:0.78rem; color:var(--text2); line-height:2">
+        doctors<br>doctor_schedules<br>holidays<br>booking_intake
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--accent1)">💬 AI 對話 / 護理</div>
+      <div style="font-size:0.78rem; color:var(--text2); line-height:2">
+        chat_sessions<br>chat_messages<br>patient_care_profile<br>care_instructions<br>follow_up_plans<br>symptom_logs
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--accent2)">📚 內容</div>
+      <div style="font-size:0.78rem; color:var(--text2); line-height:2">
+        articles<br>courses<br>course_modules<br>course_lessons<br>user_lesson_progress<br>staff_roles
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="panel" id="tab-roles">
+
+  <div class="section-title">
+    <div class="dot" style="background:var(--accent3)"></div>
+    四個角色職責對照
+  </div>
+
+  <div class="grid2">
+
+    <div class="card" style="border-color:rgba(245,166,35,0.3)">
+      <div class="card-title" style="color:#ffd07a">🏢 管理者</div>
+      <div class="flow" style="gap:8px">
+        <div class="node node-yellow" style="width:100%; font-size:0.78rem">每日快速檢查<br>（測試預約流程、確認電郵、Calendar 撞期）</div>
+        <div class="arrow-down"></div>
+        <div class="node node-yellow" style="width:100%; font-size:0.78rem">日間監察<br>（姑娘/醫師回報問題）</div>
+        <div class="arrow-down"></div>
+        <div class="node node-yellow" style="width:100%; font-size:0.78rem">收工前確認<br>（第二日排班/人手）</div>
+        <div class="arrow-down"></div>
+        <div class="node node-yellow" style="width:100%; font-size:0.78rem">權限管理<br>（staff_roles · patient_care_team）</div>
+      </div>
+    </div>
+
+    <div class="card" style="border-color:rgba(176,107,255,0.3)">
+      <div class="card-title" style="color:#d4a5ff">👨‍⚕️ 中醫師</div>
+      <div class="flow" style="gap:8px">
+        <div class="node node-purple" style="width:100%; font-size:0.78rem">睇診前：查上次體質/指引</div>
+        <div class="arrow-down"></div>
+        <div class="node node-purple" style="width:100%; font-size:0.78rem">睇診後：更新體質評估 + 備註</div>
+        <div class="arrow-down"></div>
+        <div class="node node-purple" style="width:100%; font-size:0.78rem">新增護理指引<br>（飲食/生活/警示 · 有效期設定）</div>
+        <div class="arrow-down"></div>
+        <div class="node node-purple" style="width:100%; font-size:0.78rem">設定覆診計劃<br>（pending → booked → done）</div>
+      </div>
+    </div>
+
+    <div class="card" style="border-color:rgba(0,212,170,0.3)">
+      <div class="card-title" style="color:#5ee8cc">💁‍♀️ 姑娘（排單）</div>
+      <div class="flow" style="gap:8px">
+        <div class="node node-green" style="width:100%; font-size:0.78rem">確認：醫師 / 分店 / 首診覆診</div>
+        <div class="arrow-down"></div>
+        <div class="node node-green" style="width:100%; font-size:0.78rem">查可用時段 → 確認或改日</div>
+        <div class="arrow-down"></div>
+        <div class="node node-green" style="width:100%; font-size:0.78rem">輸入病人資料（首診額外收齊）</div>
+        <div class="arrow-down"></div>
+        <div class="node node-green" style="width:100%; font-size:0.78rem">覆核一次 → 確認落單</div>
+        <div class="arrow-down"></div>
+        <div class="node node-green" style="width:100%; font-size:0.78rem">提醒病人留意確認電郵</div>
+      </div>
+    </div>
+
+    <div class="card" style="border-color:rgba(61,127,255,0.3)">
+      <div class="card-title" style="color:#93b8ff">🧑‍⚕️ 病人</div>
+      <div class="flow" style="gap:8px">
+        <div class="node node-blue" style="width:100%; font-size:0.78rem">進入網站 / 開啟聊天小助手</div>
+        <div class="arrow-down"></div>
+        <div class="node node-blue" style="width:100%; font-size:0.78rem">睇文章/課程 或 直接預約</div>
+        <div class="arrow-down"></div>
+        <div class="node node-blue" style="width:100%; font-size:0.78rem">AI 諮詢 → 轉到預約</div>
+        <div class="arrow-down"></div>
+        <div class="node node-blue" style="width:100%; font-size:0.78rem">填資料 → 確認 → 收電郵</div>
+        <div class="arrow-down"></div>
+        <div class="node node-blue" style="width:100%; font-size:0.78rem">如需改動：用電郵連結自助改期/取消</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="section-title" style="margin-top:32px">
+    <div class="dot" style="background:var(--accent2)"></div>
+    RLS 權限速查
+  </div>
+
+  <table class="rule-table">
+    <thead>
+      <tr>
+        <th>角色</th>
+        <th>可見/可做</th>
+        <th>限制</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="color:var(--text2)">Public（未登入）</td>
+        <td style="font-size:0.78rem; color:var(--text2)">SELECT published + active 文章/課程</td>
+        <td style="font-size:0.78rem; color:var(--text3)">不能看私人資料</td>
+      </tr>
+      <tr>
+        <td style="color:var(--text2)">Member / Patient</td>
+        <td style="font-size:0.78rem; color:var(--text2)">SELECT/INSERT/UPDATE 自己的 lesson_progress</td>
+        <td style="font-size:0.78rem; color:var(--text3)">只能存取自己 user_id</td>
+      </tr>
+      <tr>
+        <td style="color:var(--text2)">Admin / Staff</td>
+        <td style="font-size:0.78rem; color:var(--text2)">ALL 操作（articles / courses / modules / lessons / progress）</td>
+        <td style="font-size:0.78rem; color:var(--text3)">需通過 staff_roles 驗證</td>
+      </tr>
+      <tr>
+        <td style="color:var(--text2)">Server API（Service Role）</td>
+        <td style="font-size:0.78rem; color:var(--text2)">Bypass RLS · 完全存取所有表</td>
+        <td style="font-size:0.78rem; color:var(--text3)">只限後端使用 service role key</td>
+      </tr>
+    </tbody>
+  </table>
+
+</div>
+
+<script>
+  function showTab(id, ev) {
+    document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    document.getElementById('tab-' + id).classList.add('active');
+    if (ev && ev.currentTarget) {
+      ev.currentTarget.classList.add('active');
+    }
+  }
+</script>
+
+</body>
+</html>
