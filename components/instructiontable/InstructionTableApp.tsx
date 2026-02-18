@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { InstructiontableDefinition } from "@/lib/instructiontable-config";
+import {
+  getInstructiontable5W1H,
+  type InstructiontableDefinition,
+} from "@/lib/instructiontable-config";
 
 type RowRecord = Record<string, unknown>;
 
@@ -30,6 +33,18 @@ const GROUP_LABELS: Record<InstructiontableDefinition["group"], string> = {
   billing: "Billing",
   media: "Media",
 };
+
+const FIVE_W_ONE_H_LABELS: Array<{
+  key: "why" | "what" | "how" | "where" | "when" | "who";
+  label: string;
+}> = [
+  { key: "why", label: "Why" },
+  { key: "what", label: "What" },
+  { key: "how", label: "How" },
+  { key: "where", label: "Where" },
+  { key: "when", label: "When" },
+  { key: "who", label: "Who" },
+];
 
 function shortValue(value: unknown) {
   if (value === null) return "null";
@@ -150,6 +165,11 @@ export function InstructionTableApp({
     return [...ordered, ...remaining];
   }, [rows, selectedDefinition]);
 
+  const selected5W1H = useMemo(() => {
+    if (!selectedDefinition) return null;
+    return getInstructiontable5W1H(selectedDefinition.name);
+  }, [selectedDefinition]);
+
   const loadTables = useCallback(async () => {
     try {
       setLoadingTables(true);
@@ -183,29 +203,29 @@ export function InstructionTableApp({
       try {
         setLoadingRows(true);
         setRowsError(null);
-      const params = new URLSearchParams({
-        table: tableName,
-        limit: String(currentLimit),
-        offset: String(currentOffset),
-      });
-      const response = await fetch(`/api/instructiontable/rows?${params.toString()}`, {
-        method: "GET",
-        cache: "no-store",
-      });
-      if (response.status === 401) {
-        setAuthenticated(false);
-        return;
-      }
-      const payload = (await response.json()) as RowsResponse & { error?: string };
-      if (!response.ok || !payload.success) {
-        throw new Error(payload.error || "Failed to load rows");
-      }
-      setRows(payload.rows);
-      setRowCount(payload.count);
-    } catch (error) {
-      setRowsError(error instanceof Error ? error.message : "Failed to load rows");
-      setRows([]);
-      setRowCount(null);
+        const params = new URLSearchParams({
+          table: tableName,
+          limit: String(currentLimit),
+          offset: String(currentOffset),
+        });
+        const response = await fetch(`/api/instructiontable/rows?${params.toString()}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+        if (response.status === 401) {
+          setAuthenticated(false);
+          return;
+        }
+        const payload = (await response.json()) as RowsResponse & { error?: string };
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.error || "Failed to load rows");
+        }
+        setRows(payload.rows);
+        setRowCount(payload.count);
+      } catch (error) {
+        setRowsError(error instanceof Error ? error.message : "Failed to load rows");
+        setRows([]);
+        setRowCount(null);
       } finally {
         setLoadingRows(false);
       }
@@ -577,6 +597,35 @@ export function InstructionTableApp({
                       </div>
                     )}
                   </div>
+                </div>
+              ) : null}
+
+              {selected5W1H ? (
+                <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-emerald-900">
+                      5W1H Integrated Guide
+                    </h3>
+                    <span className="rounded-md bg-emerald-700 px-2 py-0.5 text-[11px] font-medium text-white">
+                      For {selectedDefinition?.name}
+                    </span>
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                    {FIVE_W_ONE_H_LABELS.map(({ key, label }) => (
+                      <div key={key} className="rounded-lg border border-emerald-200 bg-white p-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                          {label}
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-slate-700">
+                          {selected5W1H[key]}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Deep doc reference:{" "}
+                    <code>/docs/SUPABASE_TABLES_5W1H.md</code>
+                  </p>
                 </div>
               ) : null}
             </div>
