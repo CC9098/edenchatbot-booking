@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eden 系統架構總覽</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --bg2: #0f1628;
+    --card: #131c35;
+    --border: #1e2d52;
+    --accent1: #3d7fff;
+    --accent2: #00d4aa;
+    --accent3: #ff6b6b;
+    --accent4: #f5a623;
+    --accent5: #b06bff;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Noto Sans HK', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .auth-overlay {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at top, #122349 0%, #0a0e1a 60%);
+    z-index: 1000;
+    padding: 24px;
+  }
+
+  .auth-card {
+    width: 100%;
+    max-width: 420px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: #111a33;
+    padding: 24px;
+  }
+
+  .auth-card h1 { margin: 0 0 8px; font-size: 1.2rem; }
+  .auth-card p { margin: 0 0 16px; color: var(--text2); font-size: 0.9rem; }
+
+  .auth-row { display: flex; gap: 8px; }
+  .auth-row input {
+    flex: 1;
+    background: #0c1428;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+
+  .auth-row button {
+    border: 0;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent1), var(--accent2));
+    color: white;
+    font-weight: 700;
+    padding: 10px 14px;
+    cursor: pointer;
+  }
+
+  .auth-error { margin-top: 10px; color: #ff9a9a; font-size: 0.85rem; min-height: 1.2em; }
+  .hidden { display: none !important; }
+
+  .app { min-height: 100vh; }
+  header {
+    text-align: center;
+    padding: 40px 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #0d1530 0%, var(--bg) 100%);
+  }
+
+  header h2 {
+    margin: 0 0 8px;
+    font-size: 1.8rem;
+    background: linear-gradient(135deg, var(--accent1), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  header p { margin: 0; color: var(--text2); font-size: 0.9rem; }
+
+  .tabs {
+    display: flex;
+    gap: 8px;
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .tab {
+    border: 1px solid var(--border);
+    color: var(--text2);
+    background: #121c35;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+
+  .tab.active { color: var(--text); border-color: var(--accent1); }
+  .panel { display: none; padding: 20px 16px 28px; }
+  .panel.active { display: block; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+  }
+
+  .card h3 { margin: 0 0 8px; font-size: 0.95rem; }
+  .card p, .card li { color: var(--text2); font-size: 0.86rem; line-height: 1.5; }
+  .card code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: #9ec4ff;
+  }
+
+  ul { margin: 8px 0 0 18px; padding: 0; }
+
+  .flow {
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    background: rgba(255,255,255,0.02);
+    overflow-x: auto;
+    white-space: nowrap;
+    color: var(--text2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+  }
+
+  .note {
+    margin-top: 12px;
+    border: 1px solid rgba(245,166,35,0.35);
+    background: rgba(245,166,35,0.08);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: #ffd58f;
+    font-size: 0.84rem;
+  }
+</style>
+</head>
+<body>
+
+<div id="auth" class="auth-overlay">
+  <div class="auth-card">
+    <h1>🔒 Eden Architecture Viewer</h1>
+    <p>請輸入檢視密碼。</p>
+    <div class="auth-row">
+      <input id="pw" type="password" placeholder="Password" autocomplete="current-password" />
+      <button id="unlockBtn" type="button">進入</button>
+    </div>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+  <header>
+    <h2>⚕ Eden 系統架構總覽</h2>
+    <p>EdenChatbotBooking · Next.js 14 · Supabase · Google Calendar · Gemini</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="chat">Chat Mode</button>
+    <button class="tab" data-tab="user">用戶流程</button>
+    <button class="tab" data-tab="booking">預約流程</button>
+    <button class="tab" data-tab="pages">頁面架構</button>
+    <button class="tab" data-tab="data">資料流</button>
+  </div>
+
+  <section class="panel active" id="tab-chat">
+    <div class="grid">
+      <div class="card">
+        <h3>Mode 判定骨幹</h3>
+        <div class="flow">User Message -> Rule Engine -> (optional) Semantic Router -> Final Mode</div>
+        <ul>
+          <li>B 模式優先處理預約意圖</li>
+          <li>Router 低信心會 fallback rule mode</li>
+          <li>最終只會是 <code>G1/G2/G3/B</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>高風險規則</h3>
+        <ul>
+          <li>不可未 call function 就聲稱預約成功</li>
+          <li>查時段必須走 availability function</li>
+          <li>登入狀態下要正確處理 user-scoped data</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="tab-user">
+    <div class="card">
+      <h3>病人主旅程</h3>
+      <div class="flow">/ -> /articles or /courses -> /chat -> /booking -> confirmation email -> /reschedule or /cancel</div>
+      <div class="note">內容、AI、預約已整合到同一網站入口。</div>
+    </div>
+  </section>
+
+  <section class="panel" id="tab-booking">
+    <div class="grid">
+      <div class="card">
+        <h3>B-Mode Intake</h3>
+        <ul>
+          <li>必填：姓名、電話、email、首診/覆診、醫師、診所、日期時段</li>
+          <li>首診額外：身份證、DOB、性別、過敏、用藥、症狀</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>後端執行</h3>
+        <ul>
+          <li><code>POST /api/availability</code> 查時段</li>
+          <li><code>POST /api/booking</code> 建立預約</li>
+          <li>同步 <code>booking_intake</code> + Google Calendar + Gmail</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="tab-pages">
+    <div class="grid">
+      <div class="card"><h3>公開頁</h3><p><code>/</code>, <code>/articles</code>, <code>/courses</code>, <code>/chat</code>, <code>/booking</code></p></div>
+      <div class="card"><h3>操作頁</h3><p><code>/reschedule</code>, <code>/cancel</code>, <code>/embed</code></p></div>
+      <div class="card"><h3>後台頁</h3><p><code>/doctor</code>, <code>/doctor/patients/[id]</code>, <code>/doctor/content/articles</code></p></div>
+    </div>
+  </section>
+
+  <section class="panel" id="tab-data">
+    <div class="grid">
+      <div class="card">
+        <h3>核心 API</h3>
+        <ul>
+          <li><code>/api/chat</code> (legacy/simple)</li>
+          <li><code>/api/chat/v2</code> (main intelligent flow)</li>
+          <li><code>/api/availability</code> + <code>/api/booking</code></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>核心資料表</h3>
+        <ul>
+          <li>Booking: <code>doctors</code>, <code>doctor_schedules</code>, <code>holidays</code>, <code>booking_intake</code></li>
+          <li>Chat/Care: <code>chat_messages</code>, <code>patient_care_profile</code>, <code>care_instructions</code></li>
+          <li>Content: <code>articles</code>, <code>courses</code>, <code>course_lessons</code></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  (function () {
+    var PASSWORD = 'eden2026view';
+    var STORAGE_KEY = 'eden_arch_overview_unlocked_v1';
+
+    var auth = document.getElementById('auth');
+    var app = document.getElementById('app');
+    var input = document.getElementById('pw');
+    var unlockBtn = document.getElementById('unlockBtn');
+    var error = document.getElementById('authError');
+
+    function unlock() {
+      auth.classList.add('hidden');
+      app.classList.remove('hidden');
+      try { localStorage.setItem(STORAGE_KEY, '1'); } catch (e) {}
+    }
+
+    function tryUnlock() {
+      if ((input.value || '').trim() === PASSWORD) {
+        error.textContent = '';
+        unlock();
+      } else {
+        error.textContent = '密碼錯誤，請再試。';
+      }
+    }
+
+    try {
+      if (localStorage.getItem(STORAGE_KEY) === '1') {
+        unlock();
+      }
+    } catch (e) {}
+
+    unlockBtn.addEventListener('click', tryUnlock);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') tryUnlock();
+    });
+
+    var tabs = document.querySelectorAll('.tab');
+    var panels = document.querySelectorAll('.panel');
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        var name = tab.getAttribute('data-tab');
+        tabs.forEach(function (t) { t.classList.remove('active'); });
+        panels.forEach(function (p) { p.classList.remove('active'); });
+        tab.classList.add('active');
+        document.getElementById('tab-' + name).classList.add('active');
+      });
+    });
+  })();
+</script>
+
+</body>
+</html>
