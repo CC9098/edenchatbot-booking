@@ -165,8 +165,9 @@ export function getPromptClinicInfoLines(): string[] {
   return PHYSICAL_CLINIC_IDS.map((clinicId) => {
     const clinic = CLINIC_BY_ID[clinicId];
     const phones = clinic.phones.join(', ');
+    const waInfo = clinic.whatsappUrl ? ` | WhatsApp：${clinic.whatsappUrl}` : '';
     const mapInfo = clinic.googleMapUrl ? ` | Google地圖：${clinic.googleMapUrl}` : '';
-    return `${clinic.nameZh}診所：地址：${clinic.address} | 電話：${phones} | ${clinic.hoursText}${mapInfo}`;
+    return `${clinic.nameZh}診所：地址：${clinic.address} | 電話：${phones}${waInfo} | ${clinic.hoursText}${mapInfo}`;
   });
 }
 

@@ -514,7 +514,9 @@ const OUTPUT_FORMAT_RULES = `【輸出格式規則（必須遵守）】
 - 禁止輸出任何星號字元 *。
 - 需要強調時，請用自然語句、全形標點或換行，不要用星號。
 - 禁止提供「吸幾拍/呼幾拍/做幾多分鐘/做幾多次」等固定數字式身心練習指令，避免故弄玄虛或假精準。
-- 除非用戶明確要求呼吸練習，否則不要主動建議呼吸訓練；若涉及急症紅旗（例如呼吸困難），仍要優先提示即時求助。`;
+- 除非用戶明確要求呼吸練習，否則不要主動建議呼吸訓練；若涉及急症紅旗（例如呼吸困難），仍要優先提示即時求助。
+- 回覆診所電話或聯絡方式時，必須同時輸出對應嘅 WhatsApp 完整連結（https://wa.me/...），直接輸出完整 URL，唔需任何包裝。
+- 回覆診所地址時，必須同時輸出對應嘅 Google 地圖完整連結（https://www.google.com/maps/...），直接輸出完整 URL。`;
 
 function buildBookingSystemPrompt(careContext: string): string {
   const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
@@ -1243,9 +1245,10 @@ export async function POST(request: NextRequest) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
+    const t0 = Date.now();
     const modeDecision = await resolveModeWithRouter(messages, model);
     const mode = modeDecision.mode;
-    console.log('[chat/v2] Mode decision:', modeDecision);
+    console.log(`[chat/v2] ⏱ mode-router: ${Date.now() - t0}ms`, modeDecision);
 
     // Resolve constitution type from user profile (auto-detect)
     let type: ConstitutionType = 'depleting'; // default for unauthenticated
@@ -1254,6 +1257,7 @@ export async function POST(request: NextRequest) {
     let userEmail: string | undefined;
     let userId: string | undefined;
 
+    const t1 = Date.now();
     try {
       const user = await getCurrentUser();
       if (user) {
@@ -1268,13 +1272,18 @@ export async function POST(request: NextRequest) {
     } catch {
       // Not authenticated — continue with defaults
     }
+    console.log(`[chat/v2] ⏱ user-context: ${Date.now() - t1}ms (authenticated: ${!!userId})`);
 
+    const t2 = Date.now();
     if (mode !== 'B') {
       contentContext = await buildContentReferenceContext(latestUserMessage.content, 4);
     }
+    console.log(`[chat/v2] ⏱ content-search: ${Date.now() - t2}ms`);
 
     // Build system prompt (DB-driven with fallback)
+    const t3 = Date.now();
     let systemPrompt = await buildSystemPrompt(type, mode, careContext, contentContext);
+    console.log(`[chat/v2] ⏱ prompt-build: ${Date.now() - t3}ms`);
     if (userId && mode !== 'B') {
       // G modes also need explicit symptom logging behavior guidance.
       systemPrompt += `\n\n${SYMPTOM_RECORDING_GUIDANCE}`;
@@ -1386,6 +1395,7 @@ export async function POST(request: NextRequest) {
     let reply: string;
     let finalResponse: any;
 
+    const tGemini = Date.now();
     if (tools) {
       // Use chat API for function calling support
       const chat = model.startChat({ tools });
@@ -1449,6 +1459,8 @@ export async function POST(request: NextRequest) {
     const usage = getUsageMetadata(finalResponse);
     const durationMs = Date.now() - startTime;
     const metrics = resolveTokenMetrics(usage, fullPrompt, reply, durationMs);
+
+    console.log(`[chat/v2] ⏱ gemini-api: ${Date.now() - tGemini}ms | total: ${durationMs}ms | mode: ${mode} | tokens: ${metrics.promptTokens}p+${metrics.completionTokens}c`);
 
     // Log messages (fire-and-forget)
     void logChatMessages(sessionId, latestUserMessage.content, reply, mode, metrics);
