@@ -50,7 +50,10 @@ export function ChatInputV2({
   const canSend = text.trim().length > 0 && !disabled;
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl items-end gap-2 px-4 py-3">
+    <div
+      className="mx-auto flex w-full max-w-2xl items-end gap-2 px-4 pt-3"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
+    >
       <textarea
         ref={textareaRef}
         value={text}
@@ -68,7 +71,14 @@ export function ChatInputV2({
         onClick={handleSend}
         onTouchEnd={(e) => {
           e.preventDefault();
+          e.currentTarget.style.transform = "";
           handleSend();
+        }}
+        onTouchStart={(e) => {
+          e.currentTarget.style.transform = "scale(0.95)";
+        }}
+        onTouchCancel={(e) => {
+          e.currentTarget.style.transform = "";
         }}
         disabled={!canSend}
         className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all ${
@@ -76,14 +86,14 @@ export function ChatInputV2({
             ? "bg-primary text-white shadow-md hover:bg-primary-hover active:scale-95"
             : "bg-gray-200 text-gray-400 cursor-not-allowed"
         }`}
-        style={{
-          minHeight: '44px',
-          minWidth: '44px',
-          touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent',
-        }}
         aria-label="送出訊息"
         type="button"
+        style={{
+          touchAction: "manipulation",
+          minHeight: "44px",
+          minWidth: "44px",
+          WebkitTapHighlightColor: "transparent",
+        }}
       >
         <Send className="h-4 w-4" />
       </button>

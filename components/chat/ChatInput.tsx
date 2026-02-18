@@ -12,7 +12,10 @@ interface ChatInputProps {
 
 export function ChatInput({ value, placeholder, onChange, onSend, primaryColor, aiMode, formError }: ChatInputProps) {
   return (
-    <div className="flex-shrink-0 border-t border-gray-100 bg-white px-4 py-3">
+    <div
+      className="shrink-0 border-t border-gray-100 bg-white px-4 pt-3"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}
+    >
       <div
         className="flex items-center gap-2 rounded-2xl border border-[--primary]/20 bg-[#f4fbf3] px-3 py-2 shadow-sm focus-within:border-[--primary] focus-within:bg-white focus-within:ring-2 focus-within:ring-[--primary]/20"
         style={{ ['--primary' as string]: primaryColor }}

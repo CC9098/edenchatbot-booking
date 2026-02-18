@@ -55,6 +55,13 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+html,
+body {
+  height: 100%;
 }
 
 /* 修复 iframe 中移动端触摸问题 */
@@ -73,6 +80,14 @@ a, button, [role="button"], input, select, textarea {
 /* 防止 iOS 上的双击缩放 */
 * {
   touch-action: manipulation;
+}
+
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 /* iOS safe area support for bottom elements */

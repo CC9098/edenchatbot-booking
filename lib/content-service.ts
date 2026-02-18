@@ -490,7 +490,7 @@ export async function buildContentReferenceContext(
       return `${index + 1}. [${item.kind}] ${item.title}\n連結：${item.url}\n重點：${item.summary}`;
     });
 
-    return `\n\n【站內內容參考（文章 / 課程）】\n請優先使用以下內容回答；若有引用，建議在回覆最後附上對應連結。\n${lines.join(
+    return `\n\n【站內內容參考（文章 / 課程）】\n請優先使用以下內容回答；如適合可自然附上相關連結，避免使用機械式標籤（例如「引用：」）。\n${lines.join(
       "\n\n"
     )}`;
   } catch (error) {

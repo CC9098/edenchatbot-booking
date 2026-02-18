@@ -38,6 +38,12 @@ function Header() {
       </div>
 
       <div className="flex items-center gap-3">
+        <Link
+          href="/chat/symptoms"
+          className="rounded-lg border border-primary/20 bg-white px-3 py-1.5 text-xs font-medium text-primary transition hover:bg-primary-light"
+        >
+          我的症狀
+        </Link>
         {user && (
           <span className="hidden text-xs text-gray-500 sm:inline">
             {user.email}

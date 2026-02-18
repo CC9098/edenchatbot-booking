@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMode } from "./ModeSelector";
-import { Loader2 } from "lucide-react";
+import { Check, Copy, Loader2, Share2, ThumbsDown, ThumbsUp } from "lucide-react";
 
 export type ChatMessage = {
   role: "user" | "assistant";
@@ -14,6 +14,7 @@ export type ChatMessage = {
 type MessageListProps = {
   messages: ChatMessage[];
   loading?: boolean;
+  sessionId?: string;
 };
 
 const MODE_BADGES: Record<ChatMode, { label: string; color: string }> = {
@@ -57,24 +58,89 @@ function renderMessageContent(content: string, isUser: boolean) {
   });
 }
 
-export function MessageList({ messages, loading }: MessageListProps) {
+export function MessageList({ messages, loading, sessionId }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastMessage = messages[messages.length - 1];
+  const [feedbackByMessage, setFeedbackByMessage] = useState<Record<string, "up" | "down">>({});
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   // Auto-scroll to bottom on new messages or loading state change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, lastMessage?.content, loading]);
 
+  const postFeedback = useCallback(
+    async (
+      message: ChatMessage,
+      messageIndex: number,
+      feedbackType: "up" | "down",
+      sessionId?: string
+    ) => {
+      const contextMessages = messages
+        .slice(Math.max(0, messageIndex - 9), messageIndex + 1)
+        .map((item) => ({
+          role: item.role,
+          content: item.content,
+        }));
+
+      try {
+        await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            feedbackType,
+            source: "chat_v2",
+            messageText: message.content,
+            messageIndex,
+            messageMode: message.mode ?? null,
+            contextMessages,
+            sessionId,
+          }),
+        });
+      } catch (error) {
+        console.error("Feedback submit failed (chat_v2):", error);
+      }
+    },
+    [messages]
+  );
+
+  const handleCopy = useCallback(async (messageId: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMessageId(messageId);
+      window.setTimeout(() => setCopiedMessageId((current) => (current === messageId ? null : current)), 2000);
+    } catch (error) {
+      console.error("Copy failed:", error);
+    }
+  }, []);
+
+  const handleShare = useCallback(
+    async (messageId: string, content: string) => {
+      try {
+        if (navigator.share) {
+          await navigator.share({ text: content });
+          return;
+        }
+        await handleCopy(messageId, content);
+      } catch (error) {
+        console.error("Share failed:", error);
+      }
+    },
+    [handleCopy]
+  );
+
   return (
     <div className="h-full overflow-y-auto px-4 py-4">
       <div className="mx-auto max-w-2xl space-y-4">
         {messages.map((msg, i) => {
           const isUser = msg.role === "user";
+          const messageId = `${msg.createdAt}-${i}`;
+          const selectedFeedback = feedbackByMessage[messageId];
+          const canShowActions = !isUser && msg.content.trim().length > 0;
 
           return (
             <div
-              key={i}
+              key={messageId}
               className={`flex ${isUser ? "justify-end" : "justify-start"}`}
             >
               <div
@@ -107,6 +173,85 @@ export function MessageList({ messages, loading }: MessageListProps) {
                     {renderMessageContent(msg.content, isUser)}
                   </p>
                 </div>
+
+                {canShowActions && (
+                  <div className="mt-1.5 flex items-center gap-1 text-[11px] text-gray-500">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFeedbackByMessage((prev) => {
+                          const current = prev[messageId];
+                          const next = current === "up" ? undefined : "up";
+                          const updated = { ...prev };
+
+                          if (next) {
+                            updated[messageId] = next;
+                            void postFeedback(msg, i, next, sessionId);
+                          } else {
+                            delete updated[messageId];
+                          }
+
+                          return updated;
+                        });
+                      }}
+                      className={`rounded-md px-2 py-1 transition ${
+                        selectedFeedback === "up"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "hover:bg-gray-100"
+                      }`}
+                      aria-label="讚好此回覆"
+                    >
+                      <ThumbsUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFeedbackByMessage((prev) => {
+                          const current = prev[messageId];
+                          const next = current === "down" ? undefined : "down";
+                          const updated = { ...prev };
+
+                          if (next) {
+                            updated[messageId] = next;
+                            void postFeedback(msg, i, next, sessionId);
+                          } else {
+                            delete updated[messageId];
+                          }
+
+                          return updated;
+                        });
+                      }}
+                      className={`rounded-md px-2 py-1 transition ${
+                        selectedFeedback === "down"
+                          ? "bg-red-100 text-red-700"
+                          : "hover:bg-gray-100"
+                      }`}
+                      aria-label="對此回覆提出負評"
+                    >
+                      <ThumbsDown className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleCopy(messageId, msg.content)}
+                      className="rounded-md px-2 py-1 transition hover:bg-gray-100"
+                      aria-label="複製訊息"
+                    >
+                      {copiedMessageId === messageId ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleShare(messageId, msg.content)}
+                      className="rounded-md px-2 py-1 transition hover:bg-gray-100"
+                      aria-label="分享訊息"
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
 
                 {/* Timestamp */}
                 <div

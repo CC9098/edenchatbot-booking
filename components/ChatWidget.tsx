@@ -24,6 +24,8 @@ import { type BookingState, type BookingStep, type ConsultationFormData, type Op
 
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
+  const [widgetSessionId, setWidgetSessionId] = useState('');
+  const [iosKeyboardOffset, setIosKeyboardOffset] = useState(0);
   const [options, setOptions] = useState<Option[]>(MAIN_MENU);
   const [aiMode, setAiMode] = useState(false);
   const [formMode, setFormMode] = useState(false);
@@ -39,7 +41,6 @@ export function ChatWidget() {
   const [bookingMode, setBookingMode] = useState(false);
   const [booking, setBooking] = useState<BookingState>({ step: 'doctor' });
   const [, setIsLoading] = useState(false);
-  const [iosKeyboardOffset, setIosKeyboardOffset] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const {
     messages,
@@ -49,6 +50,20 @@ export function ChatWidget() {
     removeMessageByExactText,
     clearMessages,
   } = useChatState();
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storageKey = 'eden_widget_session_id';
+    const existing = localStorage.getItem(storageKey);
+    if (existing) {
+      setWidgetSessionId(existing);
+      return;
+    }
+
+    const id = `widget_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(storageKey, id);
+    setWidgetSessionId(id);
+  }, []);
 
   // 通知父窗口 chatbot 打开/关闭状态，让父窗口调整 iframe 大小
   useEffect(() => {
@@ -77,30 +92,31 @@ export function ChatWidget() {
     return () => clearTimeout(timer);
   }, [messages]);
 
-  // iOS keyboard offset: when keyboard opens, move widget above keyboard
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const vv = window.visualViewport;
-    if (!vv) return;
+    if (!open) {
+      setIosKeyboardOffset(0);
+      return;
+    }
 
-    const update = () => {
-      // Only apply on mobile (< 640px, Tailwind sm breakpoint)
-      if (window.innerWidth >= 640) {
-        setIosKeyboardOffset(0);
-        return;
-      }
-      // Keyboard height = layout viewport height - visual viewport height
-      const keyboardHeight = Math.max(0, window.innerHeight - vv.height);
-      setIosKeyboardOffset(keyboardHeight);
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    const viewport = window.visualViewport;
+
+    const updateViewportOffset = () => {
+      const keyboardOffset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+      setIosKeyboardOffset(keyboardOffset);
     };
 
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
+    updateViewportOffset();
+    viewport.addEventListener('resize', updateViewportOffset);
+    viewport.addEventListener('scroll', updateViewportOffset);
+    window.addEventListener('orientationchange', updateViewportOffset);
+
     return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
+      viewport.removeEventListener('resize', updateViewportOffset);
+      viewport.removeEventListener('scroll', updateViewportOffset);
+      window.removeEventListener('orientationchange', updateViewportOffset);
     };
-  }, []);
+  }, [open]);
 
   const showInput = aiMode || formMode || (bookingMode && [
     'lastName', 'firstName', 'phone', 'email',
@@ -980,10 +996,12 @@ export function ChatWidget() {
     <div
       className="fixed right-0 z-50 flex flex-col items-end gap-4 p-4"
       style={{
-        bottom: open ? `${iosKeyboardOffset}px` : '120px',  // 关闭时在网页按钮上方，打开时移到底部；iOS键盘弹出时上移
+        bottom: open
+          ? `calc(env(safe-area-inset-bottom, 0px) + ${iosKeyboardOffset}px)`
+          : 'calc(env(safe-area-inset-bottom, 0px) + 120px)',
         pointerEvents: open ? 'auto' : 'none', // iOS/Safari 對子元素 pointer-events:auto 支援不一致，開啟時直接允許事件命中容器
         touchAction: 'manipulation',
-        transition: 'bottom 0.3s ease'
+        transition: 'bottom 0.3s ease',
       }}
     >
       <AnimatePresence>
@@ -996,7 +1014,7 @@ export function ChatWidget() {
             className="relative w-[calc(100vw-2.5rem)] sm:w-[380px]"
             style={{ pointerEvents: 'auto' }}
           >
-            <div className="flex h-[calc(100dvh-8rem)] max-h-[640px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:h-[560px]">
+            <div className="flex h-[calc(100dvh-8rem)] max-h-[640px] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:h-[560px]">
               <div className="relative overflow-hidden">
                 <div
                   className="flex items-center justify-between gap-3 px-5 py-3"
@@ -1084,12 +1102,17 @@ export function ChatWidget() {
                 </div>
               </div>
 
-              <div className="flex flex-1 flex-col overflow-hidden bg-gradient-to-b from-gray-50 to-white">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-gray-50 to-white">
                 <div
                   ref={viewportRef}
-                  className="flex-1 space-y-3 overflow-y-auto px-4 py-4 scrollbar-thin scrollbar-thumb-gray-200/70 scrollbar-track-transparent"
+                  className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4 scrollbar-thin scrollbar-thumb-gray-200/70 scrollbar-track-transparent"
                 >
-                  <ChatMessages messages={messages} linkify={linkify} primaryColor={PRIMARY} />
+                  <ChatMessages
+                    messages={messages}
+                    linkify={linkify}
+                    primaryColor={PRIMARY}
+                    sessionId={widgetSessionId}
+                  />
                 </div>
 
                 {options.length > 0 && (

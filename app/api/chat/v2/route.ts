@@ -48,6 +48,14 @@ interface TokenUsageMetrics {
   error?: string;
 }
 
+interface PhaseTimingMetrics {
+  modeRouterMs: number;
+  userContextMs: number;
+  contentSearchMs: number;
+  promptBuildMs: number;
+  geminiApiMs: number;
+}
+
 interface GeminiUsageMetadata {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
@@ -63,6 +71,7 @@ interface ModeRuleSignals {
   explicitCancel: boolean;
   hasLatestG2Keyword: boolean;
   hasLatestG3Keyword: boolean;
+  hasLatestG2OptInReply: boolean;
 }
 
 interface ModeRuleResolution {
@@ -93,6 +102,8 @@ const EXPLICIT_DATE_REGEX = /\b\d{4}-\d{2}-\d{2}\b/;
 const TODAY_KEYWORDS = ['今日', '今天', '而家', '依家', '宜家', 'today', 'now'];
 const CHAT_MODES: ChatMode[] = ['G1', 'G2', 'G3', 'B'];
 const CANCEL_KEYWORDS = ['不用', '唔使', '取消', '算了', '改日', '唔約', '唔想約'];
+const G2_BOOKING_NUDGE_KEYWORDS = ['預約', '約診', '睇醫師', '見醫師', '面診', 'book', 'booking', '安排睇症'];
+const G2_MIN_SENTENCES_BETWEEN_BOOKING_NUDGES = 6;
 const MODE_ROUTER_CONTEXT_MESSAGE_COUNT = 6;
 
 // ---------------------------------------------------------------------------
@@ -154,8 +165,64 @@ const G3_KEYWORDS = [
   '困擾', '一直', '成日', '唔知點算', '幫我分析', '教我', 'coach',
 ];
 
+const G2_DEEP_DIVE_KEYWORDS = ['原理', '深入', '詳細', '解釋', '點解', 'why'];
+const G2_DEEP_DIVE_OFFER_CUES = [
+  '想唔想', '會唔會想', '要唔要', '需唔需要', '想知道',
+  '如果你想', '想嘅話', '可以再講', '我可以再講', '要我再講',
+];
+const G2_AFFIRMATIVE_SHORT_REPLIES = new Set([
+  '係', '系', '好', '要', '想', '想知', '可以', 'ok', 'okay', 'yes',
+  '嗯', '嗯嗯', '好呀', '好啊', '係呀', '係啊', '想呀', '想啊',
+  '要呀', '要啊', '可以呀', '可以啊', '請講', '講', '講下', '講啦',
+  '再講', '再講下', '深入啲', '深入些', '深入',
+]);
+
 function isChatMode(value: unknown): value is ChatMode {
   return typeof value === 'string' && CHAT_MODES.includes(value as ChatMode);
+}
+
+function normalizeIntentText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[\s\u3000]/g, '')
+    .replace(/[，。！？!?、,.；;:："“”'"`~\-()（）\[\]{}]/g, '');
+}
+
+function findPreviousAssistantMessage(messages: ChatMessagePayload[]): ChatMessagePayload | null {
+  for (let i = messages.length - 2; i >= 0; i -= 1) {
+    if (messages[i].role === 'assistant') return messages[i];
+  }
+  return null;
+}
+
+function isShortAffirmativeReply(text: string): boolean {
+  const normalized = normalizeIntentText(text);
+  if (!normalized || normalized.length > 12) return false;
+  return G2_AFFIRMATIVE_SHORT_REPLIES.has(normalized);
+}
+
+function isG2DeepDiveOfferMessage(text: string): boolean {
+  const lower = text.toLowerCase();
+  const hasDeepKeyword = G2_DEEP_DIVE_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()));
+  if (!hasDeepKeyword) return false;
+
+  const hasOfferCue = G2_DEEP_DIVE_OFFER_CUES.some((cue) => lower.includes(cue.toLowerCase()));
+  if (hasOfferCue) return true;
+
+  const trimmed = text.trim();
+  const hasQuestionTone = trimmed.includes('？') || trimmed.includes('?') || trimmed.includes('嗎');
+  return hasQuestionTone && (lower.includes('你') || lower.includes('you'));
+}
+
+function isLatestUserG2OptInReply(messages: ChatMessagePayload[]): boolean {
+  if (messages.length < 2) return false;
+  const latestMessage = messages[messages.length - 1];
+  if (latestMessage.role !== 'user') return false;
+  if (!isShortAffirmativeReply(latestMessage.content)) return false;
+
+  const previousAssistant = findPreviousAssistantMessage(messages);
+  if (!previousAssistant) return false;
+  return isG2DeepDiveOfferMessage(previousAssistant.content);
 }
 
 function resolveModeByRules(messages: ChatMessagePayload[]): ModeRuleResolution {
@@ -168,6 +235,7 @@ function resolveModeByRules(messages: ChatMessagePayload[]): ModeRuleResolution 
     const msgLower = msg.content.toLowerCase();
     return BOOKING_KEYWORDS.some(kw => msgLower.includes(kw.toLowerCase()));
   });
+  const hasLatestG2OptInReply = isLatestUserG2OptInReply(messages);
 
   const signals: ModeRuleSignals = {
     latestLength: lower.length,
@@ -176,6 +244,7 @@ function resolveModeByRules(messages: ChatMessagePayload[]): ModeRuleResolution 
     explicitCancel: CANCEL_KEYWORDS.some((kw) => lower.includes(kw)),
     hasLatestG2Keyword: G2_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase())),
     hasLatestG3Keyword: G3_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase())),
+    hasLatestG2OptInReply,
   };
 
   // If there's recent booking intent and no explicit cancellation, stay in B mode
@@ -186,6 +255,10 @@ function resolveModeByRules(messages: ChatMessagePayload[]): ModeRuleResolution 
   // Check for explicit booking keywords in latest message
   if (signals.hasLatestBookingKeyword) {
     return { mode: 'B', signals };
+  }
+
+  if (signals.hasLatestG2OptInReply) {
+    return { mode: 'G2', signals };
   }
 
   if (signals.latestLength > 150 || signals.hasLatestG3Keyword) {
@@ -202,12 +275,70 @@ function resolveModeByRules(messages: ChatMessagePayload[]): ModeRuleResolution 
 function shouldRunSemanticModeRouter(signals: ModeRuleSignals): boolean {
   // Keep explicit booking/cancel deterministic to avoid unnecessary latency.
   if (signals.hasLatestBookingKeyword || signals.explicitCancel) return false;
+  if (signals.hasLatestG2OptInReply) return false;
 
   if (signals.hasRecentBookingIntent) return true;
   if (signals.hasLatestG2Keyword && signals.hasLatestG3Keyword) return true;
 
   // Borderline long prompts around the G3 threshold are the main ambiguity zone.
   return signals.latestLength >= 120 && signals.latestLength <= 220;
+}
+
+function countApproxSentences(text: string): number {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) return 0;
+  const segments = normalized
+    .split(/[。！？!?；;\n]+/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  return segments.length || 1;
+}
+
+function containsG2BookingNudge(text: string): boolean {
+  const lower = text.toLowerCase();
+  return G2_BOOKING_NUDGE_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()));
+}
+
+function countAssistantSentencesSinceLastBookingNudge(messages: ChatMessagePayload[]): number {
+  let sentenceCount = 0;
+
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (message.role !== 'assistant') continue;
+
+    if (containsG2BookingNudge(message.content)) {
+      return sentenceCount;
+    }
+
+    sentenceCount += countApproxSentences(message.content);
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function buildG2ConversationGuidance(messages: ChatMessagePayload[]): string {
+  const sentencesSinceLastNudge = countAssistantSentencesSinceLastBookingNudge(messages);
+  const allowBookingNudge = sentencesSinceLastNudge >= G2_MIN_SENTENCES_BETWEEN_BOOKING_NUDGES;
+  const nudgeGate = allowBookingNudge
+    ? '今次可以按臨床需要，最多加 1 句預約引流。'
+    : `今次禁止主動預約引流（距離上次引流只相隔約 ${sentencesSinceLastNudge} 句，未達低頻門檻）。`;
+
+  return `【G2 回覆框架（必須遵守）】
+1. 先講 general 健康看法（現代健康角度）：先用較專業但易明的方式講機制，再講潛在好處與風險（各 1-2 句）。
+   - 機制可包含：咖啡因、代謝、神經系統、睡眠/心血管影響等。
+   - 用「可能/有助/與...相關」等審慎措辭，避免保證式或絕對化語句。
+2. 再講對用戶體質的解釋：指出對當前體質係較好、一般定較差，並補一句原因。
+3. 最後追問一條澄清問題：只問最關鍵、最能收窄判斷的一條。
+
+【G2 風格要求】
+- 保持中等深度但唔長氣，建議全段 4-8 句。
+- 語氣清晰直接，避免重覆鋪陳。
+
+【G2 預約引流規則】
+- 只可以低頻率、偶然出現；大約每 5-10 句 assistant 內容先可再提一次。
+- 只在以下情況可提：症狀反覆、持續影響日常、或用戶表示擔心想進一步檢查。
+- 引流句必須放最後，而且用可選語氣（例如：如果你想，我可以幫你安排睇醫師）。
+- ${nudgeGate}`;
 }
 
 function buildSemanticRouterPrompt(
@@ -427,8 +558,8 @@ const FALLBACK_CONSTITUTION_CONTEXT: Record<ConstitutionType, string> = {
 };
 
 const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
-  G1: '用簡短方式回答（2-3句），然後問一個引導問題，例如「想知多啲關於呢方面嘅原理嗎？」',
-  G2: '提供詳細嘅理論原理說明，包括中醫理論基礎，用段落方式解釋。',
+  G1: '用簡短方式回答（2-3句），最後可按語境問一條自然跟進問題，例如「你會唔會想知道深入些原理？」；避免提及任何模式名。',
+  G2: '先用現代健康角度講機制與好處/風險，再按用戶體質解釋利弊，最後追問一條澄清問題；保持中等深度、避免長篇。',
   G3: '以教練模式進行深入引導式對話。先理解用戶情況，提問引導反思，給予個人化建議。用同理心回應。',
   B: `你係醫天圓預約助手。你**必須**使用提供的 functions 來完成預約。**絕對唔可以**假裝完成預約或者話「已經幫你完成登記」而冇真正調用 functions。
 
@@ -513,6 +644,10 @@ const OUTPUT_FORMAT_RULES = `【輸出格式規則（必須遵守）】
 - 禁止使用 Markdown 星號格式（包括 *、**、***）。
 - 禁止輸出任何星號字元 *。
 - 需要強調時，請用自然語句、全形標點或換行，不要用星號。
+- 禁止向用戶透露或討論內部模式名稱（包括 G1/G2/G3/B），亦禁止問用戶是否要「轉模式」。
+- 禁止輸出「知識庫未收錄」、「引用：無」或「引用：」等機械標籤；如無特定資料，直接給一般建議即可。
+- 涉及診所電話時，必須同時提供完整 WhatsApp URL（https://wa.me/...）。
+- 涉及診所地址/地圖時，必須提供完整 Google Maps URL（https://...）。
 - 禁止提供「吸幾拍/呼幾拍/做幾多分鐘/做幾多次」等固定數字式身心練習指令，避免故弄玄虛或假精準。
 - 除非用戶明確要求呼吸練習，否則不要主動建議呼吸訓練；若涉及急症紅旗（例如呼吸困難），仍要優先提示即時求助。`;
 
@@ -684,7 +819,28 @@ function getUsageMetadata(response: unknown): GeminiUsageMetadata | undefined {
 
 function sanitizeAssistantReply(text: string): string {
   if (!text) return text;
-  return text.replace(/\*/g, '');
+  const stripped = text.replace(/\*/g, '');
+  const lines = stripped.split(/\r?\n/);
+  const filtered = lines.filter((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return true;
+
+    if (trimmed === '知識庫未收錄') return false;
+    if (/^引用[:：]\s*無\s*$/i.test(trimmed)) return false;
+    if (/^引用[:：]/.test(trimmed)) return false;
+    if (/^知識庫未收錄[:：]/.test(trimmed)) return false;
+
+    return true;
+  });
+
+  const normalized = filtered
+    .join('\n')
+    .replace(/知識庫未收錄/g, '')
+    .replace(/引用[:：]\s*無/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return normalized;
 }
 
 function formatValidationIssues(error: z.ZodError): Array<{ path: string; message: string }> {
@@ -713,21 +869,27 @@ async function logChatMessages(
   try {
     const supabase = createServiceClient();
 
-    await supabase.from('chat_messages').insert({
+    const { error: userMessageError } = await supabase.from('chat_messages').insert({
       session_id: sessionId,
       role: 'user',
       content_text: userContent,
-      model_gear: mode,
+      mode,
     });
+    if (userMessageError) {
+      console.error('[chat/v2] Failed to log user chat message:', userMessageError.message);
+    }
 
-    await supabase.from('chat_messages').insert({
+    const { error: assistantMessageError } = await supabase.from('chat_messages').insert({
       session_id: sessionId,
       role: 'assistant',
       content_text: assistantContent,
-      model_gear: mode,
+      mode,
     });
+    if (assistantMessageError) {
+      console.error('[chat/v2] Failed to log assistant chat message:', assistantMessageError.message);
+    }
 
-    await supabase.from('chat_request_logs').insert({
+    const { error: requestLogError } = await supabase.from('chat_request_logs').insert({
       session_id: sessionId,
       model_id: 'gemini-flash-latest',
       prompt_tokens: metrics.promptTokens,
@@ -735,9 +897,29 @@ async function logChatMessages(
       duration_ms: metrics.durationMs,
       ...(metrics.error ? { error: metrics.error } : {}),
     });
+    if (requestLogError) {
+      console.error('[chat/v2] Failed to log request metrics:', requestLogError.message);
+    }
   } catch (error) {
-    console.error('[chat/v2] Failed to log chat messages:', error);
+    console.error('[chat/v2] Unexpected logChatMessages failure:', error);
   }
+}
+
+function logPerformanceSummary(
+  mode: ChatMode,
+  timings: PhaseTimingMetrics,
+  metrics: TokenUsageMetrics,
+  authenticated: boolean,
+) {
+  const totalMs = timings.modeRouterMs
+    + timings.userContextMs
+    + timings.contentSearchMs
+    + timings.promptBuildMs
+    + timings.geminiApiMs;
+
+  console.log(
+    `[chat/v2] ⏱ mode-router: ${timings.modeRouterMs}ms | user-context: ${timings.userContextMs}ms | content-search: ${timings.contentSearchMs}ms | prompt-build: ${timings.promptBuildMs}ms | gemini-api: ${timings.geminiApiMs}ms | total: ${totalMs}ms | mode: ${mode} | auth: ${authenticated} | tokens: ${metrics.promptTokens}p+${metrics.completionTokens}c`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1195,6 +1377,14 @@ async function buildSystemPrompt(
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+  const timings: PhaseTimingMetrics = {
+    modeRouterMs: 0,
+    userContextMs: 0,
+    contentSearchMs: 0,
+    promptBuildMs: 0,
+    geminiApiMs: 0,
+  };
+  let isAuthenticated = false;
 
   try {
     let jsonBody: unknown;
@@ -1243,7 +1433,9 @@ export async function POST(request: NextRequest) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
+    const modeRouterStart = Date.now();
     const modeDecision = await resolveModeWithRouter(messages, model);
+    timings.modeRouterMs = Date.now() - modeRouterStart;
     const mode = modeDecision.mode;
     console.log('[chat/v2] Mode decision:', modeDecision);
 
@@ -1254,9 +1446,11 @@ export async function POST(request: NextRequest) {
     let userEmail: string | undefined;
     let userId: string | undefined;
 
+    const userContextStart = Date.now();
     try {
       const user = await getCurrentUser();
       if (user) {
+        isAuthenticated = true;
         userId = user.id;
         userEmail = user.email;
         // Run constitution resolution and care context fetch in parallel
@@ -1267,14 +1461,22 @@ export async function POST(request: NextRequest) {
       }
     } catch {
       // Not authenticated — continue with defaults
+    } finally {
+      timings.userContextMs = Date.now() - userContextStart;
     }
 
+    const contentSearchStart = Date.now();
     if (mode !== 'B') {
       contentContext = await buildContentReferenceContext(latestUserMessage.content, 4);
     }
+    timings.contentSearchMs = Date.now() - contentSearchStart;
 
+    const promptBuildStart = Date.now();
     // Build system prompt (DB-driven with fallback)
     let systemPrompt = await buildSystemPrompt(type, mode, careContext, contentContext);
+    if (mode === 'G2') {
+      systemPrompt += `\n\n${buildG2ConversationGuidance(messages)}`;
+    }
     if (userId && mode !== 'B') {
       // G modes also need explicit symptom logging behavior guidance.
       systemPrompt += `\n\n${SYMPTOM_RECORDING_GUIDANCE}`;
@@ -1294,6 +1496,7 @@ export async function POST(request: NextRequest) {
     const todayInHk = getTodayInHongKong();
     const dateGuardrailSection = `\n\n【當前日期（香港時間）】\n今天是 ${todayInHk}。\n當用戶講「今日／今天／而家／依家／today／now」而無提供具體日期時，症狀記錄日期必須用 ${todayInHk}（YYYY-MM-DD）。`;
     const fullPrompt = `${systemPrompt}${userInfoSection}${dateGuardrailSection}\n\n【對話記錄】\n${conversationHistory}\n\nAI助手：`;
+    timings.promptBuildMs = Date.now() - promptBuildStart;
 
     const tools = resolveFunctionTools(mode, userId);
 
@@ -1310,6 +1513,7 @@ export async function POST(request: NextRequest) {
           (async () => {
             let finalReply = '';
             let usage: GeminiUsageMetadata | undefined;
+            const geminiApiStart = Date.now();
 
             try {
               const result = await model.generateContentStream(fullPrompt);
@@ -1331,9 +1535,11 @@ export async function POST(request: NextRequest) {
 
               finalReply = sanitizeAssistantReply(finalReply);
 
+              timings.geminiApiMs = Date.now() - geminiApiStart;
               const durationMs = Date.now() - startTime;
               const metrics = resolveTokenMetrics(usage, fullPrompt, finalReply, durationMs);
               void logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, metrics);
+              logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
               push({
                 type: 'done',
@@ -1347,11 +1553,13 @@ export async function POST(request: NextRequest) {
               controller.close();
             } catch (streamError) {
               const message = streamError instanceof Error ? streamError.message : 'Unknown streaming error';
+              timings.geminiApiMs = Date.now() - geminiApiStart;
               const durationMs = Date.now() - startTime;
               const metrics = resolveTokenMetrics(usage, fullPrompt, finalReply, durationMs, message);
               if (finalReply) {
                 void logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, metrics);
               }
+              logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
               push({
                 type: 'error',
@@ -1385,6 +1593,7 @@ export async function POST(request: NextRequest) {
     // Use chat API for function calling, or generateContent for simple mode
     let reply: string;
     let finalResponse: any;
+    const geminiApiStart = Date.now();
 
     if (tools) {
       // Use chat API for function calling support
@@ -1446,12 +1655,14 @@ export async function POST(request: NextRequest) {
 
     reply = sanitizeAssistantReply(reply);
 
+    timings.geminiApiMs = Date.now() - geminiApiStart;
     const usage = getUsageMetadata(finalResponse);
     const durationMs = Date.now() - startTime;
     const metrics = resolveTokenMetrics(usage, fullPrompt, reply, durationMs);
 
     // Log messages (fire-and-forget)
     void logChatMessages(sessionId, latestUserMessage.content, reply, mode, metrics);
+    logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
     return NextResponse.json({ reply, mode, type });
   } catch (error) {

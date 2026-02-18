@@ -108,6 +108,7 @@ export function ChatRoom() {
   const [mode, setMode] = useState<ChatMode>("G1");
   const [sessionId, setSessionId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [keyboardInset, setKeyboardInset] = useState(0);
   const initialized = useRef(false);
   const storageKey = getChatStorageKey(user?.id);
   const sessionKey = getChatSessionKey(user?.id);
@@ -134,6 +135,27 @@ export function ChatRoom() {
       setMessages([welcome]);
     }
   }, [authLoading, storageKey, sessionKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.visualViewport) return;
+    const viewport = window.visualViewport;
+
+    const updateKeyboardInset = () => {
+      const inset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+      setKeyboardInset(inset);
+    };
+
+    updateKeyboardInset();
+    viewport.addEventListener("resize", updateKeyboardInset);
+    viewport.addEventListener("scroll", updateKeyboardInset);
+    window.addEventListener("orientationchange", updateKeyboardInset);
+
+    return () => {
+      viewport.removeEventListener("resize", updateKeyboardInset);
+      viewport.removeEventListener("scroll", updateKeyboardInset);
+      window.removeEventListener("orientationchange", updateKeyboardInset);
+    };
+  }, []);
 
   // Persist messages to localStorage whenever they change
   useEffect(() => {
@@ -379,7 +401,7 @@ export function ChatRoom() {
   }, [sessionKey]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" style={{ paddingBottom: keyboardInset }}>
       {/* Mode indicator bar */}
       <div className="flex items-center justify-between border-b border-primary/10 bg-white px-4 py-2">
         <ModeIndicator currentMode={mode} />
@@ -392,12 +414,12 @@ export function ChatRoom() {
       </div>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-hidden">
-        <MessageList messages={messages} loading={loading} />
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <MessageList messages={messages} loading={loading} sessionId={sessionId} />
       </div>
 
       {/* Input area */}
-      <div className="border-t border-primary/10 bg-white">
+      <div className="shrink-0 border-t border-primary/10 bg-white">
         <ChatInputV2
           onSend={handleSend}
           disabled={loading}
