@@ -864,16 +864,33 @@ async function logChatMessages(
   userContent: string,
   assistantContent: string,
   mode: ChatMode,
+  constitutionType: ConstitutionType,
+  userId: string | undefined,
   metrics: TokenUsageMetrics,
 ) {
   try {
     const supabase = createServiceClient();
+    const responseGear = mode === 'G2' ? 'g2' : mode === 'G3' ? 'g3' : 'g1';
+
+    const { error: sessionUpsertError } = await supabase.from('chat_sessions').upsert(
+      {
+        session_id: sessionId,
+        type: constitutionType,
+        user_id: userId ?? null,
+        last_seen_at: new Date().toISOString(),
+      },
+      { onConflict: 'session_id' },
+    );
+    if (sessionUpsertError) {
+      console.error('[chat/v2] Failed to upsert chat session:', sessionUpsertError.message);
+    }
 
     const { error: userMessageError } = await supabase.from('chat_messages').insert({
       session_id: sessionId,
       role: 'user',
       content_text: userContent,
       mode,
+      user_id: userId ?? null,
     });
     if (userMessageError) {
       console.error('[chat/v2] Failed to log user chat message:', userMessageError.message);
@@ -884,6 +901,7 @@ async function logChatMessages(
       role: 'assistant',
       content_text: assistantContent,
       mode,
+      user_id: userId ?? null,
     });
     if (assistantMessageError) {
       console.error('[chat/v2] Failed to log assistant chat message:', assistantMessageError.message);
@@ -891,7 +909,13 @@ async function logChatMessages(
 
     const { error: requestLogError } = await supabase.from('chat_request_logs').insert({
       session_id: sessionId,
+      type: constitutionType,
       model_id: 'gemini-flash-latest',
+      model_gear: mode,
+      prompt_source: 'code_prompt',
+      latest_user_text: userContent,
+      response_gear: responseGear,
+      user_id: userId ?? null,
       prompt_tokens: metrics.promptTokens,
       completion_tokens: metrics.completionTokens,
       duration_ms: metrics.durationMs,
@@ -1538,7 +1562,7 @@ export async function POST(request: NextRequest) {
               timings.geminiApiMs = Date.now() - geminiApiStart;
               const durationMs = Date.now() - startTime;
               const metrics = resolveTokenMetrics(usage, fullPrompt, finalReply, durationMs);
-              void logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, metrics);
+              void logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, type, userId, metrics);
               logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
               push({
@@ -1557,7 +1581,7 @@ export async function POST(request: NextRequest) {
               const durationMs = Date.now() - startTime;
               const metrics = resolveTokenMetrics(usage, fullPrompt, finalReply, durationMs, message);
               if (finalReply) {
-                void logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, metrics);
+                void logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, type, userId, metrics);
               }
               logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
@@ -1661,7 +1685,7 @@ export async function POST(request: NextRequest) {
     const metrics = resolveTokenMetrics(usage, fullPrompt, reply, durationMs);
 
     // Log messages (fire-and-forget)
-    void logChatMessages(sessionId, latestUserMessage.content, reply, mode, metrics);
+    void logChatMessages(sessionId, latestUserMessage.content, reply, mode, type, userId, metrics);
     logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
     return NextResponse.json({ reply, mode, type });
