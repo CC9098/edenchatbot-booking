@@ -66,13 +66,24 @@ export function ChatInputV2({
       />
       <button
         onClick={handleSend}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          handleSend();
+        }}
         disabled={!canSend}
         className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all ${
           canSend
             ? "bg-primary text-white shadow-md hover:bg-primary-hover active:scale-95"
-            : "bg-gray-200 text-gray-400"
+            : "bg-gray-200 text-gray-400 cursor-not-allowed"
         }`}
+        style={{
+          minHeight: '44px',
+          minWidth: '44px',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
+        }}
         aria-label="送出訊息"
+        type="button"
       >
         <Send className="h-4 w-4" />
       </button>
