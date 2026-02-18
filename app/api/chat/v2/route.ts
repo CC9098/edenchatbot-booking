@@ -1562,7 +1562,7 @@ export async function POST(request: NextRequest) {
               timings.geminiApiMs = Date.now() - geminiApiStart;
               const durationMs = Date.now() - startTime;
               const metrics = resolveTokenMetrics(usage, fullPrompt, finalReply, durationMs);
-              void logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, type, userId, metrics);
+              await logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, type, userId, metrics);
               logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
               push({
@@ -1581,7 +1581,7 @@ export async function POST(request: NextRequest) {
               const durationMs = Date.now() - startTime;
               const metrics = resolveTokenMetrics(usage, fullPrompt, finalReply, durationMs, message);
               if (finalReply) {
-                void logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, type, userId, metrics);
+                await logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, type, userId, metrics);
               }
               logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
@@ -1685,7 +1685,7 @@ export async function POST(request: NextRequest) {
     const metrics = resolveTokenMetrics(usage, fullPrompt, reply, durationMs);
 
     // Log messages (fire-and-forget)
-    void logChatMessages(sessionId, latestUserMessage.content, reply, mode, type, userId, metrics);
+    await logChatMessages(sessionId, latestUserMessage.content, reply, mode, type, userId, metrics);
     logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
     return NextResponse.json({ reply, mode, type });
