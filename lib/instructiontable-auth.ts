@@ -6,25 +6,15 @@ import { cookies } from "next/headers";
 
 export const INSTRUCTIONTABLE_COOKIE_NAME = "instructiontable_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
+const INSTRUCTIONTABLE_STATIC_PASSWORD = "eden2026view";
+const INSTRUCTIONTABLE_STATIC_SESSION_SECRET = "eden2026view-sign";
 
 function getInstructiontablePassword() {
-  const password = process.env.INSTRUCTIONTABLE_PASSWORD?.trim();
-  if (!password) {
-    throw new Error("INSTRUCTIONTABLE_PASSWORD is not set");
-  }
-  return password;
+  return INSTRUCTIONTABLE_STATIC_PASSWORD;
 }
 
 function getInstructiontableSecret() {
-  const secret =
-    process.env.INSTRUCTIONTABLE_SESSION_SECRET?.trim() ||
-    process.env.INSTRUCTIONTABLE_PASSWORD?.trim();
-  if (!secret) {
-    throw new Error(
-      "INSTRUCTIONTABLE_SESSION_SECRET or INSTRUCTIONTABLE_PASSWORD is not set"
-    );
-  }
-  return secret;
+  return INSTRUCTIONTABLE_STATIC_SESSION_SECRET;
 }
 
 function signSession(expiresAtMs: number) {
@@ -75,4 +65,3 @@ export function isInstructiontableSessionActiveFromRequest(request: NextRequest)
   const token = request.cookies.get(INSTRUCTIONTABLE_COOKIE_NAME)?.value;
   return isInstructiontableSessionTokenValid(token);
 }
-
