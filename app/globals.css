@@ -74,3 +74,25 @@ a, button, [role="button"], input, select, textarea {
 * {
   touch-action: manipulation;
 }
+
+/* iOS safe area support for bottom elements */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Prevent iOS Safari bounce scroll on fixed chat widget */
+html, body {
+  overscroll-behavior: none;
+}
+
+/* iOS input zoom prevention - keep font size >= 16px on inputs */
+@media screen and (max-width: 640px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  textarea {
+    font-size: 16px;
+  }
+}

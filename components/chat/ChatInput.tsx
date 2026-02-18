@@ -12,7 +12,7 @@ interface ChatInputProps {
 
 export function ChatInput({ value, placeholder, onChange, onSend, primaryColor, aiMode, formError }: ChatInputProps) {
   return (
-    <div className="border-t border-gray-100 bg-white px-4 py-3">
+    <div className="flex-shrink-0 border-t border-gray-100 bg-white px-4 py-3">
       <div
         className="flex items-center gap-2 rounded-2xl border border-[--primary]/20 bg-[#f4fbf3] px-3 py-2 shadow-sm focus-within:border-[--primary] focus-within:bg-white focus-within:ring-2 focus-within:ring-[--primary]/20"
         style={{ ['--primary' as string]: primaryColor }}
@@ -47,7 +47,7 @@ export function ChatInput({ value, placeholder, onChange, onSend, primaryColor, 
           onTouchCancel={(e) => {
             e.currentTarget.style.transform = '';
           }}
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-[--primary] text-white transition hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[--primary] active:scale-95"
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[--primary] text-white transition hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-[--primary] active:scale-95"
           aria-label="Send"
           type="button"
           style={{
