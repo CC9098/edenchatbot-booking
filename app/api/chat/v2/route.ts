@@ -568,11 +568,47 @@ async function fetchCareContext(userId: string): Promise<string> {
   const supabase = createServiceClient();
   const lines: string[] = [];
 
-  const { data: profile } = await supabase
-    .from('patient_care_profile')
-    .select('constitution, constitution_note')
-    .eq('patient_user_id', userId)
-    .maybeSingle();
+  const today = new Date().toISOString().split('T')[0];
+  const twoWeeksAgo = new Date();
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+  const twoWeeksAgoStr = twoWeeksAgo.toISOString().split('T')[0];
+
+  // Run all 4 queries in parallel instead of sequentially
+  const [
+    { data: profile },
+    { data: instructions },
+    { data: followUp },
+    { data: symptoms },
+  ] = await Promise.all([
+    supabase
+      .from('patient_care_profile')
+      .select('constitution, constitution_note')
+      .eq('patient_user_id', userId)
+      .maybeSingle(),
+    supabase
+      .from('care_instructions')
+      .select('title, content_md')
+      .eq('patient_user_id', userId)
+      .eq('status', 'active')
+      .or(`start_date.is.null,start_date.lte.${today}`)
+      .or(`end_date.is.null,end_date.gte.${today}`)
+      .limit(5),
+    supabase
+      .from('follow_up_plans')
+      .select('suggested_date, reason')
+      .eq('patient_user_id', userId)
+      .eq('status', 'pending')
+      .order('suggested_date', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('symptom_logs')
+      .select('id, category, description, severity, status, started_at, ended_at')
+      .eq('patient_user_id', userId)
+      .or(`status.eq.active,ended_at.gte.${twoWeeksAgoStr}`)
+      .order('started_at', { ascending: false })
+      .limit(10),
+  ]);
 
   if (profile) {
     if (profile.constitution) {
@@ -583,16 +619,6 @@ async function fetchCareContext(userId: string): Promise<string> {
     }
   }
 
-  const today = new Date().toISOString().split('T')[0];
-  const { data: instructions } = await supabase
-    .from('care_instructions')
-    .select('title, content_md')
-    .eq('patient_user_id', userId)
-    .eq('status', 'active')
-    .or(`start_date.is.null,start_date.lte.${today}`)
-    .or(`end_date.is.null,end_date.gte.${today}`)
-    .limit(5);
-
   if (instructions && instructions.length > 0) {
     lines.push('目前照護指示：');
     for (const inst of instructions) {
@@ -600,30 +626,9 @@ async function fetchCareContext(userId: string): Promise<string> {
     }
   }
 
-  const { data: followUp } = await supabase
-    .from('follow_up_plans')
-    .select('suggested_date, reason')
-    .eq('patient_user_id', userId)
-    .eq('status', 'pending')
-    .order('suggested_date', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
   if (followUp) {
     lines.push(`下次跟進：${followUp.suggested_date}${followUp.reason ? `（${followUp.reason}）` : ''}`);
   }
-
-  const twoWeeksAgo = new Date();
-  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-  const twoWeeksAgoStr = twoWeeksAgo.toISOString().split('T')[0];
-
-  const { data: symptoms } = await supabase
-    .from('symptom_logs')
-    .select('id, category, description, severity, status, started_at, ended_at')
-    .eq('patient_user_id', userId)
-    .or(`status.eq.active,ended_at.gte.${twoWeeksAgoStr}`)
-    .order('started_at', { ascending: false })
-    .limit(10);
 
   if (symptoms && symptoms.length > 0) {
     lines.push('近期症狀記錄（更新狀態時請使用對應 ID）：');
@@ -1175,6 +1180,12 @@ async function buildSystemPrompt(
     systemPrompt += contentContext;
   }
 
+  // Always inject clinic/doctor contact info so G-modes can answer location/phone queries
+  const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
+  const doctorInfo = getPromptDoctorInfoLines().map((line) => `- ${line}`).join('\n');
+  const whatsappInfo = getWhatsappContactLines().map((line) => `- ${line}`).join('\n');
+  systemPrompt += `\n\n【診所資訊】\n${clinicInfo}\n\n【醫師資訊】\n${doctorInfo}\n\n【WhatsApp 聯絡】\n${whatsappInfo}`;
+
   return systemPrompt;
 }
 
@@ -1247,9 +1258,12 @@ export async function POST(request: NextRequest) {
       const user = await getCurrentUser();
       if (user) {
         userId = user.id;
-        type = await resolveConstitution(user.id);
-        careContext = await fetchCareContext(user.id);
-        userEmail = user.email; // Extract user email for booking
+        userEmail = user.email;
+        // Run constitution resolution and care context fetch in parallel
+        [type, careContext] = await Promise.all([
+          resolveConstitution(user.id),
+          fetchCareContext(user.id),
+        ]);
       }
     } catch {
       // Not authenticated — continue with defaults
