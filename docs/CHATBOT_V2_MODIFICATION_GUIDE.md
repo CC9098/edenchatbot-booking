@@ -1,14 +1,15 @@
-# Chatbot v2 修改說明書（Prompt + Mode + Symptom Logging）
+# Chatbot v2 修改說明書（Prompt + Mode + Symptom Logging + Latency）
 
-最後更新：2026-02-16（hotfix: symptom logging + hybrid semantic mode router）
+最後更新：2026-02-18（B mode latency tuning + fast path）
 
 ## 1) TL;DR（先答你最關心）
 
-- `B mode`（預約模式）目前是 **code-driven**，不讀 Supabase prompt。**新增：B mode 同時支持 booking + symptom functions**。
-- `G1/G2/G3` 目前是 **Supabase-driven 優先**（`chat_prompt_settings` + `knowledge_docs`），沒有資料才 fallback 到 code 內建 prompt。**新增：G1/G2/G3 支持 symptom functions（需登入）**。
+- `B mode`（預約模式）目前是 **code-driven**，不讀 Supabase prompt。**現況：B mode 只開 booking functions（不開 symptom functions）**。
+- `B mode` 已加入 2026-02-18 速度優化：`B 短答限制` + `改期/查預約 fast path（一輪 list_my_bookings）`。
+- `G1/G2/G3` 目前是 **Supabase-driven 優先**（`chat_prompt_settings` + `knowledge_docs`），沒有資料才 fallback 到 code 內建 prompt；症狀 functions 只在已登入時啟用。
 - `Mode` 判斷改為 **Hybrid**：先 rule-based（keyword + length），只有邊界 case 先走 semantic router；低信心/超時自動 fallback 規則結果。
 - `/chat` 頁面用的是 `/api/chat/v2`；舊 widget 仍可能打 `/api/chat`（另一套邏輯）。
-- **新功能（2026-02-16）：症狀記錄 (Symptom Logging)** - 病人可透過對話記錄症狀，醫師可在 dashboard 查看。
+- **新功能（2026-02-16）：症狀記錄 (Symptom Logging)** - 病人可透過對話記錄症狀，醫師可在 dashboard 查看（G modes 為主）。
 
 ## 2) 系統路徑總覽
 
@@ -23,8 +24,10 @@
   - `resolveModeByRules(messages)`：rule-based 初判 `G1/G2/G3/B`
   - `resolveModeWithRouter(messages, model)`：邊界 case 才 call semantic router，最後決策 mode
   - `buildSystemPrompt(type, mode, careContext)`：決定 prompt 來源
+  - `buildBModeBrevityGuidance(latestUserText)`：B mode 每輪短答限制
+  - `isRescheduleOrBookingLookupIntent()` + `buildRescheduleLookupReply()`：改期/查紀錄 fast path
   - **Function Calling 策略**：
-    - `mode === 'B'`：booking + symptom functions
+    - `mode === 'B'`：booking functions only
     - `mode !== 'B' && userId`：symptom functions only
     - `!userId`：no function calling（simple generateContent）
   - **Streaming 與 Function Calling**：
@@ -54,8 +57,9 @@
 意思：
 - 不查 Supabase `chat_prompt_settings`
 - 不查 Supabase `knowledge_docs`
-- 會注入 `careContext`（包括護理指示、follow-up、近期症狀 ID）
+- 不注入 `careContext`（2026-02-18 起，B mode 為減延遲而跳過）
 - 完全用 code 內文（`FALLBACK_MODE_PROMPTS.B` + `buildBookingSystemPrompt(careContext)`）
+- 另外會疊加 `buildBModeBrevityGuidance()`，限制回覆長度與追問數量
 
 ### 3.2 G1/G2/G3（健康對話）
 
@@ -113,11 +117,12 @@
 | B mode 唔好講體質建議 | `FALLBACK_MODE_PROMPTS.B` + `buildBookingSystemPrompt(careContext)` | Code 改動，非 Supabase |
 | B mode 問題太多（一次3條） | 同上 | 在 prompt 明確「一次只問一條」 |
 | B mode 醫師/時段流程 | `BOOKING_FUNCTIONS` + `handleFunctionCall()` + `lib/booking-conversation-helpers.ts` | Function calling 層 |
+| B mode 改期/查紀錄太慢 | `isRescheduleOrBookingLookupIntent()` + `listMyBookings(...skipCalendarFallback)` + `buildRescheduleLookupReply()` | 2026-02-18 fast path |
 | G1/G2/G3 語氣與內容 | Supabase `chat_prompt_settings` | DB 即時生效（同 type 相關） |
 | G1/G2/G3 知識內容 | Supabase `knowledge_docs` | `sort_order` 決定注入次序 |
 | 判斷入 B/G1/G2/G3 規則 | `resolveModeByRules()` + `resolveModeWithRouter()` + keyword 常量 | Code 改動 |
-| **症狀記錄功能（新）** | `SYMPTOM_FUNCTIONS` + `handleFunctionCall()` + `lib/symptom-conversation-helpers.ts` | **2026-02-16 新增** |
-| **症狀 AI 記錄邏輯** | `SYMPTOM_RECORDING_GUIDANCE` + `buildBookingSystemPrompt(careContext)` + G mode prompt append | **Prompt engineering** |
+| **症狀記錄功能（新）** | `SYMPTOM_FUNCTIONS` + `handleFunctionCall()` + `lib/symptom-conversation-helpers.ts` | **2026-02-16 新增（G modes 需登入）** |
+| **症狀 AI 記錄邏輯** | `SYMPTOM_RECORDING_GUIDANCE` + G mode prompt append | **Prompt engineering** |
 
 ## 6) Supabase 修改範例（G 模式）
 
@@ -250,8 +255,8 @@ values ('hoarding', '痰濕飲食重點', '內容...', 20, true, true);
 **Mode-specific 啟用策略**：
 ```typescript
 if (mode === 'B') {
-  // B mode: 預約 + 症狀 functions
-  tools = [{ functionDeclarations: [...BOOKING_FUNCTIONS, ...SYMPTOM_FUNCTIONS] }];
+  // B mode: 只開 booking functions
+  tools = [{ functionDeclarations: BOOKING_FUNCTIONS }];
 } else if (userId) {
   // G1/G2/G3: 只有症狀 functions（需登入）
   tools = [{ functionDeclarations: SYMPTOM_FUNCTIONS }];
@@ -262,8 +267,8 @@ if (mode === 'B') {
 ```
 
 **為什麼咁設計**：
-- B mode 可以同時處理預約 + 記錄症狀（例如：「我想預約睇頭痛」）
-- G1/G2/G3 可以記錄症狀但唔會誤觸 booking functions
+- B mode 聚焦預約流程，減少工具分岔與延遲
+- G1/G2/G3 可以記錄症狀，但唔會誤觸 booking functions
 - 未登入用戶無法記錄症狀（因為冇 user_id）
 
 ### 11.3 Database Schema
@@ -307,8 +312,7 @@ if (mode === 'B') {
 
 **加入位置**：
 - `SYMPTOM_RECORDING_GUIDANCE`（共用指引）
-- `buildBookingSystemPrompt(careContext)`（B mode）
-- `mode !== 'B' && userId` 時，`systemPrompt` 會額外 append 同一段指引（G1/G2/G3）
+- `mode !== 'B' && userId` 時，`systemPrompt` 會額外 append（G1/G2/G3）
 
 ```
 【症狀記錄功能】
@@ -321,6 +325,7 @@ if (mode === 'B') {
 
 **User Context 注入（v2 實際路徑）**：
 - `app/api/chat/v2/route.ts` 內 `fetchCareContext()` 會 fetch 近 2 週嘅症狀
+- 只在 `mode !== 'B'` 時注入（B mode 2026-02-18 起為減延遲而略過）
 - 注入到 prompt 顯示：進行中/近期症狀 + symptom ID
 - AI 可直接用該 ID 去 call `update_symptom`
 
@@ -379,10 +384,10 @@ ORDER BY created_at DESC LIMIT 10;
 A: 不可以。症狀 functions 只在 `userId` 存在時啟用。未登入用戶會收到「需要登入才能記錄症狀」錯誤。
 
 **Q: B mode 會唔會因為有症狀 functions 而分心？**
-A: 不會。Prompt 已明確指示「只在用戶描述症狀時記錄，唔會主動問症狀」。
+A: 2026-02-18 起，B mode 已不啟用 symptom functions，只保留 booking functions。
 
 **Q: 症狀記錄會影響 AI 建議嗎？**
-A: 會。`chat/v2` 的 `fetchCareContext()` 會將近期症狀（含 ID）注入 prompt，令 AI 建議更個人化並可更新狀態。
+A: 會，但主要在 G modes。`chat/v2` 的 `fetchCareContext()` 會將近期症狀（含 ID）注入 prompt（`mode !== 'B'`）。
 
 **Q: 開咗 streaming 會唔會令症狀/預約 function 失效？**
 A: 現時唔會。當有 function tools 可用時，server 會自動改用 non-stream function-calling flow。
@@ -399,15 +404,18 @@ A: 去 Supabase Dashboard → SQL Editor → 執行 `supabase/migrations/2026021
 
 | Mode | Booking Functions | Symptom Functions | 條件 |
 |------|------------------|-------------------|------|
-| B | ✅ | ✅ | 所有用戶 |
+| B | ✅ | ❌ | 所有用戶 |
 | G1/G2/G3 | ❌ | ✅ | 需登入 |
 | 未登入任何 mode | ❌ | ❌ | - |
 
-**檔案修改總覽**（2026-02-16 症狀功能）：
+**檔案修改總覽**（2026-02-16 症狀功能 + 2026-02-18 B 速度優化）：
 - ✅ `supabase/migrations/20260216192246_add_symptom_logs.sql` - Schema
 - ✅ `lib/symptom-conversation-helpers.ts` - Function implementations
 - ✅ `app/api/me/symptoms/**` - Patient API routes
 - ✅ `app/api/doctor/patients/[id]/symptoms/**` - Doctor API routes
 - ✅ `app/api/chat/v2/route.ts` - Function calling integration
 - ✅ `app/api/chat/v2/route.ts` (`fetchCareContext`) - Context injection
+- ✅ `app/api/chat/v2/route.ts` (`buildBModeBrevityGuidance`) - B mode 回覆縮短
+- ✅ `app/api/chat/v2/route.ts` (`isRescheduleOrBookingLookupIntent`) - 改期/查紀錄 fast path
+- ✅ `lib/booking-conversation-helpers.ts` (`listMyBookings` options) - `includeRecent` / `skipCalendarFallback`
 - ✅ `app/doctor/patients/[id]/page.tsx` - Doctor UI
