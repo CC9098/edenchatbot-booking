@@ -24,6 +24,14 @@ type RowsResponse = {
 };
 
 type EditorMode = "create" | "update";
+type TopicKey =
+  | "all"
+  | "content"
+  | "chat"
+  | "care"
+  | "booking"
+  | "billing"
+  | "media";
 
 const GROUP_LABELS: Record<InstructiontableDefinition["group"], string> = {
   content: "Content",
@@ -33,6 +41,20 @@ const GROUP_LABELS: Record<InstructiontableDefinition["group"], string> = {
   billing: "Billing",
   media: "Media",
 };
+
+const TOPIC_FILTERS: Array<{
+  key: TopicKey;
+  label: string;
+  groups: Array<InstructiontableDefinition["group"]>;
+}> = [
+  { key: "all", label: "All", groups: ["content", "chat", "care", "booking", "billing", "media"] },
+  { key: "content", label: "Article / Content", groups: ["content"] },
+  { key: "chat", label: "AI Prompt / Chat", groups: ["chat"] },
+  { key: "care", label: "Care", groups: ["care"] },
+  { key: "booking", label: "Booking", groups: ["booking"] },
+  { key: "billing", label: "Billing", groups: ["billing"] },
+  { key: "media", label: "Media", groups: ["media"] },
+];
 
 const FIVE_W_ONE_H_LABELS: Array<{
   key: "why" | "what" | "how" | "where" | "when" | "who";
@@ -82,6 +104,7 @@ export function InstructionTableApp({
   const [tables, setTables] = useState<InstructiontableDefinition[]>([]);
   const [tablesError, setTablesError] = useState<string | null>(null);
   const [loadingTables, setLoadingTables] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<TopicKey>("all");
   const [tableQuery, setTableQuery] = useState("");
   const [selectedTable, setSelectedTable] = useState<string>("");
 
@@ -107,14 +130,20 @@ export function InstructionTableApp({
 
   const filteredTables = useMemo(() => {
     const query = tableQuery.trim().toLowerCase();
-    if (!query) return tables;
-    return tables.filter(
+    const allowedGroups =
+      TOPIC_FILTERS.find((item) => item.key === selectedTopic)?.groups ??
+      TOPIC_FILTERS[0].groups;
+
+    const byTopic = tables.filter((table) => allowedGroups.includes(table.group));
+    if (!query) return byTopic;
+
+    return byTopic.filter(
       (table) =>
         table.name.toLowerCase().includes(query) ||
         table.label.toLowerCase().includes(query) ||
         table.description.toLowerCase().includes(query)
     );
-  }, [tables, tableQuery]);
+  }, [tables, tableQuery, selectedTopic]);
 
   const outboundRelations = selectedDefinition?.relations ?? [];
   const inboundRelations = useMemo(() => {
@@ -244,6 +273,20 @@ export function InstructionTableApp({
       void loadRows(selectedTable, limit, offset);
     }
   }, [authenticated, selectedTable, limit, offset, loadRows]);
+
+  useEffect(() => {
+    if (!filteredTables.length) {
+      setSelectedTable("");
+      setRows([]);
+      setRowCount(null);
+      return;
+    }
+
+    if (!filteredTables.some((table) => table.name === selectedTable)) {
+      setSelectedTable(filteredTables[0].name);
+      setOffset(0);
+    }
+  }, [filteredTables, selectedTable]);
 
   async function handleLogin(event: React.FormEvent) {
     event.preventDefault();
@@ -466,6 +509,32 @@ export function InstructionTableApp({
 
         <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
           <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <div className="mb-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Topic Filter
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {TOPIC_FILTERS.map((topic) => {
+                  const active = topic.key === selectedTopic;
+                  return (
+                    <button
+                      key={topic.key}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTopic(topic.key);
+                      }}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                        active
+                          ? "bg-emerald-700 text-white"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {topic.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <input
               value={tableQuery}
               onChange={(event) => setTableQuery(event.target.value)}
