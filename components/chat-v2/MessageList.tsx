@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import type { ChatMode } from "./ModeSelector";
-import { Loader2 } from "lucide-react";
+import { Loader2, ThumbsUp, ThumbsDown, Copy, Share2, Check } from "lucide-react";
 
 export type ChatMessage = {
   role: "user" | "assistant";
@@ -57,14 +57,51 @@ function renderMessageContent(content: string, isUser: boolean) {
   });
 }
 
+type FeedbackState = Record<number, "up" | "down" | null>;
+
 export function MessageList({ messages, loading }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastMessage = messages[messages.length - 1];
+  const [feedback, setFeedback] = useState<FeedbackState>({});
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   // Auto-scroll to bottom on new messages or loading state change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, lastMessage?.content, loading]);
+
+  const handleFeedback = useCallback((idx: number, type: "up" | "down") => {
+    setFeedback((prev) => ({ ...prev, [idx]: prev[idx] === type ? null : type }));
+  }, []);
+
+  const handleCopy = useCallback(async (idx: number, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = text;
+      el.style.position = "fixed";
+      el.style.opacity = "0";
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    }
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  }, []);
+
+  const handleShare = useCallback(async (text: string) => {
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ text });
+      } catch {
+        // User cancelled — no action needed
+      }
+    } else {
+      await navigator.clipboard.writeText(text).catch(() => {});
+    }
+  }, []);
 
   return (
     <div className="h-full overflow-y-auto px-4 py-4">
@@ -77,11 +114,7 @@ export function MessageList({ messages, loading }: MessageListProps) {
               key={i}
               className={`flex ${isUser ? "justify-end" : "justify-start"}`}
             >
-              <div
-                className={`max-w-[85%] sm:max-w-[75%] ${
-                  isUser ? "order-1" : "order-1"
-                }`}
-              >
+              <div className={`max-w-[85%] sm:max-w-[75%]`}>
                 {/* Mode badge for assistant messages */}
                 {!isUser && msg.mode && (
                   <div className="mb-1 flex items-center gap-2">
@@ -116,6 +149,56 @@ export function MessageList({ messages, loading }: MessageListProps) {
                 >
                   {formatTime(msg.createdAt)}
                 </div>
+
+                {/* Action buttons — assistant messages only */}
+                {!isUser && (
+                  <div className="mt-1 flex items-center gap-0.5">
+                    <button
+                      onClick={() => handleFeedback(i, "up")}
+                      title="有用"
+                      type="button"
+                      className={`rounded-lg p-1.5 transition-colors ${
+                        feedback[i] === "up"
+                          ? "text-green-600"
+                          : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      }`}
+                    >
+                      <ThumbsUp size={13} />
+                    </button>
+                    <button
+                      onClick={() => handleFeedback(i, "down")}
+                      title="唔係幾幫到我"
+                      type="button"
+                      className={`rounded-lg p-1.5 transition-colors ${
+                        feedback[i] === "down"
+                          ? "text-red-500"
+                          : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      }`}
+                    >
+                      <ThumbsDown size={13} />
+                    </button>
+                    <button
+                      onClick={() => handleCopy(i, msg.content)}
+                      title="複製"
+                      type="button"
+                      className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                    >
+                      {copiedIdx === i ? (
+                        <Check size={13} className="text-green-600" />
+                      ) : (
+                        <Copy size={13} />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleShare(msg.content)}
+                      title="分享"
+                      type="button"
+                      className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                    >
+                      <Share2 size={13} />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );
