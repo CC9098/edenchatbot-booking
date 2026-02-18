@@ -11,6 +11,7 @@ import {
   getBookingOptions,
   createConversationalBooking,
   listMyBookings,
+  type MyBookingInfo,
 } from '@/lib/booking-conversation-helpers';
 import {
   logSymptom,
@@ -414,6 +415,50 @@ function buildBModeBrevityGuidance(latestUserText: string): string {
   return `【B 模式短答限制（本輪必須）】
 - 預設 2-4 句，優先回覆一個清晰結論，再問一條必要問題。
 - 除非用戶明確要求，唔好主動貼完整診所地址與全部聯絡連結。${extra}`;
+}
+
+function isRescheduleOrBookingLookupIntent(text: string): boolean {
+  const normalized = normalizeIntentText(text);
+  const intentKeywords = [
+    '改期',
+    '取消',
+    '預約紀錄',
+    '查我預約',
+    '我的預約',
+    '我有咩預約',
+    'list my bookings',
+  ];
+  return intentKeywords.some((kw) => normalized.includes(normalizeIntentText(kw)));
+}
+
+function formatBookingForUser(booking: MyBookingInfo): string {
+  return `${booking.appointmentDate} ${booking.appointmentTime}（${booking.doctorNameZh}｜${booking.clinicNameZh}）`;
+}
+
+function buildRescheduleLookupReply(
+  latestUserText: string,
+  lookupResult: Awaited<ReturnType<typeof listMyBookings>>
+): string {
+  const normalized = normalizeIntentText(latestUserText);
+  const isRescheduleOrCancel =
+    normalized.includes(normalizeIntentText('改期'))
+    || normalized.includes(normalizeIntentText('取消'));
+
+  if (!lookupResult.success) {
+    return '我而家查詢預約紀錄有啲問題。你想改期定取消邊一個預約？';
+  }
+
+  const upcoming = lookupResult.upcomingBookings ?? [];
+  if (upcoming.length === 0) {
+    return isRescheduleOrCancel
+      ? '我查過暫時未見到你有嚟緊嘅預約。你係想我而家幫你重新預約嗎？'
+      : '我查過暫時未見到你有嚟緊嘅預約。你想唔想我幫你重新安排一個新預約？';
+  }
+
+  const latestBooking = formatBookingForUser(upcoming[0]);
+  return isRescheduleOrCancel
+    ? `我查到你嚟緊嘅預約係：${latestBooking}。請確認你係咪想更改呢一個預約？`
+    : `我查到你嚟緊嘅預約係：${latestBooking}。請確認你想處理呢一個預約嗎？`;
 }
 
 function buildSemanticRouterPrompt(
@@ -1563,6 +1608,31 @@ export async function POST(request: NextRequest) {
       // Not authenticated — continue with defaults
     } finally {
       timings.userContextMs = Date.now() - userContextStart;
+    }
+
+    // Fast path for reschedule / booking-record lookup:
+    // perform one booking lookup and ask user to confirm target booking.
+    if (mode === 'B' && isRescheduleOrBookingLookupIntent(latestUserMessage.content)) {
+      let fastReply: string;
+
+      if (!userId) {
+        fastReply = '請先登入帳戶，我先可以幫你查預約紀錄。你登入後，我會即刻幫你確認要更改邊一個預約。';
+      } else {
+        const lookupResult = await listMyBookings(userId, {
+          userEmail,
+          limit: 3,
+          includeRecent: false,
+          skipCalendarFallback: true,
+        });
+        fastReply = buildRescheduleLookupReply(latestUserMessage.content, lookupResult);
+      }
+
+      const durationMs = Date.now() - startTime;
+      const metrics = resolveTokenMetrics(undefined, latestUserMessage.content, fastReply, durationMs);
+      await logChatMessages(sessionId, latestUserMessage.content, fastReply, mode, type, userId, metrics);
+      logPerformanceSummary(mode, timings, metrics, isAuthenticated);
+
+      return NextResponse.json({ reply: fastReply, mode, type });
     }
 
     const contentSearchStart = Date.now();

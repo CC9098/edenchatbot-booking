@@ -218,6 +218,8 @@ interface ListMyBookingsOptions {
   userEmail?: string;
   limit?: number;
   recentLimit?: number;
+  includeRecent?: boolean;
+  skipCalendarFallback?: boolean;
 }
 
 interface CalendarEventLike {
@@ -557,6 +559,8 @@ export async function listMyBookings(
     const supabase = createServiceClient();
     const today = getTodayInHongKongDate();
     const fallbackEmail = options?.userEmail?.trim();
+    const includeRecent = options?.includeRecent !== false;
+    const skipCalendarFallback = options?.skipCalendarFallback === true;
     const bookingLimit = clampPositiveInteger(
       options?.limit ?? DEFAULT_LIST_BOOKINGS_LIMIT,
       DEFAULT_LIST_BOOKINGS_LIMIT
@@ -619,46 +623,48 @@ export async function listMyBookings(
 
     let recentRows: RawBookingIntakeRow[] = [];
 
-    const recentByUser = await supabase
-      .from('booking_intake')
-      .select(selectFields)
-      .eq('user_id', userId)
-      .in('status', ['confirmed', 'cancelled'])
-      .lt('appointment_date', today)
-      .order('appointment_date', { ascending: false })
-      .order('appointment_time', { ascending: false })
-      .limit(recentLimit);
-
-    if (recentByUser.error) {
-      return { success: false, error: recentByUser.error.message };
-    }
-
-    const recentByUserData = (recentByUser.data || []) as unknown[];
-    recentRows = recentByUserData.filter(isRawBookingIntakeRow);
-
-    if (recentRows.length === 0 && fallbackEmail) {
-      const recentByEmail = await supabase
+    if (includeRecent) {
+      const recentByUser = await supabase
         .from('booking_intake')
         .select(selectFields)
-        .ilike('email', fallbackEmail)
+        .eq('user_id', userId)
         .in('status', ['confirmed', 'cancelled'])
         .lt('appointment_date', today)
         .order('appointment_date', { ascending: false })
         .order('appointment_time', { ascending: false })
         .limit(recentLimit);
 
-      if (recentByEmail.error) {
-        return { success: false, error: recentByEmail.error.message };
+      if (recentByUser.error) {
+        return { success: false, error: recentByUser.error.message };
       }
 
-      const recentByEmailData = (recentByEmail.data || []) as unknown[];
-      recentRows = recentByEmailData.filter(isRawBookingIntakeRow);
-      if (recentRows.length > 0) {
-        usedEmailFallback = true;
+      const recentByUserData = (recentByUser.data || []) as unknown[];
+      recentRows = recentByUserData.filter(isRawBookingIntakeRow);
+
+      if (recentRows.length === 0 && fallbackEmail) {
+        const recentByEmail = await supabase
+          .from('booking_intake')
+          .select(selectFields)
+          .ilike('email', fallbackEmail)
+          .in('status', ['confirmed', 'cancelled'])
+          .lt('appointment_date', today)
+          .order('appointment_date', { ascending: false })
+          .order('appointment_time', { ascending: false })
+          .limit(recentLimit);
+
+        if (recentByEmail.error) {
+          return { success: false, error: recentByEmail.error.message };
+        }
+
+        const recentByEmailData = (recentByEmail.data || []) as unknown[];
+        recentRows = recentByEmailData.filter(isRawBookingIntakeRow);
+        if (recentRows.length > 0) {
+          usedEmailFallback = true;
+        }
       }
     }
 
-    if (fallbackEmail && upcomingRows.length === 0 && recentRows.length === 0) {
+    if (!skipCalendarFallback && fallbackEmail && upcomingRows.length === 0 && recentRows.length === 0) {
       const calendarFallback = await listBookingsFromCalendarByEmail(
         fallbackEmail,
         today,
