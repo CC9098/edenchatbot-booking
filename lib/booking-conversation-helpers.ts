@@ -170,6 +170,25 @@ export interface DoctorInfo {
   scheduleSummary: string;
 }
 
+type BookingOptionMissingField = 'doctorNameZh' | 'date' | 'clinicNameZh';
+
+export interface BookingOptionsRequest {
+  doctorNameZh?: string;
+  date?: string;
+  clinicNameZh?: string;
+}
+
+export interface BookingOptionsResult {
+  success: boolean;
+  doctors?: DoctorInfo[];
+  selectedDoctor?: string;
+  clinics?: string[];
+  availableSlots?: string[];
+  missingFields?: BookingOptionMissingField[];
+  nextQuestion?: string;
+  error?: string;
+}
+
 export interface MyBookingInfo {
   intakeId: string;
   status: string;
@@ -416,6 +435,105 @@ export async function listBookableDoctors(): Promise<{ doctors: DoctorInfo[] }> 
 
   // IMPORTANT: Gemini API requires response to be an object, not an array
   return { doctors: doctorList };
+}
+
+function getClinicsForDoctor(doctorNameZh: string): string[] {
+  const doctor = DOCTOR_BY_NAME_ZH[doctorNameZh];
+  if (!doctor) return [];
+
+  const doctorMappings = CALENDAR_MAPPINGS.filter(
+    (mapping) => mapping.doctorId === doctor.id && mapping.isActive
+  );
+
+  return [...new Set(
+    doctorMappings
+      .map((mapping) => CLINIC_BY_ID[mapping.clinicId]?.nameZh)
+      .filter((name): name is string => Boolean(name))
+  )];
+}
+
+/**
+ * Combined helper for booking discovery. This collapses doctor/clinic/slot lookup
+ * into one function-call entrypoint to reduce LLM tool-call round trips.
+ */
+export async function getBookingOptions(
+  request: BookingOptionsRequest
+): Promise<BookingOptionsResult> {
+  const doctorNameZh = toSafeText(request.doctorNameZh);
+  const date = toSafeText(request.date);
+  const clinicNameZh = toSafeText(request.clinicNameZh);
+  const doctors = (await listBookableDoctors()).doctors;
+
+  if (!doctorNameZh) {
+    return {
+      success: true,
+      doctors,
+      missingFields: ['doctorNameZh'],
+      nextQuestion: '請問你想預約邊位醫師？',
+    };
+  }
+
+  if (!DOCTOR_BY_NAME_ZH[doctorNameZh]) {
+    return {
+      success: false,
+      doctors,
+      error: `找不到醫師：${doctorNameZh}`,
+      missingFields: ['doctorNameZh'],
+      nextQuestion: '請從現有醫師中選擇一位。',
+    };
+  }
+
+  const clinics = getClinicsForDoctor(doctorNameZh);
+
+  if (!date) {
+    return {
+      success: true,
+      doctors,
+      selectedDoctor: doctorNameZh,
+      clinics,
+      missingFields: ['date'],
+      nextQuestion: '請問你想預約邊一日？請用 YYYY-MM-DD。',
+    };
+  }
+
+  if (!clinicNameZh) {
+    return {
+      success: true,
+      doctors,
+      selectedDoctor: doctorNameZh,
+      clinics,
+      missingFields: ['clinicNameZh'],
+      nextQuestion: '請問你想去邊間診所（中環／佐敦／荃灣）？',
+    };
+  }
+
+  const slotsResult = await getAvailableTimeSlots(doctorNameZh, date, clinicNameZh);
+  if (!slotsResult.success) {
+    return {
+      success: false,
+      doctors,
+      selectedDoctor: doctorNameZh,
+      clinics,
+      error: slotsResult.error,
+    };
+  }
+
+  const availableSlots = (slotsResult.slots ?? [])
+    .filter((slot) => slot.available)
+    .map((slot) => slot.time);
+
+  return {
+    success: true,
+    doctors,
+    selectedDoctor: doctorNameZh,
+    clinics,
+    availableSlots,
+    missingFields: [],
+    nextQuestion:
+      availableSlots.length > 0
+        ? '請問你想揀邊個時段？'
+        : '該日暫時冇可用時段，想唔想轉另一日？',
+  };
 }
 
 // ---------------------------------------------------------------------------

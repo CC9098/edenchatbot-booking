@@ -8,6 +8,7 @@ import { getPromptDoctorInfoLines } from '@/shared/clinic-schedule-data';
 import {
   listBookableDoctors,
   getAvailableTimeSlots,
+  getBookingOptions,
   createConversationalBooking,
   listMyBookings,
 } from '@/lib/booking-conversation-helpers';
@@ -571,7 +572,7 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 - 如用戶主動想要健康建議，先簡短確認：「你想我完成預約後，再補充1-2句調理建議嗎？」
 
 **關鍵規則（必須遵守）：**
-1. 查時段：**必須調用 get_available_slots**，唔可以自己編造時段
+1. 查醫師/診所/時段：**必須調用 get_booking_options**，唔可以自己編造時段
 2. 完成預約：**必須調用 create_booking**，唔可以話「已完成」而冇調用
 3. 查本人預約紀錄：當用戶問「我預約咗幾時／我有咩預約」時，**必須調用 list_my_bookings**
 4. 用戶要求取消/改期已有預約時，優先引導：
@@ -596,9 +597,9 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
      - gender: male / female / other
 
 **預約流程（每一步都要做）：**
-步驟 1：調用 **list_doctors** 或詢問醫師名稱
-步驟 2：用戶提供醫師、日期、診所後，**立即調用 get_available_slots(醫師名, 日期, 診所)**
-步驟 3：顯示 function 返回的時段，讓用戶選擇
+步驟 1：調用 **get_booking_options**，把目前已知欄位一次傳入（doctorNameZh / date / clinicNameZh）
+步驟 2：如果 function 返回 missingFields，先追問最必要一條（一次只問一條）
+步驟 3：function 返回 availableSlots 後，讓用戶選擇時段
 步驟 4：**收集病人資料**
    - 一定要問：姓名、電話、首診/覆診、收據需求、取藥方法
    - Email：如果【用戶登入資料】有 email，直接用；如果冇，先問
@@ -608,7 +609,7 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 步驟 7：提醒用戶「我哋已經傳咗預約確認信去你嘅 email，請查收」
 
 **絕對唔准做嘅嘢：**
-❌ 唔准自己編造時段（必須調用 get_available_slots）
+❌ 唔准自己編造時段（必須調用 get_booking_options）
 ❌ 唔准話「已經幫你完成登記」而冇調用 create_booking
 ❌ 用戶問預約紀錄時，唔准靠估或者只叫對方自行查 email（除非 list_my_bookings 返回失敗/需要登入）
 ❌ 唔准問已登入用戶提供 email（如果【用戶登入資料】有 email，直接用）
@@ -617,7 +618,7 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 
 例子 1（已登入用戶）：
 用戶：「我想預約李醫師，荃灣，2月28號」
-你：**立即調用 get_available_slots("李芊霖醫師", "2026-02-28", "荃灣")**
+你：**立即調用 get_booking_options("李芊霖醫師", "2026-02-28", "荃灣")**
 （等 function 返回）
 你：「以下係可用時段：[顯示時段]」
 用戶：「10:00」
@@ -952,33 +953,24 @@ function logPerformanceSummary(
 
 const BOOKING_FUNCTIONS: FunctionDeclaration[] = [
   {
-    name: 'list_doctors',
-    description: '列出所有可預約的醫師及其時間表',
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {},
-    },
-  },
-  {
-    name: 'get_available_slots',
-    description: '查詢某位醫師在某個診所的可用時段',
+    name: 'get_booking_options',
+    description: '整合查詢預約選項（醫師/診所/時段）。可一次傳入已知資料，返回缺少欄位與下一步建議。',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         doctorNameZh: {
           type: SchemaType.STRING,
-          description: '醫師中文名稱（例如：陳家富醫師、李芊霖醫師）',
+          description: '醫師中文名稱（可選）',
         },
         date: {
           type: SchemaType.STRING,
-          description: '預約日期，格式為 YYYY-MM-DD（例如：2026-02-20）',
+          description: '預約日期，格式 YYYY-MM-DD（可選）',
         },
         clinicNameZh: {
           type: SchemaType.STRING,
-          description: '診所中文名稱（例如：中環、佐敦、荃灣）。如果不提供，會返回該醫師所有可用的診所',
+          description: '診所中文名稱（可選）',
         },
       },
-      required: ['doctorNameZh', 'date'],
     },
   },
   {
@@ -1185,6 +1177,16 @@ async function handleFunctionCall(
   const args = functionArgs as Record<string, unknown>;
 
   switch (functionName) {
+    case 'get_booking_options': {
+      const result = await getBookingOptions({
+        doctorNameZh: typeof args.doctorNameZh === 'string' ? args.doctorNameZh : undefined,
+        date: typeof args.date === 'string' ? args.date : undefined,
+        clinicNameZh: typeof args.clinicNameZh === 'string' ? args.clinicNameZh : undefined,
+      });
+      return result;
+    }
+
+    // Legacy compatibility: keep old tool names to avoid breaking older prompts.
     case 'list_doctors': {
       const result = await listBookableDoctors();
       return result;
