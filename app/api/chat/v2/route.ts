@@ -712,23 +712,20 @@ async function logChatMessages(
   mode: ChatMode,
   metrics: TokenUsageMetrics,
 ) {
+  const supabase = createServiceClient();
+
+  // Log messages (best-effort — failures don't block request_logs)
   try {
-    const supabase = createServiceClient();
+    await supabase.from('chat_messages').insert([
+      { session_id: sessionId, role: 'user', content_text: userContent, mode },
+      { session_id: sessionId, role: 'assistant', content_text: assistantContent, mode },
+    ]);
+  } catch (error) {
+    console.error('[chat/v2] Failed to log chat_messages:', error);
+  }
 
-    await supabase.from('chat_messages').insert({
-      session_id: sessionId,
-      role: 'user',
-      content_text: userContent,
-      model_gear: mode,
-    });
-
-    await supabase.from('chat_messages').insert({
-      session_id: sessionId,
-      role: 'assistant',
-      content_text: assistantContent,
-      model_gear: mode,
-    });
-
+  // Log request telemetry (always attempt, independent of chat_messages)
+  try {
     await supabase.from('chat_request_logs').insert({
       session_id: sessionId,
       model_id: 'gemini-flash-latest',
@@ -738,7 +735,7 @@ async function logChatMessages(
       ...(metrics.error ? { error: metrics.error } : {}),
     });
   } catch (error) {
-    console.error('[chat/v2] Failed to log chat messages:', error);
+    console.error('[chat/v2] Failed to log chat_request_logs:', error);
   }
 }
 
