@@ -3,9 +3,8 @@ import { formatInTimeZone } from 'date-fns-tz';
 
 import { listEventsInRange, patchEventPrivateMetadata } from '@/lib/google-calendar';
 import { sendBookingReminderEmail } from '@/lib/gmail';
-import { storage } from '@/lib/storage';
+import { getActiveCalendarIds } from '@/lib/doctor-schedule-store';
 import { CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
-import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -72,30 +71,6 @@ function buildReminderPayload(event: any, calendarId: string) {
     eventId,
     calendarId,
   };
-}
-
-async function getActiveCalendarIds(): Promise<string[]> {
-  const calendarIds = new Set<string>();
-
-  for (const mapping of CALENDAR_MAPPINGS) {
-    if (mapping.isActive && mapping.calendarId) {
-      calendarIds.add(mapping.calendarId);
-    }
-  }
-
-  try {
-    const dbSchedules = await storage.getAllDoctorSchedules();
-    for (const schedule of dbSchedules) {
-      if (schedule.isActive && schedule.calendarId) {
-        calendarIds.add(schedule.calendarId);
-      }
-    }
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    console.warn(`Reminder cron failed to read DB schedules, fallback to static only. reason=${detail}`);
-  }
-
-  return Array.from(calendarIds);
 }
 
 export async function GET(request: NextRequest) {

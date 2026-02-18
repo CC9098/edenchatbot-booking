@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { createServiceClient } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { getPromptClinicInfoLines, getWhatsappContactLines } from '@/shared/clinic-data';
-import { getPromptDoctorInfoLines } from '@/shared/clinic-schedule-data';
+import { getPromptDoctorInfoLinesServer } from '@/lib/clinic-schedule-data-server';
 import {
   listBookableDoctors,
   getAvailableTimeSlots,
@@ -652,9 +652,9 @@ const OUTPUT_FORMAT_RULES = `【輸出格式規則（必須遵守）】
 - 禁止提供「吸幾拍/呼幾拍/做幾多分鐘/做幾多次」等固定數字式身心練習指令，避免故弄玄虛或假精準。
 - 除非用戶明確要求呼吸練習，否則不要主動建議呼吸訓練；若涉及急症紅旗（例如呼吸困難），仍要優先提示即時求助。`;
 
-function buildBookingSystemPrompt(careContext: string): string {
+async function buildBookingSystemPrompt(careContext: string): Promise<string> {
   const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
-  const doctorInfo = getPromptDoctorInfoLines().map((line) => `- ${line}`).join('\n');
+  const doctorInfo = (await getPromptDoctorInfoLinesServer()).map((line) => `- ${line}`).join('\n');
   const whatsappInfo = getWhatsappContactLines().map((line) => `- ${line}`).join('\n');
 
   return `你係醫天圓中醫診所的 AI 預約助手。請用繁體中文（廣東話口語）回覆。
@@ -1282,14 +1282,14 @@ function resolveFunctionTools(
 // Build System Prompt (DB-driven with fallback)
 // ---------------------------------------------------------------------------
 
-function buildFallbackPrompt(
+async function buildFallbackPrompt(
   type: ConstitutionType,
   mode: ChatMode,
   careContext: string,
   contentContext: string,
-): string {
+): Promise<string> {
   const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
-  const doctorInfo = getPromptDoctorInfoLines().map((line) => `- ${line}`).join('\n');
+  const doctorInfo = (await getPromptDoctorInfoLinesServer()).map((line) => `- ${line}`).join('\n');
   const whatsappInfo = getWhatsappContactLines().map((line) => `- ${line}`).join('\n');
 
   return `你係醫天圓中醫診所的 AI 體質顧問，角色設定係親切、專業的中醫健康助理。請用繁體中文（廣東話口語）回答用戶問題。
@@ -1390,7 +1390,7 @@ async function buildSystemPrompt(
 
   // Always inject clinic/doctor contact info so G-modes can answer location/phone queries
   const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
-  const doctorInfo = getPromptDoctorInfoLines().map((line) => `- ${line}`).join('\n');
+  const doctorInfo = (await getPromptDoctorInfoLinesServer()).map((line) => `- ${line}`).join('\n');
   const whatsappInfo = getWhatsappContactLines().map((line) => `- ${line}`).join('\n');
   systemPrompt += `\n\n【診所資訊】\n${clinicInfo}\n\n【醫師資訊】\n${doctorInfo}\n\n【WhatsApp 聯絡】\n${whatsappInfo}`;
 

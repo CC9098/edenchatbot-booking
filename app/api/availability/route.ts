@@ -2,11 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
-import { getMappingWithFallback } from '@/lib/storage-helpers'; // Need to create this helper wrapper or use direct storage
+import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { getFreeBusy } from '@/lib/google-calendar';
 import { getScheduleForDayFromWeekly, isDateBlocked, isSlotAvailableUtc } from '@/lib/booking-helpers';
-import { storage } from '@/lib/storage';
-import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
 
 
 

@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 import { getPromptClinicInfoLines, getWhatsappContactLines } from '@/shared/clinic-data';
-import { getPromptDoctorInfoLines } from '@/shared/clinic-schedule-data';
+import { getPromptDoctorInfoLinesServer } from '@/lib/clinic-schedule-data-server';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { gatherUserContext, buildIntelligentPrompt, getDaysUntilFollowUp } from '@/lib/user-context';
 
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     // Build base prompt
     const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
-    const doctorInfo = getPromptDoctorInfoLines().map((line) => `- ${line}`).join('\n');
+    const doctorInfo = (await getPromptDoctorInfoLinesServer()).map((line) => `- ${line}`).join('\n');
     const whatsappInfo = getWhatsappContactLines().map((line) => `- ${line}`).join('\n');
 
     const basePrompt = `你係醫天圓中醫診所的 AI 助手，角色設定係親切、專業、有溫度的中醫健康顧問。請用繁體中文（廣東話口語）回答用戶問題。

@@ -5,9 +5,12 @@
  * to enable conversational booking flow in the chat interface.
  */
 
-import { getBookableDoctors, getDoctorScheduleSummaryByNameZh } from '@/shared/clinic-schedule-data';
+import {
+  getBookableDoctorsServer,
+  getDoctorScheduleSummaryByNameZhServer,
+} from '@/lib/clinic-schedule-data-server';
 import { DOCTOR_BY_NAME_ZH, CLINIC_BY_ID, CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
-import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
+import { getActiveCalendarIds, getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
 import { getFreeBusy } from './google-calendar';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { createBooking, deleteEvent, listEventsInRange } from './google-calendar';
@@ -338,12 +341,7 @@ async function listBookingsFromCalendarByEmail(
   recentLimit: number
 ): Promise<{ upcomingRows: RawBookingIntakeRow[]; recentRows: RawBookingIntakeRow[] }> {
   const normalizedEmail = normalizeEmail(email);
-  const activeCalendarIds = Array.from(
-    new Set(
-      CALENDAR_MAPPINGS.filter((mapping) => mapping.isActive && mapping.calendarId)
-        .map((mapping) => mapping.calendarId)
-    )
-  );
+  const activeCalendarIds = await getActiveCalendarIds();
 
   if (activeCalendarIds.length === 0) {
     return { upcomingRows: [], recentRows: [] };
@@ -422,27 +420,27 @@ async function listBookingsFromCalendarByEmail(
  * List all doctors that have active booking schedules
  */
 export async function listBookableDoctors(): Promise<{ doctors: DoctorInfo[] }> {
-  const doctors = getBookableDoctors();
+  const doctors = await getBookableDoctorsServer();
 
-  const doctorList = doctors.map(doctor => {
-    const scheduleSummary = getDoctorScheduleSummaryByNameZh(doctor.nameZh) || '暫無時間表';
+  const doctorList = await Promise.all(doctors.map(async (doctor) => {
+    const scheduleSummary = (await getDoctorScheduleSummaryByNameZhServer(doctor.nameZh)) || '暫無時間表';
     return {
       nameZh: doctor.nameZh,
       nameEn: doctor.nameEn,
       scheduleSummary,
     };
-  });
+  }));
 
   // IMPORTANT: Gemini API requires response to be an object, not an array
   return { doctors: doctorList };
 }
 
-function getClinicsForDoctor(doctorNameZh: string): string[] {
+async function getClinicsForDoctor(doctorNameZh: string): Promise<string[]> {
   const doctor = DOCTOR_BY_NAME_ZH[doctorNameZh];
   if (!doctor) return [];
 
-  const doctorMappings = CALENDAR_MAPPINGS.filter(
-    (mapping) => mapping.doctorId === doctor.id && mapping.isActive
+  const doctorMappings = (await getActiveScheduleMappings()).filter(
+    (mapping) => mapping.doctorId === doctor.id
   );
 
   return [...new Set(
@@ -483,7 +481,7 @@ export async function getBookingOptions(
     };
   }
 
-  const clinics = getClinicsForDoctor(doctorNameZh);
+  const clinics = await getClinicsForDoctor(doctorNameZh);
 
   if (!date) {
     return {
@@ -721,8 +719,8 @@ export async function getAvailableTimeSlots(
     const doctorId = doctor.id;
 
     // Get all active mappings for this doctor
-    const doctorMappings = CALENDAR_MAPPINGS.filter(
-      mapping => mapping.doctorId === doctorId && mapping.isActive
+    const doctorMappings = (await getActiveScheduleMappings()).filter(
+      (mapping) => mapping.doctorId === doctorId
     );
 
     if (doctorMappings.length === 0) {
@@ -869,8 +867,8 @@ export async function createConversationalBooking(
     }
 
     // Find calendar mapping
-    const mapping = CALENDAR_MAPPINGS.find(
-      (m) => m.doctorId === doctor.id && m.clinicId === clinicId && m.isActive
+    const mapping = (await getActiveScheduleMappings()).find(
+      (m) => m.doctorId === doctor.id && m.clinicId === clinicId
     );
 
     if (!mapping) {
