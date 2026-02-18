@@ -102,7 +102,7 @@ interface ModeDecision {
 const EXPLICIT_DATE_REGEX = /\b\d{4}-\d{2}-\d{2}\b/;
 const TODAY_KEYWORDS = ['今日', '今天', '而家', '依家', '宜家', 'today', 'now'];
 const CHAT_MODES: ChatMode[] = ['G1', 'G2', 'G3', 'B'];
-const CANCEL_KEYWORDS = ['不用', '唔使', '取消', '算了', '改日', '唔約', '唔想約'];
+const CANCEL_KEYWORDS = ['不用', '唔使', '取消', '取消預約', '取消预约', '算了', '改日', '唔約', '唔想約', 'cancel'];
 const G2_BOOKING_NUDGE_KEYWORDS = ['預約', '約診', '睇醫師', '見醫師', '面診', 'book', 'booking', '安排睇症'];
 const G2_MIN_SENTENCES_BETWEEN_BOOKING_NUDGES = 6;
 const MODE_ROUTER_CONTEXT_MESSAGE_COUNT = 6;
@@ -155,7 +155,9 @@ function shouldForceTodayDate(userMessage: string): boolean {
 // ---------------------------------------------------------------------------
 
 const BOOKING_KEYWORDS = [
-  '預約', '約診', 'book', '改期', '取消預約',
+  '預約', '预约', '約診', '掛號', '挂号',
+  'book', 'booking', 'appointment', 'schedule',
+  '改期', '改簽', '取消預約', '取消预约',
   'reschedule', 'cancel', '邊日有空', '幾時有得睇',
 ];
 
@@ -165,6 +167,13 @@ const G2_KEYWORDS = [
 
 const G3_KEYWORDS = [
   '困擾', '一直', '成日', '唔知點算', '幫我分析', '教我', 'coach',
+];
+
+const BOOKING_DOCTOR_HINTS = ['醫師', '医师', '医生', 'dr', 'doctor'];
+const BOOKING_TIME_HINTS = [
+  '今日', '今天', '聽日', '明日', '明天',
+  '下周', '下週', '下星期', '星期', '週',
+  'next', 'tomorrow', 'date',
 ];
 
 const G2_DEEP_DIVE_KEYWORDS = ['原理', '深入', '詳細', '解釋', '點解', 'why'];
@@ -184,10 +193,43 @@ function isChatMode(value: unknown): value is ChatMode {
 }
 
 function normalizeIntentText(text: string): string {
-  return text
+  let normalized = text
     .toLowerCase()
     .replace(/[\s\u3000]/g, '')
     .replace(/[，。！？!?、,.；;:："“”'"`~\-()（）\[\]{}]/g, '');
+
+  // Canonicalize common simplified/traditional variants and English intent words.
+  const replacements: Array<[RegExp, string]> = [
+    [/预约/g, '預約'],
+    [/取消预约/g, '取消預約'],
+    [/医师|医生/g, '醫師'],
+    [/挂号/g, '預約'],
+    [/复诊/g, '覆診'],
+    [/改签/g, '改期'],
+    [/reschedule|rebook/g, '改期'],
+    [/cancelappointment|cancelbooking|cancel/g, '取消'],
+    [/appointment|booking|book|reserve|schedule/g, '預約'],
+    [/doctor/g, '醫師'],
+  ];
+
+  for (const [pattern, next] of replacements) {
+    normalized = normalized.replace(pattern, next);
+  }
+
+  return normalized;
+}
+
+function containsNormalizedKeyword(normalizedText: string, keywords: string[]): boolean {
+  return keywords.some((kw) => normalizedText.includes(normalizeIntentText(kw)));
+}
+
+function hasDoctorAndTimeHints(rawText: string, normalizedText: string): boolean {
+  const hasDoctorHint = containsNormalizedKeyword(normalizedText, BOOKING_DOCTOR_HINTS);
+  if (!hasDoctorHint) return false;
+
+  const hasExplicitDate = EXPLICIT_DATE_REGEX.test(rawText);
+  const hasTimeHint = containsNormalizedKeyword(normalizedText, BOOKING_TIME_HINTS);
+  return hasExplicitDate || hasTimeHint;
 }
 
 function findPreviousAssistantMessage(messages: ChatMessagePayload[]): ChatMessagePayload | null {
@@ -233,26 +275,28 @@ function hasRecentUserBookingIntent(messages: ChatMessagePayload[]): boolean {
     .slice(-RECENT_USER_INTENT_WINDOW);
 
   return recentUserMessages.some((msg) => {
-    const msgLower = msg.content.toLowerCase();
-    return BOOKING_KEYWORDS.some((kw) => msgLower.includes(kw.toLowerCase()));
+    const normalized = normalizeIntentText(msg.content);
+    return containsNormalizedKeyword(normalized, BOOKING_KEYWORDS);
   });
 }
 
 function resolveModeByRules(messages: ChatMessagePayload[]): ModeRuleResolution {
   const latestMessage = messages[messages.length - 1]?.content || '';
-  const lower = latestMessage.toLowerCase();
+  const normalizedLatest = normalizeIntentText(latestMessage);
 
   // Only keep booking stickiness from recent user turns, not assistant nudges.
   const hasRecentBookingIntent = hasRecentUserBookingIntent(messages);
   const hasLatestG2OptInReply = isLatestUserG2OptInReply(messages);
 
   const signals: ModeRuleSignals = {
-    latestLength: lower.length,
-    hasLatestBookingKeyword: BOOKING_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase())),
+    latestLength: normalizedLatest.length,
+    hasLatestBookingKeyword:
+      containsNormalizedKeyword(normalizedLatest, BOOKING_KEYWORDS)
+      || hasDoctorAndTimeHints(latestMessage, normalizedLatest),
     hasRecentBookingIntent,
-    explicitCancel: CANCEL_KEYWORDS.some((kw) => lower.includes(kw)),
-    hasLatestG2Keyword: G2_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase())),
-    hasLatestG3Keyword: G3_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase())),
+    explicitCancel: containsNormalizedKeyword(normalizedLatest, CANCEL_KEYWORDS),
+    hasLatestG2Keyword: containsNormalizedKeyword(normalizedLatest, G2_KEYWORDS),
+    hasLatestG3Keyword: containsNormalizedKeyword(normalizedLatest, G3_KEYWORDS),
     hasLatestG2OptInReply,
   };
 
@@ -348,6 +392,28 @@ function buildG2ConversationGuidance(messages: ChatMessagePayload[]): string {
 - 只在以下情況可提：症狀反覆、持續影響日常、或用戶表示擔心想進一步檢查。
 - 引流句必須放最後，而且用可選語氣（例如：如果你想，我可以幫你安排睇醫師）。
 - ${nudgeGate}`;
+}
+
+function buildBModeBrevityGuidance(latestUserText: string): string {
+  const normalized = normalizeIntentText(latestUserText);
+  const isRescheduleOrCancel =
+    normalized.includes(normalizeIntentText('改期'))
+    || normalized.includes(normalizeIntentText('取消'));
+  const isBookingRecordQuery =
+    normalized.includes(normalizeIntentText('預約紀錄'))
+    || normalized.includes(normalizeIntentText('查我預約'))
+    || normalized.includes(normalizeIntentText('我的預約'))
+    || normalized.includes(normalizeIntentText('list my bookings'));
+
+  let extra = '';
+  if (isRescheduleOrCancel || isBookingRecordQuery) {
+    extra = `\n- 本輪只可用「查詢結果 + 一條下一步問題」格式，避免展開多段說明。
+- 非必要唔好一次過列出三間診所 WhatsApp 或完整地址。`;
+  }
+
+  return `【B 模式短答限制（本輪必須）】
+- 預設 2-4 句，優先回覆一個清晰結論，再問一條必要問題。
+- 除非用戶明確要求，唔好主動貼完整診所地址與全部聯絡連結。${extra}`;
 }
 
 function buildSemanticRouterPrompt(
@@ -680,6 +746,8 @@ ${FALLBACK_MODE_PROMPTS.B}
 【對話節奏】
 - 回覆先講清楚預約進度，再提出下一條必要問題
 - 一次只問一條問題
+- 默認短答（2-4 句）；非必要不要長篇解釋
+- 除非用戶要求，唔好一次過列出三間診所完整 WhatsApp/地址
 
 【地址與地圖回覆規則】
 - 當用戶要求診所地址或地圖時，只可使用「診所資訊」段落內提供的地址與 Google 地圖連結。
@@ -699,7 +767,6 @@ ${whatsappInfo}
 - 新預約、查可用時段、一般預約入口：可提供 https://edentcm.as.me/schedule.php
 - 取消/改期：唔好提供以上連結；應先引導用戶去預約確認電郵內嘅取消/改期連結，之後先提供 WhatsApp 作後備
 
-${SYMPTOM_RECORDING_GUIDANCE}
 ${careContext}
 `;
 }
@@ -1276,7 +1343,7 @@ function resolveFunctionTools(
   userId?: string,
 ): { functionDeclarations: FunctionDeclaration[] }[] | undefined {
   if (mode === 'B') {
-    return [{ functionDeclarations: [...BOOKING_FUNCTIONS, ...SYMPTOM_FUNCTIONS] }];
+    return [{ functionDeclarations: BOOKING_FUNCTIONS }];
   }
 
   if (userId) {
@@ -1487,11 +1554,10 @@ export async function POST(request: NextRequest) {
         isAuthenticated = true;
         userId = user.id;
         userEmail = user.email;
-        // Run constitution resolution and care context fetch in parallel
-        [type, careContext] = await Promise.all([
-          resolveConstitution(user.id),
-          fetchCareContext(user.id),
-        ]);
+        type = await resolveConstitution(user.id);
+        if (mode !== 'B') {
+          careContext = await fetchCareContext(user.id);
+        }
       }
     } catch {
       // Not authenticated — continue with defaults
@@ -1510,6 +1576,9 @@ export async function POST(request: NextRequest) {
     let systemPrompt = await buildSystemPrompt(type, mode, careContext, contentContext);
     if (mode === 'G2') {
       systemPrompt += `\n\n${buildG2ConversationGuidance(messages)}`;
+    }
+    if (mode === 'B') {
+      systemPrompt += `\n\n${buildBModeBrevityGuidance(latestUserMessage.content)}`;
     }
     if (userId && mode !== 'B') {
       // G modes also need explicit symptom logging behavior guidance.
