@@ -11,6 +11,7 @@ function DoctorHeader() {
   const pathname = usePathname();
   const isPatientsActive = pathname === "/doctor" || pathname.startsWith("/doctor/patients/");
   const isArticleContentActive = pathname.startsWith("/doctor/content/articles");
+  const isCardContentActive = pathname.startsWith("/doctor/content/cards");
 
   return (
     <header className="sticky top-0 z-40 border-b border-primary/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
@@ -48,6 +49,16 @@ function DoctorHeader() {
               }`}
             >
               文章管理
+            </Link>
+            <Link
+              href="/doctor/content/cards"
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                isCardContentActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-gray-600 hover:text-primary hover:bg-primary/5"
+              }`}
+            >
+              知識卡
             </Link>
           </nav>
         </div>
