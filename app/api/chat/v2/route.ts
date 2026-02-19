@@ -24,7 +24,8 @@ import { buildContentReferenceContext } from '@/lib/content-service';
 // Types
 // ---------------------------------------------------------------------------
 
-type ConstitutionType = 'depleting' | 'crossing' | 'hoarding';
+type KnowledgeConstitutionType = 'depleting' | 'crossing' | 'hoarding';
+type ConstitutionType = KnowledgeConstitutionType | 'mixed' | 'unknown';
 type ChatMode = 'G1' | 'G2' | 'G3' | 'B';
 
 interface ChatMessagePayload {
@@ -47,6 +48,7 @@ interface TokenUsageMetrics {
   promptTokens: number;
   completionTokens: number;
   durationMs: number;
+  knowledgeChars: number;
   error?: string;
 }
 
@@ -100,6 +102,56 @@ interface ModeDecision {
   routerError?: string;
 }
 
+interface OutputContract {
+  requireJson: boolean;
+  jsonKeys: string[];
+  maxWords?: number;
+  bulletCount?: number;
+}
+
+interface PromptBudgetResult {
+  history: ChatMessagePayload[];
+  trimmedByTurns: boolean;
+  trimmedByChars: boolean;
+  totalChars: number;
+}
+
+interface ChatLogMeta {
+  modeDecision?: ModeDecision;
+  timings?: PhaseTimingMetrics;
+  functionCallRounds?: number;
+  outputContract?: OutputContract;
+  promptBudgetApplied?: boolean;
+  knowledgeStats?: KnowledgeSelectionStats;
+}
+
+interface KnowledgeDocRow {
+  id: string;
+  title: string;
+  content_md: string;
+  sort_order: number;
+}
+
+interface KnowledgeSelectionStats {
+  type: ConstitutionType;
+  mode: ChatMode;
+  candidateCount: number;
+  selectedCount: number;
+  selectedChars: number;
+  selectedDocIds: string[];
+  selectedTitles: string[];
+  topK: number;
+  maxChars: number;
+  truncated: boolean;
+  sourceCount: number;
+  sourcesTruncated: boolean;
+}
+
+interface BuildSystemPromptResult {
+  systemPrompt: string;
+  knowledgeStats: KnowledgeSelectionStats;
+}
+
 const EXPLICIT_DATE_REGEX = /\b\d{4}-\d{2}-\d{2}\b/;
 const TODAY_KEYWORDS = ['今日', '今天', '而家', '依家', '宜家', 'today', 'now'];
 const CHAT_MODES: ChatMode[] = ['G1', 'G2', 'G3', 'B'];
@@ -108,6 +160,26 @@ const G2_BOOKING_NUDGE_KEYWORDS = ['預約', '約診', '睇醫師', '見醫師',
 const G2_MIN_SENTENCES_BETWEEN_BOOKING_NUDGES = 6;
 const MODE_ROUTER_CONTEXT_MESSAGE_COUNT = 6;
 const RECENT_USER_INTENT_WINDOW = 3;
+const SEMANTIC_ROUTER_DEFAULT_BOUNDARY_MIN = 130;
+const SEMANTIC_ROUTER_DEFAULT_BOUNDARY_MAX = 200;
+const KNOWLEDGE_TOP_K_BY_MODE: Record<Exclude<ChatMode, 'B'>, number> = {
+  G1: 3,
+  G2: 4,
+  G3: 5,
+};
+const KNOWLEDGE_CONSTITUTION_TYPES: KnowledgeConstitutionType[] = ['depleting', 'crossing', 'hoarding'];
+const ALL_CONSTITUTION_TYPES: ConstitutionType[] = [
+  ...KNOWLEDGE_CONSTITUTION_TYPES,
+  'mixed',
+  'unknown',
+];
+const KNOWLEDGE_MAX_CHARS_BY_MODE: Record<Exclude<ChatMode, 'B'>, number> = {
+  G1: 1200,
+  G2: 1800,
+  G3: 2200,
+};
+const KNOWLEDGE_SOURCES_MAX_ITEMS = 2;
+const KNOWLEDGE_SOURCE_TITLE_MAX_CHARS = 24;
 
 // ---------------------------------------------------------------------------
 // Feature Flags
@@ -121,6 +193,124 @@ function isSemanticModeRouterEnabled(): boolean {
   return process.env.CHAT_V2_SEMANTIC_ROUTER_ENABLED !== 'false';
 }
 
+function isTaskIntentOverrideEnabled(): boolean {
+  return process.env.CHAT_V2_TASK_INTENT_OVERRIDE_ENABLED !== 'false';
+}
+
+function isOutputContractGuardEnabled(): boolean {
+  return process.env.CHAT_V2_OUTPUT_CONTRACT_GUARD_ENABLED !== 'false';
+}
+
+function isBShortFollowUpFastPathEnabled(): boolean {
+  return process.env.CHAT_V2_B_SHORT_FOLLOWUP_FASTPATH_ENABLED !== 'false';
+}
+
+function isPromptBudgetEnabled(): boolean {
+  return process.env.CHAT_V2_PROMPT_BUDGET_ENABLED !== 'false';
+}
+
+function isBToolPolicyEnabled(): boolean {
+  return process.env.CHAT_V2_B_TOOL_POLICY_ENABLED !== 'false';
+}
+
+function isBResponseTemplateEnabled(): boolean {
+  return process.env.CHAT_V2_B_RESPONSE_TEMPLATE_ENABLED !== 'false';
+}
+
+function isG1ContextBudgetEnabled(): boolean {
+  return process.env.CHAT_V2_G1_CONTEXT_BUDGET_ENABLED !== 'false';
+}
+
+function isSemanticRouterBoundaryOnlyEnabled(): boolean {
+  return process.env.CHAT_V2_SEMANTIC_ROUTER_BOUNDARY_ONLY_ENABLED !== 'false';
+}
+
+function isNonToolTaskBypassEnabled(): boolean {
+  return process.env.CHAT_V2_NON_TOOL_TASK_BYPASS_ENABLED !== 'false';
+}
+
+function isPhaseTimingPromptVariantEnabled(): boolean {
+  return process.env.CHAT_V2_PHASE_TIMING_PROMPT_VARIANT_ENABLED !== 'false';
+}
+
+function parsePositiveIntEnv(value: string | undefined, fallback: number): number {
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || raw <= 0) return fallback;
+  return Math.round(raw);
+}
+
+function getPromptBudgetBMaxTurns(): number {
+  return parsePositiveIntEnv(process.env.CHAT_V2_PROMPT_BUDGET_B_MAX_TURNS, 6);
+}
+
+function getPromptBudgetGMaxTurns(): number {
+  return parsePositiveIntEnv(process.env.CHAT_V2_PROMPT_BUDGET_G_MAX_TURNS, 8);
+}
+
+function getPromptBudgetBMaxChars(): number {
+  return parsePositiveIntEnv(process.env.CHAT_V2_PROMPT_BUDGET_B_MAX_CHARS, 2200);
+}
+
+function getPromptBudgetGMaxChars(): number {
+  return parsePositiveIntEnv(process.env.CHAT_V2_PROMPT_BUDGET_G_MAX_CHARS, 3600);
+}
+
+function getBToolMaxRounds(): number {
+  return parsePositiveIntEnv(process.env.CHAT_V2_B_TOOL_MAX_ROUNDS, 1);
+}
+
+function getBResponseMaxSentences(): number {
+  return parsePositiveIntEnv(process.env.CHAT_V2_B_RESPONSE_MAX_SENTENCES, 3);
+}
+
+function getG1ContextTopK(): number {
+  return parsePositiveIntEnv(process.env.CHAT_V2_G1_CONTEXT_TOP_K, 2);
+}
+
+function getG1ContextMaxChars(): number {
+  return parsePositiveIntEnv(process.env.CHAT_V2_G1_CONTEXT_MAX_CHARS, 900);
+}
+
+function getG1CareContextMaxChars(): number {
+  return parsePositiveIntEnv(process.env.CHAT_V2_G1_CARE_CONTEXT_MAX_CHARS, 600);
+}
+
+function getKnowledgeTopK(mode: ChatMode): number {
+  if (mode === 'B') {
+    return 0;
+  }
+  return KNOWLEDGE_TOP_K_BY_MODE[mode];
+}
+
+function getKnowledgeMaxChars(mode: ChatMode): number {
+  if (mode === 'B') {
+    return 0;
+  }
+  return KNOWLEDGE_MAX_CHARS_BY_MODE[mode];
+}
+
+function getKnowledgeSourcesMaxItems(): number {
+  return KNOWLEDGE_SOURCES_MAX_ITEMS;
+}
+
+function getKnowledgeSourceTitleMaxChars(): number {
+  return KNOWLEDGE_SOURCE_TITLE_MAX_CHARS;
+}
+
+function getSemanticRouterBoundaryMinLength(): number {
+  return parsePositiveIntEnv(
+    process.env.CHAT_V2_SEMANTIC_ROUTER_BOUNDARY_MIN_LEN,
+    SEMANTIC_ROUTER_DEFAULT_BOUNDARY_MIN,
+  );
+}
+
+function getSemanticRouterBoundaryMaxLength(): number {
+  return parsePositiveIntEnv(
+    process.env.CHAT_V2_SEMANTIC_ROUTER_BOUNDARY_MAX_LEN,
+    SEMANTIC_ROUTER_DEFAULT_BOUNDARY_MAX,
+  );
+}
+
 function getSemanticModeRouterConfidenceThreshold(): number {
   const raw = Number(process.env.CHAT_V2_SEMANTIC_ROUTER_CONFIDENCE ?? '0.75');
   if (!Number.isFinite(raw)) return 0.75;
@@ -128,8 +318,8 @@ function getSemanticModeRouterConfidenceThreshold(): number {
 }
 
 function getSemanticModeRouterTimeoutMs(): number {
-  const raw = Number(process.env.CHAT_V2_SEMANTIC_ROUTER_TIMEOUT_MS ?? '350');
-  if (!Number.isFinite(raw) || raw <= 0) return 350;
+  const raw = Number(process.env.CHAT_V2_SEMANTIC_ROUTER_TIMEOUT_MS ?? '220');
+  if (!Number.isFinite(raw) || raw <= 0) return 220;
   return Math.round(raw);
 }
 
@@ -142,6 +332,14 @@ function getTodayInHongKong(): string {
   });
 
   return formatter.format(new Date());
+}
+
+function isConstitutionType(value: unknown): value is ConstitutionType {
+  return typeof value === 'string' && ALL_CONSTITUTION_TYPES.includes(value as ConstitutionType);
+}
+
+function isKnowledgeConstitutionType(value: unknown): value is KnowledgeConstitutionType {
+  return typeof value === 'string' && KNOWLEDGE_CONSTITUTION_TYPES.includes(value as KnowledgeConstitutionType);
 }
 
 function shouldForceTodayDate(userMessage: string): boolean {
@@ -189,6 +387,14 @@ const G2_AFFIRMATIVE_SHORT_REPLIES = new Set([
   '再講', '再講下', '深入啲', '深入些', '深入',
 ]);
 
+const TASK_REWRITE_KEYWORDS = ['改寫', '改写', 'rewrite', 'rephrase', '潤飾', '润色', 'polish'];
+const TASK_SUMMARY_KEYWORDS = ['總結', '总结', '摘要', '總結重點', 'summarize', 'summary', 'tl;dr'];
+const TASK_JSON_KEYWORDS = ['json', '只輸出json', '只返回json', '只回傳json', 'only output json', 'return json only'];
+const TASK_BULLET_KEYWORDS = ['點列', '点列', '條列', 'bullet', 'bullets', '列出'];
+const B_SHORT_FOLLOWUP_KEYWORDS = ['下周', '下週', '下星期', 'next week', 'tomorrow', '可以', 'ok', 'okay', '好', '嗯'];
+const B_ASSISTANT_PROGRESS_KEYWORDS = ['醫師', '诊所', '診所', '時段', '时间', '日期', '預約', '预约'];
+const BOOKING_NUDGE_REGEX = /(預約|预约|book|booking|appointment|時段|诊所|診所|醫師|医师|doctor|\bdr\b)/i;
+
 function isChatMode(value: unknown): value is ChatMode {
   return typeof value === 'string' && CHAT_MODES.includes(value as ChatMode);
 }
@@ -220,6 +426,174 @@ function normalizeIntentText(text: string): string {
   return normalized;
 }
 
+function extractKnowledgeTerms(text: string): string[] {
+  if (!text) return [];
+
+  const cjkTerms = text
+    .split(/[，。！？!?；;、,\s]+/)
+    .map((part) => part.trim())
+    .filter((part) => /[\p{Script=Han}]/u.test(part) && part.length >= 2 && part.length <= 16);
+
+  const latinTerms = (text.toLowerCase().match(/[a-z0-9]{2,}/g) ?? [])
+    .slice(0, 16);
+
+  const merged = [...cjkTerms, ...latinTerms]
+    .map((term) => term.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(merged)).slice(0, 24);
+}
+
+function scoreKnowledgeDoc(doc: KnowledgeDocRow, terms: string[]): number {
+  if (terms.length === 0) return 0;
+  const haystack = `${doc.title}\n${doc.content_md}`.toLowerCase();
+  let score = 0;
+
+  for (const term of terms) {
+    if (!haystack.includes(term.toLowerCase())) continue;
+    if (term.length >= 6) {
+      score += 5;
+    } else if (term.length >= 4) {
+      score += 3;
+    } else if (term.length >= 2) {
+      score += 2;
+    } else {
+      score += 1;
+    }
+  }
+
+  return score;
+}
+
+function selectKnowledgeDocs(
+  docs: KnowledgeDocRow[],
+  latestUserText: string,
+  mode: ChatMode,
+): KnowledgeDocRow[] {
+  const topK = getKnowledgeTopK(mode);
+  if (docs.length <= topK) return docs;
+
+  const terms = extractKnowledgeTerms(latestUserText);
+  if (terms.length === 0) return docs.slice(0, topK);
+
+  const scored = docs
+    .map((doc, index) => ({ doc, index, score: scoreKnowledgeDoc(doc, terms) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (a.doc.sort_order !== b.doc.sort_order) return a.doc.sort_order - b.doc.sort_order;
+      return a.index - b.index;
+    })
+    .slice(0, topK)
+    .map((item) => item.doc);
+
+  if (scored.length === 0) return docs.slice(0, topK);
+  return scored;
+}
+
+function buildKnowledgeEntries(
+  docs: KnowledgeDocRow[],
+  maxChars: number,
+): {
+  knowledgeEntries: string;
+  includedDocs: KnowledgeDocRow[];
+  truncated: boolean;
+} {
+  if (docs.length === 0 || maxChars <= 0) {
+    return { knowledgeEntries: '', includedDocs: [], truncated: docs.length > 0 };
+  }
+
+  let knowledgeEntries = '';
+  const includedDocs: KnowledgeDocRow[] = [];
+  let truncated = false;
+
+  for (const doc of docs) {
+    const block = `【${doc.title}】\n${doc.content_md}`;
+    const next = knowledgeEntries ? `${knowledgeEntries}\n\n${block}` : block;
+
+    if (next.length <= maxChars) {
+      knowledgeEntries = next;
+      includedDocs.push(doc);
+      continue;
+    }
+
+    if (!knowledgeEntries) {
+      knowledgeEntries = compactContextByChars(block, maxChars);
+      if (knowledgeEntries) includedDocs.push(doc);
+    }
+    truncated = true;
+    break;
+  }
+
+  return { knowledgeEntries, includedDocs, truncated };
+}
+
+function truncatePlainText(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`;
+}
+
+function toSourceLabel(title: string): string {
+  const summaryMatch = title.match(/::summary::\s*\d+\s*([^｜|]+)/);
+  if (summaryMatch?.[1]) {
+    return summaryMatch[1].trim();
+  }
+
+  if (title.startsWith('AUTO::')) {
+    const fragments = title.split('::');
+    const last = fragments[fragments.length - 1];
+    if (last?.trim()) return last.trim();
+  }
+
+  const pipeIndex = title.indexOf('｜');
+  if (pipeIndex > 0) return title.slice(0, pipeIndex).trim();
+  return title.trim();
+}
+
+function buildSourcesList(docs: KnowledgeDocRow[]): {
+  sourcesList: string;
+  sourceCount: number;
+  sourcesTruncated: boolean;
+  labels: string[];
+} {
+  const labels = docs
+    .map((doc) => toSourceLabel(doc.title))
+    .filter(Boolean)
+    .map((label) => truncatePlainText(label, getKnowledgeSourceTitleMaxChars()));
+
+  const maxItems = getKnowledgeSourcesMaxItems();
+  const selected = maxItems > 0 ? labels.slice(0, maxItems) : [];
+  const sourcesList = selected.length > 0 ? selected.join('、') : '（無）';
+
+  return {
+    sourcesList,
+    sourceCount: selected.length,
+    sourcesTruncated: labels.length > selected.length,
+    labels: selected,
+  };
+}
+
+function createEmptyKnowledgeStats(
+  type: ConstitutionType,
+  mode: ChatMode,
+  candidateCount = 0,
+): KnowledgeSelectionStats {
+  return {
+    type,
+    mode,
+    candidateCount,
+    selectedCount: 0,
+    selectedChars: 0,
+    selectedDocIds: [],
+    selectedTitles: [],
+    topK: getKnowledgeTopK(mode),
+    maxChars: getKnowledgeMaxChars(mode),
+    truncated: false,
+    sourceCount: 0,
+    sourcesTruncated: false,
+  };
+}
+
 function containsNormalizedKeyword(normalizedText: string, keywords: string[]): boolean {
   return keywords.some((kw) => normalizedText.includes(normalizeIntentText(kw)));
 }
@@ -231,6 +605,89 @@ function hasDoctorAndTimeHints(rawText: string, normalizedText: string): boolean
   const hasExplicitDate = EXPLICIT_DATE_REGEX.test(rawText);
   const hasTimeHint = containsNormalizedKeyword(normalizedText, BOOKING_TIME_HINTS);
   return hasExplicitDate || hasTimeHint;
+}
+
+function extractMaxWordsFromText(rawText: string): number | undefined {
+  const patterns = [
+    /(?:不多於|不超過|不超过|最多|上限|under|within|no more than|at most|max(?:imum)?(?:\s+of)?)\s*(\d{1,3})\s*(?:字|words?|characters?)/i,
+    /(\d{1,3})\s*(?:字|words?)\s*(?:內|以内|以內)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const matched = rawText.match(pattern);
+    if (!matched?.[1]) continue;
+    const parsed = Number(matched[1]);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return Math.min(Math.max(1, Math.floor(parsed)), 300);
+    }
+  }
+
+  return undefined;
+}
+
+function extractBulletCountFromText(rawText: string): number | undefined {
+  const patterns = [
+    /(?:用|以|with)\s*(\d{1,2})\s*(?:點|点|項|项|bullet|bullets)/i,
+    /(?:列出|條列|条列)\s*(\d{1,2})\s*(?:點|点|項|项|bullet|bullets)?/i,
+  ];
+
+  for (const pattern of patterns) {
+    const matched = rawText.match(pattern);
+    if (!matched?.[1]) continue;
+    const parsed = Number(matched[1]);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return Math.min(Math.max(1, Math.floor(parsed)), 10);
+    }
+  }
+
+  return undefined;
+}
+
+function extractJsonKeysFromText(rawText: string): string[] {
+  const lower = rawText.toLowerCase();
+  const matched = lower.match(/(?:欄位|字段|fields?)\s*(?:要有|是|為|为|include|including)?\s*([a-z0-9_,\s和及and]+)/i);
+  if (!matched?.[1]) return [];
+
+  const parts = matched[1]
+    .split(/[,，、\s]+|和|及|and/)
+    .map((part) => part.trim())
+    .filter((part) => /^[a-z][a-z0-9_]{0,31}$/i.test(part));
+
+  return Array.from(new Set(parts)).slice(0, 8);
+}
+
+function detectOutputContract(latestUserText: string): OutputContract {
+  const lower = latestUserText.toLowerCase();
+  const requireJson = TASK_JSON_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()));
+  const maxWords = extractMaxWordsFromText(latestUserText);
+  const bulletCount = extractBulletCountFromText(latestUserText);
+  const jsonKeys = requireJson ? extractJsonKeysFromText(latestUserText) : [];
+
+  return {
+    requireJson,
+    jsonKeys,
+    ...(typeof maxWords === 'number' ? { maxWords } : {}),
+    ...(typeof bulletCount === 'number' ? { bulletCount } : {}),
+  };
+}
+
+function isFormattingTaskIntent(latestUserText: string): boolean {
+  const normalized = normalizeIntentText(latestUserText);
+  if (!normalized) return false;
+
+  const formattingKeywordGroups = [
+    TASK_REWRITE_KEYWORDS,
+    TASK_SUMMARY_KEYWORDS,
+    TASK_JSON_KEYWORDS,
+    TASK_BULLET_KEYWORDS,
+  ];
+
+  const hasFormattingKeyword = formattingKeywordGroups.some((group) =>
+    group.some((kw) => normalized.includes(normalizeIntentText(kw)))
+  );
+
+  if (hasFormattingKeyword) return true;
+  return typeof extractMaxWordsFromText(latestUserText) === 'number';
 }
 
 function findPreviousAssistantMessage(messages: ChatMessagePayload[]): ChatMessagePayload | null {
@@ -288,6 +745,7 @@ function resolveModeByRules(messages: ChatMessagePayload[]): ModeRuleResolution 
   // Only keep booking stickiness from recent user turns, not assistant nudges.
   const hasRecentBookingIntent = hasRecentUserBookingIntent(messages);
   const hasLatestG2OptInReply = isLatestUserG2OptInReply(messages);
+  const hasShortBookingFollowUp = isBModeShortFollowUpMessage(messages, latestMessage);
 
   const signals: ModeRuleSignals = {
     latestLength: normalizedLatest.length,
@@ -300,6 +758,20 @@ function resolveModeByRules(messages: ChatMessagePayload[]): ModeRuleResolution 
     hasLatestG3Keyword: containsNormalizedKeyword(normalizedLatest, G3_KEYWORDS),
     hasLatestG2OptInReply,
   };
+
+  const shouldOverrideToFormattingTask =
+    isTaskIntentOverrideEnabled()
+    && isFormattingTaskIntent(latestMessage)
+    && !signals.hasLatestBookingKeyword
+    && !signals.explicitCancel;
+
+  if (shouldOverrideToFormattingTask) {
+    return { mode: 'G1', signals };
+  }
+
+  if (hasShortBookingFollowUp) {
+    return { mode: 'B', signals };
+  }
 
   // If there's recent booking intent and no explicit cancellation, stay in B mode
   if (signals.hasRecentBookingIntent && !signals.explicitCancel) {
@@ -331,11 +803,16 @@ function shouldRunSemanticModeRouter(signals: ModeRuleSignals): boolean {
   if (signals.hasLatestBookingKeyword || signals.explicitCancel) return false;
   if (signals.hasLatestG2OptInReply) return false;
 
-  if (signals.hasRecentBookingIntent) return true;
   if (signals.hasLatestG2Keyword && signals.hasLatestG3Keyword) return true;
 
-  // Borderline long prompts around the G3 threshold are the main ambiguity zone.
-  return signals.latestLength >= 120 && signals.latestLength <= 220;
+  if (!isSemanticRouterBoundaryOnlyEnabled()) {
+    if (signals.hasRecentBookingIntent) return true;
+    return signals.latestLength >= 120 && signals.latestLength <= 220;
+  }
+
+  const minLen = getSemanticRouterBoundaryMinLength();
+  const maxLen = getSemanticRouterBoundaryMaxLength();
+  return signals.latestLength >= minLen && signals.latestLength <= maxLen;
 }
 
 function countApproxSentences(text: string): number {
@@ -429,6 +906,83 @@ function isRescheduleOrBookingLookupIntent(text: string): boolean {
     'list my bookings',
   ];
   return intentKeywords.some((kw) => normalized.includes(normalizeIntentText(kw)));
+}
+
+function isBookingProgressAssistantMessage(text: string): boolean {
+  const normalized = normalizeIntentText(text);
+  return B_ASSISTANT_PROGRESS_KEYWORDS.some((kw) => normalized.includes(normalizeIntentText(kw)));
+}
+
+function isBModeShortFollowUpMessage(messages: ChatMessagePayload[], latestUserText: string): boolean {
+  const normalized = normalizeIntentText(latestUserText);
+  if (!normalized || normalized.length > 14) return false;
+
+  const hasCue = B_SHORT_FOLLOWUP_KEYWORDS.some((kw) =>
+    normalized.includes(normalizeIntentText(kw))
+  );
+  if (!hasCue) return false;
+
+  const previousAssistant = findPreviousAssistantMessage(messages);
+  if (!previousAssistant) return false;
+  return isBookingProgressAssistantMessage(previousAssistant.content);
+}
+
+function buildBShortFollowUpReply(latestUserText: string): string {
+  const normalized = normalizeIntentText(latestUserText);
+  if (normalized.includes(normalizeIntentText('下周')) || normalized.includes(normalizeIntentText('下週'))) {
+    return '收到，你想約下星期。請問你想預約邊位醫師？';
+  }
+  if (normalized.includes(normalizeIntentText('tomorrow'))) {
+    return '明白，你想約聽日。請問你想預約邊位醫師同邊間診所？';
+  }
+  return '明白，我幫你跟進。請先講你想預約邊位醫師。';
+}
+
+function compactContextByChars(context: string, maxChars: number): string {
+  if (!context || context.length <= maxChars) return context;
+  return `${context.slice(0, maxChars).trim()}\n（以下內容已因篇幅限制省略）`;
+}
+
+function applyPromptBudget(messages: ChatMessagePayload[], mode: ChatMode): PromptBudgetResult {
+  if (!isPromptBudgetEnabled()) {
+    const totalChars = messages.reduce((acc, msg) => acc + msg.content.length, 0);
+    return {
+      history: messages,
+      trimmedByTurns: false,
+      trimmedByChars: false,
+      totalChars,
+    };
+  }
+
+  const maxTurns = mode === 'B' ? getPromptBudgetBMaxTurns() : getPromptBudgetGMaxTurns();
+  const maxChars = mode === 'B' ? getPromptBudgetBMaxChars() : getPromptBudgetGMaxChars();
+
+  let history = messages.slice(-maxTurns);
+  const trimmedByTurns = history.length < messages.length;
+  let totalChars = history.reduce((acc, msg) => acc + msg.content.length, 0);
+  let trimmedByChars = false;
+
+  while (history.length > 1 && totalChars > maxChars) {
+    const removed = history.shift();
+    if (removed) {
+      totalChars -= removed.content.length;
+      trimmedByChars = true;
+    }
+  }
+
+  return {
+    history,
+    trimmedByTurns,
+    trimmedByChars,
+    totalChars,
+  };
+}
+
+function shouldBypassToolsForTask(mode: ChatMode, userId: string | undefined, latestUserText: string): boolean {
+  if (mode === 'B') return false;
+  if (!userId) return false;
+  if (!isNonToolTaskBypassEnabled()) return false;
+  return isFormattingTaskIntent(latestUserText);
 }
 
 function formatBookingForUser(booking: MyBookingInfo): string {
@@ -645,8 +1199,8 @@ async function resolveConstitution(userId: string): Promise<ConstitutionType> {
     .eq('patient_user_id', userId)
     .maybeSingle();
 
-  if (careProfile?.constitution && ['depleting', 'crossing', 'hoarding'].includes(careProfile.constitution)) {
-    return careProfile.constitution as ConstitutionType;
+  if (isConstitutionType(careProfile?.constitution)) {
+    return careProfile.constitution;
   }
 
   // Priority 2: profiles.constitution_type (quiz result)
@@ -656,12 +1210,12 @@ async function resolveConstitution(userId: string): Promise<ConstitutionType> {
     .eq('id', userId)
     .maybeSingle();
 
-  if (profile?.constitution_type && ['depleting', 'crossing', 'hoarding'].includes(profile.constitution_type)) {
-    return profile.constitution_type as ConstitutionType;
+  if (isConstitutionType(profile?.constitution_type)) {
+    return profile.constitution_type;
   }
 
   // Default
-  return 'depleting';
+  return 'unknown';
 }
 
 // ---------------------------------------------------------------------------
@@ -675,6 +1229,10 @@ const FALLBACK_CONSTITUTION_CONTEXT: Record<ConstitutionType, string> = {
     '用戶屬於「交叉型」體質。重點關注寒熱錯雜、虛實夾雜的複合狀態。建議方向包括平衡寒熱、扶正祛邪、調和陰陽。需要根據具體症狀靈活調整。',
   hoarding:
     '用戶屬於「積滯型」體質。重點關注痰濕、瘀血、食積等停滯問題。建議方向包括化痰祛濕、活血化瘀、消食導滯。鼓勵適量運動和清淡飲食。',
+  mixed:
+    '用戶目前屬於「混合型」狀態，可能同時見到多種體質訊號。建議先聚焦最困擾症狀與近期變化，避免過度單一化判斷，再逐步微調飲食、作息與壓力管理。',
+  unknown:
+    '用戶目前體質未明。回覆應保持中性、先做安全與可執行建議，並透過1條關鍵澄清問題收窄方向，避免直接套用單一體質結論。',
 };
 
 const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
@@ -921,12 +1479,14 @@ function resolveTokenMetrics(
   promptText: string,
   completionText: string,
   durationMs: number,
+  knowledgeChars = 0,
   error?: string,
 ): TokenUsageMetrics {
   return {
     promptTokens: usage?.promptTokenCount ?? estimateTokens(promptText),
     completionTokens: usage?.candidatesTokenCount ?? estimateTokens(completionText),
     durationMs,
+    knowledgeChars,
     ...(error ? { error } : {}),
   };
 }
@@ -964,6 +1524,204 @@ function sanitizeAssistantReply(text: string): string {
   return normalized;
 }
 
+function countWordsCjkAware(text: string): number {
+  const normalized = text.trim();
+  if (!normalized) return 0;
+
+  const cjkUnits = (normalized.match(/[\p{Script=Han}]/gu) || []).length;
+  const latinWords = (normalized.match(/[A-Za-z0-9]+(?:'[A-Za-z0-9]+)?/g) || []).length;
+  return cjkUnits + latinWords;
+}
+
+function trimToWordLimit(text: string, maxWords: number): string {
+  if (maxWords <= 0) return '';
+
+  const tokens = text.match(/[\p{Script=Han}]|[A-Za-z0-9]+(?:'[A-Za-z0-9]+)?|\s+|./gu) ?? [];
+  let used = 0;
+  let result = '';
+
+  for (const token of tokens) {
+    const isCountable = /[\p{Script=Han}]|[A-Za-z0-9]+(?:'[A-Za-z0-9]+)?/u.test(token);
+    if (isCountable && used >= maxWords) break;
+    result += token;
+    if (isCountable) used += 1;
+  }
+
+  return result.trim();
+}
+
+function toPlainSentences(text: string): string[] {
+  return text
+    .split(/[。\n！？!?；;]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function enforceBulletCount(text: string, bulletCount: number): string {
+  if (bulletCount <= 0) return text;
+  const sentences = toPlainSentences(text);
+  if (sentences.length === 0) return text;
+
+  const selected = sentences.slice(0, bulletCount);
+  return selected.map((sentence, index) => `${index + 1}. ${sentence}`).join('\n');
+}
+
+function ensureJsonReply(text: string, jsonKeys: string[]): string {
+  const extracted = extractFirstJsonObject(text);
+  if (extracted) {
+    try {
+      const parsed = JSON.parse(extracted);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        if (jsonKeys.length > 0) {
+          const enriched = { ...(parsed as Record<string, unknown>) };
+          for (const key of jsonKeys) {
+            if (!(key in enriched)) {
+              enriched[key] = '';
+            }
+          }
+          return JSON.stringify(enriched);
+        }
+        return JSON.stringify(parsed);
+      }
+    } catch {
+      // ignore and fallback
+    }
+  }
+
+  const fallbackText = sanitizeAssistantReply(text).slice(0, 240);
+  const fallbackKeys = jsonKeys.length > 0 ? jsonKeys : ['result'];
+  const fallbackPayload: Record<string, string> = {};
+  for (let i = 0; i < fallbackKeys.length; i += 1) {
+    fallbackPayload[fallbackKeys[i]] = i === 0 ? fallbackText : '';
+  }
+  return JSON.stringify(fallbackPayload);
+}
+
+function applyBResponseTemplateCap(reply: string, latestUserText: string): string {
+  if (!isBResponseTemplateEnabled()) return reply;
+
+  const maxSentences = getBResponseMaxSentences();
+  const baseSentences = toPlainSentences(reply).slice(0, maxSentences);
+  let compact = baseSentences.join('。').trim();
+  if (compact && !/[。！？!?]$/.test(compact)) {
+    compact += '。';
+  }
+
+  if (!compact) return reply;
+
+  const normalized = normalizeIntentText(latestUserText);
+  const needsFollowUpQuestion =
+    normalized.includes(normalizeIntentText('預約'))
+    || normalized.includes(normalizeIntentText('改期'))
+    || normalized.includes(normalizeIntentText('取消'));
+
+  if (needsFollowUpQuestion && !compact.includes('？') && !compact.includes('?')) {
+    compact += ' 請問你想先處理邊個預約步驟？';
+  }
+
+  return compact.trim();
+}
+
+function applyOutputContractGuard(reply: string, contract: OutputContract, mode: ChatMode, latestUserText: string): string {
+  let guarded = sanitizeAssistantReply(reply);
+
+  if (mode === 'B') {
+    guarded = applyBResponseTemplateCap(guarded, latestUserText);
+  } else if (isTaskIntentOverrideEnabled() && isFormattingTaskIntent(latestUserText)) {
+    const lines = guarded
+      .split(/\r?\n/)
+      .filter((line) => !BOOKING_NUDGE_REGEX.test(line));
+    guarded = lines.join('\n').trim();
+  }
+
+  if (!isOutputContractGuardEnabled()) {
+    return guarded;
+  }
+
+  if (contract.requireJson) {
+    guarded = ensureJsonReply(guarded, contract.jsonKeys);
+  }
+
+  if (!contract.requireJson && typeof contract.bulletCount === 'number') {
+    guarded = enforceBulletCount(guarded, contract.bulletCount);
+  }
+
+  if (typeof contract.maxWords === 'number') {
+    guarded = trimToWordLimit(guarded, contract.maxWords);
+  }
+
+  return guarded.trim();
+}
+
+function buildOutputContractGuidance(contract: OutputContract): string {
+  const lines: string[] = [];
+
+  if (contract.requireJson) {
+    if (contract.jsonKeys.length > 0) {
+      lines.push(`- 本輪必須只輸出一個 JSON object，鍵必須包含：${contract.jsonKeys.join(', ')}`);
+    } else {
+      lines.push('- 本輪必須只輸出一個 JSON object，禁止任何額外文字。');
+    }
+  }
+
+  if (typeof contract.maxWords === 'number') {
+    lines.push(`- 本輪回覆不可超過 ${contract.maxWords} 字/詞（CJK 與英文都計入限制）。`);
+  }
+
+  if (typeof contract.bulletCount === 'number') {
+    lines.push(`- 本輪請用 ${contract.bulletCount} 點列出答案。`);
+  }
+
+  if (lines.length === 0) return '';
+  return `【本輪輸出契約（高優先）】\n${lines.join('\n')}`;
+}
+
+function buildKnowledgeSourcesPayload(meta: ChatLogMeta | undefined): Record<string, unknown> | undefined {
+  if (!meta) return undefined;
+
+  const payload: Record<string, unknown> = {};
+
+  if (isPhaseTimingPromptVariantEnabled()) {
+    payload.router_source = meta.modeDecision?.source ?? 'rules';
+    payload.router_attempted = meta.modeDecision?.routerAttempted ?? false;
+    payload.router_mode = meta.modeDecision?.routerMode ?? null;
+    payload.router_confidence = meta.modeDecision?.routerConfidence ?? null;
+    payload.phase_ms = {
+      mode_router: meta.timings?.modeRouterMs ?? null,
+      user_context: meta.timings?.userContextMs ?? null,
+      content_search: meta.timings?.contentSearchMs ?? null,
+      prompt_build: meta.timings?.promptBuildMs ?? null,
+      gemini_api: meta.timings?.geminiApiMs ?? null,
+    };
+    payload.function_call_rounds = meta.functionCallRounds ?? 0;
+    payload.output_contract = {
+      require_json: meta.outputContract?.requireJson ?? false,
+      max_words: meta.outputContract?.maxWords ?? null,
+      bullet_count: meta.outputContract?.bulletCount ?? null,
+    };
+    payload.prompt_budget_applied = meta.promptBudgetApplied ?? false;
+  }
+
+  if (meta.knowledgeStats) {
+    payload.knowledge = {
+      type: meta.knowledgeStats.type,
+      mode: meta.knowledgeStats.mode,
+      candidate_count: meta.knowledgeStats.candidateCount,
+      selected_count: meta.knowledgeStats.selectedCount,
+      selected_doc_ids: meta.knowledgeStats.selectedDocIds,
+      selected_titles: meta.knowledgeStats.selectedTitles,
+      top_k: meta.knowledgeStats.topK,
+      max_chars: meta.knowledgeStats.maxChars,
+      selected_chars: meta.knowledgeStats.selectedChars,
+      truncated: meta.knowledgeStats.truncated,
+      source_count: meta.knowledgeStats.sourceCount,
+      sources_truncated: meta.knowledgeStats.sourcesTruncated,
+    };
+  }
+
+  return Object.keys(payload).length > 0 ? payload : undefined;
+}
+
 function formatValidationIssues(error: z.ZodError): Array<{ path: string; message: string }> {
   return error.issues.map((issue) => ({
     path: issue.path.join('.'),
@@ -988,10 +1746,14 @@ async function logChatMessages(
   constitutionType: ConstitutionType,
   userId: string | undefined,
   metrics: TokenUsageMetrics,
+  meta?: ChatLogMeta,
 ) {
   try {
     const supabase = createServiceClient();
     const responseGear = mode === 'G2' ? 'g2' : mode === 'G3' ? 'g3' : 'g1';
+    const knowledgePayload = buildKnowledgeSourcesPayload(meta);
+    const knowledgeChars = Math.max(0, meta?.knowledgeStats?.selectedChars ?? metrics.knowledgeChars ?? 0);
+    const knowledgeInjected = knowledgeChars > 0;
 
     const { error: sessionUpsertError } = await supabase.from('chat_sessions').upsert(
       {
@@ -1034,6 +1796,9 @@ async function logChatMessages(
       model_id: 'gemini-flash-latest',
       model_gear: mode,
       prompt_source: 'code_prompt',
+      ...(knowledgePayload ? { knowledge_sources: knowledgePayload } : {}),
+      knowledge_chars: knowledgeChars,
+      knowledge_injected: knowledgeInjected,
       latest_user_text: userContent,
       response_gear: responseGear,
       user_id: userId ?? null,
@@ -1063,7 +1828,7 @@ function logPerformanceSummary(
     + timings.geminiApiMs;
 
   console.log(
-    `[chat/v2] ⏱ mode-router: ${timings.modeRouterMs}ms | user-context: ${timings.userContextMs}ms | content-search: ${timings.contentSearchMs}ms | prompt-build: ${timings.promptBuildMs}ms | gemini-api: ${timings.geminiApiMs}ms | total: ${totalMs}ms | mode: ${mode} | auth: ${authenticated} | tokens: ${metrics.promptTokens}p+${metrics.completionTokens}c`,
+    `[chat/v2] ⏱ mode-router: ${timings.modeRouterMs}ms | user-context: ${timings.userContextMs}ms | content-search: ${timings.contentSearchMs}ms | prompt-build: ${timings.promptBuildMs}ms | gemini-api: ${timings.geminiApiMs}ms | total: ${totalMs}ms | mode: ${mode} | auth: ${authenticated} | tokens: ${metrics.promptTokens}p+${metrics.completionTokens}c | knowledge_chars: ${metrics.knowledgeChars}`,
   );
 }
 
@@ -1446,9 +2211,20 @@ async function buildSystemPrompt(
   mode: ChatMode,
   careContext: string,
   contentContext: string,
-): Promise<string> {
+  latestUserText: string,
+): Promise<BuildSystemPromptResult> {
   if (mode === 'B') {
-    return buildBookingSystemPrompt(careContext);
+    return {
+      systemPrompt: await buildBookingSystemPrompt(careContext),
+      knowledgeStats: createEmptyKnowledgeStats(type, mode),
+    };
+  }
+
+  if (!isKnowledgeConstitutionType(type)) {
+    return {
+      systemPrompt: await buildFallbackPrompt(type, mode, careContext, contentContext),
+      knowledgeStats: createEmptyKnowledgeStats(type, mode),
+    };
   }
 
   const supabase = createServiceClient();
@@ -1466,7 +2242,7 @@ async function buildSystemPrompt(
 
   const { data: docs, error: docsError } = await supabase
     .from('knowledge_docs')
-    .select('title, content_md')
+    .select('id, title, content_md, sort_order')
     .eq('type', type)
     .eq('enabled', true)
     .eq('is_active', true)
@@ -1476,14 +2252,44 @@ async function buildSystemPrompt(
     console.error('[chat/v2] Failed to fetch knowledge_docs:', docsError);
   }
 
+  const candidateDocs = (docs || []) as KnowledgeDocRow[];
+  const topK = getKnowledgeTopK(mode);
+  const maxChars = getKnowledgeMaxChars(mode);
   if (!settings) {
-    return buildFallbackPrompt(type, mode, careContext, contentContext);
+    return {
+      systemPrompt: await buildFallbackPrompt(type, mode, careContext, contentContext),
+      knowledgeStats: createEmptyKnowledgeStats(type, mode, candidateDocs.length),
+    };
   }
 
-  const knowledgeEntries = (docs || [])
-    .map((d) => `【${d.title}】\n${d.content_md}`)
-    .join('\n\n');
-  const sourcesList = (docs || []).map((d) => d.title).join('、');
+  const hasKnowledgePlaceholder = settings.prompt_md.includes('{{KNOWLEDGE}}');
+  const hasSourcesPlaceholder = settings.prompt_md.includes('{{SOURCES}}');
+  const selectedCandidates = hasKnowledgePlaceholder || hasSourcesPlaceholder
+    ? selectKnowledgeDocs(candidateDocs, latestUserText, mode)
+    : [];
+  const { knowledgeEntries, includedDocs, truncated } = hasKnowledgePlaceholder
+    ? buildKnowledgeEntries(selectedCandidates, maxChars)
+    : { knowledgeEntries: '', includedDocs: [] as KnowledgeDocRow[], truncated: false };
+
+  const docsForSources = hasKnowledgePlaceholder ? includedDocs : selectedCandidates;
+  const { sourcesList, sourceCount, sourcesTruncated, labels } = hasSourcesPlaceholder
+    ? buildSourcesList(docsForSources)
+    : { sourcesList: '（無）', sourceCount: 0, sourcesTruncated: false, labels: [] as string[] };
+
+  const knowledgeStats: KnowledgeSelectionStats = {
+    type,
+    mode,
+    candidateCount: candidateDocs.length,
+    selectedCount: hasKnowledgePlaceholder ? includedDocs.length : 0,
+    selectedChars: hasKnowledgePlaceholder ? knowledgeEntries.length : 0,
+    selectedDocIds: hasKnowledgePlaceholder ? includedDocs.map((doc) => doc.id) : [],
+    selectedTitles: labels,
+    topK,
+    maxChars,
+    truncated: hasKnowledgePlaceholder ? truncated : false,
+    sourceCount,
+    sourcesTruncated,
+  };
 
   let systemPrompt = settings.prompt_md
     .replace('{{KNOWLEDGE}}', knowledgeEntries || '（暫無站內知識庫內容）')
@@ -1514,7 +2320,10 @@ async function buildSystemPrompt(
   const whatsappInfo = getWhatsappContactLines().map((line) => `- ${line}`).join('\n');
   systemPrompt += `\n\n【診所資訊】\n${clinicInfo}\n\n【醫師資訊】\n${doctorInfo}\n\n【WhatsApp 聯絡】\n${whatsappInfo}`;
 
-  return systemPrompt;
+  return {
+    systemPrompt,
+    knowledgeStats,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1583,10 +2392,11 @@ export async function POST(request: NextRequest) {
     const modeDecision = await resolveModeWithRouter(messages, model);
     timings.modeRouterMs = Date.now() - modeRouterStart;
     const mode = modeDecision.mode;
+    const outputContract = detectOutputContract(latestUserMessage.content);
     console.log('[chat/v2] Mode decision:', modeDecision);
 
     // Resolve constitution type from user profile (auto-detect)
-    let type: ConstitutionType = 'depleting'; // default for unauthenticated
+    let type: ConstitutionType = 'unknown'; // default for unauthenticated
     let careContext = '';
     let contentContext = '';
     let userEmail: string | undefined;
@@ -1610,6 +2420,36 @@ export async function POST(request: NextRequest) {
       timings.userContextMs = Date.now() - userContextStart;
     }
 
+    // Fast path for ultra-short booking follow-up to reduce B completion tokens.
+    if (
+      mode === 'B'
+      && isBShortFollowUpFastPathEnabled()
+      && isBModeShortFollowUpMessage(messages, latestUserMessage.content)
+    ) {
+      const fastReply = buildBShortFollowUpReply(latestUserMessage.content);
+      const durationMs = Date.now() - startTime;
+      const metrics = resolveTokenMetrics(undefined, latestUserMessage.content, fastReply, durationMs);
+      await logChatMessages(
+        sessionId,
+        latestUserMessage.content,
+        fastReply,
+        mode,
+        type,
+        userId,
+        metrics,
+        {
+          modeDecision,
+          timings,
+          outputContract,
+          promptBudgetApplied: false,
+          functionCallRounds: 0,
+        },
+      );
+      logPerformanceSummary(mode, timings, metrics, isAuthenticated);
+
+      return NextResponse.json({ reply: fastReply, mode, type });
+    }
+
     // Fast path for reschedule / booking-record lookup:
     // perform one booking lookup and ask user to confirm target booking.
     if (mode === 'B' && isRescheduleOrBookingLookupIntent(latestUserMessage.content)) {
@@ -1629,7 +2469,22 @@ export async function POST(request: NextRequest) {
 
       const durationMs = Date.now() - startTime;
       const metrics = resolveTokenMetrics(undefined, latestUserMessage.content, fastReply, durationMs);
-      await logChatMessages(sessionId, latestUserMessage.content, fastReply, mode, type, userId, metrics);
+      await logChatMessages(
+        sessionId,
+        latestUserMessage.content,
+        fastReply,
+        mode,
+        type,
+        userId,
+        metrics,
+        {
+          modeDecision,
+          timings,
+          outputContract,
+          promptBudgetApplied: false,
+          functionCallRounds: 0,
+        },
+      );
       logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
       return NextResponse.json({ reply: fastReply, mode, type });
@@ -1637,13 +2492,29 @@ export async function POST(request: NextRequest) {
 
     const contentSearchStart = Date.now();
     if (mode !== 'B') {
-      contentContext = await buildContentReferenceContext(latestUserMessage.content, 4);
+      const contentTopK = mode === 'G1' && isG1ContextBudgetEnabled() ? getG1ContextTopK() : 4;
+      contentContext = await buildContentReferenceContext(latestUserMessage.content, contentTopK);
+      if (mode === 'G1' && isG1ContextBudgetEnabled()) {
+        contentContext = compactContextByChars(contentContext, getG1ContextMaxChars());
+      }
     }
     timings.contentSearchMs = Date.now() - contentSearchStart;
 
+    if (mode === 'G1' && isG1ContextBudgetEnabled()) {
+      careContext = compactContextByChars(careContext, getG1CareContextMaxChars());
+    }
+
     const promptBuildStart = Date.now();
     // Build system prompt (DB-driven with fallback)
-    let systemPrompt = await buildSystemPrompt(type, mode, careContext, contentContext);
+    const promptBuildResult = await buildSystemPrompt(
+      type,
+      mode,
+      careContext,
+      contentContext,
+      latestUserMessage.content,
+    );
+    const knowledgeStats = promptBuildResult.knowledgeStats;
+    let systemPrompt = promptBuildResult.systemPrompt;
     if (mode === 'G2') {
       systemPrompt += `\n\n${buildG2ConversationGuidance(messages)}`;
     }
@@ -1654,9 +2525,14 @@ export async function POST(request: NextRequest) {
       // G modes also need explicit symptom logging behavior guidance.
       systemPrompt += `\n\n${SYMPTOM_RECORDING_GUIDANCE}`;
     }
+    const outputContractGuidance = buildOutputContractGuidance(outputContract);
+    if (outputContractGuidance) {
+      systemPrompt += `\n\n${outputContractGuidance}`;
+    }
     systemPrompt += `\n\n${OUTPUT_FORMAT_RULES}`;
 
-    const conversationHistory = messages
+    const promptBudget = applyPromptBudget(messages, mode);
+    const conversationHistory = promptBudget.history
       .map((m) => `${m.role === 'user' ? '用戶' : 'AI助手'}：${m.content}`)
       .join('\n\n');
 
@@ -1671,10 +2547,13 @@ export async function POST(request: NextRequest) {
     const fullPrompt = `${systemPrompt}${userInfoSection}${dateGuardrailSection}\n\n【對話記錄】\n${conversationHistory}\n\nAI助手：`;
     timings.promptBuildMs = Date.now() - promptBuildStart;
 
-    const tools = resolveFunctionTools(mode, userId);
+    const tools = shouldBypassToolsForTask(mode, userId, latestUserMessage.content)
+      ? undefined
+      : resolveFunctionTools(mode, userId);
 
     const streamEnabled = isStreamingEnabled();
-    if (streamRequested && streamEnabled && !tools) {
+    const allowStreaming = streamRequested && streamEnabled && !tools && !outputContract.requireJson;
+    if (allowStreaming) {
       const encoder = new TextEncoder();
 
       const stream = new ReadableStream<Uint8Array>({
@@ -1706,12 +2585,34 @@ export async function POST(request: NextRequest) {
                 finalReply = finalResponse.text();
               }
 
-              finalReply = sanitizeAssistantReply(finalReply);
+              finalReply = applyOutputContractGuard(finalReply, outputContract, mode, latestUserMessage.content);
 
               timings.geminiApiMs = Date.now() - geminiApiStart;
               const durationMs = Date.now() - startTime;
-              const metrics = resolveTokenMetrics(usage, fullPrompt, finalReply, durationMs);
-              await logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, type, userId, metrics);
+              const metrics = resolveTokenMetrics(
+                usage,
+                fullPrompt,
+                finalReply,
+                durationMs,
+                knowledgeStats.selectedChars,
+              );
+              await logChatMessages(
+                sessionId,
+                latestUserMessage.content,
+                finalReply,
+                mode,
+                type,
+                userId,
+                metrics,
+                {
+                  modeDecision,
+                  timings,
+                  outputContract,
+                  promptBudgetApplied: promptBudget.trimmedByTurns || promptBudget.trimmedByChars,
+                  functionCallRounds: 0,
+                  knowledgeStats,
+                },
+              );
               logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
               push({
@@ -1728,9 +2629,32 @@ export async function POST(request: NextRequest) {
               const message = streamError instanceof Error ? streamError.message : 'Unknown streaming error';
               timings.geminiApiMs = Date.now() - geminiApiStart;
               const durationMs = Date.now() - startTime;
-              const metrics = resolveTokenMetrics(usage, fullPrompt, finalReply, durationMs, message);
+              const metrics = resolveTokenMetrics(
+                usage,
+                fullPrompt,
+                finalReply,
+                durationMs,
+                knowledgeStats.selectedChars,
+                message,
+              );
               if (finalReply) {
-                await logChatMessages(sessionId, latestUserMessage.content, finalReply, mode, type, userId, metrics);
+                await logChatMessages(
+                  sessionId,
+                  latestUserMessage.content,
+                  finalReply,
+                  mode,
+                  type,
+                  userId,
+                  metrics,
+                  {
+                    modeDecision,
+                    timings,
+                    outputContract,
+                    promptBudgetApplied: promptBudget.trimmedByTurns || promptBudget.trimmedByChars,
+                    functionCallRounds: 0,
+                    knowledgeStats,
+                  },
+                );
               }
               logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
@@ -1766,6 +2690,7 @@ export async function POST(request: NextRequest) {
     // Use chat API for function calling, or generateContent for simple mode
     let reply: string;
     let finalResponse: any;
+    let functionCallRoundsUsed = 0;
     const geminiApiStart = Date.now();
 
     if (tools) {
@@ -1777,10 +2702,12 @@ export async function POST(request: NextRequest) {
 
       // Handle function calls (may require multiple rounds)
       let functionCallRounds = 0;
-      const MAX_FUNCTION_ROUNDS = 5;
+      const maxFunctionRounds = mode === 'B' && isBToolPolicyEnabled()
+        ? getBToolMaxRounds()
+        : 5;
 
       while (
-        functionCallRounds < MAX_FUNCTION_ROUNDS &&
+        functionCallRounds < maxFunctionRounds &&
         response.candidates?.[0]?.content?.parts?.some((part: any) => part.functionCall)
       ) {
         functionCallRounds++;
@@ -1817,6 +2744,7 @@ export async function POST(request: NextRequest) {
         response = result.response;
       }
 
+      functionCallRoundsUsed = functionCallRounds;
       reply = response.text();
       finalResponse = response;
     } else {
@@ -1826,15 +2754,37 @@ export async function POST(request: NextRequest) {
       reply = finalResponse.text();
     }
 
-    reply = sanitizeAssistantReply(reply);
+    if (!reply || !reply.trim()) {
+      reply = mode === 'B'
+        ? '我已收到你嘅預約需求。請先確認你想預約邊位醫師同日期，我會用最少步驟幫你完成。'
+        : '我整理好重點先：你可再講一次你最想我處理嘅目標格式。';
+    }
+
+    reply = applyOutputContractGuard(reply, outputContract, mode, latestUserMessage.content);
 
     timings.geminiApiMs = Date.now() - geminiApiStart;
     const usage = getUsageMetadata(finalResponse);
     const durationMs = Date.now() - startTime;
-    const metrics = resolveTokenMetrics(usage, fullPrompt, reply, durationMs);
+    const metrics = resolveTokenMetrics(usage, fullPrompt, reply, durationMs, knowledgeStats.selectedChars);
 
     // Log messages (fire-and-forget)
-    await logChatMessages(sessionId, latestUserMessage.content, reply, mode, type, userId, metrics);
+    await logChatMessages(
+      sessionId,
+      latestUserMessage.content,
+      reply,
+      mode,
+      type,
+      userId,
+      metrics,
+      {
+        modeDecision,
+        timings,
+        outputContract,
+        promptBudgetApplied: promptBudget.trimmedByTurns || promptBudget.trimmedByChars,
+        functionCallRounds: functionCallRoundsUsed,
+        knowledgeStats,
+      },
+    );
     logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
     return NextResponse.json({ reply, mode, type });
