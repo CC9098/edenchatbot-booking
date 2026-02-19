@@ -15,6 +15,7 @@
     "test:chat:ai": "playwright test tests/chat.ai-regression.spec.ts",
     "test:chat:ai:headed": "playwright test tests/chat.ai-regression.spec.ts --headed",
     "test:chat:ai:loop": "bash ./scripts/test-chat-ai-loop.sh",
+    "test:chat:v2:regression": "tsx ./scripts/chatbot-v2-regression.ts",
     "ai:test": "npm run test:chat:ai",
     "ai:test:headed": "npm run test:chat:ai:headed",
     "ai:test:loop": "bash ./scripts/test-chat-ai-loop.sh 600",
@@ -25,9 +26,17 @@
     "migrate:legacy-content": "tsx ./scripts/migrate-legacy-content.ts",
     "mcp:github": "tsx ./mcp/github-server/index.ts",
     "typecheck:mcp:github": "tsc -p ./mcp/github-server/tsconfig.json --pretty false",
-    "setup:mcp:oauth": "bash ./scripts/setup-mcp-github-oauth.sh"
+    "setup:mcp:oauth": "bash ./scripts/setup-mcp-github-oauth.sh",
+    "cap:sync": "npx cap sync",
+    "cap:copy": "npx cap copy",
+    "ios:add": "npx cap add ios",
+    "ios:sync": "npx cap sync ios",
+    "ios:open": "npx cap open ios",
+    "ios:run": "npx cap run ios"
   },
   "dependencies": {
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/ios": "^8.1.0",
     "@google/generative-ai": "^0.24.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@neondatabase/serverless": "^0.9.0",
@@ -51,6 +60,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.1.0",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/express": "^5.0.6",
