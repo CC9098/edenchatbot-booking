@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Figtree, Noto_Sans_TC, Roboto_Mono } from "next/font/google";
 import { NativeOAuthListener } from "@/components/auth/NativeOAuthListener";
 import { PatientAppChrome } from "@/components/patient/PatientAppChrome";
@@ -29,6 +29,12 @@ export const metadata: Metadata = {
     shortcut: "/logo-eden.png",
     apple: "/logo-eden.png",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

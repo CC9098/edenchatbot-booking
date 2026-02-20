@@ -23,8 +23,9 @@
 
   --font-body: var(--font-eden-sans), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --font-display: var(--font-eden-display), var(--font-body);
-  --chat-topbar-safe-offset: calc(env(safe-area-inset-top, 0px) + 22px);
-  --chat-content-top-offset: calc(env(safe-area-inset-top, 0px) + 110px);
+  /* Cross-device strategy: safe-area + baseline floor to avoid notch clipping. */
+  --chat-topbar-safe-offset: max(56px, calc(env(safe-area-inset-top, 0px) + 20px));
+  --chat-content-top-offset: calc(var(--chat-topbar-safe-offset) + 74px);
 }
 
 @theme inline {
