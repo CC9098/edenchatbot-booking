@@ -65,7 +65,7 @@ export function ChatInputV2({
         placeholder={placeholder}
         disabled={disabled}
         rows={1}
-        className="flex-1 resize-none rounded-[22px] border border-primary/20 bg-[#f2f6f0] px-4 py-3 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10 disabled:opacity-50"
+        className="flex-1 resize-none rounded-[22px] border border-primary/20 bg-[#f2f6f0] px-4 py-3 text-base text-slate-800 placeholder-slate-400 outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10 disabled:opacity-50"
       />
       <button
         onClick={handleSend}

@@ -152,7 +152,7 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
                 {!isUser && msg.mode && (
                   <div className="mb-1 flex items-center gap-2">
                     <span
-                      className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                      className={`inline-block rounded px-2 py-1 text-[11px] font-semibold ${
                         MODE_BADGES[msg.mode].color
                       }`}
                     >
@@ -163,7 +163,7 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
 
                 {/* Message bubble */}
                 <div
-                  className={`rounded-[22px] px-4 py-3 text-sm leading-relaxed shadow-sm ${
+                  className={`rounded-[22px] px-4 py-3 text-base leading-relaxed shadow-sm ${
                     isUser
                       ? "rounded-br-lg bg-primary text-white"
                       : "rounded-bl-lg border border-primary/10 bg-white text-slate-800"
@@ -175,7 +175,7 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
                 </div>
 
                 {canShowActions && (
-                  <div className="mt-1.5 flex items-center gap-1 text-[11px] text-gray-500">
+                  <div className="mt-1.5 flex items-center gap-1 text-xs text-gray-500">
                     <button
                       type="button"
                       onClick={() => {
@@ -255,7 +255,7 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
 
                 {/* Timestamp */}
                 <div
-                  className={`mt-1 text-[10px] text-gray-400 ${
+                  className={`mt-1 text-[11px] text-gray-400 ${
                     isUser ? "text-right" : "text-left"
                   }`}
                 >
@@ -271,7 +271,7 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
           <div className="flex justify-start">
             <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-white px-4 py-3 shadow-sm ring-1 ring-black/5">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              <span className="text-xs text-gray-400">正在思考...</span>
+              <span className="text-sm text-gray-400">正在思考...</span>
             </div>
           </div>
         )}

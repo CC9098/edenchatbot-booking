@@ -385,7 +385,7 @@ export function ChatRoom() {
           <ModeIndicator currentMode={mode} />
           <button
             onClick={handleClearChat}
-            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500"
           >
             清除對話
           </button>

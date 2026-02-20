@@ -25,11 +25,11 @@ export function ModeIndicator({ currentMode }: ModeIndicatorProps) {
   return (
     <div className="flex items-center gap-2 text-primary">
       <span
-        className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${meta.color}`}
+        className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-semibold ${meta.color}`}
       >
         {icon} · {meta.label}
       </span>
-      <span className="hidden text-[11px] text-slate-500 sm:inline">{meta.desc}</span>
+      <span className="hidden text-xs text-slate-500 sm:inline">{meta.desc}</span>
     </div>
   );
 }

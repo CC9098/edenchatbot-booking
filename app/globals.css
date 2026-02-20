@@ -105,7 +105,7 @@ h3 {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.1;
   font-weight: 600;
   transition: all 0.2s ease;
@@ -181,7 +181,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
   color: #3f784d;
   box-shadow: 0 6px 18px rgba(35, 56, 39, 0.1);
@@ -189,14 +189,14 @@ h3 {
 
 .chat-fixed-topbar__action {
   justify-self: end;
-  min-height: 36px;
-  padding: 0 10px;
+  min-height: 38px;
+  padding: 0 12px;
   border-radius: var(--radius-pill);
   border: 1px solid rgba(79, 123, 87, 0.2);
   background: rgba(255, 255, 255, 0.88);
   display: inline-flex;
   align-items: center;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   color: #4b8158;
 }
@@ -226,6 +226,10 @@ a, button, [role="button"], input, select, textarea {
 }
 
 @media (max-width: 768px) {
+  html {
+    font-size: 17px;
+  }
+
   input,
   textarea,
   select {
