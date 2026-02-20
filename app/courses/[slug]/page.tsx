@@ -63,8 +63,8 @@ export default async function CourseDetailPage({ params }: PageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-primary-pale px-6 py-12 text-slate-800 sm:px-10">
-      <div className="mx-auto max-w-4xl space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+    <main className="patient-pane text-slate-800">
+      <div className="patient-card mx-auto max-w-4xl space-y-6 p-6 sm:p-8">
         <header className="space-y-3">
           <Link href="/courses" className="text-sm font-medium text-primary hover:underline">
             ← 返回課程列表
@@ -97,7 +97,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
           {modules.map((module) => {
             const moduleLessons = lessonsByModuleId.get(module.id) ?? [];
             return (
-              <div key={module.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div key={module.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <h3 className="text-sm font-semibold text-slate-900 sm:text-base">{module.title}</h3>
                 {moduleLessons.length === 0 ? (
                   <p className="mt-2 text-xs text-slate-500">此章節暫無已發布課堂。</p>
@@ -107,7 +107,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
                       <Link
                         key={lesson.id}
                         href={`/courses/${course.slug}/lessons/${lesson.slug}`}
-                        className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition hover:bg-primary-light"
+                        className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition hover:bg-primary-light"
                       >
                         <span>{lesson.title}</span>
                         <span className="text-xs text-slate-500">
@@ -129,7 +129,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
                   <Link
                     key={lesson.id}
                     href={`/courses/${course.slug}/lessons/${lesson.slug}`}
-                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition hover:bg-primary-light"
+                    className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition hover:bg-primary-light"
                   >
                     <span>{lesson.title}</span>
                     <span className="text-xs text-slate-500">
@@ -145,13 +145,13 @@ export default async function CourseDetailPage({ params }: PageProps) {
         <div className="flex flex-wrap gap-3">
           <Link
             href="/chat"
-            className="inline-flex items-center rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-primary-hover"
+            className="inline-flex items-center rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-hover"
           >
             用 AI 問課程內容
           </Link>
           <Link
             href="/booking"
-            className="inline-flex items-center rounded-lg border border-primary/20 bg-white px-3 py-2 text-sm font-medium text-primary transition hover:bg-primary-light"
+            className="inline-flex items-center rounded-full border border-primary/20 bg-white px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-primary-light"
           >
             需要時安排覆診
           </Link>

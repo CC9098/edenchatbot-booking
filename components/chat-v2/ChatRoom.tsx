@@ -6,6 +6,7 @@ import { MessageList, type ChatMessage } from "./MessageList";
 import { ChatInputV2 } from "./ChatInputV2";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getChatSessionKey, getChatStorageKey } from "@/lib/chat-storage";
+import Link from "next/link";
 
 const WELCOME_MESSAGE =
   "你好！我是醫天圓 AI 體質顧問。我會根據你嘅體質及照護資料，提供個人化嘅飲食、作息及調養建議。有什麼想了解的嗎？";
@@ -380,24 +381,36 @@ export function ChatRoom() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Mode indicator bar */}
-      <div className="flex items-center justify-between border-b border-primary/10 bg-white px-4 py-2">
+      <div className="border-b border-primary/10 bg-white/95 px-4 py-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="patient-pill inline-flex items-center px-3 py-1 text-[11px] font-semibold text-primary">
+            Eden Care Chat
+          </p>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/chat/symptoms"
+              className="rounded-full border border-primary/20 bg-primary-light/70 px-3 py-1.5 text-[11px] font-semibold text-primary transition hover:bg-primary-light"
+            >
+              我的症狀
+            </Link>
+            <button
+              onClick={handleClearChat}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+            >
+              清除對話
+            </button>
+          </div>
+        </div>
         <ModeIndicator currentMode={mode} />
-        <button
-          onClick={handleClearChat}
-          className="rounded-lg px-3 py-1.5 text-[11px] font-medium text-gray-400 transition hover:bg-red-50 hover:text-red-500"
-        >
-          清除對話
-        </button>
       </div>
 
       {/* Messages area */}
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden bg-[rgba(246,248,244,0.85)]">
         <MessageList messages={messages} loading={loading} sessionId={sessionId} />
       </div>
 
       {/* Input area */}
-      <div className="shrink-0 border-t border-primary/10 bg-white">
+      <div className="shrink-0 border-t border-primary/10 bg-white/95">
         <ChatInputV2
           onSend={handleSend}
           disabled={loading}

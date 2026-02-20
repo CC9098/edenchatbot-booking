@@ -204,25 +204,25 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-primary-pale px-4">
-      <div className="w-full max-w-sm space-y-8">
+    <div className="patient-pane flex min-h-[calc(100dvh-130px)] items-center justify-center">
+      <div className="w-full max-w-sm space-y-6">
         {/* Branding */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary text-white text-2xl font-bold">
+          <div className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-white shadow-sm">
             醫
           </div>
           <h1 className="text-2xl font-bold text-primary">醫天圓</h1>
-          <p className="text-sm text-gray-500">Eden TCM Clinic</p>
+          <p className="text-sm text-slate-500">Eden TCM Clinic</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-6">
+        <div className="patient-card space-y-6 p-8">
           <div className="text-center">
-            <h2 className="text-lg font-semibold text-gray-900">登入帳號</h2>
-            <p className="text-sm text-gray-500 mt-1">選擇登入方式以繼續</p>
+            <h2 className="text-lg font-semibold text-slate-900">登入帳號</h2>
+            <p className="mt-1 text-sm text-slate-500">選擇登入方式以繼續</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1">
+          <div className="grid grid-cols-2 gap-2 rounded-full bg-slate-100 p-1">
             <button
               type="button"
               onClick={() => {
@@ -231,10 +231,10 @@ function LoginForm() {
                 setSuccessMessage(null);
                 setPendingConfirmationEmail(null);
               }}
-              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              className={`rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                 activeMethod === "google"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Google 登入
@@ -247,10 +247,10 @@ function LoginForm() {
                 setSuccessMessage(null);
                 setPendingConfirmationEmail(null);
               }}
-              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+              className={`rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                 activeMethod === "email"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               電郵登入
@@ -274,7 +274,7 @@ function LoginForm() {
               type="button"
               onClick={handleResendConfirmationEmail}
               disabled={loading}
-              className="w-full rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-full border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "重發中..." : "重新發送確認信"}
             </button>
@@ -284,7 +284,7 @@ function LoginForm() {
             <button
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex w-full items-center justify-center gap-3 rounded-[18px] border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {/* Google icon */}
               <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
@@ -309,7 +309,7 @@ function LoginForm() {
             </button>
           ) : (
             <form onSubmit={handleEmailAuth} className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1">
+              <div className="grid grid-cols-2 gap-2 rounded-full bg-slate-100 p-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -318,10 +318,10 @@ function LoginForm() {
                     setSuccessMessage(null);
                     setPendingConfirmationEmail(null);
                   }}
-                  className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                     emailAuthMode === "signin"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-600 hover:text-gray-900"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   電郵登入
@@ -334,10 +334,10 @@ function LoginForm() {
                     setSuccessMessage(null);
                     setPendingConfirmationEmail(null);
                   }}
-                  className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                     emailAuthMode === "signup"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-600 hover:text-gray-900"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   建立帳戶
@@ -355,7 +355,7 @@ function LoginForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
                   required
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="w-full rounded-[16px] border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="you@example.com"
                 />
               </div>
@@ -374,7 +374,7 @@ function LoginForm() {
                   }
                   required
                   minLength={8}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="w-full rounded-[16px] border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="至少 8 個字元"
                 />
               </div>
@@ -382,7 +382,7 @@ function LoginForm() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading
                   ? "處理中..."
@@ -394,7 +394,7 @@ function LoginForm() {
           )}
         </div>
 
-        <p className="text-center text-xs text-gray-400">
+        <p className="text-center text-xs text-slate-400">
           &copy; {new Date().getFullYear()} 醫天圓中醫診所
         </p>
       </div>
@@ -406,7 +406,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-primary-pale">
+        <div className="flex min-h-[calc(100dvh-130px)] items-center justify-center">
           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       }

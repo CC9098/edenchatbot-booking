@@ -51,7 +51,7 @@ export function ChatInputV2({
 
   return (
     <div
-      className="mx-auto flex w-full max-w-2xl items-end gap-2 px-4 pt-3"
+      className="mx-auto flex w-full max-w-2xl items-end gap-2 px-3 pt-3 sm:px-4"
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
     >
       <textarea
@@ -65,7 +65,7 @@ export function ChatInputV2({
         placeholder={placeholder}
         disabled={disabled}
         rows={1}
-        className="flex-1 resize-none rounded-xl border border-primary/20 bg-[#f5f7f3] px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10 disabled:opacity-50"
+        className="flex-1 resize-none rounded-[22px] border border-primary/20 bg-[#f2f6f0] px-4 py-3 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10 disabled:opacity-50"
       />
       <button
         onClick={handleSend}
@@ -81,10 +81,10 @@ export function ChatInputV2({
           e.currentTarget.style.transform = "";
         }}
         disabled={!canSend}
-        className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all ${
+        className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full transition-all ${
           canSend
-            ? "bg-primary text-white shadow-md hover:bg-primary-hover active:scale-95"
-            : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            ? "bg-primary text-white shadow-sm hover:bg-primary-hover active:scale-95"
+            : "cursor-not-allowed bg-slate-200 text-slate-400"
         }`}
         aria-label="送出訊息"
         type="button"

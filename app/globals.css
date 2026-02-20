@@ -1,24 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  /* Base colors */
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f4f6f1;
+  --foreground: #223327;
 
-  /* Brand colors - Eden TCM Clinic */
-  --primary: #2d5016;
-  --primary-hover: #1f3810;
-  --primary-light: #e8f5e0;
-  --primary-pale: #f5f9f2;
+  --primary: #4b8158;
+  --primary-hover: #396845;
+  --primary-light: #e7f1e8;
+  --primary-pale: #f4f6f1;
 
-  /* Semantic colors */
-  --success: #10b981;
-  --error: #ef4444;
-  --warning: #f59e0b;
+  --success: #1ea26b;
+  --error: #c44f4f;
+  --warning: #d6a047;
 
-  /* Neutral colors */
-  --surface: #f8fafc;
-  --border: #e2e8f0;
+  --surface: #ffffff;
+  --border: #d8e2d8;
+
+  --app-shell-max-width: 760px;
+  --radius-card: 28px;
+  --radius-pill: 999px;
+  --shadow-soft: 0 10px 30px rgba(24, 40, 26, 0.08);
+
+  --font-body: var(--font-eden-sans), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-display: var(--font-eden-display), var(--font-body);
 }
 
 @theme inline {
@@ -40,21 +44,15 @@
   --color-surface: var(--surface);
   --color-border: var(--border);
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-eden-mono);
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(120% 85% at 50% -15%, #bdd2c1 0%, #ecf2eb 52%, #f4f6f1 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
   -webkit-text-size-adjust: 100%;
   overscroll-behavior-y: none;
 }
@@ -62,6 +60,90 @@ body {
 html,
 body {
   height: 100%;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+}
+
+/* Patient app shell */
+.patient-mobile-shell {
+  min-height: 100dvh;
+}
+
+.patient-tabbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  padding: 0 12px calc(env(safe-area-inset-bottom, 0px) + 10px);
+  background: linear-gradient(to top, rgba(244, 246, 241, 0.98), rgba(244, 246, 241, 0.9) 55%, rgba(244, 246, 241, 0));
+}
+
+.patient-tabbar__inner {
+  margin: 0 auto;
+  max-width: var(--app-shell-max-width);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+  border-radius: 24px;
+  border: 1px solid rgba(74, 114, 82, 0.18);
+  background: rgba(250, 252, 248, 0.9);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 -4px 20px rgba(38, 57, 42, 0.08);
+}
+
+.patient-tab {
+  min-height: 50px;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+  line-height: 1.1;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.patient-tab--idle {
+  color: #7f8b7f;
+}
+
+.patient-tab--active {
+  color: #3f784d;
+  background: rgba(70, 126, 83, 0.12);
+}
+
+.patient-tab:focus-visible {
+  outline: 3px solid rgba(70, 126, 83, 0.35);
+  outline-offset: 2px;
+}
+
+.patient-pane {
+  width: 100%;
+  max-width: var(--app-shell-max-width);
+  margin: 0 auto;
+  padding: 20px 16px;
+}
+
+.patient-card {
+  border: 1px solid rgba(79, 123, 87, 0.18);
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-soft);
+}
+
+.patient-pill {
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(79, 123, 87, 0.22);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 /* 修复 iframe 中移动端触摸问题 */

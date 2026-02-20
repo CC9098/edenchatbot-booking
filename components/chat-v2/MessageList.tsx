@@ -130,7 +130,7 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
   );
 
   return (
-    <div className="h-full overflow-y-auto px-4 py-4">
+    <div className="h-full overflow-y-auto px-3 py-4 sm:px-4">
       <div className="mx-auto max-w-2xl space-y-4">
         {messages.map((msg, i) => {
           const isUser = msg.role === "user";
@@ -163,10 +163,10 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
 
                 {/* Message bubble */}
                 <div
-                  className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                  className={`rounded-[22px] px-4 py-3 text-sm leading-relaxed shadow-sm ${
                     isUser
-                      ? "rounded-br-md bg-primary text-white"
-                      : "rounded-bl-md bg-white text-gray-800 shadow-sm ring-1 ring-black/5"
+                      ? "rounded-br-lg bg-primary text-white"
+                      : "rounded-bl-lg border border-primary/10 bg-white text-slate-800"
                   }`}
                 >
                   <p className="whitespace-pre-wrap break-words">
@@ -196,8 +196,8 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
                       }}
                       className={`rounded-md px-2 py-1 transition ${
                         selectedFeedback === "up"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "hover:bg-gray-100"
+                          ? "bg-primary-light text-primary"
+                          : "hover:bg-primary-light/60"
                       }`}
                       aria-label="讚好此回覆"
                     >
@@ -224,7 +224,7 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
                       className={`rounded-md px-2 py-1 transition ${
                         selectedFeedback === "down"
                           ? "bg-red-100 text-red-700"
-                          : "hover:bg-gray-100"
+                          : "hover:bg-primary-light/60"
                       }`}
                       aria-label="對此回覆提出負評"
                     >
@@ -233,7 +233,7 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
                     <button
                       type="button"
                       onClick={() => void handleCopy(messageId, msg.content)}
-                      className="rounded-md px-2 py-1 transition hover:bg-gray-100"
+                      className="rounded-md px-2 py-1 transition hover:bg-primary-light/60"
                       aria-label="複製訊息"
                     >
                       {copiedMessageId === messageId ? (
@@ -245,7 +245,7 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
                     <button
                       type="button"
                       onClick={() => void handleShare(messageId, msg.content)}
-                      className="rounded-md px-2 py-1 transition hover:bg-gray-100"
+                      className="rounded-md px-2 py-1 transition hover:bg-primary-light/60"
                       aria-label="分享訊息"
                     >
                       <Share2 className="h-3.5 w-3.5" />
