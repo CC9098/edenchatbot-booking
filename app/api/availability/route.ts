@@ -4,7 +4,13 @@ import { z } from 'zod';
 import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { getFreeBusy } from '@/lib/google-calendar';
-import { getScheduleForDayFromWeekly, isDateBlocked, isSlotAvailableUtc } from '@/lib/booking-helpers';
+import {
+                getApplicableHolidaysForDate,
+                getScheduleForDayFromWeekly,
+                isSlotAvailableUtc,
+                isSlotBlockedByHolidaysUtc,
+} from '@/lib/booking-helpers';
+import { type Holiday } from '@/shared/schema';
 
 
 
@@ -33,15 +39,18 @@ export async function POST(request: NextRequest) {
 
                                 // Check holidays
                                 let isBlocked = false;
+                                let applicableHolidays: Holiday[] = [];
                                 try {
                                                 console.time('db-check-holidays');
-                                                isBlocked = await isDateBlocked(requestedDate, doctorId, clinicId);
+                                                applicableHolidays = await getApplicableHolidaysForDate(requestedDate, doctorId, clinicId);
+                                                isBlocked = applicableHolidays.some((holiday) => !holiday.startTime || !holiday.endTime);
                                                 console.timeEnd('db-check-holidays');
                                 } catch (error: any) {
                                                 console.timeEnd('db-check-holidays');
                                                 console.error('Failed to check holidays from DB, assuming open:', error);
                                                 // Fail open: if DB is down, we don't block the date
                                                 isBlocked = false;
+                                                applicableHolidays = [];
                                 }
 
                                 if (isBlocked) {
@@ -87,8 +96,11 @@ export async function POST(request: NextRequest) {
                                                                                 const slotEnd = new Date(currentSlot.getTime() + durationMinutes * 60000);
                                                                                 if (slotEnd > endData) break;
 
-                                                                                // Check against Google Calendar busy slots
-                                                                                if (isSlotAvailableUtc(currentSlot, slotEnd, busySlots)) {
+                                                                                // Check against Google Calendar busy slots + partial-day holiday blocks
+                                                                                if (
+                                                                                                isSlotAvailableUtc(currentSlot, slotEnd, busySlots)
+                                                                                                && !isSlotBlockedByHolidaysUtc(currentSlot, slotEnd, applicableHolidays)
+                                                                                ) {
                                                                                                 // Format as HH:mm
                                                                                                 const slotStr = formatInTimeZone(currentSlot, HONG_KONG_TIMEZONE, 'HH:mm');
                                                                                                 availableSlots.push(slotStr);
@@ -101,7 +113,13 @@ export async function POST(request: NextRequest) {
                                                 return NextResponse.json({ success: true, slots: availableSlots });
                                 } catch (calError: any) {
                                                 console.error('Calendar error:', calError);
-                                                return NextResponse.json({ error: 'Failed to fetch calendar availability' }, { status: 500 });
+                                                return NextResponse.json(
+                                                                {
+                                                                                error: 'Calendar availability temporarily unavailable',
+                                                                                errorCode: 'CALENDAR_UNAVAILABLE',
+                                                                },
+                                                                { status: 503 }
+                                                );
                                 }
 
                 } catch (error: any) {

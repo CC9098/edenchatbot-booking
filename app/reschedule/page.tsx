@@ -127,6 +127,8 @@ function RescheduleBookingContent() {
                                                                 setAvailableSlots(data.slots);
                                                 } else if (data.isClosed || data.isHoliday) {
                                                                 setSlotError('診所當日休診。');
+                                                } else if (data.errorCode === 'CALENDAR_UNAVAILABLE') {
+                                                                setSlotError('暫時未能讀取預約日曆，請稍後再試或聯絡診所。');
                                                 } else {
                                                                 setSlotError('當日暫無可預約時段。');
                                                 }
