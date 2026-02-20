@@ -4,11 +4,13 @@ import { formatInTimeZone, fromZonedTime, toZonedTime } from "date-fns-tz";
 import { getMappingWithFallback } from "@/lib/storage-helpers";
 import { getFreeBusy } from "@/lib/google-calendar";
 import {
+  getApplicableHolidaysForDate,
   getScheduleForDayFromWeekly,
-  isDateBlocked,
   isSlotAvailableUtc,
+  isSlotBlockedByHolidaysUtc,
 } from "@/lib/booking-helpers";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { type Holiday } from "@/shared/schema";
 
 // ── Whitelist schema ────────────────────────────────────────────────
 // Only these fields are accepted; anything extra is stripped.
@@ -63,11 +65,20 @@ export async function POST(request: NextRequest) {
 
     // Check holidays
     let isBlocked = false;
+    let applicableHolidays: Holiday[] = [];
     try {
-      isBlocked = await isDateBlocked(requestedDate, doctorId, clinicId);
+      applicableHolidays = await getApplicableHolidaysForDate(
+        requestedDate,
+        doctorId,
+        clinicId
+      );
+      isBlocked = applicableHolidays.some(
+        (holiday) => !holiday.startTime || !holiday.endTime
+      );
     } catch {
       // Fail open if DB is unreachable
       isBlocked = false;
+      applicableHolidays = [];
     }
 
     if (isBlocked) {
@@ -91,7 +102,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch Google Calendar busy slots
-    const busySlots = await getFreeBusy(mapping.calendarId, requestedDayUtc);
+    let busySlots: { start: Date; end: Date }[] = [];
+    try {
+      busySlots = await getFreeBusy(mapping.calendarId, requestedDayUtc);
+    } catch (calendarError) {
+      console.error("[chat/booking/availability] Calendar error:", calendarError);
+      return NextResponse.json(
+        {
+          error: "Calendar availability temporarily unavailable",
+          errorCode: "CALENDAR_UNAVAILABLE",
+        },
+        { status: 503 }
+      );
+    }
 
     const availableSlots: string[] = [];
     const nowUtc = new Date();
@@ -127,7 +150,14 @@ export async function POST(request: NextRequest) {
         );
         if (slotEnd > endData) break;
 
-        if (isSlotAvailableUtc(currentSlot, slotEnd, busySlots)) {
+        if (
+          isSlotAvailableUtc(currentSlot, slotEnd, busySlots) &&
+          !isSlotBlockedByHolidaysUtc(
+            currentSlot,
+            slotEnd,
+            applicableHolidays
+          )
+        ) {
           const slotStr = formatInTimeZone(
             currentSlot,
             HONG_KONG_TIMEZONE,

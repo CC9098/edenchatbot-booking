@@ -35,11 +35,11 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: [{ start: "11:00", end: "14:00" }],
+      1: null,
       2: [{ start: "11:00", end: "14:00" }],
-      3: [{ start: "11:00", end: "14:00" }],
+      3: null,
       4: null,
-      5: null,
+      5: [{ start: "11:00", end: "14:00" }],
       6: null,
     }
   },
@@ -51,10 +51,10 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     schedule: {
       0: null,
       1: null,
-      2: [{ start: "15:00", end: "19:00" }],
+      2: [{ start: "15:30", end: "19:30" }],
       3: null,
-      4: [{ start: "15:00", end: "19:00" }],
-      5: [{ start: "15:00", end: "19:00" }],
+      4: null,
+      5: null,
       6: null,
     }
   },
@@ -82,9 +82,9 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: [{ start: "15:30", end: "20:00" }],
-      2: [{ start: "15:30", end: "19:00" }],
-      3: [{ start: "11:00", end: "13:30" }, { start: "15:30", end: "19:00" }],
+      1: [{ start: "15:30", end: "19:30" }],
+      2: [{ start: "15:30", end: "19:30" }],
+      3: [{ start: "11:00", end: "14:00" }, { start: "15:30", end: "19:30" }],
       4: null,
       5: null,
       6: null,
@@ -97,12 +97,12 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: null,
-      2: null,
+      1: [{ start: "11:00", end: "14:00" }],
+      2: [{ start: "11:00", end: "14:00" }],
       3: null,
-      4: [{ start: "11:00", end: "14:00" }, { start: "15:30", end: "19:00" }],
-      5: [{ start: "11:00", end: "14:00" }, { start: "15:30", end: "19:00" }],
-      6: [{ start: "10:00", end: "13:00" }],
+      4: null,
+      5: [{ start: "15:30", end: "19:30" }],
+      6: [{ start: "11:00", end: "14:00" }, { start: "15:30", end: "18:30" }],
     }
   },
   { 
@@ -112,10 +112,10 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: [{ start: "10:00", end: "14:00" }],
+      1: null,
       2: null,
       3: null,
-      4: null,
+      4: [{ start: "10:30", end: "14:00" }, { start: "15:30", end: "19:00" }],
       5: null,
       6: null,
     }
@@ -145,9 +145,9 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     schedule: {
       0: null,
       1: [{ start: "11:00", end: "14:00" }],
-      2: [{ start: "11:00", end: "14:00" }],
+      2: null,
       3: null,
-      4: null,
+      4: [{ start: "11:00", end: "14:00" }],
       5: null,
       6: null,
     }
@@ -159,12 +159,12 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: null,
+      1: [{ start: "15:30", end: "19:30" }],
       2: null,
-      3: [{ start: "15:00", end: "19:00" }],
-      4: [{ start: "15:00", end: "19:00" }],
-      5: [{ start: "15:00", end: "19:00" }],
-      6: [{ start: "10:00", end: "14:00" }],
+      3: null,
+      4: [{ start: "15:30", end: "19:30" }],
+      5: null,
+      6: null,
     }
   },
   { 
@@ -174,12 +174,12 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: [{ start: "15:00", end: "18:00" }],
-      2: [{ start: "15:00", end: "18:00" }],
+      1: null,
+      2: [{ start: "10:30", end: "14:00" }, { start: "15:30", end: "19:00" }],
       3: null,
       4: null,
-      5: null,
-      6: null,
+      5: [{ start: "10:30", end: "14:00" }, { start: "15:30", end: "19:00" }],
+      6: [{ start: "10:30", end: "14:00" }, { start: "15:30", end: "19:00" }],
     }
   },
   { 
@@ -208,9 +208,9 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
       0: null,
       1: null,
       2: null,
-      3: [{ start: "15:00", end: "19:00" }],
-      4: [{ start: "15:00", end: "19:00" }],
-      5: [{ start: "15:00", end: "19:00" }],
+      3: null,
+      4: [{ start: "15:30", end: "19:30" }],
+      5: [{ start: "15:30", end: "19:30" }],
       6: null,
     }
   },
@@ -221,12 +221,12 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: [{ start: "11:00", end: "14:00" }, { start: "15:30", end: "19:00" }],
-      2: [{ start: "11:00", end: "14:00" }, { start: "15:30", end: "19:00" }],
-      3: null,
+      1: null,
+      2: null,
+      3: [{ start: "11:00", end: "14:00" }, { start: "15:30", end: "19:30" }],
       4: null,
-      5: null,
-      6: [{ start: "10:00", end: "14:00" }],
+      5: [{ start: "11:00", end: "14:00" }],
+      6: null,
     }
   },
   { 
@@ -235,10 +235,10 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     calendarId: "79e5638e12bd9579183595c7baad1eb44d1a27036a3d2686432d155abd04c044@group.calendar.google.com", 
     isActive: true,
     schedule: {
-      0: null,
-      1: null,
+      0: [{ start: "10:30", end: "14:00" }, { start: "15:30", end: "19:00" }],
+      1: [{ start: "10:30", end: "14:00" }, { start: "15:30", end: "19:00" }],
       2: null,
-      3: [{ start: "10:00", end: "13:00" }],
+      3: null,
       4: null,
       5: null,
       6: null,

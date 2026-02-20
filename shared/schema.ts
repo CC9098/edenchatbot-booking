@@ -37,6 +37,8 @@ export const holidays = pgTable("holidays", {
   doctorId: text("doctor_id"), // null means all doctors
   clinicId: text("clinic_id"), // null means all clinics
   holidayDate: date("holiday_date").notNull(),
+  startTime: text("start_time"), // null means all-day holiday
+  endTime: text("end_time"), // null means all-day holiday
   reason: text("reason"),
 });
 
