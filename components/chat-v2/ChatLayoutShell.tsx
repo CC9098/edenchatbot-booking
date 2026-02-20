@@ -1,15 +1,44 @@
 "use client";
 
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import { Menu } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ChatShellProvider, useChatShell } from "./ChatShellContext";
 
 export function ChatLayoutShell({ children }: { children: React.ReactNode }) {
+  return (
+    <ChatShellProvider>
+      <ChatLayoutFrame>{children}</ChatLayoutFrame>
+    </ChatShellProvider>
+  );
+}
+
+function ChatLayoutFrame({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const { toggleHistory } = useChatShell();
+  const isChatHome = pathname === "/chat";
+  const isSymptomsPage = pathname.startsWith("/chat/symptoms");
+  const actionHref = isSymptomsPage ? "/chat" : "/chat/symptoms";
+  const actionLabel = isSymptomsPage ? "返回聊天" : "我的症狀";
+
   return (
     <AuthGuard>
       <header className="chat-fixed-topbar">
         <div className="chat-fixed-topbar__inner">
-          <div className="chat-fixed-topbar__spacer" />
+          {isChatHome ? (
+            <button
+              type="button"
+              onClick={toggleHistory}
+              className="chat-fixed-topbar__menu"
+              aria-label="開啟對話歷史"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+          ) : (
+            <div className="chat-fixed-topbar__spacer" />
+          )}
           <Link href="/chat" className="chat-fixed-topbar__brand">
             <Image
               src="/logo-eden.png"
@@ -20,8 +49,8 @@ export function ChatLayoutShell({ children }: { children: React.ReactNode }) {
             />
             <span>Eden Care</span>
           </Link>
-          <Link href="/chat/symptoms" className="chat-fixed-topbar__action">
-            我的症狀
+          <Link href={actionHref} className="chat-fixed-topbar__action">
+            {actionLabel}
           </Link>
         </div>
       </header>

@@ -21,7 +21,7 @@ const TABS: TabItem[] = [
   { id: "chat", label: "聊天", href: "/chat", Icon: Sparkles },
   { id: "booking", label: "預約", href: "/booking", Icon: CalendarCheck2 },
   { id: "learn", label: "學習", href: "/courses", Icon: BookOpenText },
-  { id: "profile", label: "我的", href: "/login", Icon: UserRound },
+  { id: "profile", label: "我的", href: "/chat/symptoms", Icon: UserRound },
 ];
 
 function isPatientRoute(pathname: string): boolean {
@@ -37,6 +37,7 @@ function isPatientRoute(pathname: string): boolean {
 }
 
 function getActiveTab(pathname: string): TabItem["id"] {
+  if (pathname.startsWith("/chat/symptoms")) return "profile";
   if (pathname.startsWith("/chat")) return "chat";
   if (
     pathname.startsWith("/booking") ||
