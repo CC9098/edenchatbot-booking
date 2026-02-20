@@ -375,17 +375,31 @@ const BOOKING_TIME_HINTS = [
   'next', 'tomorrow', 'date',
 ];
 
-const G2_DEEP_DIVE_KEYWORDS = ['原理', '深入', '詳細', '解釋', '點解', 'why'];
+const G2_DEEP_DIVE_KEYWORDS = ['原理', '深入', '詳細', '解釋', '點解', 'why', '機制', '原因'];
+const G2_DEEP_DIVE_EXPANSION_CUES = [
+  '講多啲', '讲多点', '講多d', '再講', '再讲', '補充', '补充', '展開', '展开',
+  '更多', '多一點', '多一点', '多一些',
+  'elaborate', 'more detail', 'tell me more', 'go deeper', 'know more', 'learn more',
+];
 const G2_DEEP_DIVE_OFFER_CUES = [
   '想唔想', '會唔會想', '要唔要', '需唔需要', '想知道',
   '如果你想', '想嘅話', '可以再講', '我可以再講', '要我再講',
+  '要我講多啲', '想我講多啲', '要我補充', '想我補充', '要我展開', '想我展開',
+  '想聽多啲', '要我講詳細啲',
 ];
 const G2_AFFIRMATIVE_SHORT_REPLIES = new Set([
   '係', '系', '好', '要', '想', '想知', '可以', 'ok', 'okay', 'yes',
+  'sure', 'yep', 'yeah', 'please', 'pls',
   '嗯', '嗯嗯', '好呀', '好啊', '係呀', '係啊', '想呀', '想啊',
   '要呀', '要啊', '可以呀', '可以啊', '請講', '講', '講下', '講啦',
   '再講', '再講下', '深入啲', '深入些', '深入',
+  '講多啲', '讲多点', '可以再講', '可以再讲', '再詳細啲', '再详细点',
 ]);
+const G2_AFFIRMATIVE_REPLY_PREFIXES = [
+  'yes', 'yeah', 'yep', 'sure', 'ok', 'okay',
+  '係', '系', '好', '要', '想', '可以',
+  '請講', '講', '再講', '講多', '深入',
+];
 
 const TASK_REWRITE_KEYWORDS = ['改寫', '改写', 'rewrite', 'rephrase', '潤飾', '润色', 'polish'];
 const TASK_SUMMARY_KEYWORDS = ['總結', '总结', '摘要', '總結重點', 'summarize', 'summary', 'tl;dr'];
@@ -699,21 +713,33 @@ function findPreviousAssistantMessage(messages: ChatMessagePayload[]): ChatMessa
 
 function isShortAffirmativeReply(text: string): boolean {
   const normalized = normalizeIntentText(text);
-  if (!normalized || normalized.length > 12) return false;
-  return G2_AFFIRMATIVE_SHORT_REPLIES.has(normalized);
+  if (!normalized || normalized.length > 24) return false;
+  if (G2_AFFIRMATIVE_SHORT_REPLIES.has(normalized)) return true;
+
+  const compactLower = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  const hasAffirmativePrefix = G2_AFFIRMATIVE_REPLY_PREFIXES.some((prefix) =>
+    compactLower.startsWith(prefix)
+  );
+  if (!hasAffirmativePrefix) return false;
+
+  const hasNegation = /唔要|不要|唔使|不用|not now|no thanks|later/i.test(compactLower);
+  return !hasNegation;
 }
 
 function isG2DeepDiveOfferMessage(text: string): boolean {
   const lower = text.toLowerCase();
   const hasDeepKeyword = G2_DEEP_DIVE_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()));
-  if (!hasDeepKeyword) return false;
+  const hasExpansionCue = G2_DEEP_DIVE_EXPANSION_CUES.some((cue) => lower.includes(cue.toLowerCase()));
+  if (!hasDeepKeyword && !hasExpansionCue) return false;
 
   const hasOfferCue = G2_DEEP_DIVE_OFFER_CUES.some((cue) => lower.includes(cue.toLowerCase()));
   if (hasOfferCue) return true;
 
   const trimmed = text.trim();
   const hasQuestionTone = trimmed.includes('？') || trimmed.includes('?') || trimmed.includes('嗎');
-  return hasQuestionTone && (lower.includes('你') || lower.includes('you'));
+  const hasSecondPersonPrompt = lower.includes('你') || lower.includes('you');
+  const hasOfferVerb = lower.includes('想') || lower.includes('要') || lower.includes('可以');
+  return hasQuestionTone && hasSecondPersonPrompt && hasOfferVerb;
 }
 
 function isLatestUserG2OptInReply(messages: ChatMessagePayload[]): boolean {
@@ -724,6 +750,7 @@ function isLatestUserG2OptInReply(messages: ChatMessagePayload[]): boolean {
 
   const previousAssistant = findPreviousAssistantMessage(messages);
   if (!previousAssistant) return false;
+  if (isBookingProgressAssistantMessage(previousAssistant.content)) return false;
   return isG2DeepDiveOfferMessage(previousAssistant.content);
 }
 

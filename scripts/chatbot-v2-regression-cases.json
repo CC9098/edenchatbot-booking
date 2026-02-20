@@ -196,6 +196,32 @@
       "expect": {
         "modeIn": ["B"]
       }
+    },
+    {
+      "id": "L7",
+      "title": "G1 to G2 opt-in (yes with filler words)",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "assistant", "content": "如果你想，我可以再講多啲點解晚間飲咖啡會影響睡眠。你想唔想知道更多？" },
+        { "role": "user", "content": "yes. 好 等等" }
+      ],
+      "expect": {
+        "modeIn": ["G2"],
+        "disallowBookingNudge": true
+      }
+    },
+    {
+      "id": "L8",
+      "title": "G1 to G2 opt-in (assistant expansion cue)",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "assistant", "content": "要我再展開講多一點原理嗎？" },
+        { "role": "user", "content": "可以" }
+      ],
+      "expect": {
+        "modeIn": ["G2"],
+        "disallowBookingNudge": true
+      }
     }
   ]
 }

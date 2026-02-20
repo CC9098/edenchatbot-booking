@@ -64,7 +64,7 @@ Semantic 唔係每次跑，只有以下情況先跑：
 - 只有 `confidence >= threshold`（預設 `0.75`）先覆蓋 rules 結果。
 - 否則（低信心、timeout、JSON 失敗）全部 fallback 用 `ruleMode`。
 
-## 6) 最終 mode 驗收題庫（20 題）
+## 6) 最終 mode 驗收題庫（21 題）
 
 格式：`輸入 -> 預期 mode -> 命中理由`
 
@@ -80,14 +80,15 @@ Semantic 唔係每次跑，只有以下情況先跑：
 10. `可以詳細解釋下原理嗎？` -> `G2` -> G2 keyword
 11. `why does this happen?` -> `G2` -> G2 keyword
 12. `好`（上一輪 assistant 問「想唔想我詳細講原理？」） -> `G2` -> G2 opt-in
-13. `我呢幾個月一直瞓唔好，成日心慌，唔知點算` -> `G3` -> G3 keyword
-14. `幫我分析下點解每晚都焦慮` -> `G3` -> G3 keyword
-15. 超長 180 字生活困擾描述 -> `G3` -> length > 150
-16. `我想預約，同埋想知點解我頸痛` -> `B` -> B 優先序高於 G2
-17. `下周`（前文連續 2 輪講預約） -> `B` 或 semantic 覆蓋 -> 先 rule=B，再視 confidence
-18. `其實唔使預約住，想問飲食先` -> 通常 `G1/G2` -> cancel 訊號會打斷 B stickiness
-19. `book... but explain why I keep neck pain` -> `B` -> booking 優先
-20. `我一直困擾，但都想改期` -> `B` -> booking 優先
+13. `yes. 好 等等`（上一輪 assistant 問「你想唔想知道更多？」） -> `G2` -> G2 opt-in（肯定前綴 + 補字）
+14. `我呢幾個月一直瞓唔好，成日心慌，唔知點算` -> `G3` -> G3 keyword
+15. `幫我分析下點解每晚都焦慮` -> `G3` -> G3 keyword
+16. 超長 180 字生活困擾描述 -> `G3` -> length > 150
+17. `我想預約，同埋想知點解我頸痛` -> `B` -> B 優先序高於 G2
+18. `下周`（前文連續 2 輪講預約） -> `B` 或 semantic 覆蓋 -> 先 rule=B，再視 confidence
+19. `其實唔使預約住，想問飲食先` -> 通常 `G1/G2` -> cancel 訊號會打斷 B stickiness
+20. `book... but explain why I keep neck pain` -> `B` -> booking 優先
+21. `我一直困擾，但都想改期` -> `B` -> booking 優先
 
 ## 7) Debug 對照（實戰）
 
