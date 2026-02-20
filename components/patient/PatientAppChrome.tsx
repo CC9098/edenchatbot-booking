@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
   Sparkles,
   CalendarCheck2,
@@ -52,40 +53,75 @@ function getActiveTab(pathname: string): TabItem["id"] {
 
 export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const patientRoute = isPatientRoute(pathname);
+  const isChatRoute = pathname.startsWith("/chat");
 
-  if (!isPatientRoute(pathname)) {
+  const activeTab = getActiveTab(pathname);
+  const shouldShowTabbar = !isChatRoute || !keyboardOpen;
+
+  // Avoid iOS keyboard + fixed tabbar collision on chat pages.
+  useEffect(() => {
+    if (!isChatRoute) {
+      setKeyboardOpen(false);
+      return;
+    }
+
+    if (typeof window === "undefined") return;
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const threshold = 120;
+    const handleViewportChange = () => {
+      const delta = window.innerHeight - viewport.height;
+      setKeyboardOpen(delta > threshold);
+    };
+
+    handleViewportChange();
+    viewport.addEventListener("resize", handleViewportChange);
+    viewport.addEventListener("scroll", handleViewportChange);
+
+    return () => {
+      viewport.removeEventListener("resize", handleViewportChange);
+      viewport.removeEventListener("scroll", handleViewportChange);
+    };
+  }, [isChatRoute]);
+
+  const shellPaddingBottom = useMemo(
+    () => (shouldShowTabbar ? "calc(88px + env(safe-area-inset-bottom))" : "0px"),
+    [shouldShowTabbar]
+  );
+
+  if (!patientRoute) {
     return <>{children}</>;
   }
 
-  const activeTab = getActiveTab(pathname);
-
   return (
-    <div className="patient-mobile-shell pb-[calc(88px+env(safe-area-inset-bottom))]">
+    <div className="patient-mobile-shell" style={{ paddingBottom: shellPaddingBottom }}>
       {children}
 
-      <nav
-        className="patient-tabbar"
-        aria-label="病人功能導覽"
-      >
-        <div className="patient-tabbar__inner">
-          {TABS.map(({ id, label, href, Icon }) => {
-            const isActive = activeTab === id;
-            return (
-              <Link
-                key={id}
-                href={href}
-                className={`patient-tab ${
-                  isActive ? "patient-tab--active" : "patient-tab--idle"
-                }`}
-                aria-current={isActive ? "page" : undefined}
-              >
-                <Icon className="h-[18px] w-[18px]" strokeWidth={2.25} />
-                <span>{label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      {shouldShowTabbar ? (
+        <nav className="patient-tabbar" aria-label="病人功能導覽">
+          <div className="patient-tabbar__inner">
+            {TABS.map(({ id, label, href, Icon }) => {
+              const isActive = activeTab === id;
+              return (
+                <Link
+                  key={id}
+                  href={href}
+                  className={`patient-tab ${
+                    isActive ? "patient-tab--active" : "patient-tab--idle"
+                  }`}
+                  aria-current={isActive ? "page" : undefined}
+                >
+                  <Icon className="h-[18px] w-[18px]" strokeWidth={2.25} />
+                  <span>{label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      ) : null}
     </div>
   );
 }
