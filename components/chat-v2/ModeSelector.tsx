@@ -28,7 +28,7 @@ export function ModeIndicator({ currentMode }: ModeIndicatorProps) {
       >
         {currentMode === "B" ? "📅" : "💬"} {meta.label}
       </span>
-      <span className="text-[11px] text-gray-400">{meta.desc}</span>
+      <span className="hidden text-[11px] text-gray-400 sm:inline">{meta.desc}</span>
     </div>
   );
 }

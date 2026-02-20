@@ -65,7 +65,10 @@ function Header() {
 export function ChatLayoutShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
-      <div className="flex h-dvh flex-col bg-[#f5f7f3]">
+      <div
+        className="flex min-h-dvh flex-col bg-[#f5f7f3]"
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+      >
         <Header />
         <main className="flex flex-1 flex-col overflow-hidden">
           {children}
