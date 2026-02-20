@@ -26,7 +26,7 @@ export function ChatLayoutShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="mx-auto flex min-h-[calc(100dvh-130px)] w-full max-w-[760px] flex-col px-4 pt-[calc(env(safe-area-inset-top)+84px)]">
+      <div className="chat-content-offset mx-auto flex min-h-[calc(100dvh-130px)] w-full max-w-[760px] flex-col px-4">
         <main className="patient-card flex min-h-full flex-1 flex-col overflow-hidden">
           {children}
         </main>
