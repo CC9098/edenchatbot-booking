@@ -1,0 +1,201 @@
+{
+  "version": "2026-02-18",
+  "description": "Fixed regression corpus for chatbot-v2 Sprint 0-3",
+  "cases": [
+    {
+      "id": "T1",
+      "title": "Booking new appointment intent",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "user", "content": "我想預約陳醫師，下星期三中環有咩時段？" }
+      ],
+      "expect": {
+        "modeIn": ["B"],
+        "mustContain": ["陳", "時段"]
+      }
+    },
+    {
+      "id": "T2",
+      "title": "Reschedule intent",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "user", "content": "我想改期，幫我睇下我嚟緊嗰個預約。" }
+      ],
+      "expect": {
+        "modeIn": ["B"],
+        "mustContain": ["預約"]
+      }
+    },
+    {
+      "id": "T3",
+      "title": "Rewrite task should avoid booking flow",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "user", "content": "請將呢句改寫得更專業：我近排成日攰。" }
+      ],
+      "expect": {
+        "modeNotIn": ["B"],
+        "disallowBookingNudge": true
+      }
+    },
+    {
+      "id": "T4",
+      "title": "Summarization task should avoid booking flow",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "user", "content": "請總結呢段文字重點：熬夜會影響皮質醇節律，導致白天疲倦、夜晚更精神。" }
+      ],
+      "expect": {
+        "modeNotIn": ["B"],
+        "disallowBookingNudge": true
+      }
+    },
+    {
+      "id": "T5",
+      "title": "General health why-question",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "user", "content": "點解我飲完咖啡會心跳快同瞓唔著？" }
+      ],
+      "expect": {
+        "modeIn": ["G1", "G2"],
+        "disallowBookingNudge": true
+      }
+    },
+    {
+      "id": "T6",
+      "title": "Word limit contract (Traditional Chinese)",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "user", "content": "請用不多於30字，答我今晚點改善瞓眠。" }
+      ],
+      "expect": {
+        "modeNotIn": ["B"],
+        "maxWords": 30,
+        "disallowBookingNudge": true
+      }
+    },
+    {
+      "id": "T7",
+      "title": "Bullet output contract",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "user", "content": "請用3點列出減少肩頸緊張嘅方法。" }
+      ],
+      "expect": {
+        "modeNotIn": ["B"],
+        "mustContain": ["1", "2", "3"],
+        "disallowBookingNudge": true
+      }
+    },
+    {
+      "id": "T8",
+      "title": "JSON contract",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "user", "content": "只輸出JSON，欄位要有 advice 和 caution，內容關於晚睡。" }
+      ],
+      "expect": {
+        "modeNotIn": ["B"],
+        "requireJson": true,
+        "disallowBookingNudge": true
+      }
+    },
+    {
+      "id": "T9",
+      "title": "Booking records intent",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "user", "content": "我有咩預約？幫我查下。" }
+      ],
+      "expect": {
+        "modeIn": ["B"],
+        "mustContain": ["預約"]
+      }
+    },
+    {
+      "id": "T10",
+      "title": "English rewrite with word cap",
+      "language": "en",
+      "messages": [
+        { "role": "user", "content": "Rewrite this in under 45 words: I always sleep after 2am and wake up exhausted, so my mood and concentration are getting worse." }
+      ],
+      "expect": {
+        "modeNotIn": ["B"],
+        "maxWords": 45,
+        "disallowBookingNudge": true
+      }
+    },
+    {
+      "id": "L1",
+      "title": "Simplified Chinese booking synonym with doctor",
+      "language": "zh-Hans",
+      "messages": [
+        { "role": "user", "content": "我想预约韓医师，下周二铜锣湾可以吗？" }
+      ],
+      "expect": {
+        "modeIn": ["B"]
+      }
+    },
+    {
+      "id": "L2",
+      "title": "English booking synonym",
+      "language": "en",
+      "messages": [
+        { "role": "user", "content": "Can you book Dr Chan for me next Wednesday in Central?" }
+      ],
+      "expect": {
+        "modeIn": ["B"]
+      }
+    },
+    {
+      "id": "L3",
+      "title": "Simplified Chinese JSON request",
+      "language": "zh-Hans",
+      "messages": [
+        { "role": "user", "content": "请只返回JSON，字段是 steps 和 warning，主题是改善失眠。" }
+      ],
+      "expect": {
+        "modeNotIn": ["B"],
+        "requireJson": true,
+        "disallowBookingNudge": true
+      }
+    },
+    {
+      "id": "L4",
+      "title": "English summarization",
+      "language": "en",
+      "messages": [
+        { "role": "user", "content": "Summarize this into 2 short bullet points: Late caffeine intake can delay melatonin and increase nighttime alertness." }
+      ],
+      "expect": {
+        "modeNotIn": ["B"],
+        "disallowBookingNudge": true
+      }
+    },
+    {
+      "id": "L5",
+      "title": "Simplified Chinese rewrite",
+      "language": "zh-Hans",
+      "messages": [
+        { "role": "user", "content": "把这句话改写得更温和：你这样熬夜不行。" }
+      ],
+      "expect": {
+        "modeNotIn": ["B"],
+        "disallowBookingNudge": true
+      }
+    },
+    {
+      "id": "L6",
+      "title": "Booking short follow-up phrase",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "assistant", "content": "你想預約邊位醫師同邊區診所？" },
+        { "role": "user", "content": "下周。" }
+      ],
+      "expect": {
+        "modeIn": ["B"]
+      }
+    }
+  ]
+}

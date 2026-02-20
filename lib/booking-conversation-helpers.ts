@@ -9,7 +9,14 @@ import {
   getBookableDoctorsServer,
   getDoctorScheduleSummaryByNameZhServer,
 } from '@/lib/clinic-schedule-data-server';
-import { DOCTOR_BY_NAME_ZH, CLINIC_BY_ID, CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
+import {
+  DOCTOR_BY_NAME_ZH,
+  CLINIC_BY_ID,
+  CLINIC_ID_BY_NAME_ZH,
+  DOCTORS,
+  CLINICS,
+  getClinicAddress,
+} from '@/shared/clinic-data';
 import { getActiveCalendarIds, getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
 import { getFreeBusy } from './google-calendar';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
@@ -34,6 +41,7 @@ const DEFAULT_LIST_BOOKINGS_LIMIT = 5;
 const DEFAULT_RECENT_BOOKINGS_LIMIT = 3;
 const CALENDAR_LOOKBACK_DAYS = 180;
 const CALENDAR_LOOKAHEAD_DAYS = 365;
+const CALENDAR_UNAVAILABLE_TAG = '[CALENDAR_UNAVAILABLE]';
 
 const RECEIPT_LABELS: Record<BookingReceiptType, string> = {
   no: '不用',
@@ -53,6 +61,10 @@ const GENDER_LABELS: Record<BookingGender, string> = {
   female: '女 Female',
   other: '其他 Other',
 };
+
+function isBookingAliasResolutionEnabled(): boolean {
+  return process.env.CHAT_V2_BOOKING_ALIAS_RESOLUTION_ENABLED !== 'false';
+}
 
 const conversationalBookingSchema = z
   .object({
@@ -122,6 +134,85 @@ export interface BookingCreationContext {
 function toSafeText(value?: string): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function normalizeLookupToken(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[\s.'’"()\-_/]/g, '')
+    .replace(/医师|醫生|医生/g, '醫師')
+    .replace(/韩/g, '韓');
+}
+
+const DOCTOR_ALIAS_MAP: Record<string, string> = (() => {
+  const aliases: Record<string, string> = {};
+
+  for (const doctor of DOCTORS) {
+    const canonical = doctor.nameZh;
+    const enShort = doctor.nameEn.replace(/^dr\.?\s*/i, '').trim();
+    const zhSurname = canonical.slice(0, 1);
+
+    const keys = new Set<string>([
+      canonical,
+      canonical.replace('醫師', ''),
+      canonical.replace('醫師', '医师'),
+      `${zhSurname}醫師`,
+      `${zhSurname}医师`,
+      doctor.nameEn,
+      `dr ${enShort}`,
+      `doctor ${enShort}`,
+      enShort,
+    ]);
+
+    if (canonical.startsWith('韓')) {
+      keys.add(canonical.replace(/^韓/, '韩'));
+      keys.add('韓醫師');
+      keys.add('韩医师');
+      keys.add('韩医生');
+    }
+
+    for (const key of keys) {
+      aliases[normalizeLookupToken(key)] = canonical;
+    }
+  }
+
+  return aliases;
+})();
+
+const CLINIC_ALIAS_MAP: Record<string, string> = (() => {
+  const aliases: Record<string, string> = {};
+
+  for (const clinic of CLINICS) {
+    aliases[normalizeLookupToken(clinic.nameZh)] = clinic.nameZh;
+    aliases[normalizeLookupToken(clinic.nameEn)] = clinic.nameZh;
+  }
+
+  aliases[normalizeLookupToken('中环')] = '中環';
+  aliases[normalizeLookupToken('铜锣湾')] = '中環';
+  aliases[normalizeLookupToken('荃湾')] = '荃灣';
+  aliases[normalizeLookupToken('线上')] = '網上';
+
+  return aliases;
+})();
+
+function resolveDoctorNameZh(raw?: string): string | undefined {
+  const safe = toSafeText(raw);
+  if (!safe) return undefined;
+  if (!isBookingAliasResolutionEnabled()) return safe;
+  if (DOCTOR_BY_NAME_ZH[safe]) return safe;
+
+  const resolved = DOCTOR_ALIAS_MAP[normalizeLookupToken(safe)];
+  return resolved || undefined;
+}
+
+function resolveClinicNameZh(raw?: string): string | undefined {
+  const safe = toSafeText(raw);
+  if (!safe) return undefined;
+  if (!isBookingAliasResolutionEnabled()) return safe;
+  if (CLINIC_ID_BY_NAME_ZH[safe]) return safe;
+
+  const resolved = CLINIC_ALIAS_MAP[normalizeLookupToken(safe)];
+  return resolved || undefined;
 }
 
 function buildStructuredBookingNotes(request: BookingRequest): string {
@@ -438,7 +529,8 @@ export async function listBookableDoctors(): Promise<{ doctors: DoctorInfo[] }> 
 }
 
 async function getClinicsForDoctor(doctorNameZh: string): Promise<string[]> {
-  const doctor = DOCTOR_BY_NAME_ZH[doctorNameZh];
+  const resolvedDoctorNameZh = resolveDoctorNameZh(doctorNameZh) || doctorNameZh;
+  const doctor = DOCTOR_BY_NAME_ZH[resolvedDoctorNameZh];
   if (!doctor) return [];
 
   const doctorMappings = (await getActiveScheduleMappings()).filter(
@@ -459,12 +551,14 @@ async function getClinicsForDoctor(doctorNameZh: string): Promise<string[]> {
 export async function getBookingOptions(
   request: BookingOptionsRequest
 ): Promise<BookingOptionsResult> {
-  const doctorNameZh = toSafeText(request.doctorNameZh);
+  const rawDoctorName = toSafeText(request.doctorNameZh);
+  const doctorNameZh = resolveDoctorNameZh(rawDoctorName);
   const date = toSafeText(request.date);
-  const clinicNameZh = toSafeText(request.clinicNameZh);
+  const rawClinicName = toSafeText(request.clinicNameZh);
+  const clinicNameZh = resolveClinicNameZh(rawClinicName);
   const doctors = (await listBookableDoctors()).doctors;
 
-  if (!doctorNameZh) {
+  if (!rawDoctorName) {
     return {
       success: true,
       doctors,
@@ -473,11 +567,11 @@ export async function getBookingOptions(
     };
   }
 
-  if (!DOCTOR_BY_NAME_ZH[doctorNameZh]) {
+  if (!doctorNameZh) {
     return {
       success: false,
       doctors,
-      error: `找不到醫師：${doctorNameZh}`,
+      error: `找不到醫師：${rawDoctorName}`,
       missingFields: ['doctorNameZh'],
       nextQuestion: '請從現有醫師中選擇一位。',
     };
@@ -496,7 +590,7 @@ export async function getBookingOptions(
     };
   }
 
-  if (!clinicNameZh) {
+  if (!rawClinicName || !clinicNameZh) {
     return {
       success: true,
       doctors,
@@ -509,12 +603,19 @@ export async function getBookingOptions(
 
   const slotsResult = await getAvailableTimeSlots(doctorNameZh, date, clinicNameZh);
   if (!slotsResult.success) {
+    const isCalendarUnavailable = Boolean(
+      slotsResult.error?.includes(CALENDAR_UNAVAILABLE_TAG)
+    );
+    const normalizedError = slotsResult.error?.replace(CALENDAR_UNAVAILABLE_TAG, '').trim();
     return {
       success: false,
       doctors,
       selectedDoctor: doctorNameZh,
       clinics,
-      error: slotsResult.error,
+      error: normalizedError,
+      nextQuestion: isCalendarUnavailable
+        ? '系統暫時未能讀取預約日曆，想唔想我幫你轉去 WhatsApp 由姑娘即時跟進？'
+        : undefined,
     };
   }
 
@@ -702,6 +803,12 @@ export interface TimeSlot {
   available: boolean;
 }
 
+function isCalendarUnavailableError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  return msg.includes('calendar') || msg.includes('oauth') || msg.includes('auth');
+}
+
 /**
  * Get available time slots for a doctor at a specific clinic on a specific date
  */
@@ -716,8 +823,11 @@ export async function getAvailableTimeSlots(
   error?: string;
 }> {
   try {
+    const resolvedDoctorNameZh = resolveDoctorNameZh(doctorNameZh);
+    const resolvedClinicNameZh = resolveClinicNameZh(clinicNameZh);
+
     // Validate doctor
-    const doctor = DOCTOR_BY_NAME_ZH[doctorNameZh];
+    const doctor = resolvedDoctorNameZh ? DOCTOR_BY_NAME_ZH[resolvedDoctorNameZh] : undefined;
     if (!doctor) {
       return { success: false, error: `找不到醫師：${doctorNameZh}` };
     }
@@ -734,7 +844,7 @@ export async function getAvailableTimeSlots(
     }
 
     // If clinic not specified, return list of available clinics
-    if (!clinicNameZh) {
+    if (!clinicNameZh || !resolvedClinicNameZh) {
       const availableClinics = doctorMappings
         .map(m => CLINIC_BY_ID[m.clinicId]?.nameZh)
         .filter((name): name is string => Boolean(name));
@@ -746,7 +856,7 @@ export async function getAvailableTimeSlots(
     }
 
     // Validate clinic
-    const clinicId = CLINIC_ID_BY_NAME_ZH[clinicNameZh];
+    const clinicId = CLINIC_ID_BY_NAME_ZH[resolvedClinicNameZh];
     if (!clinicId) {
       return { success: false, error: `找不到診所：${clinicNameZh}` };
     }
@@ -754,7 +864,7 @@ export async function getAvailableTimeSlots(
     // Find mapping for this doctor + clinic
     const mapping = doctorMappings.find(m => m.clinicId === clinicId);
     if (!mapping) {
-      return { success: false, error: `${doctorNameZh} 在 ${clinicNameZh} 沒有可預約時段` };
+      return { success: false, error: `${resolvedDoctorNameZh} 在 ${resolvedClinicNameZh} 沒有可預約時段` };
     }
 
     // Parse date and get day of week
@@ -767,12 +877,21 @@ export async function getAvailableTimeSlots(
     const daySchedule = mapping.schedule[dayOfWeek];
 
     if (!daySchedule || daySchedule.length === 0) {
-      return { success: false, error: `${doctorNameZh} 在 ${clinicNameZh} 於${date}沒有診症` };
+      return { success: false, error: `${resolvedDoctorNameZh} 在 ${resolvedClinicNameZh} 於${date}沒有診症` };
     }
 
     // Get busy slots from Google Calendar
     const requestDateUtc = fromZonedTime(`${date}T00:00:00`, HONG_KONG_TIMEZONE);
-    const busySlots = await getFreeBusy(mapping.calendarId, requestDateUtc);
+    let busySlots: { start: Date; end: Date }[] = [];
+    try {
+      busySlots = await getFreeBusy(mapping.calendarId, requestDateUtc);
+    } catch (calendarError) {
+      console.error('[getAvailableTimeSlots] Calendar error:', calendarError);
+      return {
+        success: false,
+        error: `${CALENDAR_UNAVAILABLE_TAG} 暫時未能讀取預約日曆，請稍後再試或聯絡診所。`,
+      };
+    }
 
     // Generate time slots based on schedule ranges
     const timeSlots: TimeSlot[] = [];
@@ -822,6 +941,12 @@ export async function getAvailableTimeSlots(
     };
   } catch (error) {
     console.error('[getAvailableTimeSlots] Error:', error);
+    if (isCalendarUnavailableError(error)) {
+      return {
+        success: false,
+        error: '暫時未能讀取預約日曆，請稍後再試或聯絡診所。',
+      };
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : '查詢時段時發生錯誤',
@@ -854,15 +979,22 @@ export async function createConversationalBooking(
       };
     }
     const bookingData = parsed.data;
+    const normalizedDoctorNameZh = resolveDoctorNameZh(bookingData.doctorNameZh) || bookingData.doctorNameZh;
+    const normalizedClinicNameZh = resolveClinicNameZh(bookingData.clinicNameZh) || bookingData.clinicNameZh;
+    const normalizedBookingData: BookingRequest = {
+      ...bookingData,
+      doctorNameZh: normalizedDoctorNameZh,
+      clinicNameZh: normalizedClinicNameZh,
+    };
 
     // Validate doctor
-    const doctor = DOCTOR_BY_NAME_ZH[bookingData.doctorNameZh];
+    const doctor = DOCTOR_BY_NAME_ZH[normalizedBookingData.doctorNameZh];
     if (!doctor) {
       return { success: false, error: `找不到醫師：${bookingData.doctorNameZh}` };
     }
 
     // Validate clinic
-    const clinicId = CLINIC_ID_BY_NAME_ZH[bookingData.clinicNameZh];
+    const clinicId = CLINIC_ID_BY_NAME_ZH[normalizedBookingData.clinicNameZh];
     if (!clinicId) {
       return { success: false, error: `找不到診所：${bookingData.clinicNameZh}` };
     }
@@ -880,13 +1012,13 @@ export async function createConversationalBooking(
     if (!mapping) {
       return {
         success: false,
-        error: `${bookingData.doctorNameZh} 在 ${bookingData.clinicNameZh} 沒有可預約時段`,
+        error: `${normalizedBookingData.doctorNameZh} 在 ${normalizedBookingData.clinicNameZh} 沒有可預約時段`,
       };
     }
 
     // Calculate start and end times
     const startDate = fromZonedTime(
-      `${bookingData.date}T${bookingData.time}:00`,
+      `${normalizedBookingData.date}T${normalizedBookingData.time}:00`,
       HONG_KONG_TIMEZONE
     );
 
@@ -900,7 +1032,7 @@ export async function createConversationalBooking(
 
     // Re-check availability to prevent race conditions
     const requestDateUtc = fromZonedTime(
-      `${bookingData.date}T00:00:00`,
+      `${normalizedBookingData.date}T00:00:00`,
       HONG_KONG_TIMEZONE
     );
     const busySlots = await getFreeBusy(mapping.calendarId, requestDateUtc);
@@ -920,7 +1052,7 @@ export async function createConversationalBooking(
       };
     }
 
-    const notes = buildStructuredBookingNotes(bookingData);
+    const notes = buildStructuredBookingNotes(normalizedBookingData);
 
     // Persist intake first. If this fails, stop before writing Google Calendar.
     const intakeCreate = await createPendingBookingIntake({
@@ -931,24 +1063,24 @@ export async function createConversationalBooking(
       doctorNameZh: doctor.nameZh,
       clinicId: clinic.id,
       clinicNameZh: clinic.nameZh,
-      appointmentDate: bookingData.date,
-      appointmentTime: bookingData.time,
+      appointmentDate: normalizedBookingData.date,
+      appointmentTime: normalizedBookingData.time,
       durationMinutes: DEFAULT_DURATION_MINUTES,
-      patientName: bookingData.patientName,
-      phone: bookingData.phone,
-      email: bookingData.email,
-      visitType: bookingData.visitType as BookingVisitType,
-      needReceipt: bookingData.needReceipt as BookingReceiptType,
-      medicationPickup: bookingData.medicationPickup as BookingPickupType,
-      idCard: toSafeText(bookingData.idCard),
-      dob: toSafeText(bookingData.dob),
-      gender: bookingData.gender,
-      allergies: toSafeText(bookingData.allergies),
-      medications: toSafeText(bookingData.medications),
-      symptoms: toSafeText(bookingData.symptoms),
-      referralSource: toSafeText(bookingData.referralSource),
+      patientName: normalizedBookingData.patientName,
+      phone: normalizedBookingData.phone,
+      email: normalizedBookingData.email,
+      visitType: normalizedBookingData.visitType as BookingVisitType,
+      needReceipt: normalizedBookingData.needReceipt as BookingReceiptType,
+      medicationPickup: normalizedBookingData.medicationPickup as BookingPickupType,
+      idCard: toSafeText(normalizedBookingData.idCard),
+      dob: toSafeText(normalizedBookingData.dob),
+      gender: normalizedBookingData.gender,
+      allergies: toSafeText(normalizedBookingData.allergies),
+      medications: toSafeText(normalizedBookingData.medications),
+      symptoms: toSafeText(normalizedBookingData.symptoms),
+      referralSource: toSafeText(normalizedBookingData.referralSource),
       notes,
-      bookingPayload: bookingData,
+      bookingPayload: normalizedBookingData,
     });
 
     if (!intakeCreate.success || !intakeCreate.intakeId) {
@@ -966,9 +1098,9 @@ export async function createConversationalBooking(
       clinicNameZh: clinic.nameZh,
       startTime: startDate,
       endTime: endDate,
-      patientName: bookingData.patientName,
-      phone: bookingData.phone,
-      email: bookingData.email,
+      patientName: normalizedBookingData.patientName,
+      phone: normalizedBookingData.phone,
+      email: normalizedBookingData.email,
       notes,
     });
 
@@ -1013,15 +1145,15 @@ export async function createConversationalBooking(
     // Send email confirmation (best effort)
     const clinicAddress = getClinicAddress(clinic.nameZh);
     const emailResult = await sendBookingConfirmationEmail({
-      patientName: bookingData.patientName,
-      patientEmail: bookingData.email,
+      patientName: normalizedBookingData.patientName,
+      patientEmail: normalizedBookingData.email,
       doctorName: doctor.nameEn,
       doctorNameZh: doctor.nameZh,
       clinicName: clinic.nameEn,
       clinicNameZh: clinic.nameZh,
       clinicAddress: clinicAddress,
-      date: bookingData.date,
-      time: bookingData.time,
+      date: normalizedBookingData.date,
+      time: normalizedBookingData.time,
       eventId: result.eventId,
       calendarId: mapping.calendarId,
     });

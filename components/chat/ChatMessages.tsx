@@ -118,7 +118,7 @@ export function ChatMessages({ messages, linkify, primaryColor, sessionId }: Cha
           >
             {isBot && (
               <div className="relative h-8 w-8 shrink-0">
-                <Image src="/logo eden.png" alt="醫天圓" fill className="object-contain" />
+                <Image src="/logo-eden.png" alt="醫天圓" fill className="object-contain" />
               </div>
             )}
             <div className="max-w-[82%]">
