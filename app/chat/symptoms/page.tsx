@@ -97,16 +97,16 @@ export default function MySymptomsPage() {
   return (
     <div className="mx-auto h-full w-full max-w-4xl flex-1 overflow-y-auto p-4 sm:p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">我的症狀紀錄</h1>
+        <h1 className="text-lg font-semibold text-slate-900">我的症狀紀錄</h1>
         <Link
           href="/chat"
-          className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100"
+          className="rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
         >
           返回 AI 諮詢
         </Link>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-primary/10 bg-white">
+      <div className="overflow-hidden rounded-2xl border border-primary/10 bg-white shadow-sm">
         <div className="grid grid-cols-[170px,1fr] border-b border-primary/10 bg-primary-light/40 px-4 py-3 text-xs font-semibold text-gray-600 sm:grid-cols-[220px,1fr]">
           <p>日期時間</p>
           <p>症狀內容</p>

@@ -184,7 +184,7 @@ function RescheduleBookingContent() {
 
                 if (error) {
                                 return (
-                                                <div className="mx-auto mt-10 max-w-md rounded-xl border border-red-100 bg-red-50 p-6 text-center">
+                                                <div className="mx-auto mt-10 max-w-md rounded-2xl border border-red-100 bg-red-50 p-6 text-center shadow-sm">
                                                                 <AlertCircle className="mx-auto mb-4 h-10 w-10 text-red-500" />
                                                                 <h2 className="mb-2 text-lg font-semibold text-red-700">發生錯誤</h2>
                                                                 <p className="text-red-600">{error}</p>
@@ -194,7 +194,7 @@ function RescheduleBookingContent() {
 
                 if (step === 'success') {
                                 return (
-                                                <div className="mx-auto mt-10 max-w-md rounded-xl border border-green-100 bg-green-50 p-8 text-center">
+                                                <div className="mx-auto mt-10 max-w-md rounded-2xl border border-green-100 bg-green-50 p-8 text-center shadow-sm">
                                                                 <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-primary" />
                                                                 <h2 className="mb-2 text-2xl font-bold text-green-800">改期成功！</h2>
                                                                 <p className="text-green-700">你的預約已更新。</p>
@@ -208,7 +208,7 @@ function RescheduleBookingContent() {
 
                 if (!doctor || !clinic) {
                                 return (
-                                                <div className="mx-auto mt-10 max-w-md rounded-xl border border-amber-100 bg-amber-50 p-6 text-center">
+                                                <div className="mx-auto mt-10 max-w-md rounded-2xl border border-amber-100 bg-amber-50 p-6 text-center shadow-sm">
                                                                 <AlertCircle className="mx-auto mb-4 h-10 w-10 text-amber-500" />
                                                                 <p className="text-amber-800">
                                                                                 無法從預約資料自動識別你的醫師或診所。
@@ -227,12 +227,12 @@ function RescheduleBookingContent() {
                                 : '--';
 
                 return (
-                                <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+                                <div className="patient-card mx-auto max-w-xl p-6 md:p-8">
                                                 <h1 className="mb-6 text-center text-2xl font-bold text-primary">更改預約</h1>
 
                                                 {step === 'summary' && (
                                                                 <div className="space-y-6">
-                                                                                <div className="rounded-xl bg-slate-50 p-5">
+                                                                                <div className="rounded-2xl bg-slate-50 p-5">
                                                                                                 <h3 className="mb-3 text-sm font-semibold text-slate-500">目前預約</h3>
                                                                                                 <p className="text-lg font-semibold text-slate-800">{doctor.nameZh} @ {clinic.nameZh}</p>
                                                                                                 <div className="mt-2 flex items-center gap-2 text-slate-600">
@@ -247,7 +247,7 @@ function RescheduleBookingContent() {
 
                                                                                 <button
                                                                                                 onClick={() => setStep('date')}
-                                                                                                className="flex w-full items-center justify-center rounded-xl bg-primary px-4 py-3 font-semibold text-white transition hover:bg-primary-hover"
+                                                                                                className="flex w-full items-center justify-center rounded-[18px] bg-primary px-4 py-3 font-semibold text-white transition hover:bg-primary-hover"
                                                                                 >
                                                                                                 選擇新時段
                                                                                 </button>
@@ -265,7 +265,7 @@ function RescheduleBookingContent() {
                                                                                                                 <button
                                                                                                                                 key={d.dateStr}
                                                                                                                                 onClick={() => handleDateSelect(d.dateStr)}
-                                                                                                                                className="flex flex-col items-center justify-center rounded-lg border border-slate-200 p-3 transition hover:border-primary hover:bg-primary-light"
+                                                                                                                                className="flex flex-col items-center justify-center rounded-xl border border-slate-200 p-3 transition hover:border-primary hover:bg-primary-light"
                                                                                                                 >
                                                                                                                                 <span className="text-xs font-medium text-slate-500">{d.dayName}</span>
                                                                                                                                 <span className="text-lg font-bold text-slate-800">{d.display}</span>
@@ -300,7 +300,7 @@ function RescheduleBookingContent() {
                                                                                                                                 <button
                                                                                                                                                 key={time}
                                                                                                                                                 onClick={() => { setSelectedTime(time); setStep('confirm'); }}
-                                                                                                                                                className="rounded-lg border border-green-100 bg-green-50 py-2 font-medium text-green-800 transition hover:bg-[#d1ead1] hover:shadow-sm"
+                                                                                                                                                className="rounded-xl border border-green-100 bg-green-50 py-2 font-medium text-green-800 transition hover:bg-[#d1ead1] hover:shadow-sm"
                                                                                                                                 >
                                                                                                                                                 {time}
                                                                                                                                 </button>
@@ -318,7 +318,7 @@ function RescheduleBookingContent() {
                                                                                 <h3 className="mb-6 text-xl font-bold text-slate-800">確認更改預約</h3>
 
                                                                                 <div className="space-y-4">
-                                                                                                <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 opacity-70">
+                                                                                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 opacity-70">
                                                                                                                 <p className="mb-1 text-xs font-bold text-slate-500">原預約</p>
                                                                                                                 <div className="flex items-center gap-2 text-slate-600 line-through">
                                                                                                                                 <Calendar className="h-4 w-4" />
@@ -332,7 +332,7 @@ function RescheduleBookingContent() {
                                                                                                                 <ChevronRight className="h-6 w-6 rotate-90 text-slate-400 sm:rotate-0" />
                                                                                                 </div>
 
-                                                                                                <div className="rounded-xl border border-green-200 bg-primary-light p-4 shadow-sm">
+                                                                                                <div className="rounded-2xl border border-green-200 bg-primary-light p-4 shadow-sm">
                                                                                                                 <p className="mb-1 text-xs font-bold text-primary">新預約</p>
                                                                                                                 <div className="flex items-center gap-2 text-lg font-bold text-green-800">
                                                                                                                                 <Calendar className="h-5 w-5" />
@@ -346,7 +346,7 @@ function RescheduleBookingContent() {
                                                                                 <button
                                                                                                 onClick={handleRescheduleConfirm}
                                                                                                 disabled={submitting}
-                                                                                                className="mt-8 flex w-full items-center justify-center rounded-xl bg-primary px-4 py-3 font-semibold text-white transition hover:bg-primary-hover disabled:opacity-70"
+                                                                                                className="mt-8 flex w-full items-center justify-center rounded-[18px] bg-primary px-4 py-3 font-semibold text-white transition hover:bg-primary-hover disabled:opacity-70"
                                                                                 >
                                                                                                 {submitting ? <Loader2 className="animate-spin" /> : '確認更改'}
                                                                                 </button>
@@ -359,7 +359,7 @@ function RescheduleBookingContent() {
 
 export default function ReschedulePage() {
                 return (
-                                <main className="min-h-screen bg-slate-50 px-4 py-12 md:py-20">
+                                <main className="patient-pane px-4 py-12 md:py-20">
                                                 <Suspense fallback={<div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
                                                                 <RescheduleBookingContent />
                                                 </Suspense>

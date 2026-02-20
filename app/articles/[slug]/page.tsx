@@ -43,8 +43,8 @@ export default async function ArticleDetailPage({ params }: PageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-primary-pale px-6 py-12 text-slate-800 sm:px-10">
-      <article className="mx-auto max-w-3xl space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+    <main className="patient-pane text-slate-800">
+      <article className="patient-card mx-auto max-w-3xl space-y-6 p-6 sm:p-8">
         <div className="space-y-3">
           <Link href="/articles" className="text-sm font-medium text-primary hover:underline">
             ← 返回文章列表
@@ -74,13 +74,13 @@ export default async function ArticleDetailPage({ params }: PageProps) {
         <div className="flex flex-wrap gap-3">
           <Link
             href="/chat"
-            className="inline-flex items-center rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-primary-hover"
+            className="inline-flex items-center rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-hover"
           >
             問 AI 深入解釋
           </Link>
           <Link
             href="/booking"
-            className="inline-flex items-center rounded-lg border border-primary/20 bg-white px-3 py-2 text-sm font-medium text-primary transition hover:bg-primary-light"
+            className="inline-flex items-center rounded-full border border-primary/20 bg-white px-4 py-2.5 text-sm font-semibold text-primary transition hover:bg-primary-light"
           >
             需要時直接預約
           </Link>

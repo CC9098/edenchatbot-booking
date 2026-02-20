@@ -80,7 +80,7 @@ function CancelBookingContent() {
 
                 if (error) {
                                 return (
-                                                <div className="mx-auto max-w-md rounded-xl border border-red-100 bg-red-50 p-6 text-center">
+                                                <div className="mx-auto max-w-md rounded-2xl border border-red-100 bg-red-50 p-6 text-center shadow-sm">
                                                                 <AlertCircle className="mx-auto mb-4 h-10 w-10 text-red-500" />
                                                                 <h2 className="mb-2 text-lg font-semibold text-red-700">發生錯誤</h2>
                                                                 <p className="text-red-600">{error}</p>
@@ -90,7 +90,7 @@ function CancelBookingContent() {
 
                 if (cancelled) {
                                 return (
-                                                <div className="mx-auto max-w-md rounded-xl border border-green-100 bg-green-50 p-8 text-center">
+                                                <div className="mx-auto max-w-md rounded-2xl border border-green-100 bg-green-50 p-8 text-center shadow-sm">
                                                                 <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-green-600" />
                                                                 <h2 className="mb-2 text-2xl font-bold text-green-800">預約已取消</h2>
                                                                 <p className="text-green-700">你的預約已成功取消。</p>
@@ -109,7 +109,7 @@ function CancelBookingContent() {
                                 : '--';
 
                 return (
-                                <div className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+                                <div className="patient-card mx-auto max-w-lg p-6 md:p-8">
                                                 <h1 className="mb-6 text-center text-2xl font-bold text-slate-800">取消預約</h1>
 
                                                 <div className="mb-8 space-y-4 rounded-xl bg-slate-50 p-5">
@@ -145,7 +145,7 @@ function CancelBookingContent() {
                                                                 <button
                                                                                 onClick={handleCancel}
                                                                                 disabled={cancelling}
-                                                                                className="flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-3 font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                                                                                className="flex w-full items-center justify-center rounded-[18px] bg-red-600 px-4 py-3 font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
                                                                 >
                                                                                 {cancelling ? (
                                                                                                 <>
@@ -159,7 +159,7 @@ function CancelBookingContent() {
 
                                                                 <button
                                                                                 onClick={() => window.close()} // Won't work in all browsers if not opened by script, but good fallback intent
-                                                                                className="w-full rounded-xl border border-slate-200 px-4 py-3 font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                                                                                className="w-full rounded-[18px] border border-slate-200 px-4 py-3 font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
                                                                 >
                                                                                 保留預約
                                                                 </button>
@@ -170,7 +170,7 @@ function CancelBookingContent() {
 
 export default function CancelPage() {
                 return (
-                                <main className="min-h-screen bg-slate-50 px-4 py-12 md:py-20">
+                                <main className="patient-pane px-4 py-12 md:py-20">
                                                 <Suspense fallback={<div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
                                                                 <CancelBookingContent />
                                                 </Suspense>
