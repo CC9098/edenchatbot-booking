@@ -35,6 +35,8 @@
     "ios:run": "npx cap run ios"
   },
   "dependencies": {
+    "@capacitor/app": "^8.0.1",
+    "@capacitor/browser": "^8.0.1",
     "@capacitor/core": "^8.1.0",
     "@capacitor/ios": "^8.1.0",
     "@google/generative-ai": "^0.24.1",

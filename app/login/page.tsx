@@ -2,7 +2,10 @@
 
 import { useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
+import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
 import { createBrowserClient } from "@/lib/supabase-browser";
+import { getNativeAuthCallbackUrl, getWebAuthCallbackUrl } from "@/lib/auth-redirect";
 
 type EmailAuthMode = "signin" | "signup";
 
@@ -55,12 +58,43 @@ function LoginForm() {
     setSuccessMessage(null);
     setLoading(true);
     const supabase = createBrowserClient();
+
+    if (Capacitor.isNativePlatform()) {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: getNativeAuthCallbackUrl(),
+          skipBrowserRedirect: true,
+          queryParams: {
+            prompt: "select_account",
+          },
+        },
+      });
+
+      if (error || !data?.url) {
+        console.error("OAuth error:", error?.message ?? "missing oauth url");
+        setErrorMessage("Google 登入失敗，請稍後再試。");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        await Browser.open({ url: data.url });
+      } catch (browserError) {
+        console.error("Browser open error:", browserError);
+        setErrorMessage("無法開啟 Google 登入頁面，請稍後再試。");
+        setLoading(false);
+      }
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/api/auth/callback`,
+        redirectTo: getWebAuthCallbackUrl("/chat"),
       },
     });
+
     if (error) {
       console.error("OAuth error:", error.message);
       setErrorMessage("Google 登入失敗，請稍後再試。");
@@ -108,7 +142,7 @@ function LoginForm() {
       email: trimmedEmail,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+        emailRedirectTo: getWebAuthCallbackUrl("/chat"),
       },
     });
 
@@ -154,7 +188,7 @@ function LoginForm() {
       type: "signup",
       email: pendingConfirmationEmail,
       options: {
-        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+        emailRedirectTo: getWebAuthCallbackUrl("/chat"),
       },
     });
 
