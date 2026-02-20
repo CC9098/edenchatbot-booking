@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Sans_TC, Roboto_Mono } from "next/font/google";
+import { NativeOAuthListener } from "@/components/auth/NativeOAuthListener";
 import "./globals.css";
 
 const sans = Noto_Sans_TC({
@@ -16,6 +17,11 @@ const mono = Roboto_Mono({
 export const metadata: Metadata = {
   title: "醫天圓小助手 | Chatbot Widget",
   description: "Decision-tree chatbot widget for 醫天圓中醫診所，提供預約、收費、診所資訊與諮詢。",
+  icons: {
+    icon: "/logo-eden.png",
+    shortcut: "/logo-eden.png",
+    apple: "/logo-eden.png",
+  },
 };
 
 export default function RootLayout({
@@ -28,6 +34,7 @@ export default function RootLayout({
       <body
         className={`${sans.variable} ${mono.variable} antialiased`}
       >
+        <NativeOAuthListener />
         {children}
       </body>
     </html>
