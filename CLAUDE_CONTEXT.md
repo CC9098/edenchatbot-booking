@@ -141,10 +141,11 @@ Reference migrations:
 ## 8) Suggested Read Order for New AI Session
 
 1. `CLAUDE_CONTEXT.md` (this file)
-2. `docs/WEBSITE_ARCHITECTURE_MAP.md`
-3. `ARCHITECTURE.md`
-4. `README.md`
-5. target files for the current task
+2. `docs/CROSS_AGENT_HANDOFF_PLAYBOOK.md`
+3. `docs/WEBSITE_ARCHITECTURE_MAP.md`
+4. `ARCHITECTURE.md`
+5. `README.md`
+6. target files for the current task
 
 ## 9) Boundaries
 
