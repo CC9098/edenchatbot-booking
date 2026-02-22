@@ -1,6 +1,9 @@
 import ChatWidget from '@/components/ChatWidget';
 import Link from 'next/link';
 import { listPublishedArticles, listPublishedCourses } from '@/lib/content-service';
+import { createServerClient } from "@/lib/supabase-server";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +19,19 @@ function formatDate(date: string): string {
 }
 
 export default async function Home() {
+  const userAgent = headers().get("user-agent") ?? "";
+  if (/\bCapacitor\b/i.test(userAgent)) {
+    redirect("/chat");
+  }
+
+  const supabase = createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    redirect("/chat");
+  }
+
   const [articles, courses] = await Promise.all([listPublishedArticles(4), listPublishedCourses(4)]);
 
   return (

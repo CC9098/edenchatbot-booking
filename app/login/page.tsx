@@ -1,7 +1,8 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
 import { createBrowserClient } from "@/lib/supabase-browser";
@@ -42,6 +43,7 @@ function mapResendError(message: string): string {
 }
 
 function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const authError = searchParams.get("error") === "auth";
   const [activeMethod, setActiveMethod] = useState<"google" | "email">("google");
@@ -52,6 +54,30 @@ function LoginForm() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const supabase = createBrowserClient();
+    let active = true;
+
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
+      if (active && session?.user) {
+        router.replace("/chat");
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+      if (session?.user) {
+        router.replace("/chat");
+      }
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [router]);
 
   async function handleGoogleLogin() {
     setErrorMessage(null);
@@ -133,6 +159,7 @@ function LoginForm() {
       } else {
         setSuccessMessage("登入成功，正在跳轉...");
         setPendingConfirmationEmail(null);
+        router.replace("/chat");
       }
       setLoading(false);
       return;
@@ -173,6 +200,7 @@ function LoginForm() {
 
     setSuccessMessage("註冊成功，已自動登入。");
     setPendingConfirmationEmail(null);
+    router.replace("/chat");
     setLoading(false);
   }
 

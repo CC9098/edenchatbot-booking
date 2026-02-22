@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: "Eden Booking",
   webDir: "public",
   server: {
-    url: "https://edenchatbot-booking.vercel.app/",
+    url: "https://edenchatbot-booking.vercel.app/chat",
     iosScheme: "https",
   },
 };
