@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Sparkles,
   CalendarCheck2,
@@ -16,6 +16,8 @@ type TabItem = {
   href: string;
   Icon: typeof Sparkles;
 };
+
+const BOOKING_EXTERNAL_URL = "https://edentcm.as.me/schedule.php";
 
 const TABS: TabItem[] = [
   { id: "chat", label: "聊天", href: "/chat", Icon: Sparkles },
@@ -60,11 +62,27 @@ function getActiveTab(pathname: string): TabItem["id"] {
 export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [bookingHref, setBookingHref] = useState("/booking");
   const patientRoute = isPatientRoute(pathname);
   const isChatRoute = pathname.startsWith("/chat");
 
   const activeTab = getActiveTab(pathname);
   const shouldShowTabbar = !isChatRoute || !keyboardOpen;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const cap = (window as Window & {
+      Capacitor?: { isNativePlatform?: () => boolean };
+    }).Capacitor;
+    const isNative = Boolean(cap?.isNativePlatform?.() ?? cap);
+    const ua = window.navigator.userAgent ?? "";
+    const isCapacitorUa = /\bCapacitor\b/i.test(ua);
+
+    if (isNative || isCapacitorUa) {
+      setBookingHref(BOOKING_EXTERNAL_URL);
+    }
+  }, []);
 
   // Avoid iOS keyboard + fixed tabbar collision on chat pages.
   useEffect(() => {
@@ -93,10 +111,8 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
     };
   }, [isChatRoute]);
 
-  const shellPaddingBottom = useMemo(
-    () => (shouldShowTabbar ? "calc(88px + env(safe-area-inset-bottom))" : "0px"),
-    [shouldShowTabbar]
-  );
+  // Keep a stable spacer so chat content won't jump when keyboard toggles tabbar visibility.
+  const shellPaddingBottom = "calc(88px + env(safe-area-inset-bottom))";
 
   if (!patientRoute) {
     return <>{children}</>;
@@ -111,10 +127,11 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
           <div className="patient-tabbar__inner">
             {TABS.map(({ id, label, href, Icon }) => {
               const isActive = activeTab === id;
+              const tabHref = id === "booking" ? bookingHref : href;
               return (
                 <Link
                   key={id}
-                  href={href}
+                  href={tabHref}
                   className={`patient-tab ${
                     isActive ? "patient-tab--active" : "patient-tab--idle"
                   }`}

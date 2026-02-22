@@ -82,7 +82,7 @@ h3 {
   left: 0;
   right: 0;
   z-index: 90;
-  padding: 0 12px calc(env(safe-area-inset-bottom, 0px) + 10px);
+  padding: 0 12px calc(env(safe-area-inset-bottom, 0px) + 6px);
   background: linear-gradient(to top, rgba(244, 246, 241, 0.98), rgba(244, 246, 241, 0.9) 55%, rgba(244, 246, 241, 0));
 }
 
