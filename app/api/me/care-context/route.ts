@@ -4,6 +4,13 @@ import { createServiceClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
+const CONSTITUTION_VALUES = ["depleting", "crossing", "hoarding", "mixed", "unknown"] as const;
+type ConstitutionValue = (typeof CONSTITUTION_VALUES)[number];
+
+function isConstitutionValue(value: unknown): value is ConstitutionValue {
+  return typeof value === "string" && CONSTITUTION_VALUES.includes(value as ConstitutionValue);
+}
+
 export async function GET() {
   try {
     const user = await getCurrentUser();
@@ -23,6 +30,50 @@ export async function GET() {
     if (cpError) {
       console.error("[GET /api/me/care-context] care profile error:", cpError.message);
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+
+    // Fallback source: profile-level constitution
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("constitution_type")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("[GET /api/me/care-context] profile constitution error:", profileError.message);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+
+    // Last fallback source: latest chat session type bound to this login user.
+    const { data: latestSession, error: latestSessionError } = await supabase
+      .from("chat_sessions")
+      .select("type")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestSessionError) {
+      console.error("[GET /api/me/care-context] latest session type error:", latestSessionError.message);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+
+    // Keep consistency with chat/v2 resolution while adding legacy fallback to chat_sessions.type.
+    let resolvedConstitution: ConstitutionValue = "unknown";
+    let constitutionSource: "patient_care_profile" | "profiles" | "chat_sessions" | "default" = "default";
+
+    if (isConstitutionValue(careProfile?.constitution) && careProfile.constitution !== "unknown") {
+      resolvedConstitution = careProfile.constitution;
+      constitutionSource = "patient_care_profile";
+    } else if (isConstitutionValue(profile?.constitution_type)) {
+      resolvedConstitution = profile.constitution_type;
+      constitutionSource = "profiles";
+    } else if (isConstitutionValue(latestSession?.type)) {
+      resolvedConstitution = latestSession.type;
+      constitutionSource = "chat_sessions";
+    } else if (isConstitutionValue(careProfile?.constitution)) {
+      resolvedConstitution = careProfile.constitution;
+      constitutionSource = "patient_care_profile";
     }
 
     // Fetch active care instructions
@@ -80,7 +131,8 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      constitution: careProfile?.constitution || "unknown",
+      constitution: resolvedConstitution,
+      constitutionSource,
       constitutionNote: careProfile?.constitution_note || null,
       activeInstructions: (instructions || []).map((i) => {
         const createdBy = typeof i.created_by === "string" ? i.created_by : null;

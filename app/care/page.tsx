@@ -25,6 +25,7 @@ type NextFollowUp = {
 
 type CareContextResponse = {
   constitution: string;
+  constitutionSource?: "patient_care_profile" | "profiles" | "chat_sessions" | "default";
   constitutionNote: string | null;
   activeInstructions: CareInstruction[];
   nextFollowUp: NextFollowUp | null;
@@ -106,6 +107,13 @@ function instructionMetaText(item: CareInstruction): string {
   const doctorName = item.createdByName || "醫師";
   const updatedAt = formatDateTime(item.updatedAt || item.createdAt);
   return `${formatInstructionDateRange(item)} ・ 醫師：${doctorName} ・ 更新：${updatedAt}`;
+}
+
+function constitutionSourceLabel(source: CareContextResponse["constitutionSource"]): string {
+  if (source === "patient_care_profile") return "來源：醫師評估";
+  if (source === "profiles") return "來源：帳號體質檔案";
+  if (source === "chat_sessions") return "來源：登入帳號對話紀錄";
+  return "來源：未有完整資料";
 }
 
 export default function CareAdvicePage() {
@@ -192,6 +200,7 @@ export default function CareAdvicePage() {
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">我的體質</h2>
                   <p className="mt-1 text-sm text-slate-600">{constitutionMeta.summary}</p>
+                  <p className="mt-2 text-xs text-slate-500">{constitutionSourceLabel(data?.constitutionSource)}</p>
                 </div>
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${constitutionMeta.badgeClass}`}
