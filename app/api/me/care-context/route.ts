@@ -28,7 +28,7 @@ export async function GET() {
     // Fetch active care instructions
     const { data: instructions, error: instrError } = await supabase
       .from("care_instructions")
-      .select("id, instruction_type, title, content_md, status, start_date, end_date, created_at")
+      .select("id, instruction_type, title, content_md, status, start_date, end_date, created_by, created_at, updated_at")
       .eq("patient_user_id", user.id)
       .eq("status", "active")
       .order("created_at", { ascending: false });
@@ -36,6 +36,32 @@ export async function GET() {
     if (instrError) {
       console.error("[GET /api/me/care-context] instructions error:", instrError.message);
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+
+    const creatorIds = Array.from(
+      new Set(
+        (instructions || [])
+          .map((item) => item.created_by)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
+    );
+
+    let creatorNameMap = new Map<string, string>();
+    if (creatorIds.length > 0) {
+      const { data: creators, error: creatorsError } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", creatorIds);
+
+      if (creatorsError) {
+        console.error("[GET /api/me/care-context] creator profile error:", creatorsError.message);
+      } else {
+        creatorNameMap = new Map(
+          (creators || [])
+            .filter((row): row is { id: string; display_name: string | null } => typeof row.id === "string")
+            .map((row) => [row.id, row.display_name || "醫師"]),
+        );
+      }
     }
 
     // Fetch next pending follow-up plan (earliest suggested_date)
@@ -56,16 +82,22 @@ export async function GET() {
     return NextResponse.json({
       constitution: careProfile?.constitution || "unknown",
       constitutionNote: careProfile?.constitution_note || null,
-      activeInstructions: (instructions || []).map((i) => ({
-        id: i.id,
-        instructionType: i.instruction_type,
-        title: i.title,
-        contentMd: i.content_md,
-        status: i.status,
-        startDate: i.start_date,
-        endDate: i.end_date,
-        createdAt: i.created_at,
-      })),
+      activeInstructions: (instructions || []).map((i) => {
+        const createdBy = typeof i.created_by === "string" ? i.created_by : null;
+        return {
+          id: i.id,
+          instructionType: i.instruction_type,
+          title: i.title,
+          contentMd: i.content_md,
+          status: i.status,
+          startDate: i.start_date,
+          endDate: i.end_date,
+          createdBy,
+          createdByName: createdBy ? creatorNameMap.get(createdBy) || null : null,
+          createdAt: i.created_at,
+          updatedAt: i.updated_at,
+        };
+      }),
       nextFollowUp: nextFollowUp
         ? {
             id: nextFollowUp.id,

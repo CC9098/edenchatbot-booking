@@ -207,22 +207,44 @@ export function ChatRoom() {
       }
 
       const rows = (data || []) as HistoryRow[];
-      const seen = new Set<string>();
-      const items: HistoryItem[] = [];
+      const sessions = new Map<
+        string,
+        {
+          sessionId: string;
+          updatedAt: string;
+          latestPreview: string;
+          firstPreview: string;
+        }
+      >();
 
       for (const row of rows) {
         const sid = row.session_id?.trim();
-        if (!sid || seen.has(sid)) continue;
+        if (!sid) continue;
 
-        seen.add(sid);
         const preview = toPreviewText(row.content_text);
-        items.push({
-          sessionId: sid,
-          title: toTitleText(preview),
-          preview,
-          updatedAt: row.created_at || new Date().toISOString(),
-        });
+        const createdAt = row.created_at || new Date().toISOString();
+        const existing = sessions.get(sid);
+
+        if (!existing) {
+          sessions.set(sid, {
+            sessionId: sid,
+            updatedAt: createdAt,
+            latestPreview: preview,
+            firstPreview: preview,
+          });
+          continue;
+        }
+
+        // Rows are sorted newest -> oldest, so keep replacing to land on first user message.
+        existing.firstPreview = preview;
       }
+
+      const items: HistoryItem[] = Array.from(sessions.values()).map((session) => ({
+        sessionId: session.sessionId,
+        title: toTitleText(session.firstPreview),
+        preview: session.latestPreview,
+        updatedAt: session.updatedAt,
+      }));
 
       setHistoryItems(items);
     } catch (err) {

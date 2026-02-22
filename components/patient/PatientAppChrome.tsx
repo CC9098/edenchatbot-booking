@@ -6,12 +6,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Sparkles,
   CalendarCheck2,
-  BookOpenText,
+  Leaf,
   UserRound,
 } from "lucide-react";
 
 type TabItem = {
-  id: "chat" | "booking" | "learn" | "profile";
+  id: "chat" | "booking" | "care" | "profile";
   label: string;
   href: string;
   Icon: typeof Sparkles;
@@ -20,7 +20,7 @@ type TabItem = {
 const TABS: TabItem[] = [
   { id: "chat", label: "聊天", href: "/chat", Icon: Sparkles },
   { id: "booking", label: "預約", href: "/booking", Icon: CalendarCheck2 },
-  { id: "learn", label: "學習", href: "/courses", Icon: BookOpenText },
+  { id: "care", label: "宜忌", href: "/care", Icon: Leaf },
   { id: "profile", label: "我的", href: "/chat/symptoms", Icon: UserRound },
 ];
 
@@ -32,6 +32,7 @@ function isPatientRoute(pathname: string): boolean {
     pathname.startsWith("/reschedule") ||
     pathname.startsWith("/articles") ||
     pathname.startsWith("/courses") ||
+    pathname.startsWith("/care") ||
     pathname.startsWith("/login")
   );
 }
@@ -46,8 +47,12 @@ function getActiveTab(pathname: string): TabItem["id"] {
   ) {
     return "booking";
   }
-  if (pathname.startsWith("/articles") || pathname.startsWith("/courses")) {
-    return "learn";
+  if (
+    pathname.startsWith("/care") ||
+    pathname.startsWith("/articles") ||
+    pathname.startsWith("/courses")
+  ) {
+    return "care";
   }
   return "profile";
 }
