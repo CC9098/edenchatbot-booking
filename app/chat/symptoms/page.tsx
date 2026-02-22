@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 type SymptomItem = {
   id: string;
@@ -11,6 +11,9 @@ type SymptomItem = {
   status: string | null;
   startedAt: string | null;
   endedAt: string | null;
+  resolutionMethod: string | null;
+  resolutionNote: string | null;
+  resolutionDays: number | null;
   loggedVia: string | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -22,6 +25,23 @@ type SymptomApiResponse = {
 };
 
 type StatusFilter = "all" | "active" | "resolved" | "recurring";
+type ResolveFormState = {
+  endedAt: string;
+  resolutionMethod: string;
+  customMethod: string;
+  resolutionNote: string;
+  resolutionDays: string;
+};
+
+const RESOLUTION_METHOD_OPTIONS = [
+  "多休息",
+  "飲薑茶或暖身飲品",
+  "補充水分",
+  "調整飲食",
+  "按時服藥",
+  "減少壓力 / 早睡",
+  "其他",
+] as const;
 
 const STATUS_META: Record<Exclude<StatusFilter, "all">, { label: string; pillClass: string }> = {
   active: {
@@ -53,6 +73,15 @@ function toSafeDate(value: string | null): Date | null {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return date;
+}
+
+function todayInHongKongDate(): string {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Hong_Kong",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 function isSameMonth(date: Date, monthBase: Date): boolean {
@@ -115,6 +144,16 @@ export default function MySymptomsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [resolveTarget, setResolveTarget] = useState<SymptomItem | null>(null);
+  const [resolveSaving, setResolveSaving] = useState(false);
+  const [resolveError, setResolveError] = useState("");
+  const [resolveForm, setResolveForm] = useState<ResolveFormState>({
+    endedAt: todayInHongKongDate(),
+    resolutionMethod: RESOLUTION_METHOD_OPTIONS[0],
+    customMethod: "",
+    resolutionNote: "",
+    resolutionDays: "",
+  });
 
   const loadSymptoms = useCallback(async () => {
     try {
@@ -184,6 +223,86 @@ export default function MySymptomsPage() {
     ],
     [stats.activeCount, stats.recurringCount, stats.total, sortedSymptoms],
   );
+
+  function openResolveModal(symptom: SymptomItem) {
+    setResolveTarget(symptom);
+    setResolveSaving(false);
+    setResolveError("");
+    setResolveForm({
+      endedAt: todayInHongKongDate(),
+      resolutionMethod: RESOLUTION_METHOD_OPTIONS[0],
+      customMethod: "",
+      resolutionNote: "",
+      resolutionDays: "",
+    });
+  }
+
+  function closeResolveModal() {
+    if (resolveSaving) return;
+    setResolveTarget(null);
+    setResolveError("");
+  }
+
+  async function submitResolveForm(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!resolveTarget) return;
+
+    const normalizedMethod =
+      resolveForm.resolutionMethod === "其他"
+        ? resolveForm.customMethod.trim()
+        : resolveForm.resolutionMethod;
+
+    if (!resolveForm.endedAt) {
+      setResolveError("請輸入好返日期");
+      return;
+    }
+
+    if (resolveForm.resolutionMethod === "其他" && !normalizedMethod) {
+      setResolveError("請補充好返方式");
+      return;
+    }
+
+    let normalizedDays: number | null = null;
+    if (resolveForm.resolutionDays.trim()) {
+      const parsed = Number.parseInt(resolveForm.resolutionDays.trim(), 10);
+      if (!Number.isInteger(parsed) || parsed < 0 || parsed > 365) {
+        setResolveError("好返天數需為 0-365 之間整數");
+        return;
+      }
+      normalizedDays = parsed;
+    }
+
+    try {
+      setResolveSaving(true);
+      setResolveError("");
+
+      const response = await fetch(`/api/me/symptoms/${resolveTarget.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: "resolved",
+          endedAt: resolveForm.endedAt,
+          resolutionMethod: normalizedMethod || null,
+          resolutionNote: resolveForm.resolutionNote.trim() || null,
+          resolutionDays: normalizedDays,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || "更新症狀失敗");
+      }
+
+      setResolveTarget(null);
+      await loadSymptoms();
+    } catch (err) {
+      setResolveError(err instanceof Error ? err.message : "更新症狀失敗");
+    } finally {
+      setResolveSaving(false);
+    }
+  }
 
   return (
     <div className="mx-auto h-full w-full max-w-4xl flex-1 overflow-y-auto p-4 sm:p-6">
@@ -277,20 +396,31 @@ export default function MySymptomsPage() {
               {filteredSymptoms.map((symptom) => (
                 <article key={symptom.id} className="px-4 py-4 sm:px-5">
                   <div className="space-y-2.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusPillClass(
-                          symptom.status,
-                        )}`}
-                      >
-                        {getStatusLabel(symptom.status)}
-                      </span>
-                      <h2 className="text-sm font-semibold text-gray-900">
-                        {symptom.category?.trim() || "未命名症狀"}
-                      </h2>
-                      <span className="text-xs text-gray-400">
-                        {symptom.loggedVia === "chat" ? "AI 對話記錄" : "手動記錄"}
-                      </span>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusPillClass(
+                            symptom.status,
+                          )}`}
+                        >
+                          {getStatusLabel(symptom.status)}
+                        </span>
+                        <h2 className="text-sm font-semibold text-gray-900">
+                          {symptom.category?.trim() || "未命名症狀"}
+                        </h2>
+                        <span className="text-xs text-gray-400">
+                          {symptom.loggedVia === "chat" ? "AI 對話記錄" : "手動記錄"}
+                        </span>
+                      </div>
+                      {(symptom.status === "active" || symptom.status === "recurring") && (
+                        <button
+                          type="button"
+                          onClick={() => openResolveModal(symptom)}
+                          className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100"
+                        >
+                          標記已好返
+                        </button>
+                      )}
                     </div>
 
                     {symptom.description?.trim() ? (
@@ -303,6 +433,20 @@ export default function MySymptomsPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-500">嚴重程度</span>
                         {severityBar(symptom.severity)}
+                      </div>
+                    ) : null}
+
+                    {(symptom.resolutionMethod || symptom.resolutionDays !== null && symptom.resolutionDays !== undefined || symptom.resolutionNote) ? (
+                      <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-800">
+                        {symptom.resolutionMethod ? (
+                          <p>點樣好返：{symptom.resolutionMethod}</p>
+                        ) : null}
+                        {symptom.resolutionDays !== null && symptom.resolutionDays !== undefined ? (
+                          <p>幾耐好返：約 {symptom.resolutionDays} 日</p>
+                        ) : null}
+                        {symptom.resolutionNote ? (
+                          <p className="whitespace-pre-wrap">補充：{symptom.resolutionNote}</p>
+                        ) : null}
                       </div>
                     ) : null}
 
@@ -321,10 +465,142 @@ export default function MySymptomsPage() {
 
         {!loading && !error && filteredSymptoms.length > 0 ? (
           <div className="rounded-xl border border-primary/10 bg-primary-light/30 px-4 py-3 text-xs text-gray-600">
-            提示：如果某個症狀已改善，可以喺聊天同 AI 講「好返咗」，系統會更新狀態。
+            提示：你可以用「標記已好返」按鈕，或者喺聊天同 AI 講「好返咗」去更新狀態。
           </div>
         ) : null}
       </div>
+
+      {resolveTarget ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+          <div className="w-full max-h-[92vh] overflow-y-auto rounded-t-2xl bg-white shadow-xl sm:max-w-lg sm:rounded-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-4 py-4">
+              <h2 className="text-base font-semibold text-gray-900">
+                標記已好返：{resolveTarget.category?.trim() || "症狀"}
+              </h2>
+              <button
+                type="button"
+                onClick={closeResolveModal}
+                className="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                disabled={resolveSaving}
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={submitResolveForm} className="space-y-4 px-4 py-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">好返日期</label>
+                <input
+                  type="date"
+                  value={resolveForm.endedAt}
+                  onChange={(e) =>
+                    setResolveForm((prev) => ({
+                      ...prev,
+                      endedAt: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">點樣好返</label>
+                <select
+                  value={resolveForm.resolutionMethod}
+                  onChange={(e) =>
+                    setResolveForm((prev) => ({
+                      ...prev,
+                      resolutionMethod: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {RESOLUTION_METHOD_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {resolveForm.resolutionMethod === "其他" ? (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">其他方式</label>
+                  <input
+                    type="text"
+                    value={resolveForm.customMethod}
+                    onChange={(e) =>
+                      setResolveForm((prev) => ({
+                        ...prev,
+                        customMethod: e.target.value,
+                      }))
+                    }
+                    placeholder="例如：針灸後休息"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              ) : null}
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">幾耐好返（天，可留空）</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={365}
+                  value={resolveForm.resolutionDays}
+                  onChange={(e) =>
+                    setResolveForm((prev) => ({
+                      ...prev,
+                      resolutionDays: e.target.value,
+                    }))
+                  }
+                  placeholder="例如 3"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">補充（可留空）</label>
+                <textarea
+                  value={resolveForm.resolutionNote}
+                  onChange={(e) =>
+                    setResolveForm((prev) => ({
+                      ...prev,
+                      resolutionNote: e.target.value,
+                    }))
+                  }
+                  rows={3}
+                  placeholder="例如：連續三晚早睡，配合暖湯後改善"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+
+              {resolveError ? <p className="text-sm text-red-600">{resolveError}</p> : null}
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeResolveModal}
+                  disabled={resolveSaving}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 sm:w-auto"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={resolveSaving}
+                  className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
+                >
+                  {resolveSaving ? "儲存中..." : "確認標記已好返"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

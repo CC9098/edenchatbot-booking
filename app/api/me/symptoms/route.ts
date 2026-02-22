@@ -4,6 +4,10 @@ import { createServiceClient } from "@/lib/supabase";
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_STATUS_FILTERS = new Set(["all", "active", "resolved", "recurring"]);
+const RESOLUTION_METHOD_MAX = 120;
+const RESOLUTION_NOTE_MAX = 500;
+const RESOLUTION_DAYS_MIN = 0;
+const RESOLUTION_DAYS_MAX = 365;
 
 function parsePositiveInt(value: string | null, fallback: number): number {
   if (!value) return fallback;
@@ -37,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from("symptom_logs")
-      .select("id, category, description, severity, status, started_at, ended_at, logged_via, created_at, updated_at", { count: "exact" })
+      .select("id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at, updated_at", { count: "exact" })
       .eq("patient_user_id", user.id);
 
     // Apply filters
@@ -70,6 +74,9 @@ export async function GET(request: NextRequest) {
         status: s.status,
         startedAt: s.started_at,
         endedAt: s.ended_at,
+        resolutionMethod: s.resolution_method,
+        resolutionNote: s.resolution_note,
+        resolutionDays: s.resolution_days,
         loggedVia: s.logged_via,
         createdAt: s.created_at,
         updatedAt: s.updated_at,
@@ -94,7 +101,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { category, description, severity, startedAt, endedAt } = body;
+    const { category, description, severity, startedAt, endedAt, resolutionMethod, resolutionNote, resolutionDays } = body;
 
     // Validate required fields
     if (typeof category !== "string" || !category.trim()) {
@@ -139,6 +146,66 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "description must be a string" }, { status: 400 });
     }
 
+    const normalizedResolutionMethod =
+      resolutionMethod === undefined || resolutionMethod === null || resolutionMethod === ""
+        ? null
+        : resolutionMethod;
+
+    if (
+      normalizedResolutionMethod !== null &&
+      (typeof normalizedResolutionMethod !== "string" ||
+        !normalizedResolutionMethod.trim() ||
+        normalizedResolutionMethod.trim().length > RESOLUTION_METHOD_MAX)
+    ) {
+      return NextResponse.json(
+        { error: `resolutionMethod must be a non-empty string up to ${RESOLUTION_METHOD_MAX} chars` },
+        { status: 400 },
+      );
+    }
+
+    const normalizedResolutionNote =
+      resolutionNote === undefined || resolutionNote === null || resolutionNote === ""
+        ? null
+        : resolutionNote;
+
+    if (
+      normalizedResolutionNote !== null &&
+      (typeof normalizedResolutionNote !== "string" ||
+        normalizedResolutionNote.trim().length > RESOLUTION_NOTE_MAX)
+    ) {
+      return NextResponse.json(
+        { error: `resolutionNote must be a string up to ${RESOLUTION_NOTE_MAX} chars` },
+        { status: 400 },
+      );
+    }
+
+    let normalizedResolutionDays: number | null = null;
+    if (resolutionDays !== undefined && resolutionDays !== null && resolutionDays !== "") {
+      if (
+        !Number.isInteger(resolutionDays) ||
+        resolutionDays < RESOLUTION_DAYS_MIN ||
+        resolutionDays > RESOLUTION_DAYS_MAX
+      ) {
+        return NextResponse.json(
+          { error: `resolutionDays must be an integer between ${RESOLUTION_DAYS_MIN} and ${RESOLUTION_DAYS_MAX}` },
+          { status: 400 },
+        );
+      }
+      normalizedResolutionDays = resolutionDays;
+    }
+
+    const hasResolutionDetails =
+      normalizedResolutionMethod !== null ||
+      normalizedResolutionNote !== null ||
+      normalizedResolutionDays !== null;
+
+    if (hasResolutionDetails && !normalizedEndedAt) {
+      return NextResponse.json(
+        { error: "resolution details require endedAt" },
+        { status: 400 },
+      );
+    }
+
     const supabase = createServiceClient();
 
     const insertData: Record<string, unknown> = {
@@ -159,12 +226,21 @@ export async function POST(request: NextRequest) {
 
     if (normalizedEndedAt) {
       insertData.ended_at = normalizedEndedAt;
+      if (normalizedResolutionMethod !== null) {
+        insertData.resolution_method = normalizedResolutionMethod.trim();
+      }
+      if (normalizedResolutionNote !== null) {
+        insertData.resolution_note = normalizedResolutionNote.trim() || null;
+      }
+      if (normalizedResolutionDays !== null) {
+        insertData.resolution_days = normalizedResolutionDays;
+      }
     }
 
     const { data: inserted, error: insertError } = await supabase
       .from("symptom_logs")
       .insert(insertData)
-      .select("id, patient_user_id, category, description, severity, status, started_at, ended_at, logged_via, created_at, updated_at")
+      .select("id, patient_user_id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at, updated_at")
       .single();
 
     if (insertError) {
@@ -196,6 +272,9 @@ export async function POST(request: NextRequest) {
       status: inserted.status,
       startedAt: inserted.started_at,
       endedAt: inserted.ended_at,
+      resolutionMethod: inserted.resolution_method,
+      resolutionNote: inserted.resolution_note,
+      resolutionDays: inserted.resolution_days,
       loggedVia: inserted.logged_via,
       createdAt: inserted.created_at,
       updatedAt: inserted.updated_at,

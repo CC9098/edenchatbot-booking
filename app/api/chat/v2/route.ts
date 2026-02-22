@@ -1342,7 +1342,7 @@ const SYMPTOM_RECORDING_GUIDANCE = `【症狀記錄功能】
 1. 當用戶「描述」自己的症狀時（例如「我今日頭痛」「我最近失眠」），先 call log_symptom 記錄，再回覆
 2. 回覆時先自然提及「我幫你記錄低咗，醫師睇症時會參考」，再提供 1-2 句安全建議
 3. 當用戶「詢問」症狀原因時（例如「頭痛點算好」），先回答，再按語境決定是否建議記錄
-4. 如果用戶話症狀好返，call update_symptom 更新狀態
+4. 如果用戶話症狀好返，call update_symptom 更新狀態；若用戶有講「點樣好返」或「幾多日好返」，一併寫入 resolutionMethod / resolutionDays / resolutionNote
 5. 如果用戶問歷史記錄，call list_my_symptoms`;
 
 const OUTPUT_FORMAT_RULES = `【輸出格式規則（必須遵守）】
@@ -1444,7 +1444,7 @@ async function fetchCareContext(userId: string): Promise<string> {
       .maybeSingle(),
     supabase
       .from('symptom_logs')
-      .select('id, category, description, severity, status, started_at, ended_at')
+      .select('id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days')
       .eq('patient_user_id', userId)
       .or(`status.eq.active,ended_at.gte.${twoWeeksAgoStr}`)
       .order('started_at', { ascending: false })
@@ -1479,7 +1479,15 @@ async function fetchCareContext(userId: string): Promise<string> {
         : `${symptom.started_at} 至今`;
       const severityPart = symptom.severity ? ` 嚴重度${symptom.severity}/5` : '';
       const descPart = symptom.description ? `：${symptom.description}` : '';
-      lines.push(`- [ID: ${symptom.id}] ${symptom.category}（${datePart}，${symptom.status}）${severityPart}${descPart}`);
+      const resolutionMethodPart =
+        symptom.resolution_method ? `；好返方式：${symptom.resolution_method}` : '';
+      const resolutionDaysPart =
+        symptom.resolution_days !== null && symptom.resolution_days !== undefined
+          ? `；約 ${symptom.resolution_days} 日好返`
+          : '';
+      const resolutionNotePart =
+        symptom.resolution_note ? `；補充：${symptom.resolution_note}` : '';
+      lines.push(`- [ID: ${symptom.id}] ${symptom.category}（${datePart}，${symptom.status}）${severityPart}${descPart}${resolutionMethodPart}${resolutionDaysPart}${resolutionNotePart}`);
     }
   }
 
@@ -2023,6 +2031,18 @@ const SYMPTOM_FUNCTIONS: FunctionDeclaration[] = [
           type: SchemaType.STRING,
           description: '症狀結束日期，格式 YYYY-MM-DD。如果仍然持續則不提供。',
         },
+        resolutionMethod: {
+          type: SchemaType.STRING,
+          description: '（可選）症狀點樣好返，例如：多休息、飲薑茶、補水、戒口、按時食藥。',
+        },
+        resolutionNote: {
+          type: SchemaType.STRING,
+          description: '（可選）好返補充說明，例如：晚晚 11 點前瞓，三日後明顯改善。',
+        },
+        resolutionDays: {
+          type: SchemaType.INTEGER,
+          description: '（可選）大約幾多日好返，介乎 0-365。',
+        },
       },
       required: ['category', 'startedAt'],
     },
@@ -2044,6 +2064,18 @@ const SYMPTOM_FUNCTIONS: FunctionDeclaration[] = [
         status: {
           type: SchemaType.STRING,
           description: '新狀態：resolved（已好）或 recurring（反覆出現）',
+        },
+        resolutionMethod: {
+          type: SchemaType.STRING,
+          description: '（可選）症狀點樣好返，例如：休息、飲薑茶、調整飲食。',
+        },
+        resolutionNote: {
+          type: SchemaType.STRING,
+          description: '（可選）好返補充說明。',
+        },
+        resolutionDays: {
+          type: SchemaType.INTEGER,
+          description: '（可選）大約幾多日好返，介乎 0-365。',
         },
       },
       required: ['symptomId'],

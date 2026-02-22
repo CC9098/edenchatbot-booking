@@ -9,6 +9,10 @@ import { createServiceClient } from '@/lib/supabase';
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_STATUSES = new Set(['active', 'resolved', 'recurring']);
+const RESOLUTION_METHOD_MAX = 120;
+const RESOLUTION_NOTE_MAX = 500;
+const RESOLUTION_DAYS_MIN = 0;
+const RESOLUTION_DAYS_MAX = 365;
 
 // ---------------------------------------------------------------------------
 // 1. Log Symptom
@@ -20,6 +24,9 @@ export interface LogSymptomRequest {
   severity?: number | null; // 1-5
   startedAt: string; // YYYY-MM-DD
   endedAt?: string | null;  // YYYY-MM-DD
+  resolutionMethod?: string | null;
+  resolutionNote?: string | null;
+  resolutionDays?: number | string | null;
 }
 
 /**
@@ -77,6 +84,64 @@ export async function logSymptom(
       return { success: false, error: '症狀描述格式無效' };
     }
 
+    const normalizedResolutionMethod =
+      request.resolutionMethod === undefined ||
+      request.resolutionMethod === null ||
+      request.resolutionMethod === ''
+        ? null
+        : request.resolutionMethod;
+
+    if (
+      normalizedResolutionMethod !== null &&
+      (typeof normalizedResolutionMethod !== 'string' ||
+        !normalizedResolutionMethod.trim() ||
+        normalizedResolutionMethod.trim().length > RESOLUTION_METHOD_MAX)
+    ) {
+      return { success: false, error: `好返方式長度不可超過 ${RESOLUTION_METHOD_MAX} 字` };
+    }
+
+    const normalizedResolutionNote =
+      request.resolutionNote === undefined ||
+      request.resolutionNote === null ||
+      request.resolutionNote === ''
+        ? null
+        : request.resolutionNote;
+
+    if (
+      normalizedResolutionNote !== null &&
+      (typeof normalizedResolutionNote !== 'string' ||
+        normalizedResolutionNote.trim().length > RESOLUTION_NOTE_MAX)
+    ) {
+      return { success: false, error: `好返補充長度不可超過 ${RESOLUTION_NOTE_MAX} 字` };
+    }
+
+    let normalizedResolutionDays: number | null = null;
+    if (request.resolutionDays !== undefined && request.resolutionDays !== null && request.resolutionDays !== '') {
+      const parsedDays =
+        typeof request.resolutionDays === 'number'
+          ? request.resolutionDays
+          : Number.parseInt(String(request.resolutionDays), 10);
+      if (
+        !Number.isInteger(parsedDays) ||
+        parsedDays < RESOLUTION_DAYS_MIN ||
+        parsedDays > RESOLUTION_DAYS_MAX
+      ) {
+        return {
+          success: false,
+          error: `好返天數必須介乎 ${RESOLUTION_DAYS_MIN}-${RESOLUTION_DAYS_MAX}`,
+        };
+      }
+      normalizedResolutionDays = parsedDays;
+    }
+
+    const hasResolutionDetails =
+      normalizedResolutionMethod !== null ||
+      normalizedResolutionNote !== null ||
+      normalizedResolutionDays !== null;
+    if (hasResolutionDetails && !normalizedEndedAt) {
+      return { success: false, error: '提供好返資料時必須同時提供 endedAt' };
+    }
+
     const supabase = createServiceClient();
 
     // Prepare insert data
@@ -99,13 +164,22 @@ export async function logSymptom(
     if (normalizedEndedAt) {
       insertData.ended_at = normalizedEndedAt;
       insertData.status = 'resolved'; // If ended_at is provided, mark as resolved
+      if (normalizedResolutionMethod !== null) {
+        insertData.resolution_method = normalizedResolutionMethod.trim();
+      }
+      if (normalizedResolutionNote !== null) {
+        insertData.resolution_note = normalizedResolutionNote.trim() || null;
+      }
+      if (normalizedResolutionDays !== null) {
+        insertData.resolution_days = normalizedResolutionDays;
+      }
     }
 
     // Insert symptom log
     const { data: inserted, error: insertError } = await supabase
       .from('symptom_logs')
       .insert(insertData)
-      .select('id, patient_user_id, category, description, severity, status, started_at, ended_at, logged_via, created_at')
+      .select('id, patient_user_id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at')
       .single();
 
     if (insertError) {
@@ -152,6 +226,9 @@ export interface UpdateSymptomRequest {
   status?: 'resolved' | 'recurring' | 'active';
   severity?: number | null;   // 1-5
   description?: string | null;
+  resolutionMethod?: string | null;
+  resolutionNote?: string | null;
+  resolutionDays?: number | string | null;
 }
 
 /**
@@ -235,6 +312,55 @@ export async function updateSymptom(
         typeof request.description === 'string' ? request.description.trim() || null : null;
     }
 
+    if (request.resolutionMethod !== undefined) {
+      if (request.resolutionMethod === null || request.resolutionMethod === '') {
+        updateData.resolution_method = null;
+      } else if (
+        typeof request.resolutionMethod !== 'string' ||
+        !request.resolutionMethod.trim() ||
+        request.resolutionMethod.trim().length > RESOLUTION_METHOD_MAX
+      ) {
+        return { success: false, error: `好返方式長度不可超過 ${RESOLUTION_METHOD_MAX} 字` };
+      } else {
+        updateData.resolution_method = request.resolutionMethod.trim();
+      }
+    }
+
+    if (request.resolutionNote !== undefined) {
+      if (request.resolutionNote === null || request.resolutionNote === '') {
+        updateData.resolution_note = null;
+      } else if (
+        typeof request.resolutionNote !== 'string' ||
+        request.resolutionNote.trim().length > RESOLUTION_NOTE_MAX
+      ) {
+        return { success: false, error: `好返補充長度不可超過 ${RESOLUTION_NOTE_MAX} 字` };
+      } else {
+        updateData.resolution_note = request.resolutionNote.trim() || null;
+      }
+    }
+
+    if (request.resolutionDays !== undefined) {
+      if (request.resolutionDays === null || request.resolutionDays === '') {
+        updateData.resolution_days = null;
+      } else {
+        const parsedDays =
+          typeof request.resolutionDays === 'number'
+            ? request.resolutionDays
+            : Number.parseInt(String(request.resolutionDays), 10);
+        if (
+          !Number.isInteger(parsedDays) ||
+          parsedDays < RESOLUTION_DAYS_MIN ||
+          parsedDays > RESOLUTION_DAYS_MAX
+        ) {
+          return {
+            success: false,
+            error: `好返天數必須介乎 ${RESOLUTION_DAYS_MIN}-${RESOLUTION_DAYS_MAX}`,
+          };
+        }
+        updateData.resolution_days = parsedDays;
+      }
+    }
+
     if (Object.keys(updateData).length === 0) {
       return { success: false, error: '沒有需要更新的資料' };
     }
@@ -246,6 +372,28 @@ export async function updateSymptom(
         : existing.ended_at;
     if (nextStatus === 'active' && nextEndedAt) {
       return { success: false, error: '進行中症狀不能有結束日期，請先將 endedAt 設為 null' };
+    }
+
+    const nextResolutionMethod =
+      Object.prototype.hasOwnProperty.call(updateData, 'resolution_method')
+        ? (updateData.resolution_method as string | null)
+        : (existing.resolution_method as string | null);
+    const nextResolutionNote =
+      Object.prototype.hasOwnProperty.call(updateData, 'resolution_note')
+        ? (updateData.resolution_note as string | null)
+        : (existing.resolution_note as string | null);
+    const nextResolutionDays =
+      Object.prototype.hasOwnProperty.call(updateData, 'resolution_days')
+        ? (updateData.resolution_days as number | null)
+        : (existing.resolution_days as number | null);
+
+    const hasResolutionDetails =
+      nextResolutionMethod !== null ||
+      nextResolutionNote !== null ||
+      (nextResolutionDays !== null && nextResolutionDays !== undefined);
+
+    if (hasResolutionDetails && (nextStatus !== 'resolved' || !nextEndedAt)) {
+      return { success: false, error: '好返資料只可用於已結束症狀（status=resolved 且有 endedAt）' };
     }
 
     // Update symptom log
@@ -305,6 +453,9 @@ export interface SymptomRecord {
   status: string;
   startedAt: string;
   endedAt: string | null;
+  resolutionMethod: string | null;
+  resolutionNote: string | null;
+  resolutionDays: number | null;
   loggedVia: string;
   createdAt: string;
 }
@@ -325,7 +476,7 @@ export async function listSymptoms(
 
     let query = supabase
       .from('symptom_logs')
-      .select('id, category, description, severity, status, started_at, ended_at, logged_via, created_at')
+      .select('id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at')
       .eq('patient_user_id', userId);
 
     // Apply filters
@@ -379,6 +530,9 @@ export async function listSymptoms(
       status: s.status,
       startedAt: s.started_at,
       endedAt: s.ended_at,
+      resolutionMethod: s.resolution_method,
+      resolutionNote: s.resolution_note,
+      resolutionDays: s.resolution_days,
       loggedVia: s.logged_via,
       createdAt: s.created_at,
     }));

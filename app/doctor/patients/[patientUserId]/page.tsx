@@ -48,6 +48,9 @@ interface SymptomLog {
   status: string;
   startedAt: string;
   endedAt: string | null;
+  resolutionMethod: string | null;
+  resolutionNote: string | null;
+  resolutionDays: number | null;
   loggedVia: string;
   createdAt: string;
 }
@@ -1157,6 +1160,20 @@ function SymptomsSection({
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-500">嚴重程度:</span>
                     {severityBar(symptom.severity)}
+                  </div>
+                )}
+
+                {(symptom.resolutionMethod || symptom.resolutionNote || (symptom.resolutionDays !== null && symptom.resolutionDays !== undefined)) && (
+                  <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-800">
+                    {symptom.resolutionMethod ? (
+                      <p>好返方式：{symptom.resolutionMethod}</p>
+                    ) : null}
+                    {symptom.resolutionDays !== null && symptom.resolutionDays !== undefined ? (
+                      <p>好返時間：約 {symptom.resolutionDays} 日</p>
+                    ) : null}
+                    {symptom.resolutionNote ? (
+                      <p className="whitespace-pre-wrap">補充：{symptom.resolutionNote}</p>
+                    ) : null}
                   </div>
                 )}
 

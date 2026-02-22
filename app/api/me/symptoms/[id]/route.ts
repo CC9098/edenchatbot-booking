@@ -4,6 +4,10 @@ import { createServiceClient } from "@/lib/supabase";
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_STATUSES = new Set(["active", "resolved", "recurring"]);
+const RESOLUTION_METHOD_MAX = 120;
+const RESOLUTION_NOTE_MAX = 500;
+const RESOLUTION_DAYS_MIN = 0;
+const RESOLUTION_DAYS_MAX = 365;
 
 /**
  * PATCH /api/me/symptoms/[id]
@@ -21,7 +25,7 @@ export async function PATCH(
 
     const { id } = params;
     const body = await request.json();
-    const { status, endedAt, severity, description } = body;
+    const { status, endedAt, severity, description, resolutionMethod, resolutionNote, resolutionDays } = body;
 
     const supabase = createServiceClient();
 
@@ -88,6 +92,56 @@ export async function PATCH(
       updateData.description = typeof description === "string" ? description.trim() || null : null;
     }
 
+    if (resolutionMethod !== undefined) {
+      if (resolutionMethod === null || resolutionMethod === "") {
+        updateData.resolution_method = null;
+      } else if (
+        typeof resolutionMethod !== "string" ||
+        !resolutionMethod.trim() ||
+        resolutionMethod.trim().length > RESOLUTION_METHOD_MAX
+      ) {
+        return NextResponse.json(
+          { error: `resolutionMethod must be a non-empty string up to ${RESOLUTION_METHOD_MAX} chars` },
+          { status: 400 },
+        );
+      } else {
+        updateData.resolution_method = resolutionMethod.trim();
+      }
+    }
+
+    if (resolutionNote !== undefined) {
+      if (resolutionNote === null || resolutionNote === "") {
+        updateData.resolution_note = null;
+      } else if (
+        typeof resolutionNote !== "string" ||
+        resolutionNote.trim().length > RESOLUTION_NOTE_MAX
+      ) {
+        return NextResponse.json(
+          { error: `resolutionNote must be a string up to ${RESOLUTION_NOTE_MAX} chars` },
+          { status: 400 },
+        );
+      } else {
+        updateData.resolution_note = resolutionNote.trim() || null;
+      }
+    }
+
+    if (resolutionDays !== undefined) {
+      if (resolutionDays === null || resolutionDays === "") {
+        updateData.resolution_days = null;
+      } else if (
+        !Number.isInteger(resolutionDays) ||
+        resolutionDays < RESOLUTION_DAYS_MIN ||
+        resolutionDays > RESOLUTION_DAYS_MAX
+      ) {
+        return NextResponse.json(
+          { error: `resolutionDays must be an integer between ${RESOLUTION_DAYS_MIN} and ${RESOLUTION_DAYS_MAX}` },
+          { status: 400 },
+        );
+      } else {
+        updateData.resolution_days = resolutionDays;
+      }
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
@@ -101,6 +155,31 @@ export async function PATCH(
       return NextResponse.json(
         { error: "active status cannot have endedAt. Set endedAt to null first." },
         { status: 400 }
+      );
+    }
+
+    const nextResolutionMethod =
+      Object.prototype.hasOwnProperty.call(updateData, "resolution_method")
+        ? (updateData.resolution_method as string | null)
+        : (existing.resolution_method as string | null);
+    const nextResolutionNote =
+      Object.prototype.hasOwnProperty.call(updateData, "resolution_note")
+        ? (updateData.resolution_note as string | null)
+        : (existing.resolution_note as string | null);
+    const nextResolutionDays =
+      Object.prototype.hasOwnProperty.call(updateData, "resolution_days")
+        ? (updateData.resolution_days as number | null)
+        : (existing.resolution_days as number | null);
+
+    const hasResolutionDetails =
+      nextResolutionMethod !== null ||
+      nextResolutionNote !== null ||
+      (nextResolutionDays !== null && nextResolutionDays !== undefined);
+
+    if (hasResolutionDetails && (nextStatus !== "resolved" || !nextEndedAt)) {
+      return NextResponse.json(
+        { error: "resolution details require status=resolved and endedAt" },
+        { status: 400 },
       );
     }
 
@@ -142,6 +221,9 @@ export async function PATCH(
       status: updated.status,
       startedAt: updated.started_at,
       endedAt: updated.ended_at,
+      resolutionMethod: updated.resolution_method,
+      resolutionNote: updated.resolution_note,
+      resolutionDays: updated.resolution_days,
       loggedVia: updated.logged_via,
       createdAt: updated.created_at,
       updatedAt: updated.updated_at,

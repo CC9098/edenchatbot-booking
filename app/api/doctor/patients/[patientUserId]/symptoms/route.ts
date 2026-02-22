@@ -43,7 +43,7 @@ export async function GET(
 
     let query = supabase
       .from("symptom_logs")
-      .select("id, category, description, severity, status, started_at, ended_at, logged_via, created_at, updated_at", { count: "exact" })
+      .select("id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at, updated_at", { count: "exact" })
       .eq("patient_user_id", patientUserId);
 
     // Apply filters
@@ -76,6 +76,9 @@ export async function GET(
         status: s.status,
         startedAt: s.started_at,
         endedAt: s.ended_at,
+        resolutionMethod: s.resolution_method,
+        resolutionNote: s.resolution_note,
+        resolutionDays: s.resolution_days,
         loggedVia: s.logged_via,
         createdAt: s.created_at,
         updatedAt: s.updated_at,
