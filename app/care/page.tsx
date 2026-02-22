@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { getConstitutionDietTips } from "@/lib/constitution-diet-tips";
 
 type CareInstruction = {
   id: string;
@@ -36,7 +37,6 @@ type ConstitutionMeta = {
   label: string;
   badgeClass: string;
   summary: string;
-  dietTips: string[];
 };
 
 const CONSTITUTION_META: Record<string, ConstitutionMeta> = {
@@ -44,31 +44,26 @@ const CONSTITUTION_META: Record<string, ConstitutionMeta> = {
     label: "虛損",
     badgeClass: "bg-emerald-100 text-emerald-800",
     summary: "重點是補氣養血、減少過度勞累，飲食以溫和、易消化為主。",
-    dietTips: ["三餐定時，避免長時間空腹", "可優先選暖身湯水、熟食", "避免生冷寒涼、過甜及過油"],
   },
   crossing: {
     label: "鬱結",
     badgeClass: "bg-blue-100 text-blue-800",
     summary: "重點是疏導壓力、調節作息，飲食避免過度刺激與偏性太強。",
-    dietTips: ["進食節奏慢一點，避免暴飲暴食", "少辛辣、少酒精，減少夜宵", "增加蔬果與纖維，保持腸胃節律"],
   },
   hoarding: {
     label: "痰濕",
     badgeClass: "bg-purple-100 text-purple-800",
     summary: "重點是化濕健脾，飲食以清淡為主，減少濕重與黏滯食物。",
-    dietTips: ["少甜品、少奶製品、少油炸", "主食份量適中，避免過量精製澱粉", "可多選蒸煮燉，減少重口味調味"],
   },
   mixed: {
     label: "混合",
     badgeClass: "bg-orange-100 text-orange-800",
     summary: "目前屬混合狀態，先跟隨醫師指示，逐步微調飲食與作息。",
-    dietTips: ["優先執行醫師已標註的宜忌", "每次只改一兩項習慣，較易持續", "每週檢視身體反應再微調"],
   },
   unknown: {
     label: "未評估",
     badgeClass: "bg-gray-100 text-gray-700",
     summary: "尚未建立完整體質評估，先採用清淡、規律、少刺激的基本原則。",
-    dietTips: ["飲食定時定量，先穩定作息", "先減少生冷、油炸、甜食", "如症狀持續，建議與醫師再評估"],
   },
 };
 
@@ -148,6 +143,10 @@ export default function CareAdvicePage() {
 
   const constitutionKey = data?.constitution ?? "unknown";
   const constitutionMeta = CONSTITUTION_META[constitutionKey] || CONSTITUTION_META.unknown;
+  const fallbackDietTips = useMemo(
+    () => getConstitutionDietTips(constitutionKey),
+    [constitutionKey],
+  );
 
   const dietRecommendItems = useMemo(
     () => (data?.activeInstructions || []).filter((item) => item.instructionType === "diet_recommend"),
@@ -237,7 +236,7 @@ export default function CareAdvicePage() {
                 <div className="mt-4 rounded-2xl border border-primary/10 bg-primary-light/35 p-4">
                   <p className="text-sm font-medium text-slate-900">目前未有醫師設定的綠色推薦，先按以下體質方針執行：</p>
                   <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-slate-700">
-                    {constitutionMeta.dietTips.map((tip) => (
+                    {fallbackDietTips.map((tip) => (
                       <li key={tip}>{tip}</li>
                     ))}
                   </ul>
