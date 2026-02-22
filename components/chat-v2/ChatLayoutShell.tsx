@@ -1,10 +1,12 @@
 "use client";
 
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Menu } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useState } from "react";
 import { ChatShellProvider, useChatShell } from "./ChatShellContext";
 
 export function ChatLayoutShell({ children }: { children: React.ReactNode }) {
@@ -16,12 +18,27 @@ export function ChatLayoutShell({ children }: { children: React.ReactNode }) {
 }
 
 function ChatLayoutFrame({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const { signOut } = useAuth();
   const pathname = usePathname();
   const { toggleHistory } = useChatShell();
+  const [signingOut, setSigningOut] = useState(false);
   const isChatHome = pathname === "/chat";
   const isSymptomsPage = pathname.startsWith("/chat/symptoms");
   const actionHref = isSymptomsPage ? "/chat" : "/chat/symptoms";
   const actionLabel = isSymptomsPage ? "返回聊天" : "我的症狀";
+
+  const handleSignOut = useCallback(async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+
+    try {
+      await signOut();
+      router.replace("/login");
+    } finally {
+      setSigningOut(false);
+    }
+  }, [router, signOut, signingOut]);
 
   return (
     <AuthGuard>
@@ -49,9 +66,19 @@ function ChatLayoutFrame({ children }: { children: React.ReactNode }) {
             />
             <span>Eden Care</span>
           </Link>
-          <Link href={actionHref} className="chat-fixed-topbar__action">
-            {actionLabel}
-          </Link>
+          <div className="chat-fixed-topbar__actions">
+            <Link href={actionHref} className="chat-fixed-topbar__action">
+              {actionLabel}
+            </Link>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="chat-fixed-topbar__action chat-fixed-topbar__action--logout"
+            >
+              {signingOut ? "登出中..." : "登出"}
+            </button>
+          </div>
         </div>
       </header>
 
