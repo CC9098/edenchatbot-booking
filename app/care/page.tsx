@@ -106,7 +106,7 @@ function instructionMetaText(item: CareInstruction): string {
 
 function constitutionSourceLabel(source: CareContextResponse["constitutionSource"]): string {
   if (source === "patient_care_profile") return "來源：醫師評估";
-  if (source === "profiles") return "來源：帳號體質檔案";
+  if (source === "profiles") return "來源：帳號體質檔案（自我評估）";
   if (source === "chat_sessions") return "來源：登入帳號對話紀錄";
   return "來源：未有完整資料";
 }
@@ -212,6 +212,23 @@ export default function CareAdvicePage() {
                 <div className="mt-4 rounded-2xl border border-primary/10 bg-primary-light/40 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-primary">醫師體質備註</p>
                   <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{data.constitutionNote}</p>
+                </div>
+              ) : null}
+
+              {/* CTA: encourage self-assessment when constitution is not yet doctor-assessed */}
+              {(constitutionKey === "unknown" || data?.constitutionSource !== "patient_care_profile") ? (
+                <div className="mt-4 rounded-2xl border border-dashed border-primary/30 bg-primary-light/20 p-4">
+                  <p className="text-sm font-medium text-slate-800">
+                    {constitutionKey === "unknown"
+                      ? "你尚未完成體質評估，先做個簡單問卷了解自己的初步狀態。"
+                      : "你已有初步體質參考，如需醫師正式評估可預約面診。"}
+                  </p>
+                  <Link
+                    href="/questionnaire"
+                    className="mt-3 inline-flex items-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#3d6b20]"
+                  >
+                    {constitutionKey === "unknown" ? "開始體質問卷" : "重新做問卷"}
+                  </Link>
                 </div>
               ) : null}
 

@@ -33,6 +33,7 @@ function isPatientRoute(pathname: string): boolean {
     pathname.startsWith("/articles") ||
     pathname.startsWith("/courses") ||
     pathname.startsWith("/care") ||
+    pathname.startsWith("/questionnaire") ||
     pathname.startsWith("/login")
   );
 }
@@ -50,7 +51,8 @@ function getActiveTab(pathname: string): TabItem["id"] {
   if (
     pathname.startsWith("/care") ||
     pathname.startsWith("/articles") ||
-    pathname.startsWith("/courses")
+    pathname.startsWith("/courses") ||
+    pathname.startsWith("/questionnaire")
   ) {
     return "care";
   }
@@ -68,7 +70,8 @@ function getTopbarTitle(pathname: string): string {
   if (
     pathname.startsWith("/care") ||
     pathname.startsWith("/articles") ||
-    pathname.startsWith("/courses")
+    pathname.startsWith("/courses") ||
+    pathname.startsWith("/questionnaire")
   ) {
     return "養生專區";
   }
