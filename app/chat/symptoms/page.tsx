@@ -30,7 +30,6 @@ type ResolveFormState = {
   resolutionMethod: string;
   customMethod: string;
   resolutionNote: string;
-  resolutionDays: string;
 };
 
 const RESOLUTION_METHOD_OPTIONS = [
@@ -152,7 +151,6 @@ export default function MySymptomsPage() {
     resolutionMethod: RESOLUTION_METHOD_OPTIONS[0],
     customMethod: "",
     resolutionNote: "",
-    resolutionDays: "",
   });
 
   const loadSymptoms = useCallback(async () => {
@@ -233,7 +231,6 @@ export default function MySymptomsPage() {
       resolutionMethod: RESOLUTION_METHOD_OPTIONS[0],
       customMethod: "",
       resolutionNote: "",
-      resolutionDays: "",
     });
   }
 
@@ -262,14 +259,15 @@ export default function MySymptomsPage() {
       return;
     }
 
+    // Auto-calculate recovery days from start date → end date
     let normalizedDays: number | null = null;
-    if (resolveForm.resolutionDays.trim()) {
-      const parsed = Number.parseInt(resolveForm.resolutionDays.trim(), 10);
-      if (!Number.isInteger(parsed) || parsed < 0 || parsed > 365) {
-        setResolveError("好返天數需為 0-365 之間整數");
-        return;
+    if (resolveTarget.startedAt && resolveForm.endedAt) {
+      const start = toSafeDate(resolveTarget.startedAt);
+      const end = toSafeDate(resolveForm.endedAt);
+      if (start && end) {
+        const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        if (diff >= 0 && diff <= 365) normalizedDays = diff;
       }
-      normalizedDays = parsed;
     }
 
     try {
@@ -489,112 +487,94 @@ export default function MySymptomsPage() {
               </button>
             </div>
 
-            <form onSubmit={submitResolveForm} className="space-y-4 px-4 py-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">好返日期</label>
-                <input
-                  type="date"
-                  value={resolveForm.endedAt}
-                  onChange={(e) =>
-                    setResolveForm((prev) => ({
-                      ...prev,
-                      endedAt: e.target.value,
-                    }))
-                  }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">點樣好返</label>
-                <select
-                  value={resolveForm.resolutionMethod}
-                  onChange={(e) =>
-                    setResolveForm((prev) => ({
-                      ...prev,
-                      resolutionMethod: e.target.value,
-                    }))
-                  }
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  {RESOLUTION_METHOD_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {resolveForm.resolutionMethod === "其他" ? (
+            <form onSubmit={submitResolveForm} className="flex flex-col">
+              <div className="space-y-4 px-4 py-4">
+                {/* 好返日期 */}
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">其他方式</label>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">好返日期</label>
                   <input
-                    type="text"
-                    value={resolveForm.customMethod}
+                    type="date"
+                    value={resolveForm.endedAt}
                     onChange={(e) =>
-                      setResolveForm((prev) => ({
-                        ...prev,
-                        customMethod: e.target.value,
-                      }))
+                      setResolveForm((prev) => ({ ...prev, endedAt: e.target.value }))
                     }
-                    placeholder="例如：針灸後休息"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    required
                   />
                 </div>
-              ) : null}
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">幾耐好返（天，可留空）</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={365}
-                  value={resolveForm.resolutionDays}
-                  onChange={(e) =>
-                    setResolveForm((prev) => ({
-                      ...prev,
-                      resolutionDays: e.target.value,
-                    }))
-                  }
-                  placeholder="例如 3"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
+                {/* 點樣好返 — chip selection */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">點樣好返</label>
+                  <div className="flex flex-wrap gap-2">
+                    {RESOLUTION_METHOD_OPTIONS.map((option) => {
+                      const selected = resolveForm.resolutionMethod === option;
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() =>
+                            setResolveForm((prev) => ({ ...prev, resolutionMethod: option, customMethod: "" }))
+                          }
+                          className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                            selected
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {resolveForm.resolutionMethod === "其他" ? (
+                    <input
+                      type="text"
+                      value={resolveForm.customMethod}
+                      onChange={(e) =>
+                        setResolveForm((prev) => ({ ...prev, customMethod: e.target.value }))
+                      }
+                      placeholder="自行填寫方式"
+                      className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  ) : null}
+                </div>
+
+                {/* 備注（可選） */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    備注 <span className="font-normal text-gray-400">（可留空）</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={resolveForm.resolutionNote}
+                    onChange={(e) =>
+                      setResolveForm((prev) => ({ ...prev, resolutionNote: e.target.value }))
+                    }
+                    placeholder="有咩想補充？"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+
+                {resolveError ? <p className="text-sm text-red-600">{resolveError}</p> : null}
               </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">補充（可留空）</label>
-                <textarea
-                  value={resolveForm.resolutionNote}
-                  onChange={(e) =>
-                    setResolveForm((prev) => ({
-                      ...prev,
-                      resolutionNote: e.target.value,
-                    }))
-                  }
-                  rows={3}
-                  placeholder="例如：連續三晚早睡，配合暖湯後改善"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-
-              {resolveError ? <p className="text-sm text-red-600">{resolveError}</p> : null}
-
-              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              {/* Sticky action buttons */}
+              <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t border-gray-100 bg-white px-4 pb-5 pt-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={closeResolveModal}
                   disabled={resolveSaving}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 sm:w-auto"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 sm:w-auto"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
                   disabled={resolveSaving}
-                  className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
+                  className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
                 >
-                  {resolveSaving ? "儲存中..." : "確認標記已好返"}
+                  {resolveSaving ? "儲存中..." : "確認好返"}
                 </button>
               </div>
             </form>
