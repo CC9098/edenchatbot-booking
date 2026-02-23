@@ -1,7 +1,5 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "預約入口 | 醫天圓",
@@ -9,11 +7,6 @@ export const metadata: Metadata = {
 };
 
 export default function BookingPage() {
-  const userAgent = headers().get("user-agent") ?? "";
-  if (/\bCapacitor\b/i.test(userAgent)) {
-    redirect("https://edentcm.as.me/schedule.php");
-  }
-
   return (
     <main className="patient-pane text-slate-800">
       <div className="patient-card mx-auto max-w-xl space-y-6 p-6 sm:p-8">

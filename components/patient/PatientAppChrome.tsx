@@ -17,8 +17,6 @@ type TabItem = {
   Icon: typeof Sparkles;
 };
 
-const BOOKING_EXTERNAL_URL = "https://edentcm.as.me/schedule.php";
-
 const TABS: TabItem[] = [
   { id: "chat", label: "聊天", href: "/chat", Icon: Sparkles },
   { id: "booking", label: "預約", href: "/booking", Icon: CalendarCheck2 },
@@ -59,30 +57,35 @@ function getActiveTab(pathname: string): TabItem["id"] {
   return "profile";
 }
 
+function getTopbarTitle(pathname: string): string {
+  if (
+    pathname.startsWith("/booking") ||
+    pathname.startsWith("/cancel") ||
+    pathname.startsWith("/reschedule")
+  ) {
+    return "預約服務";
+  }
+  if (
+    pathname.startsWith("/care") ||
+    pathname.startsWith("/articles") ||
+    pathname.startsWith("/courses")
+  ) {
+    return "養生專區";
+  }
+  if (pathname.startsWith("/login")) return "會員登入";
+  return "Eden Care";
+}
+
 export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [keyboardOpen, setKeyboardOpen] = useState(false);
-  const [bookingHref, setBookingHref] = useState("/booking");
   const patientRoute = isPatientRoute(pathname);
   const isChatRoute = pathname.startsWith("/chat");
 
   const activeTab = getActiveTab(pathname);
+  const topbarTitle = getTopbarTitle(pathname);
+  const shouldShowRouteTopbar = patientRoute && !isChatRoute;
   const shouldShowTabbar = !isChatRoute || !keyboardOpen;
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const cap = (window as Window & {
-      Capacitor?: { isNativePlatform?: () => boolean };
-    }).Capacitor;
-    const isNative = Boolean(cap?.isNativePlatform?.() ?? cap);
-    const ua = window.navigator.userAgent ?? "";
-    const isCapacitorUa = /\bCapacitor\b/i.test(ua);
-
-    if (isNative || isCapacitorUa) {
-      setBookingHref(BOOKING_EXTERNAL_URL);
-    }
-  }, []);
 
   // Avoid iOS keyboard + fixed tabbar collision on chat pages.
   useEffect(() => {
@@ -120,6 +123,17 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="patient-mobile-shell" style={{ paddingBottom: shellPaddingBottom }}>
+      {shouldShowRouteTopbar ? (
+        <header className="patient-route-topbar" aria-label={`${topbarTitle} 頂部導覽`}>
+          <div className="patient-route-topbar__inner">
+            <Link href="/chat" className="patient-route-topbar__brand">
+              Eden Care
+            </Link>
+            <span className="patient-route-topbar__title">{topbarTitle}</span>
+          </div>
+        </header>
+      ) : null}
+
       {children}
 
       {shouldShowTabbar ? (
@@ -127,11 +141,10 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
           <div className="patient-tabbar__inner">
             {TABS.map(({ id, label, href, Icon }) => {
               const isActive = activeTab === id;
-              const tabHref = id === "booking" ? bookingHref : href;
               return (
                 <Link
                   key={id}
-                  href={tabHref}
+                  href={href}
                   className={`patient-tab ${
                     isActive ? "patient-tab--active" : "patient-tab--idle"
                   }`}
