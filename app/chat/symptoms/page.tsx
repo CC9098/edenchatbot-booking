@@ -320,25 +320,6 @@ export default function MySymptomsPage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <div className="rounded-xl border border-primary/10 bg-white p-3">
-            <p className="text-xs text-gray-500">總紀錄</p>
-            <p className="mt-1 text-xl font-semibold text-gray-900">{stats.total}</p>
-          </div>
-          <div className="rounded-xl border border-red-100 bg-red-50/40 p-3">
-            <p className="text-xs text-red-700">進行中</p>
-            <p className="mt-1 text-xl font-semibold text-red-700">{stats.activeCount}</p>
-          </div>
-          <div className="rounded-xl border border-green-100 bg-green-50/50 p-3">
-            <p className="text-xs text-green-700">本月已改善</p>
-            <p className="mt-1 text-xl font-semibold text-green-700">{stats.improvedThisMonthCount}</p>
-          </div>
-          <div className="rounded-xl border border-orange-100 bg-orange-50/50 p-3">
-            <p className="text-xs text-orange-700">反覆症狀</p>
-            <p className="mt-1 text-xl font-semibold text-orange-700">{stats.recurringCount}</p>
-          </div>
-        </div>
-
         <div className="flex flex-wrap items-center gap-2">
           {filterChips.map((chip) => {
             const active = statusFilter === chip.value;
@@ -469,7 +450,7 @@ export default function MySymptomsPage() {
       </div>
 
       {resolveTarget ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
           <div className="w-full max-h-[92vh] overflow-y-auto rounded-t-2xl bg-white shadow-xl sm:max-w-lg sm:rounded-2xl">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-4 py-4">
               <h2 className="text-base font-semibold text-gray-900">
@@ -560,7 +541,7 @@ export default function MySymptomsPage() {
               </div>
 
               {/* Sticky action buttons */}
-              <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t border-gray-100 bg-white px-4 pb-5 pt-3 sm:flex-row sm:justify-end">
+              <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t border-gray-100 bg-white px-4 pb-[calc(env(safe-area-inset-bottom,0px)+16px)] pt-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={closeResolveModal}
