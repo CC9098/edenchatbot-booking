@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { isNativeAppRuntime } from "@/lib/platform";
 import {
   Sparkles,
   CalendarCheck2,
@@ -78,9 +79,28 @@ function getTopbarTitle(pathname: string): string {
 
 export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [isNativeApp, setIsNativeApp] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
-  const patientRoute = isPatientRoute(pathname);
-  const isChatRoute = pathname.startsWith("/chat");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const syncNativeState = () => {
+      setIsNativeApp(isNativeAppRuntime());
+    };
+
+    syncNativeState();
+    window.addEventListener("focus", syncNativeState);
+    document.addEventListener("visibilitychange", syncNativeState);
+
+    return () => {
+      window.removeEventListener("focus", syncNativeState);
+      document.removeEventListener("visibilitychange", syncNativeState);
+    };
+  }, []);
+
+  // Keep the mobile chrome exclusive to the native Capacitor app.
+  const patientRoute = isNativeApp && isPatientRoute(pathname);
+  const isChatRoute = patientRoute && pathname.startsWith("/chat");
 
   const activeTab = getActiveTab(pathname);
   const topbarTitle = getTopbarTitle(pathname);
