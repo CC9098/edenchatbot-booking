@@ -234,7 +234,7 @@ export default function CareAdvicePage() {
                 </div>
               ) : (
                 <div className="mt-4 rounded-2xl border border-primary/10 bg-primary-light/35 p-4">
-                  <p className="text-sm font-medium text-slate-900">目前未有醫師設定的綠色推薦，先按以下體質方針執行：</p>
+                  <p className="text-sm font-medium text-slate-900">以下是你的體質方針建議：</p>
                   <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-slate-700">
                     {fallbackDietTips.map((tip) => (
                       <li key={tip}>{tip}</li>
