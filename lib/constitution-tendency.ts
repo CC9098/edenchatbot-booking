@@ -34,41 +34,41 @@ export const TENDENCY_LABELS: Record<TendencyKey, string> = {
 
 export const BASE_QUESTION_COPY = {
   group1: {
-    prompt: "第一組：以下邊段最接近你平時態度與行為？",
+    prompt: "當你面對新挑戰，最自然反應係邊個？",
     options: [
       {
         id: "A",
-        text: "我想發揮影響力。我不喜歡無所事事，知道自己想要什麼並努力追求。",
+        text: "我想發揮影響力，不喜歡無所事事；知道自己想要什麼，會主動推進。",
       },
       {
         id: "B",
-        text: "很多人說我是個愛做夢的人，我在想像世界中會感到興奮，容易滿足；在人群中有時我會選擇獨處。",
+        text: "我容易投入想像世界，偏向安靜觀察；在人群中有時會選擇獨處。",
       },
       {
         id: "C",
-        text: "我常先做好該做的事（甚至犧牲自己），有時間才休息或做想做的事。",
+        text: "我會先完成責任，即使要先放低自己；有空先休息或做想做的事。",
       },
     ] as const,
   },
   group2: {
-    prompt: "第二組：以下邊段最接近你面對壓力時的反應？",
+    prompt: "壓力升高時，你通常會點應對？",
     options: [
       {
         id: "X",
-        text: "我保持樂觀，唔開心時都會盡量唔俾人睇到，但有時會拖住自己要處理嘅問題。",
+        text: "我會先保持正面，唔開心都盡量唔俾人睇到；有時會拖住未處理的問題。",
       },
       {
         id: "Y",
-        text: "我情感比較強烈，唔舒服時通常睇得出；我想自己決定做法，不喜歡被指揮。",
+        text: "我情緒反應比較直接，唔舒服時通常睇得出；我希望自己決定做法。",
       },
       {
         id: "Z",
-        text: "我偏向冷靜同效率，遇到衝突會盡量保持理性，但有時會被形容太抽離。",
+        text: "我偏向理性同效率，遇到衝突會抽離情緒先處理，但有時會被覺得太冷靜。",
       },
     ] as const,
   },
   group3: {
-    prompt: "第三組：以下邊句最接近你近期身體狀態？",
+    prompt: "最近身體狀態，邊句最貼近你？",
     options: [
       {
         id: "J",
@@ -107,7 +107,7 @@ const BASE_SCORE_MAP: Record<string, Record<string, ScoreDelta>> = {
 export const DAILY_CHECKIN_QUESTIONS: DailyCheckinQuestion[] = [
   {
     id: "sleep",
-    prompt: "你昨晚瞓覺最接近以下邊個狀態？",
+    prompt: "昨晚休息之後，你今朝最接近邊種狀態？",
     options: [
       { id: "sleep_j", text: "偏淺眠、易醒，瞓完都有耗損感。", delta: { J: 5 } },
       { id: "sleep_k", text: "瞓好多但仍然沉重、醒來未清。", delta: { K: 5 } },
@@ -116,7 +116,7 @@ export const DAILY_CHECKIN_QUESTIONS: DailyCheckinQuestion[] = [
   },
   {
     id: "body_signal",
-    prompt: "今日身體訊號最明顯係？",
+    prompt: "今日最明顯的身體訊號係？",
     options: [
       { id: "body_j", text: "偏乾、偏緊，像一直耗緊。", delta: { J: 4 } },
       { id: "body_k", text: "偏重、偏滯，像卡住唔郁。", delta: { K: 4 } },
@@ -125,7 +125,7 @@ export const DAILY_CHECKIN_QUESTIONS: DailyCheckinQuestion[] = [
   },
   {
     id: "after_meal",
-    prompt: "食完飯後最常見嘅反應係？",
+    prompt: "食完飯後，你最常見反應係？",
     options: [
       { id: "meal_j", text: "偏快耗，想靠提神先頂到。", delta: { J: 4, L: 1 } },
       { id: "meal_k", text: "偏困倦、偏脹，節奏慢落嚟。", delta: { K: 5 } },
@@ -134,7 +134,7 @@ export const DAILY_CHECKIN_QUESTIONS: DailyCheckinQuestion[] = [
   },
   {
     id: "stress",
-    prompt: "工作或生活壓力高時，你最易出現邊種狀態？",
+    prompt: "工作或生活壓力高時，你最易進入邊種狀態？",
     options: [
       { id: "stress_j", text: "腦不停轉，心神耗得快。", delta: { J: 5 } },
       { id: "stress_k", text: "人會拖住，動力跌落去。", delta: { K: 5 } },
@@ -143,7 +143,7 @@ export const DAILY_CHECKIN_QUESTIONS: DailyCheckinQuestion[] = [
   },
   {
     id: "stable",
-    prompt: "如果以今日整體狀態計，邊句最貼近？",
+    prompt: "以今日整體狀態計，邊句最貼近？",
     options: [
       { id: "stable_j", text: "仍然偏乾耗，需要慢落嚟。", delta: { J: 3 } },
       { id: "stable_k", text: "仍然偏沉滯，需要動起來。", delta: { K: 3 } },
@@ -272,4 +272,3 @@ export function getDailyCheckinQuestion(dateKey = getLocalDateKey()): DailyCheck
   const index = Math.abs(dayNumber) % DAILY_CHECKIN_QUESTIONS.length;
   return DAILY_CHECKIN_QUESTIONS[index];
 }
-

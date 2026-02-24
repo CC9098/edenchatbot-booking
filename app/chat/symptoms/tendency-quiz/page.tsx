@@ -44,8 +44,8 @@ export default function TendencyQuizPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">我的狀態問卷</h1>
-            <p className="mt-1 text-xs text-gray-500">先建立初型，再每日 1 題微調傾向分佈。</p>
+            <h1 className="text-lg font-semibold text-slate-900">SOUL 風水雷旅程</h1>
+            <p className="mt-1 text-xs text-gray-500">以每日抉擇調整風、水、雷三勢，逐步尋回你的原初力量。</p>
           </div>
           <Link
             href="/chat/symptoms"
@@ -70,7 +70,7 @@ export default function TendencyQuizPage() {
           </div>
         ) : (
           <section className="rounded-2xl border border-primary/10 bg-white p-4 sm:p-5">
-            <p className="mb-3 text-sm text-slate-600">此分析只作生活傾向參考，並非醫療診斷。</p>
+            <p className="mb-3 text-sm text-slate-600">此旅程為生活傾向互動，並非醫療診斷。</p>
             <TendencyQuizPanel userId={userId} />
           </section>
         )}
@@ -78,4 +78,3 @@ export default function TendencyQuizPage() {
     </div>
   );
 }
-

@@ -16,6 +16,7 @@ import {
   normalizeToPercentages,
   rankTendency,
   type BaseQuizAnswers,
+  type ScoreDelta,
   type TendencyKey,
   type TendencyScore,
 } from "@/lib/constitution-tendency";
@@ -37,21 +38,36 @@ type TendencyStorageState = {
 
 const TENDENCY_STORAGE_VERSION = 1;
 
-const TENDENCY_BAR_META: Record<TendencyKey, { label: string; barClass: string; textClass: string }> = {
+const FORCE_META: Record<
+  TendencyKey,
+  {
+    name: string;
+    icon: string;
+    fillClass: string;
+    textClass: string;
+    hint: string;
+  }
+> = {
   J: {
-    label: "J（乾耗訊號）",
-    barClass: "bg-amber-500",
-    textClass: "text-amber-700",
+    name: "風勢",
+    icon: "🌀",
+    fillClass: "bg-emerald-500",
+    textClass: "text-emerald-700",
+    hint: "流動、調頻、回氣",
   },
   K: {
-    label: "K（屯積訊號）",
-    barClass: "bg-indigo-500",
-    textClass: "text-indigo-700",
+    name: "水勢",
+    icon: "💧",
+    fillClass: "bg-sky-500",
+    textClass: "text-sky-700",
+    hint: "沉穩、聚養、修復",
   },
   L: {
-    label: "L（高壓訊號）",
-    barClass: "bg-rose-500",
-    textClass: "text-rose-700",
+    name: "雷勢",
+    icon: "⚡️",
+    fillClass: "bg-amber-500",
+    textClass: "text-amber-700",
+    hint: "決斷、突破、行動",
   },
 };
 
@@ -96,6 +112,29 @@ function parseStoredTendencyState(raw: string | null): TendencyStorageState | nu
   } catch {
     return null;
   }
+}
+
+function repeatIcon(icon: string, count: number): string {
+  const safeCount = Math.max(1, Math.min(5, count));
+  return Array.from({ length: safeCount }).map(() => icon).join("");
+}
+
+function buildDeltaBattleReport(delta: ScoreDelta): string[] {
+  const lines: string[] = [];
+  (Object.keys(FORCE_META) as TendencyKey[]).forEach((key) => {
+    const value = Number(delta[key] || 0);
+    if (!value) return;
+    const direction = value > 0 ? "增幅" : "消耗";
+    lines.push(`${FORCE_META[key].name}${direction} ${repeatIcon(FORCE_META[key].icon, Math.abs(value))}`);
+  });
+  return lines;
+}
+
+function forceStateLabel(percent: number): string {
+  if (percent >= 45) return "主勢啟動";
+  if (percent >= 33) return "穩定上升";
+  if (percent >= 24) return "平衡中";
+  return "待補充";
 }
 
 export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
@@ -171,14 +210,17 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
       : false;
 
   const todayAnswerRecord = tendencyState?.answeredDaily?.[todayKey];
-  const todayAnswerText =
-    todayQuestion.options.find((option) => option.id === todayAnswerRecord?.optionId)?.text || null;
+  const todayAnswerOption = todayQuestion.options.find((option) => option.id === todayAnswerRecord?.optionId) || null;
+  const todayBattleReport = useMemo(
+    () => buildDeltaBattleReport(todayAnswerOption?.delta || {}),
+    [todayAnswerOption],
+  );
 
   const handleSaveBaseQuiz = useCallback(() => {
     setTendencyError(null);
     if (!tendencyState) return;
     if (!isBaseQuizComplete(baseAnswersDraft)) {
-      setTendencyError("請先完成三組問題，先可以建立初型。");
+      setTendencyError("請完成三段選擇，先建立 SOUL 原力盤。");
       return;
     }
 
@@ -198,18 +240,18 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
     setTendencyError(null);
     if (!tendencyState) return;
     if (!isBaseQuizComplete(tendencyState.baseAnswers)) {
-      setTendencyError("請先完成初型問卷，再做每日更新。");
+      setTendencyError("請先完成原力初型，再做每日事件卡。");
       return;
     }
     if (todayAnswerRecord) return;
     if (!dailyOptionDraft) {
-      setTendencyError("請先揀選今日狀態。");
+      setTendencyError("請先揀選你今日的抉擇。");
       return;
     }
 
     const selectedOption = todayQuestion.options.find((option) => option.id === dailyOptionDraft);
     if (!selectedOption) {
-      setTendencyError("今日題目資料有誤，請重新載入。");
+      setTendencyError("今日事件卡資料有誤，請重新載入。");
       return;
     }
 
@@ -239,11 +281,18 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
   }, [dailyOptionDraft, persistTendencyState, tendencyState, todayAnswerRecord, todayKey, todayQuestion]);
 
   if (!tendencyReady) {
-    return <p className="text-sm text-slate-500">初始化中...</p>;
+    return <p className="text-sm text-slate-500">初始化 SOUL 原力盤...</p>;
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-primary/15 bg-primary-light/35 p-4">
+        <p className="text-xs font-semibold tracking-wide text-primary">SOUL JOURNEY</p>
+        <p className="mt-1 text-sm text-slate-700">
+          你會喺日常抉擇中調整風、水、雷三勢，逐步搵返自己最穩定的原初力量。
+        </p>
+      </div>
+
       {!baseQuizCompleted ? (
         <div className="space-y-5">
           <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
@@ -262,7 +311,6 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
                         : "border-slate-200 bg-white text-slate-700 hover:border-primary/30"
                     }`}
                   >
-                    <span className="mr-2 text-xs font-semibold text-slate-500">{option.id}</span>
                     {option.text}
                   </button>
                 );
@@ -286,7 +334,6 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
                         : "border-slate-200 bg-white text-slate-700 hover:border-primary/30"
                     }`}
                   >
-                    <span className="mr-2 text-xs font-semibold text-slate-500">{option.id}</span>
                     {option.text}
                   </button>
                 );
@@ -322,32 +369,34 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
             onClick={handleSaveBaseQuiz}
             className="inline-flex items-center rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#3d6b20]"
           >
-            建立初型分佈
+            啟動原力盤
           </button>
         </div>
       ) : (
         <div className="space-y-3">
-          {(Object.keys(TENDENCY_BAR_META) as TendencyKey[]).map((key) => (
-            <div key={key} className="rounded-2xl border border-slate-200 bg-slate-50/60 px-3 py-3">
+          {(Object.keys(FORCE_META) as TendencyKey[]).map((key) => (
+            <div key={key} className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-3">
               <div className="mb-2 flex items-center justify-between">
-                <p className={`text-sm font-semibold ${TENDENCY_BAR_META[key].textClass}`}>
-                  {TENDENCY_BAR_META[key].label}
+                <p className={`text-sm font-semibold ${FORCE_META[key].textClass}`}>
+                  {FORCE_META[key].icon} {FORCE_META[key].name}
                 </p>
-                <p className="text-sm font-semibold text-slate-700">{tendencyPercentages[key]}%</p>
+                <p className="text-xs text-slate-600">{forceStateLabel(tendencyPercentages[key])}</p>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-slate-200">
                 <div
-                  className={`h-2 rounded-full ${TENDENCY_BAR_META[key].barClass}`}
+                  className={`h-2 rounded-full transition-[width] duration-500 ${FORCE_META[key].fillClass}`}
                   style={{ width: `${tendencyPercentages[key]}%` }}
                 />
               </div>
+              <p className="mt-2 text-xs text-slate-500">{FORCE_META[key].hint}</p>
             </div>
           ))}
+
           {primaryTendency && secondaryTendency ? (
             <p className="text-xs text-slate-600">
-              目前主傾向：{TENDENCY_BAR_META[primaryTendency].label}
-              {isMixedTendency ? "（接近混合）" : ""}
-              ，次傾向：{TENDENCY_BAR_META[secondaryTendency].label}
+              目前主勢：{FORCE_META[primaryTendency].icon} {FORCE_META[primaryTendency].name}
+              {isMixedTendency ? "（接近共鳴）" : ""}
+              ，副勢：{FORCE_META[secondaryTendency].icon} {FORCE_META[secondaryTendency].name}
             </p>
           ) : null}
         </div>
@@ -355,10 +404,21 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
 
       {baseQuizCompleted ? (
         <div className="rounded-2xl border border-primary/15 bg-primary-light/30 p-4">
-          <p className="text-sm font-semibold text-slate-900">每日微調（每日 1 題）</p>
+          <p className="text-sm font-semibold text-slate-900">今日事件卡</p>
           <p className="mt-1 text-sm text-slate-700">{todayQuestion.prompt}</p>
           {todayAnswerRecord ? (
-            <p className="mt-3 text-sm text-emerald-700">今日已更新：{todayAnswerText || "已完成今日作答"}</p>
+            <div className="mt-3 space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+              <p className="text-sm text-emerald-800">今日戰報：{todayAnswerOption?.text || "已完成今日抉擇"}</p>
+              {todayBattleReport.length > 0 ? (
+                <ul className="space-y-1">
+                  {todayBattleReport.map((line) => (
+                    <li key={line} className="text-xs text-emerald-700">
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           ) : (
             <>
               <div className="mt-3 space-y-2">
@@ -382,7 +442,7 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
                 onClick={handleSubmitDailyCheckin}
                 className="mt-3 inline-flex items-center rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#3d6b20]"
               >
-                更新今日分數
+                提交今日抉擇
               </button>
             </>
           )}

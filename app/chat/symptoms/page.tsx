@@ -414,7 +414,7 @@ export default function MySymptomsPage() {
                 href="/chat/symptoms/tendency-quiz"
                 className="inline-flex items-center rounded-full border border-primary/20 bg-white px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
               >
-                問卷
+                SOUL 問卷
               </Link>
             </div>
           </div>
