@@ -42,34 +42,99 @@ const FORCE_META: Record<
   TendencyKey,
   {
     name: string;
-    icon: string;
     fillClass: string;
     textClass: string;
+    iconClass: string;
     hint: string;
   }
 > = {
   J: {
     name: "風勢",
-    icon: "🌀",
-    fillClass: "bg-emerald-500",
-    textClass: "text-emerald-700",
+    fillClass: "bg-[#5e7880]",
+    textClass: "text-[#3f5a62]",
+    iconClass: "text-[#4b666e]",
     hint: "流動、調頻、回氣",
   },
   K: {
     name: "水勢",
-    icon: "💧",
-    fillClass: "bg-sky-500",
-    textClass: "text-sky-700",
+    fillClass: "bg-[#4a5278]",
+    textClass: "text-[#343c62]",
+    iconClass: "text-[#3b4368]",
     hint: "沉穩、聚養、修復",
   },
   L: {
     name: "雷勢",
-    icon: "⚡️",
-    fillClass: "bg-amber-500",
-    textClass: "text-amber-700",
+    fillClass: "bg-[#8a7541]",
+    textClass: "text-[#665730]",
+    iconClass: "text-[#725f34]",
     hint: "決斷、突破、行動",
   },
 };
+
+type BattleReportItem = {
+  key: TendencyKey;
+  direction: "增幅" | "消耗";
+  count: number;
+};
+
+type ForceIconProps = {
+  force: TendencyKey;
+  className?: string;
+};
+
+function ForceIcon({ force, className = "h-4 w-4 text-primary" }: ForceIconProps) {
+  if (force === "J") {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+        aria-hidden="true"
+      >
+        <path d="M4 8c2.4-2.8 6.4-3.6 9.8-2.1 2.7 1.2 4.2 3.9 3.9 6.6-.3 2.8-2.4 4.9-5.1 5.4-2.5.5-5-.5-6.5-2.5" />
+        <path d="M4 8h4.2" />
+        <path d="M5.8 5.8 4 8l1.8 2.2" />
+      </svg>
+    );
+  }
+
+  if (force === "K") {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+        aria-hidden="true"
+      >
+        <path d="M12 3.8c-3.5 4.4-6.2 7.5-6.2 10.7a6.2 6.2 0 0 0 12.4 0c0-3.2-2.7-6.3-6.2-10.7Z" />
+        <path d="M9.2 14.6c.5 1.4 1.6 2.3 3 2.6" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M13 2 5.5 13h5.7L9.8 22 18.5 10h-5.7L13 2Z" />
+    </svg>
+  );
+}
 
 function createInitialTendencyState(): TendencyStorageState {
   return {
@@ -114,20 +179,18 @@ function parseStoredTendencyState(raw: string | null): TendencyStorageState | nu
   }
 }
 
-function repeatIcon(icon: string, count: number): string {
-  const safeCount = Math.max(1, Math.min(5, count));
-  return Array.from({ length: safeCount }).map(() => icon).join("");
-}
-
-function buildDeltaBattleReport(delta: ScoreDelta): string[] {
-  const lines: string[] = [];
+function buildDeltaBattleReport(delta: ScoreDelta): BattleReportItem[] {
+  const items: BattleReportItem[] = [];
   (Object.keys(FORCE_META) as TendencyKey[]).forEach((key) => {
     const value = Number(delta[key] || 0);
     if (!value) return;
-    const direction = value > 0 ? "增幅" : "消耗";
-    lines.push(`${FORCE_META[key].name}${direction} ${repeatIcon(FORCE_META[key].icon, Math.abs(value))}`);
+    items.push({
+      key,
+      direction: value > 0 ? "增幅" : "消耗",
+      count: Math.max(1, Math.min(5, Math.abs(value))),
+    });
   });
-  return lines;
+  return items;
 }
 
 function forceStateLabel(percent: number): string {
@@ -147,6 +210,7 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
   const todayKey = useMemo(() => getLocalDateKey(), []);
   const todayQuestion = useMemo(() => getDailyCheckinQuestion(todayKey), [todayKey]);
   const tendencyStorageKey = useMemo(() => `eden:tendency:v1:${userId || "guest"}`, [userId]);
+  const todayAnswerOptionId = tendencyState?.answeredDaily?.[todayKey]?.optionId;
 
   const persistTendencyState = useCallback(
     (nextState: TendencyStorageState) => {
@@ -183,7 +247,7 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
 
   useEffect(() => {
     setDailyOptionDraft("");
-  }, [todayQuestion.id, tendencyState?.answeredDaily?.[todayKey]?.optionId, todayKey]);
+  }, [todayQuestion.id, todayAnswerOptionId, todayKey]);
 
   const baseQuizCompleted = useMemo(
     () => isBaseQuizComplete(tendencyState?.baseAnswers || {}),
@@ -377,8 +441,11 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
           {(Object.keys(FORCE_META) as TendencyKey[]).map((key) => (
             <div key={key} className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-3">
               <div className="mb-2 flex items-center justify-between">
-                <p className={`text-sm font-semibold ${FORCE_META[key].textClass}`}>
-                  {FORCE_META[key].icon} {FORCE_META[key].name}
+                <p className={`inline-flex items-center gap-2 text-sm font-semibold ${FORCE_META[key].textClass}`}>
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white ring-1 ring-black/5">
+                    <ForceIcon force={key} className={`h-3.5 w-3.5 ${FORCE_META[key].iconClass}`} />
+                  </span>
+                  <span>{FORCE_META[key].name}</span>
                 </p>
                 <p className="text-xs text-slate-600">{forceStateLabel(tendencyPercentages[key])}</p>
               </div>
@@ -394,9 +461,20 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
 
           {primaryTendency && secondaryTendency ? (
             <p className="text-xs text-slate-600">
-              目前主勢：{FORCE_META[primaryTendency].icon} {FORCE_META[primaryTendency].name}
+              目前主勢：
+              <span className={`mx-1 inline-flex items-center gap-1 ${FORCE_META[primaryTendency].textClass}`}>
+                <ForceIcon force={primaryTendency} className={`h-3.5 w-3.5 ${FORCE_META[primaryTendency].iconClass}`} />
+                {FORCE_META[primaryTendency].name}
+              </span>
               {isMixedTendency ? "（接近共鳴）" : ""}
-              ，副勢：{FORCE_META[secondaryTendency].icon} {FORCE_META[secondaryTendency].name}
+              ，副勢：
+              <span className={`mx-1 inline-flex items-center gap-1 ${FORCE_META[secondaryTendency].textClass}`}>
+                <ForceIcon
+                  force={secondaryTendency}
+                  className={`h-3.5 w-3.5 ${FORCE_META[secondaryTendency].iconClass}`}
+                />
+                {FORCE_META[secondaryTendency].name}
+              </span>
             </p>
           ) : null}
         </div>
@@ -407,13 +485,25 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
           <p className="text-sm font-semibold text-slate-900">今日事件卡</p>
           <p className="mt-1 text-sm text-slate-700">{todayQuestion.prompt}</p>
           {todayAnswerRecord ? (
-            <div className="mt-3 space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
-              <p className="text-sm text-emerald-800">今日戰報：{todayAnswerOption?.text || "已完成今日抉擇"}</p>
+            <div className="mt-3 space-y-2 rounded-xl border border-primary/20 bg-white/80 p-3">
+              <p className="text-sm text-slate-800">今日戰報：{todayAnswerOption?.text || "已完成今日抉擇"}</p>
               {todayBattleReport.length > 0 ? (
                 <ul className="space-y-1">
-                  {todayBattleReport.map((line) => (
-                    <li key={line} className="text-xs text-emerald-700">
-                      {line}
+                  {todayBattleReport.map((item) => (
+                    <li key={`${item.key}-${item.direction}`} className="flex items-center gap-2 text-xs text-slate-700">
+                      <span className="min-w-[78px] font-medium text-slate-600">
+                        {FORCE_META[item.key].name}
+                        {item.direction}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        {Array.from({ length: item.count }).map((_, index) => (
+                          <ForceIcon
+                            key={`${item.key}-${item.direction}-${index}`}
+                            force={item.key}
+                            className={`h-3.5 w-3.5 ${FORCE_META[item.key].iconClass}`}
+                          />
+                        ))}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -453,4 +543,3 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
     </div>
   );
 }
-
