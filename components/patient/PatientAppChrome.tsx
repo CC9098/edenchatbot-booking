@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { isNativeAppRuntime } from "@/lib/platform";
+import { isNativeAppRuntime, isNativeAppUserAgent } from "@/lib/platform";
 import {
   Sparkles,
   CalendarCheck2,
@@ -79,21 +79,35 @@ function getTopbarTitle(pathname: string): string {
 
 export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [isNativeApp, setIsNativeApp] = useState(false);
+  const [isNativeApp, setIsNativeApp] = useState(() => {
+    if (typeof navigator === "undefined") return false;
+    return isNativeAppUserAgent(navigator.userAgent);
+  });
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    let cancelled = false;
+
     const syncNativeState = () => {
-      setIsNativeApp(isNativeAppRuntime());
+      if (cancelled) return;
+      // Native bridge availability can lag behind first render in WebView.
+      setIsNativeApp((previous) => previous || isNativeAppRuntime());
     };
 
     syncNativeState();
+    const retryDelays = [120, 320, 760, 1600];
+    const retryTimers = retryDelays.map((delay) => window.setTimeout(syncNativeState, delay));
+
     window.addEventListener("focus", syncNativeState);
+    window.addEventListener("pageshow", syncNativeState);
     document.addEventListener("visibilitychange", syncNativeState);
 
     return () => {
+      cancelled = true;
+      retryTimers.forEach((timer) => window.clearTimeout(timer));
       window.removeEventListener("focus", syncNativeState);
+      window.removeEventListener("pageshow", syncNativeState);
       document.removeEventListener("visibilitychange", syncNativeState);
     };
   }, []);
