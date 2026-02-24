@@ -18,6 +18,29 @@ export async function GET(
 
     const supabase = createServiceClient();
 
+    const { data: profileRow, error: profileError } = await supabase
+      .from("profiles")
+      .select("display_name, phone")
+      .eq("id", patientUserId)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("[GET patient profile] profile error:", profileError.message);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+
+    const { data: latestBookingContact, error: bookingContactError } = await supabase
+      .from("booking_intake")
+      .select("patient_name, phone, email, created_at")
+      .eq("user_id", patientUserId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (bookingContactError) {
+      console.error("[GET patient profile] booking contact warning:", bookingContactError.message);
+    }
+
     // Fetch patient care profile
     const { data: careProfile, error: cpError } = await supabase
       .from("patient_care_profile")
@@ -77,6 +100,11 @@ export async function GET(
     }
 
     return NextResponse.json({
+      patientIdentity: {
+        displayName: profileRow?.display_name || latestBookingContact?.patient_name || null,
+        phone: profileRow?.phone || latestBookingContact?.phone || null,
+        email: latestBookingContact?.email || null,
+      },
       careProfile: careProfile
         ? {
             patientUserId: careProfile.patient_user_id,

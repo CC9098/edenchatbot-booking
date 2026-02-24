@@ -64,7 +64,14 @@ interface SymptomLog {
   createdAt: string;
 }
 
+interface PatientIdentity {
+  displayName: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
 interface PatientProfile {
+  patientIdentity: PatientIdentity;
   careProfile: CareProfile | null;
   activeInstructions: CareInstruction[];
   pendingFollowUps: FollowUp[];
@@ -326,6 +333,8 @@ export default function PatientDetailPage() {
         返回病人列表
       </button>
 
+      <PatientIdentitySection identity={data.patientIdentity} />
+
       {/* Section A: Constitution */}
       <ConstitutionSection
         patientUserId={patientUserId}
@@ -354,6 +363,36 @@ export default function PatientDetailPage() {
 
       <AuditLogsSection patientUserId={patientUserId} />
     </div>
+  );
+}
+
+function PatientIdentitySection({ identity }: { identity: PatientIdentity }) {
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="border-b border-gray-100 px-4 py-4 sm:px-5">
+        <h2 className="text-base font-semibold text-gray-900">病人聯絡資料</h2>
+      </div>
+      <div className="space-y-3 px-4 py-4 sm:px-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-gray-500">姓名:</span>
+          <span className="text-sm font-medium text-gray-900">
+            {identity.displayName || "未設定"}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-gray-500">電話:</span>
+          <span className="text-sm font-medium text-gray-900">
+            {identity.phone || "未設定"}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-gray-500">電郵:</span>
+          <span className="text-sm font-medium text-gray-700">
+            {identity.email || "--"}
+          </span>
+        </div>
+      </div>
+    </section>
   );
 }
 

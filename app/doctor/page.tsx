@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 interface PatientItem {
   patientUserId: string;
   displayName: string | null;
+  phone: string | null;
   constitution: string;
   nextFollowUpDate: string | null;
 }
@@ -106,7 +107,7 @@ export default function DoctorPatientsPage() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="搜尋病人姓名..."
+          placeholder="搜尋病人姓名或電話..."
           className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </div>
@@ -146,6 +147,7 @@ export default function DoctorPatientsPage() {
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50">
                   <th className="px-4 py-3 text-left font-medium text-gray-500">姓名</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-500">電話</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-500">體質分型</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-500">下次覆診</th>
                   <th className="px-4 py-3 text-right font-medium text-gray-500"></th>
@@ -160,6 +162,9 @@ export default function DoctorPatientsPage() {
                   >
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {p.displayName || "未設定姓名"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">
+                      {p.phone || "--"}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -195,6 +200,9 @@ export default function DoctorPatientsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-gray-900 truncate">
                     {p.displayName || "未設定姓名"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-600">
+                    電話: {p.phone || "--"}
                   </p>
                   <div className="mt-1 flex items-center gap-2">
                     <span

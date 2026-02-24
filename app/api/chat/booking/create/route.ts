@@ -12,6 +12,7 @@ import { getClinicAddress } from "@/shared/clinic-data";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { createServiceClient } from "@/lib/supabase";
 import { getSafeErrorMessage } from "@/lib/error-sanitizer";
+import { syncPatientProfileContact } from "@/lib/profile-contact-sync";
 
 // ── Whitelist schema ────────────────────────────────────────────────
 const bridgeBookingSchema = z
@@ -133,6 +134,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Failed to create booking in calendar" },
         { status: 500 }
+      );
+    }
+
+    // Keep patient contact data searchable in doctor dashboard.
+    const profileSync = await syncPatientProfileContact({
+      userId: user?.id,
+      displayName: bookingData.patientName,
+      phone: bookingData.phone,
+    });
+    if (!profileSync.success) {
+      console.warn(
+        `[chat/booking/create] profile sync warning: ${profileSync.error}`
       );
     }
 

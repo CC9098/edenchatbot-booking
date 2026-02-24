@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { isNativeAppRuntime, isNativeAppUserAgent } from "@/lib/platform";
 import {
   Sparkles,
@@ -77,6 +77,133 @@ function getTopbarTitle(pathname: string): string {
   return "Eden Care";
 }
 
+function ProfileCompletionPrompt({ enabled }: { enabled: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [displayName, setDisplayName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      setOpen(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadProfile = async () => {
+      try {
+        const response = await fetch("/api/me/profile", { cache: "no-store" });
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (cancelled) return;
+
+        const nextDisplayName = (data.displayName || "").trim();
+        const nextPhone = (data.phone || "").trim();
+
+        setDisplayName(nextDisplayName);
+        setPhone(nextPhone);
+        setOpen(Boolean(data.missingRequiredContact));
+      } catch {
+        // Best-effort prompt only.
+      }
+    };
+
+    loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+
+  if (!enabled || !open) return null;
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setFormError(null);
+
+    const nameValue = displayName.trim();
+    const phoneValue = phone.trim();
+    const phoneDigits = phoneValue.replace(/\D/g, "");
+
+    if (nameValue.length < 2) {
+      setFormError("請輸入有效姓名");
+      return;
+    }
+
+    if (phoneDigits.length < 8) {
+      setFormError("請輸入有效電話號碼");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch("/api/me/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: nameValue,
+          phone: phoneValue,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "儲存失敗");
+      }
+
+      setOpen(false);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "儲存失敗");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/45" />
+      <div className="relative z-[81] w-full max-w-md rounded-xl bg-white p-5 shadow-2xl">
+        <h3 className="text-base font-semibold text-gray-900">完善病人資料</h3>
+        <p className="mt-1 text-sm text-gray-600">
+          請填寫姓名與電話，方便醫師以姓名或電話快速查找你的護理記錄。
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">姓名</label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="例：陳大文"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">電話</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="例：91234567"
+            />
+          </div>
+          {formError ? <p className="text-sm text-red-600">{formError}</p> : null}
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3d6b20] disabled:opacity-60"
+          >
+            {saving ? "儲存中..." : "儲存資料"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isNativeApp, setIsNativeApp] = useState(() => {
@@ -120,6 +247,7 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   const topbarTitle = getTopbarTitle(pathname);
   const shouldShowRouteTopbar = patientRoute && !isChatRoute;
   const shouldShowTabbar = !isChatRoute || !keyboardOpen;
+  const shouldPromptProfileCompletion = isPatientRoute(pathname) && !pathname.startsWith("/login");
 
   // Avoid iOS keyboard + fixed tabbar collision on chat pages.
   useEffect(() => {
@@ -152,11 +280,17 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   const shellPaddingBottom = "calc(88px + env(safe-area-inset-bottom))";
 
   if (!patientRoute) {
-    return <>{children}</>;
+    return (
+      <>
+        <ProfileCompletionPrompt enabled={shouldPromptProfileCompletion} />
+        {children}
+      </>
+    );
   }
 
   return (
     <div className="patient-mobile-shell" style={{ paddingBottom: shellPaddingBottom }}>
+      <ProfileCompletionPrompt enabled={shouldPromptProfileCompletion} />
       {shouldShowRouteTopbar ? (
         <header className="chat-fixed-topbar chat-fixed-topbar--route" aria-label={`${topbarTitle} 頂部導覽`}>
           <div className="chat-fixed-topbar__inner">

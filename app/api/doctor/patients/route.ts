@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, requireStaffRole, AuthError } from "@/lib/auth-helpers";
 import { createServiceClient } from "@/lib/supabase";
+import { normalizePhoneForSearch } from "@/lib/contact-utils";
 
 export const dynamic = "force-dynamic";
+const MAX_SEARCH_PATIENT_SCAN = 2000;
+
+function includesIgnoreCase(source: string | null | undefined, query: string): boolean {
+  if (!source || !query) return false;
+  return source.toLowerCase().includes(query);
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,9 +21,12 @@ export async function GET(request: NextRequest) {
     await requireStaffRole(user.id);
 
     const { searchParams } = new URL(request.url);
-    const q = searchParams.get("q") || "";
+    const q = (searchParams.get("q") || "").trim();
+    const queryText = q.toLowerCase();
+    const queryDigits = normalizePhoneForSearch(q);
+    const isSearching = q.length > 0;
     const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "20", 10) || 20, 1), 100);
-    const cursor = searchParams.get("cursor") || null;
+    const cursor = !isSearching ? searchParams.get("cursor") || null : null;
 
     const supabase = createServiceClient();
 
@@ -25,10 +35,15 @@ export async function GET(request: NextRequest) {
       .from("patient_care_team")
       .select("patient_user_id")
       .eq("staff_user_id", user.id)
-      .order("patient_user_id", { ascending: true })
-      .limit(limit + 1); // fetch one extra for cursor
+      .order("patient_user_id", { ascending: true });
 
-    if (cursor) {
+    if (isSearching) {
+      teamQuery = teamQuery.limit(MAX_SEARCH_PATIENT_SCAN);
+    } else {
+      teamQuery = teamQuery.limit(limit + 1); // fetch one extra for cursor
+    }
+
+    if (!isSearching && cursor) {
       teamQuery = teamQuery.gt("patient_user_id", cursor);
     }
 
@@ -43,34 +58,75 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ items: [], nextCursor: null });
     }
 
-    const hasMore = teamRows.length > limit;
-    const patientIds = teamRows.slice(0, limit).map((r) => r.patient_user_id);
-
-    // Fetch profiles
-    let profileQuery = supabase
-      .from("profiles")
-      .select("id, display_name")
-      .in("id", patientIds);
-
-    if (q) {
-      profileQuery = profileQuery.ilike("display_name", `%${q}%`);
+    const hasMore = !isSearching && teamRows.length > limit;
+    const candidatePatientIds = (isSearching ? teamRows : teamRows.slice(0, limit)).map((r) => r.patient_user_id);
+    if (candidatePatientIds.length === 0) {
+      return NextResponse.json({ items: [], nextCursor: null });
     }
 
-    const { data: profiles, error: profileError } = await profileQuery;
+    const { data: profiles, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, display_name, phone")
+      .in("id", candidatePatientIds);
 
     if (profileError) {
       console.error("[GET /api/doctor/patients] profile query error:", profileError.message);
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 
-    // If search filter applied, narrow down patient IDs
-    const matchedIds = profiles ? profiles.map((p) => p.id) : [];
+    const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
-    if (q && matchedIds.length === 0) {
+    // Pull latest intake contact snapshot for fallback display/search.
+    const { data: bookingContacts, error: bookingContactsError } = await supabase
+      .from("booking_intake")
+      .select("user_id, patient_name, phone, email, created_at")
+      .in("user_id", candidatePatientIds)
+      .order("created_at", { ascending: false });
+
+    if (bookingContactsError) {
+      console.error(
+        "[GET /api/doctor/patients] booking_intake query warning:",
+        bookingContactsError.message,
+      );
+    }
+
+    const bookingContactMap = new Map<
+      string,
+      { patient_name: string | null; phone: string | null; email: string | null }
+    >();
+    for (const row of bookingContacts || []) {
+      if (typeof row.user_id !== "string") continue;
+      if (bookingContactMap.has(row.user_id)) continue;
+      bookingContactMap.set(row.user_id, {
+        patient_name: row.patient_name,
+        phone: row.phone,
+        email: row.email,
+      });
+    }
+
+    const matchedIds = !isSearching
+      ? candidatePatientIds
+      : candidatePatientIds.filter((id) => {
+          const profile = profileMap.get(id);
+          const intakeContact = bookingContactMap.get(id);
+
+          const nameMatch =
+            includesIgnoreCase(profile?.display_name, queryText) ||
+            includesIgnoreCase(intakeContact?.patient_name, queryText);
+
+          const phoneMatch =
+            queryDigits.length > 0 &&
+            (normalizePhoneForSearch(profile?.phone).includes(queryDigits) ||
+              normalizePhoneForSearch(intakeContact?.phone).includes(queryDigits));
+
+          return nameMatch || phoneMatch;
+        });
+
+    if (matchedIds.length === 0) {
       return NextResponse.json({ items: [], nextCursor: null });
     }
 
-    const idsToFetch = q ? matchedIds : patientIds;
+    const idsToFetch = isSearching ? matchedIds.slice(0, limit) : matchedIds;
 
     // Fetch care profiles
     const { data: careProfiles } = await supabase
@@ -87,7 +143,6 @@ export async function GET(request: NextRequest) {
       .order("suggested_date", { ascending: true });
 
     // Build lookup maps
-    const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
     const careMap = new Map(careProfiles?.map((c) => [c.patient_user_id, c]) || []);
     const followUpMap = new Map<string, string>();
     if (followUps) {
@@ -100,12 +155,13 @@ export async function GET(request: NextRequest) {
 
     const items = idsToFetch.map((id) => ({
       patientUserId: id,
-      displayName: profileMap.get(id)?.display_name || null,
+      displayName: profileMap.get(id)?.display_name || bookingContactMap.get(id)?.patient_name || null,
+      phone: profileMap.get(id)?.phone || bookingContactMap.get(id)?.phone || null,
       constitution: careMap.get(id)?.constitution || "unknown",
       nextFollowUpDate: followUpMap.get(id) || null,
     }));
 
-    const nextCursor = hasMore && !q ? patientIds[patientIds.length - 1] : null;
+    const nextCursor = hasMore && !isSearching ? matchedIds[matchedIds.length - 1] : null;
 
     return NextResponse.json({ items, nextCursor });
   } catch (err) {

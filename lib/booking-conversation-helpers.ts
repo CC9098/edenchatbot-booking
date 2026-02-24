@@ -34,6 +34,7 @@ import {
   type BookingVisitType,
 } from './booking-intake-storage';
 import { getSafeErrorMessage } from './error-sanitizer';
+import { syncPatientProfileContact } from './profile-contact-sync';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const DEFAULT_DURATION_MINUTES = 15;
@@ -1143,6 +1144,18 @@ export async function createConversationalBooking(
         success: false,
         error: "系統同步失敗，預約未完成，請再試一次。",
       };
+    }
+
+    // Keep patient profile searchable by doctor (name + phone) after booking succeeds.
+    const profileSync = await syncPatientProfileContact({
+      userId: context?.userId,
+      displayName: normalizedBookingData.patientName,
+      phone: normalizedBookingData.phone,
+    });
+    if (!profileSync.success) {
+      console.warn(
+        `[createConversationalBooking] profile sync warning: ${profileSync.error}`,
+      );
     }
 
     // Send email confirmation (best effort)
