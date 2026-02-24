@@ -2,6 +2,7 @@ import ChatWidget from '@/components/ChatWidget';
 import Link from 'next/link';
 import { listPublishedArticles, listPublishedCourses } from '@/lib/content-service';
 import { createServerClient } from "@/lib/supabase-server";
+import { isNativeAppUserAgent } from "@/lib/platform";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -20,7 +21,7 @@ function formatDate(date: string): string {
 
 export default async function Home() {
   const userAgent = headers().get("user-agent") ?? "";
-  if (/\bCapacitor\b/i.test(userAgent)) {
+  if (isNativeAppUserAgent(userAgent)) {
     redirect("/chat");
   }
 
