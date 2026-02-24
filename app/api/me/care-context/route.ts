@@ -131,6 +131,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
+      userId: user.id,
       constitution: resolvedConstitution,
       constitutionSource,
       constitutionNote: careProfile?.constitution_note || null,
