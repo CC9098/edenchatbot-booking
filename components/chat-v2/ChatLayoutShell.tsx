@@ -3,7 +3,6 @@
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Menu } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -57,14 +56,7 @@ function ChatLayoutFrame({ children }: { children: React.ReactNode }) {
             <div className="chat-fixed-topbar__spacer" />
           )}
           <Link href="/chat" className="chat-fixed-topbar__brand">
-            <Image
-              src="/logo-eden.png"
-              alt="Eden logo"
-              width={28}
-              height={28}
-              className="h-7 w-7 rounded-full object-cover"
-            />
-            <span>Eden Care</span>
+            Eden Care
           </Link>
           <div className="chat-fixed-topbar__actions">
             <Link href={actionHref} className="chat-fixed-topbar__action">

@@ -249,16 +249,18 @@ h3 {
 
 .chat-fixed-topbar__brand {
   justify-self: center;
-  min-height: 52px;
-  padding: 0 16px;
+  min-height: 46px;
+  padding: 0 14px;
   border-radius: var(--radius-pill);
   border: 1px solid rgba(79, 123, 87, 0.2);
   background: rgba(246, 250, 246, 0.92);
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-size: 19px;
+  font-size: 15px;
+  line-height: 1;
   font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
   color: #3f784d;
   box-shadow: 0 6px 18px rgba(35, 56, 39, 0.1);
 }
@@ -273,6 +275,7 @@ h3 {
   align-items: center;
   font-size: 13px;
   font-weight: 700;
+  white-space: nowrap;
   color: #4b8158;
 }
 
