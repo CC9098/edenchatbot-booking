@@ -397,26 +397,38 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
         </div>
       ) : (
         <div className="space-y-3">
-          {(Object.keys(FORCE_META) as TendencyKey[]).map((key) => (
-            <div key={key} className="rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-3">
-              <div className="mb-2 flex items-center justify-between">
-                <p className={`inline-flex items-center gap-2 text-sm font-semibold ${FORCE_META[key].textClass}`}>
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white ring-1 ring-black/5">
-                    <ForceIcon force={key} className={`h-3.5 w-3.5 ${FORCE_META[key].iconClass}`} />
-                  </span>
-                  <span>{FORCE_META[key].name}</span>
-                </p>
-                <p className="text-xs text-slate-600">{forceStateLabel(tendencyPercentages[key])}</p>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+            <p className="text-xs font-semibold tracking-wide text-slate-500">原力版圖</p>
+            <div className="mt-2 overflow-hidden rounded-full bg-slate-200 ring-1 ring-slate-200">
+              <div className="flex h-3 w-full">
+                {(Object.keys(FORCE_META) as TendencyKey[]).map((key, index, allKeys) => (
+                  <div
+                    key={key}
+                    className={`h-3 transition-[width] duration-500 ${FORCE_META[key].fillClass} ${
+                      index < allKeys.length - 1 ? "border-r border-white/60" : ""
+                    }`}
+                    style={{ width: `${tendencyPercentages[key]}%` }}
+                  />
+                ))}
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-                <div
-                  className={`h-2 rounded-full transition-[width] duration-500 ${FORCE_META[key].fillClass}`}
-                  style={{ width: `${tendencyPercentages[key]}%` }}
-                />
-              </div>
-              <p className="mt-2 text-xs text-slate-500">{FORCE_META[key].hint}</p>
             </div>
-          ))}
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              {(Object.keys(FORCE_META) as TendencyKey[]).map((key) => (
+                <div key={key} className="rounded-xl border border-slate-200 bg-white/85 px-3 py-2">
+                  <p className={`inline-flex items-center gap-2 text-sm font-semibold ${FORCE_META[key].textClass}`}>
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white ring-1 ring-black/5">
+                      <ForceIcon force={key} className={`h-3.5 w-3.5 ${FORCE_META[key].iconClass}`} />
+                    </span>
+                    <span>{FORCE_META[key].name}</span>
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    {Math.round(tendencyPercentages[key])}% ・ {forceStateLabel(tendencyPercentages[key])}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">{FORCE_META[key].hint}</p>
+                </div>
+              ))}
+            </div>
+          </div>
 
           {primaryTendency && secondaryTendency ? (
             <p className="text-xs text-slate-600">
