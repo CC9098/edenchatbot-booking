@@ -21,6 +21,7 @@ import {
   type TendencyKey,
   type TendencyScore,
 } from "@/lib/constitution-tendency";
+import { generateForceReading } from "@/lib/narrative-copy";
 
 type TendencyQuizPanelProps = {
   userId?: string;
@@ -431,22 +432,27 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
           </div>
 
           {primaryTendency && secondaryTendency ? (
-            <p className="text-xs text-slate-600">
-              目前主勢：
-              <span className={`mx-1 inline-flex items-center gap-1 ${FORCE_META[primaryTendency].textClass}`}>
-                <ForceIcon force={primaryTendency} className={`h-3.5 w-3.5 ${FORCE_META[primaryTendency].iconClass}`} />
-                {FORCE_META[primaryTendency].name}
-              </span>
-              {isMixedTendency ? "（接近共鳴）" : ""}
-              ，副勢：
-              <span className={`mx-1 inline-flex items-center gap-1 ${FORCE_META[secondaryTendency].textClass}`}>
-                <ForceIcon
-                  force={secondaryTendency}
-                  className={`h-3.5 w-3.5 ${FORCE_META[secondaryTendency].iconClass}`}
-                />
-                {FORCE_META[secondaryTendency].name}
-              </span>
-            </p>
+            <>
+              <p className="text-xs text-slate-600">
+                目前主勢：
+                <span className={`mx-1 inline-flex items-center gap-1 ${FORCE_META[primaryTendency].textClass}`}>
+                  <ForceIcon force={primaryTendency} className={`h-3.5 w-3.5 ${FORCE_META[primaryTendency].iconClass}`} />
+                  {FORCE_META[primaryTendency].name}
+                </span>
+                {isMixedTendency ? "（接近共鳴）" : ""}
+                ，副勢：
+                <span className={`mx-1 inline-flex items-center gap-1 ${FORCE_META[secondaryTendency].textClass}`}>
+                  <ForceIcon
+                    force={secondaryTendency}
+                    className={`h-3.5 w-3.5 ${FORCE_META[secondaryTendency].iconClass}`}
+                  />
+                  {FORCE_META[secondaryTendency].name}
+                </span>
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                「{generateForceReading(primaryTendency, secondaryTendency, tendencyPercentages, isMixedTendency)}」
+              </p>
+            </>
           ) : null}
         </div>
       )}
