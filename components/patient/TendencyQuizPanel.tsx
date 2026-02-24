@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Droplet, Wind, Zap } from "lucide-react";
 import {
   BASE_QUESTION_COPY,
   applyDailyDecay,
@@ -50,9 +51,9 @@ const FORCE_META: Record<
 > = {
   J: {
     name: "風勢",
-    fillClass: "bg-[#5e7880]",
-    textClass: "text-[#3f5a62]",
-    iconClass: "text-[#4b666e]",
+    fillClass: "bg-[#4e8a96]",
+    textClass: "text-[#2f6873]",
+    iconClass: "text-[#3a7782]",
     hint: "流動、調頻、回氣",
   },
   K: {
@@ -64,9 +65,9 @@ const FORCE_META: Record<
   },
   L: {
     name: "雷勢",
-    fillClass: "bg-[#8a7541]",
-    textClass: "text-[#665730]",
-    iconClass: "text-[#725f34]",
+    fillClass: "bg-[#b89a2c]",
+    textClass: "text-[#876d15]",
+    iconClass: "text-[#9a7d1c]",
     hint: "決斷、突破、行動",
   },
 };
@@ -84,56 +85,14 @@ type ForceIconProps = {
 
 function ForceIcon({ force, className = "h-4 w-4 text-primary" }: ForceIconProps) {
   if (force === "J") {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className={className}
-        aria-hidden="true"
-      >
-        <path d="M4 8c2.4-2.8 6.4-3.6 9.8-2.1 2.7 1.2 4.2 3.9 3.9 6.6-.3 2.8-2.4 4.9-5.1 5.4-2.5.5-5-.5-6.5-2.5" />
-        <path d="M4 8h4.2" />
-        <path d="M5.8 5.8 4 8l1.8 2.2" />
-      </svg>
-    );
+    return <Wind className={className} strokeWidth={1.9} aria-hidden="true" />;
   }
 
   if (force === "K") {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className={className}
-        aria-hidden="true"
-      >
-        <path d="M12 3.8c-3.5 4.4-6.2 7.5-6.2 10.7a6.2 6.2 0 0 0 12.4 0c0-3.2-2.7-6.3-6.2-10.7Z" />
-        <path d="M9.2 14.6c.5 1.4 1.6 2.3 3 2.6" />
-      </svg>
-    );
+    return <Droplet className={className} strokeWidth={1.9} aria-hidden="true" />;
   }
 
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M13 2 5.5 13h5.7L9.8 22 18.5 10h-5.7L13 2Z" />
-    </svg>
-  );
+  return <Zap className={className} strokeWidth={1.9} aria-hidden="true" />;
 }
 
 function createInitialTendencyState(): TendencyStorageState {
