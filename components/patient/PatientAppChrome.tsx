@@ -158,12 +158,17 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   return (
     <div className="patient-mobile-shell" style={{ paddingBottom: shellPaddingBottom }}>
       {shouldShowRouteTopbar ? (
-        <header className="patient-route-topbar" aria-label={`${topbarTitle} 頂部導覽`}>
-          <div className="patient-route-topbar__inner">
-            <Link href="/chat" className="patient-route-topbar__brand">
+        <header className="chat-fixed-topbar chat-fixed-topbar--route" aria-label={`${topbarTitle} 頂部導覽`}>
+          <div className="chat-fixed-topbar__inner">
+            <div className="chat-fixed-topbar__spacer" aria-hidden="true" />
+            <Link href="/chat" className="chat-fixed-topbar__brand">
               Eden Care
             </Link>
-            <span className="patient-route-topbar__title">{topbarTitle}</span>
+            <div className="chat-fixed-topbar__actions">
+              <span className="chat-fixed-topbar__action chat-fixed-topbar__action--section">
+                {topbarTitle}
+              </span>
+            </div>
           </div>
         </header>
       ) : null}
