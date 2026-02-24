@@ -21,7 +21,9 @@ export async function GET(
     // Fetch patient care profile
     const { data: careProfile, error: cpError } = await supabase
       .from("patient_care_profile")
-      .select("patient_user_id, constitution, constitution_note, last_visit_at, updated_by, updated_at")
+      .select(
+        "patient_user_id, constitution, constitution_note, last_visit_at, updated_by, updated_at, constitution_score_depleting, constitution_score_crossing, constitution_score_hoarding, constitution_score_mixed, doctor_assessment_level, doctor_assessment_constitution, doctor_assessment_at",
+      )
       .eq("patient_user_id", patientUserId)
       .maybeSingle();
 
@@ -83,6 +85,15 @@ export async function GET(
             lastVisitAt: careProfile.last_visit_at,
             updatedBy: careProfile.updated_by,
             updatedAt: careProfile.updated_at,
+            doctorAssessmentLevel: careProfile.doctor_assessment_level,
+            doctorAssessmentConstitution: careProfile.doctor_assessment_constitution,
+            doctorAssessmentAt: careProfile.doctor_assessment_at,
+            constitutionScores: {
+              depleting: Number(careProfile.constitution_score_depleting || 0),
+              crossing: Number(careProfile.constitution_score_crossing || 0),
+              hoarding: Number(careProfile.constitution_score_hoarding || 0),
+              mixed: Number(careProfile.constitution_score_mixed || 0),
+            },
           }
         : null,
       activeInstructions: (instructions || []).map((i) => ({

@@ -14,6 +14,15 @@ interface CareProfile {
   lastVisitAt: string | null;
   updatedBy: string | null;
   updatedAt: string | null;
+  doctorAssessmentLevel: "suspect" | "likely" | "confirmed" | null;
+  doctorAssessmentConstitution: string | null;
+  doctorAssessmentAt: string | null;
+  constitutionScores: {
+    depleting: number;
+    crossing: number;
+    hoarding: number;
+    mixed: number;
+  };
 }
 
 interface CareInstruction {
@@ -86,6 +95,18 @@ const CONSTITUTION_OPTIONS = [
   { value: "mixed", label: "混合", color: "bg-orange-100 text-orange-800" },
   { value: "unknown", label: "未評估", color: "bg-gray-100 text-gray-600" },
 ];
+
+const DOCTOR_ASSESSMENT_LEVEL_OPTIONS = [
+  { value: "suspect", label: "懷疑（+30）" },
+  { value: "likely", label: "應該（+70）" },
+  { value: "confirmed", label: "確定（Confirm）" },
+] as const;
+
+function doctorAssessmentLevelLabel(value: string | null | undefined): string {
+  if (!value) return "未設定";
+  const item = DOCTOR_ASSESSMENT_LEVEL_OPTIONS.find((opt) => opt.value === value);
+  return item?.label || value;
+}
 
 const INSTRUCTION_TYPE_OPTIONS = [
   { value: "diet_avoid", label: "紅色避口", color: "bg-red-100 text-red-800" },
@@ -352,11 +373,15 @@ function ConstitutionSection({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [constitution, setConstitution] = useState(careProfile?.constitution || "unknown");
+  const [assessmentLevel, setAssessmentLevel] = useState<"suspect" | "likely" | "confirmed">(
+    careProfile?.doctorAssessmentLevel || "confirmed",
+  );
   const [note, setNote] = useState(careProfile?.constitutionNote || "");
   const [formError, setFormError] = useState<string | null>(null);
 
   function openEdit() {
     setConstitution(careProfile?.constitution || "unknown");
+    setAssessmentLevel(careProfile?.doctorAssessmentLevel || "confirmed");
     setNote(careProfile?.constitutionNote || "");
     setFormError(null);
     setEditing(true);
@@ -370,7 +395,7 @@ function ConstitutionSection({
       const res = await fetch(`/api/doctor/patients/${patientUserId}/constitution`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ constitution, constitutionNote: note || null }),
+        body: JSON.stringify({ constitution, constitutionNote: note || null, assessmentLevel }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -402,6 +427,23 @@ function ConstitutionSection({
           <span className="text-sm text-gray-500">體質分型:</span>
           {constitutionBadge(careProfile?.constitution || "unknown")}
         </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">醫師級別:</span>
+          <span className="text-sm font-medium text-gray-700">
+            {doctorAssessmentLevelLabel(careProfile?.doctorAssessmentLevel)}
+          </span>
+        </div>
+        {careProfile?.constitutionScores ? (
+          <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-3">
+            <p className="text-xs font-semibold text-gray-600">累積分數（由高到低）</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <p className="text-xs text-gray-700">虛損：{careProfile.constitutionScores.depleting}</p>
+              <p className="text-xs text-gray-700">鬱結：{careProfile.constitutionScores.crossing}</p>
+              <p className="text-xs text-gray-700">痰濕：{careProfile.constitutionScores.hoarding}</p>
+              <p className="text-xs text-gray-700">混合：{careProfile.constitutionScores.mixed}</p>
+            </div>
+          </div>
+        ) : null}
         {careProfile?.constitutionNote && (
           <div>
             <span className="text-sm text-gray-500">備註:</span>
@@ -434,6 +476,23 @@ function ConstitutionSection({
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">醫師判定級別</label>
+            <select
+              value={assessmentLevel}
+              onChange={(e) =>
+                setAssessmentLevel(e.target.value as "suspect" | "likely" | "confirmed")
+              }
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              {DOCTOR_ASSESSMENT_LEVEL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              規則：懷疑 +30、應該 +70、確定會直接作為最終 Confirm。
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">備註</label>
