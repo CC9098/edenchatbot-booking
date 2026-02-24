@@ -11,6 +11,7 @@ import { isSlotAvailableUtc } from "@/lib/booking-helpers";
 import { getClinicAddress } from "@/shared/clinic-data";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { createServiceClient } from "@/lib/supabase";
+import { getSafeErrorMessage } from "@/lib/error-sanitizer";
 
 // ── Whitelist schema ────────────────────────────────────────────────
 const bridgeBookingSchema = z
@@ -99,12 +100,14 @@ export async function POST(request: NextRequest) {
       }
     } catch (calError) {
       console.error(
-        "[chat/booking/create] Calendar availability re-check failed:",
-        calError
+        `[chat/booking/create] Calendar availability re-check failed: ${getSafeErrorMessage(calError)}`
       );
       return NextResponse.json(
-        { error: "Failed to verify slot availability" },
-        { status: 500 }
+        {
+          error: "暫時未能讀取預約日曆，請稍後再試或聯絡診所。",
+          errorCode: "CALENDAR_UNAVAILABLE",
+        },
+        { status: 503 }
       );
     }
 
@@ -151,8 +154,7 @@ export async function POST(request: NextRequest) {
         });
       } catch (emailError) {
         console.error(
-          "[chat/booking/create] Email sending failed:",
-          emailError
+          `[chat/booking/create] Email sending failed: ${getSafeErrorMessage(emailError)}`
         );
       }
     }
@@ -200,8 +202,7 @@ export async function POST(request: NextRequest) {
       } catch (followUpError) {
         // Non-critical -- don't fail the booking
         console.error(
-          "[chat/booking/create] Follow-up link error:",
-          followUpError
+          `[chat/booking/create] Follow-up link error: ${getSafeErrorMessage(followUpError)}`
         );
       }
     }
@@ -211,7 +212,7 @@ export async function POST(request: NextRequest) {
       bookingId: calResult.eventId,
     });
   } catch (error: unknown) {
-    console.error("[chat/booking/create] Error:", error);
+    console.error(`[chat/booking/create] Error: ${getSafeErrorMessage(error)}`);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid input", details: error.errors },

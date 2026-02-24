@@ -33,6 +33,7 @@ import {
   type BookingReceiptType,
   type BookingVisitType,
 } from './booking-intake-storage';
+import { getSafeErrorMessage } from './error-sanitizer';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const DEFAULT_DURATION_MINUTES = 15;
@@ -886,7 +887,9 @@ export async function getAvailableTimeSlots(
     try {
       busySlots = await getFreeBusy(mapping.calendarId, requestDateUtc);
     } catch (calendarError) {
-      console.error('[getAvailableTimeSlots] Calendar error:', calendarError);
+      console.error(
+        `[getAvailableTimeSlots] Calendar error: ${getSafeErrorMessage(calendarError)}`
+      );
       return {
         success: false,
         error: `${CALENDAR_UNAVAILABLE_TAG} 暫時未能讀取預約日曆，請稍後再試或聯絡診所。`,

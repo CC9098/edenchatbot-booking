@@ -4,6 +4,7 @@ import { fromZonedTime } from "date-fns-tz";
 import { updateEvent } from "@/lib/google-calendar";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { markBookingIntakeRescheduledByEvent } from "@/lib/booking-intake-storage";
+import { getSafeErrorMessage } from "@/lib/error-sanitizer";
 
 // ── Whitelist schema ────────────────────────────────────────────────
 const bridgeRescheduleSchema = z
@@ -78,7 +79,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error("[chat/booking/reschedule] Error:", error);
+    console.error(
+      `[chat/booking/reschedule] Error: ${getSafeErrorMessage(error)}`
+    );
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid input", details: error.errors },

@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 
 import { getGoogleAuthClient } from './google-auth';
+import { getSafeErrorMessage } from './error-sanitizer';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
@@ -96,7 +97,7 @@ export async function createBooking(
       eventId: response.data.id || undefined,
     };
   } catch (error: any) {
-    console.error('Failed to create calendar event:', error);
+    console.error(`Failed to create calendar event: ${getSafeErrorMessage(error)}`);
     return {
       success: false,
       error: error.message || 'Failed to create booking',
@@ -149,7 +150,7 @@ export async function getEvent(
       event: response.data,
     };
   } catch (error: any) {
-    console.error('Failed to get calendar event:', error);
+    console.error(`Failed to get calendar event: ${getSafeErrorMessage(error)}`);
     return {
       success: false,
       error: error.message || 'Failed to get event',
@@ -172,7 +173,7 @@ export async function deleteEvent(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Failed to delete calendar event:', error);
+    console.error(`Failed to delete calendar event: ${getSafeErrorMessage(error)}`);
     return {
       success: false,
       error: error.message || 'Failed to delete event',
@@ -219,7 +220,7 @@ export async function updateEvent(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Failed to update calendar event:', error);
+    console.error(`Failed to update calendar event: ${getSafeErrorMessage(error)}`);
     return {
       success: false,
       error: error.message || 'Failed to update event',
@@ -257,7 +258,9 @@ export async function listEventsInRange(
 
     return { success: true, events };
   } catch (error: any) {
-    console.error(`Failed to list calendar events for ${calendarId}:`, error);
+    console.error(
+      `Failed to list calendar events for ${calendarId}: ${getSafeErrorMessage(error)}`
+    );
     return {
       success: false,
       events: [],
@@ -293,7 +296,9 @@ export async function patchEventPrivateMetadata(
 
     return { success: true };
   } catch (error: any) {
-    console.error(`Failed to patch event metadata for ${calendarId}/${eventId}:`, error);
+    console.error(
+      `Failed to patch event metadata for ${calendarId}/${eventId}: ${getSafeErrorMessage(error)}`
+    );
     return {
       success: false,
       error: error.message || 'Failed to patch event metadata',

@@ -8,6 +8,7 @@ import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { bookingSchema } from '@/shared/types';
 import { CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
 import { isSlotAvailableUtc } from '@/lib/booking-helpers';
+import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import {
                 markBookingIntakeCancelledByEvent,
                 markBookingIntakeRescheduledByEvent,
@@ -188,8 +189,16 @@ export async function POST(request: NextRequest) {
                                                                 );
                                                 }
                                 } catch (calError) {
-                                                console.error('Calendar availability re-check failed:', calError);
-                                                return NextResponse.json({ error: 'Failed to verify slot availability' }, { status: 500 });
+                                                console.error(
+                                                                `Calendar availability re-check failed: ${getSafeErrorMessage(calError)}`
+                                                );
+                                                return NextResponse.json(
+                                                                {
+                                                                                error: '暫時未能讀取預約日曆，請稍後再試或聯絡診所。',
+                                                                                errorCode: 'CALENDAR_UNAVAILABLE',
+                                                                },
+                                                                { status: 503 }
+                                                );
                                 }
 
                                 // Create Google Calendar Event
@@ -230,7 +239,7 @@ export async function POST(request: NextRequest) {
                                                                                 calendarId: calendarId
                                                                 });
                                                 } catch (emailError) {
-                                                                console.error('Email sending failed:', emailError);
+                                                                console.error(`Email sending failed: ${getSafeErrorMessage(emailError)}`);
                                                                 // We don't fail the request if email fails, but log it
                                                 }
                                 }

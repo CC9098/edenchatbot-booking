@@ -11,6 +11,7 @@ import {
 } from "@/lib/booking-helpers";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { type Holiday } from "@/shared/schema";
+import { getSafeErrorMessage } from "@/lib/error-sanitizer";
 
 // ── Whitelist schema ────────────────────────────────────────────────
 // Only these fields are accepted; anything extra is stripped.
@@ -106,10 +107,12 @@ export async function POST(request: NextRequest) {
     try {
       busySlots = await getFreeBusy(mapping.calendarId, requestedDayUtc);
     } catch (calendarError) {
-      console.error("[chat/booking/availability] Calendar error:", calendarError);
+      console.error(
+        `[chat/booking/availability] Calendar error: ${getSafeErrorMessage(calendarError)}`
+      );
       return NextResponse.json(
         {
-          error: "Calendar availability temporarily unavailable",
+          error: "暫時未能讀取預約日曆，請稍後再試或聯絡診所。",
           errorCode: "CALENDAR_UNAVAILABLE",
         },
         { status: 503 }
@@ -172,7 +175,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, slots: availableSlots });
   } catch (error: unknown) {
-    console.error("[chat/booking/availability] Error:", error);
+    console.error(
+      `[chat/booking/availability] Error: ${getSafeErrorMessage(error)}`
+    );
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

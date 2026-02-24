@@ -3,6 +3,7 @@ import { z } from "zod";
 import { deleteEvent } from "@/lib/google-calendar";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { markBookingIntakeCancelledByEvent } from "@/lib/booking-intake-storage";
+import { getSafeErrorMessage } from "@/lib/error-sanitizer";
 
 // ── Whitelist schema ────────────────────────────────────────────────
 const bridgeCancelSchema = z
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error("[chat/booking/cancel] Error:", error);
+    console.error(`[chat/booking/cancel] Error: ${getSafeErrorMessage(error)}`);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid input", details: error.errors },

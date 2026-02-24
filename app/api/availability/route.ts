@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { getFreeBusy } from '@/lib/google-calendar';
+import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import {
                 getApplicableHolidaysForDate,
                 getScheduleForDayFromWeekly,
@@ -112,10 +113,10 @@ export async function POST(request: NextRequest) {
 
                                                 return NextResponse.json({ success: true, slots: availableSlots });
                                 } catch (calError: any) {
-                                                console.error('Calendar error:', calError);
+                                                console.error(`Calendar error: ${getSafeErrorMessage(calError)}`);
                                                 return NextResponse.json(
                                                                 {
-                                                                                error: 'Calendar availability temporarily unavailable',
+                                                                                error: '暫時未能讀取預約日曆，請稍後再試或聯絡診所。',
                                                                                 errorCode: 'CALENDAR_UNAVAILABLE',
                                                                 },
                                                                 { status: 503 }

@@ -217,6 +217,11 @@ export function BookingTabFlow() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (data?.errorCode === 'CALENDAR_UNAVAILABLE') {
+          setSlotError('暫時未能連接預約日曆，請稍後再試或在聊天頁由姑娘協助安排。');
+          return;
+        }
+
         setSlotError(data?.error || '暫時未能讀取可預約時段，請稍後再試。');
         return;
       }
