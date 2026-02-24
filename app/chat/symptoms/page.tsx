@@ -24,12 +24,54 @@ type SymptomApiResponse = {
   error?: string;
 };
 
+type CareContextResponse = {
+  userId?: string;
+  constitution: string;
+  constitutionSource?: "patient_care_profile" | "profiles" | "chat_sessions" | "default";
+  constitutionNote: string | null;
+  error?: string;
+};
+
 type StatusFilter = "all" | "active" | "resolved" | "recurring";
 type ResolveFormState = {
   endedAt: string;
   resolutionMethod: string;
   customMethod: string;
   resolutionNote: string;
+};
+
+type ConstitutionMeta = {
+  label: string;
+  badgeClass: string;
+  summary: string;
+};
+
+const CONSTITUTION_META: Record<string, ConstitutionMeta> = {
+  depleting: {
+    label: "虛損",
+    badgeClass: "bg-emerald-100 text-emerald-800",
+    summary: "重點是補氣養血、減少過度勞累，飲食以溫和、易消化為主。",
+  },
+  crossing: {
+    label: "鬱結",
+    badgeClass: "bg-blue-100 text-blue-800",
+    summary: "重點是疏導壓力、調節作息，飲食避免過度刺激與偏性太強。",
+  },
+  hoarding: {
+    label: "痰濕",
+    badgeClass: "bg-purple-100 text-purple-800",
+    summary: "重點是化濕健脾，飲食以清淡為主，減少濕重與黏滯食物。",
+  },
+  mixed: {
+    label: "混合",
+    badgeClass: "bg-orange-100 text-orange-800",
+    summary: "目前屬混合狀態，先跟隨醫師指示，逐步微調飲食與作息。",
+  },
+  unknown: {
+    label: "未評估",
+    badgeClass: "bg-gray-100 text-gray-700",
+    summary: "尚未建立完整體質評估，先採用清淡、規律、少刺激的基本原則。",
+  },
 };
 
 const RESOLUTION_METHOD_OPTIONS = [
@@ -118,6 +160,13 @@ function formatDate(value: string | null): string {
   ).padStart(2, "0")}`;
 }
 
+function constitutionSourceLabel(source: CareContextResponse["constitutionSource"]): string {
+  if (source === "patient_care_profile") return "來源：醫師評估";
+  if (source === "profiles") return "來源：帳號體質檔案";
+  if (source === "chat_sessions") return "來源：登入帳號對話紀錄";
+  return "來源：未有完整資料";
+}
+
 function severityBar(severity: number | null) {
   if (!severity) return null;
 
@@ -142,6 +191,9 @@ export default function MySymptomsPage() {
   const [symptoms, setSymptoms] = useState<SymptomItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [careContext, setCareContext] = useState<CareContextResponse | null>(null);
+  const [careLoading, setCareLoading] = useState(true);
+  const [careError, setCareError] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [resolveTarget, setResolveTarget] = useState<SymptomItem | null>(null);
   const [resolveSaving, setResolveSaving] = useState(false);
@@ -173,9 +225,28 @@ export default function MySymptomsPage() {
     }
   }, []);
 
+  const loadCareContext = useCallback(async () => {
+    try {
+      setCareLoading(true);
+      setCareError("");
+      const response = await fetch("/api/me/care-context");
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || "無法載入體質資料");
+      }
+      const data = (await response.json()) as CareContextResponse;
+      setCareContext(data);
+    } catch (err) {
+      setCareError(err instanceof Error ? err.message : "無法載入體質資料");
+    } finally {
+      setCareLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    loadSymptoms();
-  }, [loadSymptoms]);
+    void loadSymptoms();
+    void loadCareContext();
+  }, [loadSymptoms, loadCareContext]);
 
   const sortedSymptoms = useMemo(
     () =>
@@ -221,6 +292,9 @@ export default function MySymptomsPage() {
     ],
     [stats.activeCount, stats.recurringCount, stats.total, sortedSymptoms],
   );
+
+  const constitutionKey = careContext?.constitution || "unknown";
+  const constitutionMeta = CONSTITUTION_META[constitutionKey] || CONSTITUTION_META.unknown;
 
   function openResolveModal(symptom: SymptomItem) {
     setResolveTarget(symptom);
@@ -319,6 +393,32 @@ export default function MySymptomsPage() {
             返回 AI 諮詢
           </Link>
         </div>
+
+        <section className="rounded-2xl border border-primary/10 bg-white p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">我的體質</h2>
+              <p className="mt-1 text-xs text-slate-600">
+                {careLoading ? "載入中..." : constitutionMeta.summary}
+              </p>
+              {!careLoading && !careError ? (
+                <p className="mt-2 text-xs text-slate-500">{constitutionSourceLabel(careContext?.constitutionSource)}</p>
+              ) : null}
+              {!careLoading && careError ? <p className="mt-2 text-xs text-red-600">{careError}</p> : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${constitutionMeta.badgeClass}`}>
+                {constitutionMeta.label}
+              </span>
+              <Link
+                href="/chat/symptoms/tendency-quiz"
+                className="inline-flex items-center rounded-full border border-primary/20 bg-white px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
+              >
+                問卷
+              </Link>
+            </div>
+          </div>
+        </section>
 
         <div className="flex flex-wrap items-center gap-2">
           {filterChips.map((chip) => {
