@@ -5,6 +5,7 @@ import { Loader2, Plus } from "lucide-react";
 import { ModeIndicator, type ChatMode } from "./ModeSelector";
 import { MessageList, type ChatMessage } from "./MessageList";
 import { ChatInputV2 } from "./ChatInputV2";
+import { TendencyWhisper } from "./TendencyWhisper";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { createBrowserClient } from "@/lib/supabase-browser";
 import { useChatShell } from "./ChatShellContext";
@@ -562,6 +563,8 @@ export function ChatRoom() {
             </button>
           </div>
         </div>
+
+        <TendencyWhisper />
 
         <div className="min-h-0 flex-1 overflow-hidden bg-[rgba(246,248,244,0.85)]">
           <MessageList messages={messages} loading={loading} sessionId={sessionId} />

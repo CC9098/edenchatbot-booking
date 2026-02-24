@@ -850,6 +850,7 @@ export function BookingTabFlow() {
           <div>
             <h2 className="text-2xl font-semibold text-slate-900">預約成功</h2>
             <p className="mt-2 text-sm text-slate-600">已完成預約，確認電郵將發送到你提供的信箱。</p>
+            <p className="mt-3 text-xs text-slate-400">每一次回來，身體都記得。</p>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-sm text-slate-700">

@@ -19,10 +19,10 @@ type TabItem = {
 };
 
 const TABS: TabItem[] = [
-  { id: "chat", label: "聊天", href: "/chat", Icon: Sparkles },
+  { id: "chat", label: "問問", href: "/chat", Icon: Sparkles },
   { id: "booking", label: "預約", href: "/booking", Icon: CalendarCheck2 },
-  { id: "care", label: "宜忌", href: "/care", Icon: Leaf },
-  { id: "profile", label: "我的", href: "/chat/symptoms", Icon: UserRound },
+  { id: "care", label: "養生", href: "/care", Icon: Leaf },
+  { id: "profile", label: "根源", href: "/chat/symptoms", Icon: UserRound },
 ];
 
 function isPatientRoute(pathname: string): boolean {

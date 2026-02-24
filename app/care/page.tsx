@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Wind, Droplet, Zap } from "lucide-react";
 import { getConstitutionDietTips } from "@/lib/constitution-diet-tips";
+import {
+  FORCE_NARRATIVE,
+  NARRATIVE,
+  constitutionToTendencyKey,
+} from "@/lib/narrative-copy";
+import { DailyTipCard } from "@/components/patient/DailyTipCard";
+import { DailySensePrompt } from "@/components/patient/DailySensePrompt";
 
 type CareInstruction = {
   id: string;
@@ -33,39 +41,12 @@ type CareContextResponse = {
   error?: string;
 };
 
-type ConstitutionMeta = {
-  label: string;
-  badgeClass: string;
-  summary: string;
-};
-
-const CONSTITUTION_META: Record<string, ConstitutionMeta> = {
-  depleting: {
-    label: "虛損",
-    badgeClass: "bg-emerald-100 text-emerald-800",
-    summary: "重點是補氣養血、減少過度勞累，飲食以溫和、易消化為主。",
-  },
-  crossing: {
-    label: "鬱結",
-    badgeClass: "bg-blue-100 text-blue-800",
-    summary: "重點是疏導壓力、調節作息，飲食避免過度刺激與偏性太強。",
-  },
-  hoarding: {
-    label: "痰濕",
-    badgeClass: "bg-purple-100 text-purple-800",
-    summary: "重點是化濕健脾，飲食以清淡為主，減少濕重與黏滯食物。",
-  },
-  mixed: {
-    label: "混合",
-    badgeClass: "bg-orange-100 text-orange-800",
-    summary: "目前屬混合狀態，先跟隨醫師指示，逐步微調飲食與作息。",
-  },
-  unknown: {
-    label: "未評估",
-    badgeClass: "bg-gray-100 text-gray-700",
-    summary: "尚未建立完整體質評估，先採用清淡、規律、少刺激的基本原則。",
-  },
-};
+function ForceIcon({ tendencyKey, className }: { tendencyKey: string; className?: string }) {
+  const cls = className ?? "h-4 w-4";
+  if (tendencyKey === "J") return <Wind className={cls} strokeWidth={1.9} />;
+  if (tendencyKey === "K") return <Droplet className={cls} strokeWidth={1.9} />;
+  return <Zap className={cls} strokeWidth={1.9} />;
+}
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
@@ -123,15 +104,15 @@ export default function CareAdvicePage() {
       const res = await fetch("/api/me/care-context");
       if (!res.ok) {
         if (res.status === 401) {
-          throw new Error("請先登入，先可以查看你的養生宜忌建議。");
+          throw new Error("請先登入，先可以查看你的養生建議。");
         }
         const payload = await res.json().catch(() => ({}));
-        throw new Error(payload.error || "載入養生宜忌建議失敗");
+        throw new Error(payload.error || "載入養生建議失敗");
       }
       const payload = (await res.json()) as CareContextResponse;
       setData(payload);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "載入養生宜忌建議失敗");
+      setError(err instanceof Error ? err.message : "載入養生建議失敗");
     } finally {
       setLoading(false);
     }
@@ -142,7 +123,9 @@ export default function CareAdvicePage() {
   }, [loadCareContext]);
 
   const constitutionKey = data?.constitution ?? "unknown";
-  const constitutionMeta = CONSTITUTION_META[constitutionKey] || CONSTITUTION_META.unknown;
+  const tendencyKey = constitutionToTendencyKey(constitutionKey);
+  const narrative = tendencyKey ? FORCE_NARRATIVE[tendencyKey] : null;
+
   const fallbackDietTips = useMemo(
     () => getConstitutionDietTips(constitutionKey),
     [constitutionKey],
@@ -158,20 +141,32 @@ export default function CareAdvicePage() {
     [data?.activeInstructions],
   );
 
+  // Resolve narrative text (with fallbacks for mixed/unknown)
+  const bodyDescription = narrative?.bodyDescription ?? (
+    constitutionKey === "mixed" ? NARRATIVE.mixedBodyDescription : NARRATIVE.unknownBodyDescription
+  );
+  const dietIntro = narrative?.dietIntro ?? (
+    constitutionKey === "mixed" ? NARRATIVE.mixedDietIntro : NARRATIVE.unknownDietIntro
+  );
+  const tcmLabel = narrative?.tcmLabel ?? (
+    constitutionKey === "mixed" ? NARRATIVE.mixedTcmLabel : NARRATIVE.unknownTcmLabel
+  );
+  const accentBg = narrative?.accentBg ?? "bg-primary-light/30";
+
   return (
     <main className="patient-pane text-slate-800">
       <div className="mx-auto max-w-4xl space-y-5">
-        <header className="space-y-3">
-          <p className="patient-pill inline-flex px-3 py-1 text-xs font-semibold text-primary">個人化照護</p>
-          <h1 className="text-3xl font-semibold text-primary sm:text-4xl">養生宜忌建議</h1>
-          <p className="max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">
-            這裡整合你的體質、飲食方向與醫師戒口提醒，方便你每日跟住做。
+        {/* ── Opening: quiet quote ── */}
+        <header className="space-y-4 pb-1">
+          <h1 className="text-2xl font-semibold text-primary sm:text-3xl">養生</h1>
+          <p className="whitespace-pre-line text-sm leading-relaxed text-slate-500">
+            「{NARRATIVE.carePageQuote}」
           </p>
         </header>
 
         {loading ? (
           <section className="patient-card px-6 py-10 text-center">
-            <p className="text-sm text-slate-600">載入中...</p>
+            <p className="text-sm text-slate-500">載入中...</p>
           </section>
         ) : error ? (
           <section className="patient-card px-6 py-10 text-center">
@@ -194,23 +189,33 @@ export default function CareAdvicePage() {
           </section>
         ) : (
           <>
+            {/* ── Daily tip card (one quiet thought per day) ── */}
+            <DailyTipCard constitution={constitutionKey} accentBg={accentBg} />
+
+            {/* ── Constitution card (dual-track: force name + TCM label) ── */}
             <section className="patient-card p-5 sm:p-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">我的體質</h2>
-                  <p className="mt-1 text-sm text-slate-600">{constitutionMeta.summary}</p>
-                  <p className="mt-2 text-xs text-slate-500">{constitutionSourceLabel(data?.constitutionSource)}</p>
+              <div className="flex items-start gap-3">
+                {tendencyKey ? (
+                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+                    <ForceIcon tendencyKey={tendencyKey} className="h-4 w-4 text-slate-600" />
+                  </span>
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base font-semibold text-slate-900">
+                    {narrative ? `你的體質傾向：${narrative.forceName}` : "你的體質"}
+                  </h2>
+                  <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">
+                    {bodyDescription}
+                  </p>
+                  <p className="mt-3 text-xs text-slate-400">
+                    中醫稱為「{tcmLabel}」 · {constitutionSourceLabel(data?.constitutionSource)}
+                  </p>
                 </div>
-                <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${constitutionMeta.badgeClass}`}
-                >
-                  {constitutionMeta.label}
-                </span>
               </div>
 
               {data?.constitutionNote ? (
                 <div className="mt-4 rounded-2xl border border-primary/10 bg-primary-light/40 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">醫師體質備註</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">醫師備註</p>
                   <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{data.constitutionNote}</p>
                 </div>
               ) : null}
@@ -220,8 +225,11 @@ export default function CareAdvicePage() {
               ) : null}
             </section>
 
+            {/* ── Diet recommendations ── */}
             <section className="patient-card p-5 sm:p-6">
-              <h2 className="text-lg font-semibold text-slate-900">養生飲食方針</h2>
+              <h2 className="text-base font-semibold text-slate-900">養生飲食方針</h2>
+              <p className="mt-2 text-sm text-slate-500">{dietIntro}</p>
+
               {dietRecommendItems.length > 0 ? (
                 <div className="mt-4 space-y-3">
                   {dietRecommendItems.map((item) => (
@@ -233,19 +241,17 @@ export default function CareAdvicePage() {
                   ))}
                 </div>
               ) : (
-                <div className="mt-4 rounded-2xl border border-primary/10 bg-primary-light/35 p-4">
-                  <p className="text-sm font-medium text-slate-900">以下是你的體質方針建議：</p>
-                  <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-slate-700">
-                    {fallbackDietTips.map((tip) => (
-                      <li key={tip}>{tip}</li>
-                    ))}
-                  </ul>
-                </div>
+                <ul className="mt-4 list-disc space-y-1.5 pl-5 text-sm text-slate-700">
+                  {fallbackDietTips.map((tip) => (
+                    <li key={tip}>{tip}</li>
+                  ))}
+                </ul>
               )}
             </section>
 
+            {/* ── Diet avoidances ── */}
             <section className="patient-card p-5 sm:p-6">
-              <h2 className="text-lg font-semibold text-slate-900">醫師點評的戒口指引</h2>
+              <h2 className="text-base font-semibold text-slate-900">醫師戒口提醒</h2>
               {dietAvoidItems.length > 0 ? (
                 <div className="mt-4 space-y-3">
                   {dietAvoidItems.map((item) => (
@@ -257,18 +263,20 @@ export default function CareAdvicePage() {
                   ))}
                 </div>
               ) : (
-                <div className="mt-4 rounded-2xl border border-dashed border-gray-300 bg-gray-50/80 p-4">
-                  <p className="text-sm text-slate-600">暫時未有醫師新增戒口指引。</p>
-                </div>
+                <p className="mt-3 text-sm text-slate-500">暫時未有醫師新增戒口指引。</p>
               )}
             </section>
 
-            <section className="flex flex-wrap gap-3">
+            {/* ── Daily sense prompt (gentle check-in at the bottom) ── */}
+            <DailySensePrompt />
+
+            {/* ── Navigation links ── */}
+            <section className="flex flex-wrap gap-3 pb-2">
               <Link
                 href="/chat"
                 className="inline-flex items-center rounded-full border border-primary/20 bg-white px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary-light"
               >
-                去 AI 諮詢
+                去問問 AI
               </Link>
               <Link
                 href="/courses"

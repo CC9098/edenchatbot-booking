@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { TendencyQuizPanel } from "@/components/patient/TendencyQuizPanel";
 
 type SymptomItem = {
   id: string;
@@ -381,43 +382,22 @@ export default function MySymptomsPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">我的症狀紀錄</h1>
+            <h1 className="text-lg font-semibold text-slate-900">根源</h1>
             <p className="mt-1 text-xs text-gray-500">
-              追蹤你最近身體變化，方便覆診時更快溝通。
+              你的三勢、症狀紀錄，都在這裡。
             </p>
           </div>
           <Link
             href="/chat"
             className="rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
           >
-            返回 AI 諮詢
+            去問問 AI
           </Link>
         </div>
 
-        <section className="rounded-2xl border border-primary/10 bg-white p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-900">我的體質</h2>
-              <p className="mt-1 text-xs text-slate-600">
-                {careLoading ? "載入中..." : constitutionMeta.summary}
-              </p>
-              {!careLoading && !careError ? (
-                <p className="mt-2 text-xs text-slate-500">{constitutionSourceLabel(careContext?.constitutionSource)}</p>
-              ) : null}
-              {!careLoading && careError ? <p className="mt-2 text-xs text-red-600">{careError}</p> : null}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${constitutionMeta.badgeClass}`}>
-                {constitutionMeta.label}
-              </span>
-              <Link
-                href="/chat/symptoms/tendency-quiz"
-                className="inline-flex items-center rounded-full border border-primary/20 bg-white px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
-              >
-                SOUL 問卷
-              </Link>
-            </div>
-          </div>
+        {/* ── SOUL force panel (embedded directly) ── */}
+        <section className="rounded-2xl border border-primary/10 bg-white p-4 sm:p-5">
+          <TendencyQuizPanel userId={careContext?.userId} />
         </section>
 
         <div className="flex flex-wrap items-center gap-2">
