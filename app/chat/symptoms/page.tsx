@@ -34,6 +34,7 @@ type CareContextResponse = {
 };
 
 type StatusFilter = "all" | "active" | "resolved" | "recurring";
+type RootSection = "symptoms" | "force";
 type ResolveFormState = {
   endedAt: string;
   resolutionMethod: string;
@@ -196,6 +197,7 @@ export default function MySymptomsPage() {
   const [careLoading, setCareLoading] = useState(true);
   const [careError, setCareError] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [rootSection, setRootSection] = useState<RootSection>("symptoms");
   const [resolveTarget, setResolveTarget] = useState<SymptomItem | null>(null);
   const [resolveSaving, setResolveSaving] = useState(false);
   const [resolveError, setResolveError] = useState("");
@@ -267,6 +269,7 @@ export default function MySymptomsPage() {
   const stats = useMemo(() => {
     const now = new Date();
     const activeCount = sortedSymptoms.filter((s) => s.status === "active").length;
+    const resolvedCount = sortedSymptoms.filter((s) => s.status === "resolved").length;
     const recurringCount = sortedSymptoms.filter((s) => s.status === "recurring").length;
     const improvedThisMonthCount = sortedSymptoms.filter((s) => {
       if (s.status !== "resolved") return false;
@@ -279,6 +282,7 @@ export default function MySymptomsPage() {
     return {
       total: sortedSymptoms.length,
       activeCount,
+      resolvedCount,
       recurringCount,
       improvedThisMonthCount,
     };
@@ -288,10 +292,10 @@ export default function MySymptomsPage() {
     () => [
       { value: "all" as const, label: "全部", count: stats.total },
       { value: "active" as const, label: "進行中", count: stats.activeCount },
-      { value: "resolved" as const, label: "已好返", count: sortedSymptoms.filter((s) => s.status === "resolved").length },
+      { value: "resolved" as const, label: "已好返", count: stats.resolvedCount },
       { value: "recurring" as const, label: "反覆", count: stats.recurringCount },
     ],
-    [stats.activeCount, stats.recurringCount, stats.total, sortedSymptoms],
+    [stats.activeCount, stats.recurringCount, stats.resolvedCount, stats.total],
   );
 
   const constitutionKey = careContext?.constitution || "unknown";
@@ -380,153 +384,235 @@ export default function MySymptomsPage() {
   return (
     <div className="mx-auto h-full w-full max-w-4xl flex-1 overflow-y-auto p-4 sm:p-6">
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-900">根源</h1>
-            <p className="mt-1 text-xs text-gray-500">
-              你的三勢、症狀紀錄，都在這裡。
-            </p>
-          </div>
-          <Link
-            href="/chat"
-            className="rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
-          >
-            去問問 AI
-          </Link>
-        </div>
-
-        {/* ── SOUL force panel (embedded directly) ── */}
         <section className="rounded-2xl border border-primary/10 bg-white p-4 sm:p-5">
-          <TendencyQuizPanel userId={careContext?.userId} />
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-lg font-semibold text-slate-900">根源</h1>
+              <p className="mt-1 text-xs text-gray-500">
+                先睇症狀，再按需要切去原力圖與問卷，手機會更清晰。
+              </p>
+            </div>
+            <Link
+              href="/chat"
+              className="rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
+            >
+              去問問 AI
+            </Link>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="rounded-xl border border-primary/10 bg-primary-light/35 px-3 py-2">
+              <p className="text-[11px] text-slate-500">症狀總數</p>
+              <p className="mt-1 text-base font-semibold text-slate-900">{stats.total}</p>
+            </div>
+            <div className="rounded-xl border border-red-100 bg-red-50/70 px-3 py-2">
+              <p className="text-[11px] text-red-600">進行中</p>
+              <p className="mt-1 text-base font-semibold text-red-700">{stats.activeCount}</p>
+            </div>
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2">
+              <p className="text-[11px] text-emerald-700">本月已好返</p>
+              <p className="mt-1 text-base font-semibold text-emerald-700">{stats.improvedThisMonthCount}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2 rounded-full border border-primary/10 bg-primary-light/40 p-1">
+            <button
+              type="button"
+              onClick={() => setRootSection("symptoms")}
+              className={`flex-1 rounded-full px-3 py-2 text-xs font-semibold transition ${
+                rootSection === "symptoms" ? "bg-white text-primary shadow-sm" : "text-slate-600"
+              }`}
+              aria-pressed={rootSection === "symptoms"}
+            >
+              我的症狀
+            </button>
+            <button
+              type="button"
+              onClick={() => setRootSection("force")}
+              className={`flex-1 rounded-full px-3 py-2 text-xs font-semibold transition ${
+                rootSection === "force" ? "bg-white text-primary shadow-sm" : "text-slate-600"
+              }`}
+              aria-pressed={rootSection === "force"}
+            >
+              原力圖・問卷
+            </button>
+          </div>
         </section>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {filterChips.map((chip) => {
-            const active = statusFilter === chip.value;
-            return (
-              <button
-                key={chip.value}
-                type="button"
-                onClick={() => setStatusFilter(chip.value)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                  active
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                {chip.label} ({chip.count})
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="overflow-hidden rounded-2xl border border-primary/10 bg-white shadow-sm">
-          {loading ? (
-            <div className="px-4 py-8 text-sm text-gray-500">載入中...</div>
-          ) : error ? (
-            <div className="px-4 py-8 text-center">
-              <p className="text-sm text-red-600">{error}</p>
-              <button
-                type="button"
-                onClick={loadSymptoms}
-                className="mt-3 rounded-md bg-red-100 px-4 py-1.5 text-sm font-medium text-red-800 transition hover:bg-red-200"
-              >
-                重試
-              </button>
+        {rootSection === "symptoms" ? (
+          <>
+            <div className="overflow-x-auto">
+              <div className="flex min-w-max items-center gap-2 rounded-2xl border border-primary/10 bg-white p-2">
+                {filterChips.map((chip) => {
+                  const active = statusFilter === chip.value;
+                  return (
+                    <button
+                      key={chip.value}
+                      type="button"
+                      onClick={() => setStatusFilter(chip.value)}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {chip.label} ({chip.count})
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          ) : sortedSymptoms.length === 0 ? (
-            <div className="px-4 py-12 text-center">
-              <p className="text-sm font-medium text-gray-900">暫時未有症狀紀錄</p>
-              <p className="mt-1 text-xs text-gray-500">你可以喺聊天時描述症狀，系統會自動幫你整理。</p>
+
+            <div className="overflow-hidden rounded-2xl border border-primary/10 bg-white shadow-sm">
+              {loading ? (
+                <div className="px-4 py-8 text-sm text-gray-500">載入中...</div>
+              ) : error ? (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-sm text-red-600">{error}</p>
+                  <button
+                    type="button"
+                    onClick={loadSymptoms}
+                    className="mt-3 rounded-md bg-red-100 px-4 py-1.5 text-sm font-medium text-red-800 transition hover:bg-red-200"
+                  >
+                    重試
+                  </button>
+                </div>
+              ) : sortedSymptoms.length === 0 ? (
+                <div className="px-4 py-12 text-center">
+                  <p className="text-sm font-medium text-gray-900">暫時未有症狀紀錄</p>
+                  <p className="mt-1 text-xs text-gray-500">你可以喺聊天時描述症狀，系統會自動幫你整理。</p>
+                  <Link
+                    href="/chat"
+                    className="mt-4 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-[#3d6b20]"
+                  >
+                    去 AI 對話記錄首個症狀
+                  </Link>
+                </div>
+              ) : filteredSymptoms.length === 0 ? (
+                <div className="px-4 py-12 text-center">
+                  <p className="text-sm font-medium text-gray-900">呢個篩選暫時未有資料</p>
+                  <p className="mt-1 text-xs text-gray-500">可以切換其他狀態查看。</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {filteredSymptoms.map((symptom) => (
+                    <article key={symptom.id} className="px-4 py-4 sm:px-5">
+                      <div className="space-y-2.5">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusPillClass(
+                                symptom.status,
+                              )}`}
+                            >
+                              {getStatusLabel(symptom.status)}
+                            </span>
+                            <h2 className="text-sm font-semibold text-gray-900">
+                              {symptom.category?.trim() || "未命名症狀"}
+                            </h2>
+                            <span className="text-xs text-gray-400">
+                              {symptom.loggedVia === "chat" ? "AI 對話記錄" : "手動記錄"}
+                            </span>
+                          </div>
+                          {(symptom.status === "active" || symptom.status === "recurring") && (
+                            <button
+                              type="button"
+                              onClick={() => openResolveModal(symptom)}
+                              className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100"
+                            >
+                              標記已好返
+                            </button>
+                          )}
+                        </div>
+
+                        {symptom.description?.trim() ? (
+                          <p className="text-sm text-gray-700">{symptom.description.trim()}</p>
+                        ) : (
+                          <p className="text-sm text-gray-400">未有補充描述</p>
+                        )}
+
+                        {symptom.severity ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">嚴重程度</span>
+                            {severityBar(symptom.severity)}
+                          </div>
+                        ) : null}
+
+                        {(symptom.resolutionMethod || symptom.resolutionDays !== null && symptom.resolutionDays !== undefined || symptom.resolutionNote) ? (
+                          <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-800">
+                            {symptom.resolutionMethod ? (
+                              <p>點樣好返：{symptom.resolutionMethod}</p>
+                            ) : null}
+                            {symptom.resolutionDays !== null && symptom.resolutionDays !== undefined ? (
+                              <p>幾耐好返：約 {symptom.resolutionDays} 日</p>
+                            ) : null}
+                            {symptom.resolutionNote ? (
+                              <p className="whitespace-pre-wrap">補充：{symptom.resolutionNote}</p>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        <p className="text-xs text-gray-400">
+                          {formatDate(symptom.startedAt)}
+                          {symptom.endedAt ? ` → ${formatDate(symptom.endedAt)}` : ""}
+                          {!symptom.endedAt && symptom.status === "active" ? " → 進行中" : ""}
+                          {" ・ "}更新於 {formatDateTime(symptom.updatedAt || symptom.createdAt)}
+                        </p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {!loading && !error && filteredSymptoms.length > 0 ? (
+              <div className="rounded-xl border border-primary/10 bg-primary-light/30 px-4 py-3 text-xs text-gray-600">
+                提示：你可以用「標記已好返」按鈕，或者喺聊天同 AI 講「好返咗」去更新狀態。
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <section className="rounded-2xl border border-primary/10 bg-white p-4 sm:p-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">SOUL 原力圖・問卷</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  問卷同原力圖會留喺呢一層，避免同症狀清單爭首屏位置。
+                </p>
+              </div>
               <Link
-                href="/chat"
-                className="mt-4 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-[#3d6b20]"
+                href="/chat/symptoms/tendency-quiz"
+                className="rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
               >
-                去 AI 對話記錄首個症狀
+                專注模式
               </Link>
             </div>
-          ) : filteredSymptoms.length === 0 ? (
-            <div className="px-4 py-12 text-center">
-              <p className="text-sm font-medium text-gray-900">呢個篩選暫時未有資料</p>
-              <p className="mt-1 text-xs text-gray-500">可以切換其他狀態查看。</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {filteredSymptoms.map((symptom) => (
-                <article key={symptom.id} className="px-4 py-4 sm:px-5">
-                  <div className="space-y-2.5">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusPillClass(
-                            symptom.status,
-                          )}`}
-                        >
-                          {getStatusLabel(symptom.status)}
-                        </span>
-                        <h2 className="text-sm font-semibold text-gray-900">
-                          {symptom.category?.trim() || "未命名症狀"}
-                        </h2>
-                        <span className="text-xs text-gray-400">
-                          {symptom.loggedVia === "chat" ? "AI 對話記錄" : "手動記錄"}
-                        </span>
-                      </div>
-                      {(symptom.status === "active" || symptom.status === "recurring") && (
-                        <button
-                          type="button"
-                          onClick={() => openResolveModal(symptom)}
-                          className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100"
-                        >
-                          標記已好返
-                        </button>
-                      )}
-                    </div>
 
-                    {symptom.description?.trim() ? (
-                      <p className="text-sm text-gray-700">{symptom.description.trim()}</p>
-                    ) : (
-                      <p className="text-sm text-gray-400">未有補充描述</p>
-                    )}
+            {careLoading ? (
+              <div className="mb-4 rounded-xl border border-primary/10 bg-primary-light/30 px-3 py-2 text-xs text-slate-600">
+                載入體質資料...
+              </div>
+            ) : careError ? (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50/70 px-3 py-2 text-xs text-red-700">
+                {careError}
+              </div>
+            ) : (
+              <div className="mb-4 rounded-xl border border-primary/10 bg-primary-light/35 px-3 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${constitutionMeta.badgeClass}`}>
+                    {constitutionMeta.label}
+                  </span>
+                  <span className="text-[11px] text-slate-500">{constitutionSourceLabel(careContext?.constitutionSource)}</span>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-slate-700">
+                  {careContext?.constitutionNote?.trim() || constitutionMeta.summary}
+                </p>
+              </div>
+            )}
 
-                    {symptom.severity ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500">嚴重程度</span>
-                        {severityBar(symptom.severity)}
-                      </div>
-                    ) : null}
-
-                    {(symptom.resolutionMethod || symptom.resolutionDays !== null && symptom.resolutionDays !== undefined || symptom.resolutionNote) ? (
-                      <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-800">
-                        {symptom.resolutionMethod ? (
-                          <p>點樣好返：{symptom.resolutionMethod}</p>
-                        ) : null}
-                        {symptom.resolutionDays !== null && symptom.resolutionDays !== undefined ? (
-                          <p>幾耐好返：約 {symptom.resolutionDays} 日</p>
-                        ) : null}
-                        {symptom.resolutionNote ? (
-                          <p className="whitespace-pre-wrap">補充：{symptom.resolutionNote}</p>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    <p className="text-xs text-gray-400">
-                      {formatDate(symptom.startedAt)}
-                      {symptom.endedAt ? ` → ${formatDate(symptom.endedAt)}` : ""}
-                      {!symptom.endedAt && symptom.status === "active" ? " → 進行中" : ""}
-                      {" ・ "}更新於 {formatDateTime(symptom.updatedAt || symptom.createdAt)}
-                    </p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {!loading && !error && filteredSymptoms.length > 0 ? (
-          <div className="rounded-xl border border-primary/10 bg-primary-light/30 px-4 py-3 text-xs text-gray-600">
-            提示：你可以用「標記已好返」按鈕，或者喺聊天同 AI 講「好返咗」去更新狀態。
-          </div>
-        ) : null}
+            <TendencyQuizPanel userId={careContext?.userId} />
+          </section>
+        )}
       </div>
 
       {resolveTarget ? (
