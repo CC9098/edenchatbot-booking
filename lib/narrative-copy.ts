@@ -113,6 +113,20 @@ export const NARRATIVE = {
   /** Daily tip label (right-aligned small text) */
   dailyTipLabel: "— 今日一念",
 
+  /** Chat welcome message — warm companion tone */
+  chatWelcome:
+    "你好。我是醫天圓的體質顧問。\n\n飲食、作息、體質調養⋯⋯或者就是想聊聊今天的感覺，我都在這裡。",
+
+  /** Booking page opening quote */
+  bookingQuote: "每一次預約，\n都是照顧自己的開始。",
+
+  /** Booking page subtitle (native in-app flow) */
+  bookingSubtitle: "選好醫師和時間，其餘的交給我們。",
+
+  /** Web booking page description */
+  webBookingDescription:
+    "你可以先用 AI 助手了解體質與養生建議，再完成預約；\n或直接前往預約平台選擇時段。",
+
   /** Mixed constitution narrative */
   mixedBodyDescription: "你的三勢正在尋找平衡，\n先跟隨醫師的方向走。",
   mixedDietIntro: "混合狀態下，穩定比追求完美更重要。",

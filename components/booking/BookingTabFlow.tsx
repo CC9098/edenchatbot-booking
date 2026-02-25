@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { ArrowLeft, CalendarDays, CheckCircle2, Loader2, UserRound } from 'lucide-react';
 import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
 import { CLINICS, DOCTORS, type ClinicId, type DoctorId } from '@/shared/clinic-data';
+import { NARRATIVE } from '@/lib/narrative-copy';
 
 type BookingStep = 'setup' | 'timeslot' | 'details' | 'success';
 type VisitType = 'first' | 'followup';
@@ -438,12 +439,12 @@ export function BookingTabFlow() {
   return (
     <div className="patient-card mx-auto max-w-2xl p-6 sm:p-8">
       <div className="mb-6 space-y-3">
-        <p className="patient-pill inline-flex px-3 py-1 text-xs font-semibold text-primary">
-          App 內預約
-        </p>
         <h1 className="text-2xl font-semibold text-primary sm:text-3xl">預約服務</h1>
-        <p className="text-sm leading-relaxed text-slate-600 sm:text-base">
-          預約流程已整合在手機 App 內，不需要跳到外部瀏覽器。
+        <p className="whitespace-pre-line text-sm leading-relaxed text-slate-500">
+          「{NARRATIVE.bookingQuote}」
+        </p>
+        <p className="text-sm text-slate-600">
+          {NARRATIVE.bookingSubtitle}
         </p>
       </div>
 
@@ -850,7 +851,7 @@ export function BookingTabFlow() {
           <div>
             <h2 className="text-2xl font-semibold text-slate-900">預約成功</h2>
             <p className="mt-2 text-sm text-slate-600">已完成預約，確認電郵將發送到你提供的信箱。</p>
-            <p className="mt-3 text-xs text-slate-400">每一次回來，身體都記得。</p>
+            <p className="mt-3 text-xs text-slate-400">{NARRATIVE.bookingSuccessLine}</p>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-sm text-slate-700">

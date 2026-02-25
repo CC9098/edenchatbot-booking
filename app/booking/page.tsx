@@ -3,6 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { BookingTabFlow } from "@/components/booking/BookingTabFlow";
 import { isNativeAppUserAgent } from "@/lib/platform";
+import { NARRATIVE } from "@/lib/narrative-copy";
 
 export const metadata: Metadata = {
   title: "預約服務 | 醫天圓",
@@ -25,13 +26,12 @@ export default function BookingPage() {
     <main className="min-h-screen bg-primary-pale px-6 py-12 text-slate-800 sm:px-10">
       <div className="mx-auto max-w-3xl space-y-6 rounded-2xl border border-primary/10 bg-white p-6 shadow-sm sm:p-8">
         <div className="space-y-3">
-          <p className="inline-flex rounded-full bg-primary-light px-3 py-1 text-xs font-semibold text-primary">
-            醫天圓統一入口
+          <h1 className="text-2xl font-semibold text-primary sm:text-3xl">預約服務</h1>
+          <p className="whitespace-pre-line text-sm leading-relaxed text-slate-500">
+            「{NARRATIVE.bookingQuote}」
           </p>
-          <h1 className="text-2xl font-semibold text-primary sm:text-3xl">預約與 AI 諮詢</h1>
-          <p className="text-sm leading-relaxed text-slate-600 sm:text-base">
-            你可以先用 AI 助手了解體質與覆診建議，再由對話流程完成預約；
-            或直接前往網上預約平台查看最新時段。
+          <p className="whitespace-pre-line text-sm leading-relaxed text-slate-600 sm:text-base">
+            {NARRATIVE.webBookingDescription}
           </p>
         </div>
 
@@ -40,7 +40,7 @@ export default function BookingPage() {
             href="/chat"
             className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-medium text-white transition hover:bg-primary-hover"
           >
-            進入 AI 諮詢（可導向預約）
+            問問 AI 體質顧問
           </Link>
           <a
             href="https://edentcm.as.me/schedule.php"
