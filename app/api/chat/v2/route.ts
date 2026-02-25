@@ -1715,6 +1715,38 @@ function applyBResponseTemplateCap(reply: string, latestUserText: string): strin
   return compact.trim();
 }
 
+function isG1DirectActionIntent(latestUserText: string): boolean {
+  const normalized = normalizeIntentText(latestUserText);
+  if (!normalized) return false;
+
+  const scopeKeywords = ['食', '飲', '煮', '湯', '水果', '份量', '一日', '每日', '作息'];
+  const intentKeywords = ['可唔可以', '可以', '幾多', '點煮', '點食', '幾時', '最好', '建議', '點樣', '怎样'];
+  const hasScope = scopeKeywords.some((kw) => normalized.includes(normalizeIntentText(kw)));
+  const hasIntent = intentKeywords.some((kw) => normalized.includes(normalizeIntentText(kw)));
+  return hasScope && hasIntent;
+}
+
+function stripQuestionSentencesFromReply(text: string): string {
+  const paragraphs = text
+    .split(/\r?\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const cleanedParagraphs = paragraphs
+    .map((paragraph) => {
+      const chunks = paragraph.match(/[^。！？!?]+[。！？!?]?/g) ?? [paragraph];
+      const kept = chunks
+        .map((chunk) => chunk.trim())
+        .filter(Boolean)
+        .filter((chunk) => !chunk.includes('？') && !chunk.includes('?'));
+      return kept.join('');
+    })
+    .filter(Boolean);
+
+  const cleaned = cleanedParagraphs.join('\n\n').trim();
+  return cleaned || text.trim();
+}
+
 function applyOutputContractGuard(reply: string, contract: OutputContract, mode: ChatMode, latestUserText: string): string {
   let guarded = sanitizeAssistantReply(reply);
 
@@ -1725,6 +1757,9 @@ function applyOutputContractGuard(reply: string, contract: OutputContract, mode:
       .split(/\r?\n/)
       .filter((line) => !BOOKING_NUDGE_REGEX.test(line));
     guarded = lines.join('\n').trim();
+  } else if (mode === 'G1' && isG1DirectActionIntent(latestUserText)) {
+    // For direct actionable G1 questions, avoid non-essential follow-up questions.
+    guarded = stripQuestionSentencesFromReply(guarded);
   }
 
   if (!isOutputContractGuardEnabled()) {
