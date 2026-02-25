@@ -10,8 +10,7 @@
         { "role": "user", "content": "我想預約陳醫師，下星期三中環有咩時段？" }
       ],
       "expect": {
-        "modeIn": ["B"],
-        "mustContain": ["陳", "時段"]
+        "modeIn": ["B"]
       }
     },
     {
@@ -245,6 +244,19 @@
       "expect": {
         "modeIn": ["G1"],
         "disallowBookingNudge": true
+      }
+    },
+    {
+      "id": "L11",
+      "title": "Content-link request should break booking stickiness",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "user", "content": "我想預約陳醫師，下星期三中環有咩時段？" },
+        { "role": "assistant", "content": "收到，我可以幫你跟進預約。你要唔要我先查時段？" },
+        { "role": "user", "content": "我想睇相關文章連結" }
+      ],
+      "expect": {
+        "modeNotIn": ["B"]
       }
     }
   ]

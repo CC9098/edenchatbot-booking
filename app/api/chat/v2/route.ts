@@ -402,6 +402,7 @@ const G2_DEEP_DIVE_OFFER_CUES = [
   '想唔想', '會唔會想', '要唔要', '需唔需要', '想知道',
   '如果你想', '想嘅話', '可以再講', '我可以再講', '要我再講',
   '要我講多啲', '想我講多啲', '要我補充', '想我補充', '要我展開', '想我展開',
+  '要我再展開', '想我再展開', '再展開講',
   '想聽多啲', '要我講詳細啲',
 ];
 const G2_AFFIRMATIVE_SHORT_REPLIES = new Set([
@@ -424,13 +425,17 @@ const TASK_REWRITE_KEYWORDS = ['改寫', '改写', 'rewrite', 'rephrase', '潤�
 const TASK_SUMMARY_KEYWORDS = ['總結', '总结', '摘要', '總結重點', 'summarize', 'summary', 'tl;dr'];
 const TASK_JSON_KEYWORDS = ['json', '只輸出json', '只返回json', '只回傳json', 'only output json', 'return json only'];
 const TASK_BULLET_KEYWORDS = ['點列', '点列', '條列', 'bullet', 'bullets', '列出'];
-const B_SHORT_FOLLOWUP_KEYWORDS = ['下周', '下週', '下星期', 'next week', 'tomorrow', '可以', 'ok', 'okay', '好', '嗯'];
+const B_SHORT_FOLLOWUP_KEYWORDS = ['下周', '下週', '下星期', 'tomorrow', 'next week', '聽日', '明日', '明天'];
 const B_ASSISTANT_PROGRESS_KEYWORDS = ['醫師', '诊所', '診所', '時段', '时间', '日期', '預約', '预约'];
 const BOOKING_NUDGE_REGEX = /(預約|预约|book|booking|appointment|時段|诊所|診所|醫師|医师|doctor|\bdr\b)/i;
 const NON_B_BOOKING_GUIDANCE_KEYWORDS = [
   '收費', '收费', '價錢', '价钱', '幾錢', '几钱', '價目', '价格', 'price', 'cost',
   '真人', '職員', '职员', '客服', '聯絡', '联络', 'contact', '電話', '电话',
   'whatsapp', '地址', '地圖', '地图', 'location', 'where',
+];
+const CONTENT_REFERENCE_KEYWORDS = [
+  '文章', '連結', '链接', '網址', '网址', '資料來源', '资料来源',
+  'source', 'sources', 'link', 'links', 'article', 'articles',
 ];
 
 function isChatMode(value: unknown): value is ChatMode {
@@ -657,6 +662,14 @@ function shouldIncludeNonBBookingGuidance(latestUserText: string): boolean {
   );
 }
 
+function isContentReferenceIntent(latestUserText: string): boolean {
+  const normalized = normalizeIntentText(latestUserText);
+  if (!normalized) return false;
+  return CONTENT_REFERENCE_KEYWORDS.some((kw) =>
+    normalized.includes(normalizeIntentText(kw))
+  );
+}
+
 function extractMaxWordsFromText(rawText: string): number | undefined {
   const patterns = [
     /(?:不多於|不超過|不超过|最多|上限|under|within|no more than|at most|max(?:imum)?(?:\s+of)?)\s*(\d{1,3})\s*(?:字|words?|characters?)/i,
@@ -804,6 +817,7 @@ function hasRecentUserBookingIntent(messages: ChatMessagePayload[]): boolean {
 function resolveModeByRules(messages: ChatMessagePayload[]): ModeRuleResolution {
   const latestMessage = messages[messages.length - 1]?.content || '';
   const normalizedLatest = normalizeIntentText(latestMessage);
+  const wantsContentReference = isContentReferenceIntent(latestMessage);
 
   // Only keep booking stickiness from recent user turns, not assistant nudges.
   const hasRecentBookingIntent = hasRecentUserBookingIntent(messages);
@@ -832,12 +846,12 @@ function resolveModeByRules(messages: ChatMessagePayload[]): ModeRuleResolution 
     return { mode: 'G1', signals };
   }
 
-  if (hasShortBookingFollowUp) {
+  if (hasShortBookingFollowUp && !wantsContentReference) {
     return { mode: 'B', signals };
   }
 
   // If there's recent booking intent and no explicit cancellation, stay in B mode
-  if (signals.hasRecentBookingIntent && !signals.explicitCancel) {
+  if (signals.hasRecentBookingIntent && !signals.explicitCancel && !wantsContentReference) {
     return { mode: 'B', signals };
   }
 
@@ -911,11 +925,19 @@ function countAssistantSentencesSinceLastBookingNudge(messages: ChatMessagePaylo
 }
 
 function buildG2ConversationGuidance(messages: ChatMessagePayload[]): string {
+  const latestUserMessage = [...messages].reverse().find((msg) => msg.role === 'user');
+  const latestUserText = latestUserMessage?.content ?? '';
+  const normalizedLatest = normalizeIntentText(latestUserText);
+  const userHasBookingIntent = containsNormalizedKeyword(normalizedLatest, BOOKING_KEYWORDS)
+    || hasDoctorAndTimeHints(latestUserText, normalizedLatest);
   const sentencesSinceLastNudge = countAssistantSentencesSinceLastBookingNudge(messages);
-  const allowBookingNudge = sentencesSinceLastNudge >= G2_MIN_SENTENCES_BETWEEN_BOOKING_NUDGES;
+  const allowBookingNudge = userHasBookingIntent
+    && sentencesSinceLastNudge >= G2_MIN_SENTENCES_BETWEEN_BOOKING_NUDGES;
   const nudgeGate = allowBookingNudge
-    ? '今次可以按臨床需要，最多加 1 句預約引流。'
-    : `今次禁止主動預約引流（距離上次引流只相隔約 ${sentencesSinceLastNudge} 句，未達低頻門檻）。`;
+    ? '今次只可回應用戶已提出嘅預約需求，最多加 1 句預約相關下一步。'
+    : userHasBookingIntent
+      ? `今次禁止主動預約引流（距離上次引流只相隔約 ${sentencesSinceLastNudge} 句，未達低頻門檻）。`
+      : '今次禁止主動預約引流；除非用戶明確提出想預約/想睇醫師。';
 
   return `【G2 回覆框架（必須遵守）】
 1. 先講 general 健康看法（現代健康角度）：先用較專業但易明的方式講機制，再講潛在好處與風險（各 1-2 句）。
@@ -929,8 +951,8 @@ function buildG2ConversationGuidance(messages: ChatMessagePayload[]): string {
 - 語氣清晰直接，避免重覆鋪陳。
 
 【G2 預約引流規則】
-- 只可以低頻率、偶然出現；大約每 5-10 句 assistant 內容先可再提一次。
-- 只在以下情況可提：症狀反覆、持續影響日常、或用戶表示擔心想進一步檢查。
+- 只可回應用戶主動提出嘅預約/睇醫師需求；禁止主動引流。
+- 即使用戶已提出預約，也要保持低頻（每 5-10 句 assistant 內容最多一次）。
 - 引流句必須放最後，而且用可選語氣（例如：如果你想，我可以幫你安排睇醫師）。
 - ${nudgeGate}`;
 }
@@ -1299,7 +1321,7 @@ const FALLBACK_CONSTITUTION_CONTEXT: Record<ConstitutionType, string> = {
 };
 
 const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
-  G1: '用簡短方式回答（2-3句），最後可按語境問一條自然跟進問題，例如「你會唔會想知道深入些原理？」；避免提及任何模式名。',
+  G1: '用簡短方式回答（2-3句）：先答結論，再給可執行做法（份量/時段/溫度）。預設唔提問；只有缺少關鍵資料時先可問 1 條會改變建議嘅問題。避免提及任何模式名。',
   G2: '先用現代健康角度講機制與好處/風險，再按用戶體質解釋利弊，最後追問一條澄清問題；保持中等深度、避免長篇。',
   G3: '以教練模式進行深入引導式對話。先理解用戶情況，提問引導反思，給予個人化建議。用同理心回應。',
   B: `你係醫天圓預約助手。你**必須**使用提供的 functions 來完成預約。**絕對唔可以**假裝完成預約或者話「已經幫你完成登記」而冇真正調用 functions。
@@ -2628,6 +2650,14 @@ export async function POST(request: NextRequest) {
     const outputContractGuidance = buildOutputContractGuidance(outputContract);
     if (outputContractGuidance) {
       systemPrompt += `\n\n${outputContractGuidance}`;
+    }
+    const wantsContentReference = mode !== 'B' && isContentReferenceIntent(latestUserMessage.content);
+    if (wantsContentReference) {
+      systemPrompt += `\n\n【文章連結回覆規則（本輪必須）】
+- 用戶主動要求文章/連結/資料來源：請優先提供 1-3 條最相關連結（完整 URL）與每條一句重點。
+- 禁止只回覆官網首頁或籠統叫用戶自行搜尋。
+- 除非用戶本輪同時問預約，否則不要主動重提預約、時段、醫師排班。
+- 若暫時無精準對應連結，請明確講「暫時未有精準對應文章」，再請用戶補充關鍵字。`;
     }
     systemPrompt += `\n\n${OUTPUT_FORMAT_RULES}`;
 

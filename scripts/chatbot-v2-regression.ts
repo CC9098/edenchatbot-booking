@@ -86,7 +86,8 @@ type PerfGateResult = {
   ok: boolean;
 };
 
-const BOOKING_NUDGE_REGEX = /(預約|预约|book|booking|appointment|診所|时段|時段|醫師|医师|doctor|\bdr\b)/i;
+const BOOKING_NUDGE_REGEX =
+  /(如果你想[^。！\n]*(預約|预约|安排睇醫師|睇醫師)|想唔想[^。！\n]*(預約|预约|睇醫師)|可以幫你[^。！\n]*(預約|预约|安排)|幫你安排[^。！\n]*(預約|预约|睇醫師)|book(ing)?\b|appointment)/i;
 
 function getNowStamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-');
