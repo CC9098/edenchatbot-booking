@@ -408,6 +408,11 @@ const TASK_BULLET_KEYWORDS = ['點列', '点列', '條列', 'bullet', 'bullets',
 const B_SHORT_FOLLOWUP_KEYWORDS = ['下周', '下週', '下星期', 'next week', 'tomorrow', '可以', 'ok', 'okay', '好', '嗯'];
 const B_ASSISTANT_PROGRESS_KEYWORDS = ['醫師', '诊所', '診所', '時段', '时间', '日期', '預約', '预约'];
 const BOOKING_NUDGE_REGEX = /(預約|预约|book|booking|appointment|時段|诊所|診所|醫師|医师|doctor|\bdr\b)/i;
+const NON_B_BOOKING_GUIDANCE_KEYWORDS = [
+  '收費', '收费', '價錢', '价钱', '幾錢', '几钱', '價目', '价格', 'price', 'cost',
+  '真人', '職員', '职员', '客服', '聯絡', '联络', 'contact', '電話', '电话',
+  'whatsapp', '地址', '地圖', '地图', 'location', 'where',
+];
 
 function isChatMode(value: unknown): value is ChatMode {
   return typeof value === 'string' && CHAT_MODES.includes(value as ChatMode);
@@ -619,6 +624,18 @@ function hasDoctorAndTimeHints(rawText: string, normalizedText: string): boolean
   const hasExplicitDate = EXPLICIT_DATE_REGEX.test(rawText);
   const hasTimeHint = containsNormalizedKeyword(normalizedText, BOOKING_TIME_HINTS);
   return hasExplicitDate || hasTimeHint;
+}
+
+function shouldIncludeNonBBookingGuidance(latestUserText: string): boolean {
+  const normalized = normalizeIntentText(latestUserText);
+  if (!normalized) return false;
+
+  if (containsNormalizedKeyword(normalized, BOOKING_KEYWORDS)) return true;
+  if (hasDoctorAndTimeHints(latestUserText, normalized)) return true;
+
+  return NON_B_BOOKING_GUIDANCE_KEYWORDS.some((kw) =>
+    normalized.includes(normalizeIntentText(kw))
+  );
 }
 
 function extractMaxWordsFromText(rawText: string): number | undefined {
@@ -2231,10 +2248,19 @@ async function buildFallbackPrompt(
   mode: ChatMode,
   careContext: string,
   contentContext: string,
+  latestUserText: string,
 ): Promise<string> {
   const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
   const doctorInfo = (await getPromptDoctorInfoLinesServer()).map((line) => `- ${line}`).join('\n');
   const whatsappInfo = getWhatsappContactLines().map((line) => `- ${line}`).join('\n');
+  const showBookingGuidance = shouldIncludeNonBBookingGuidance(latestUserText);
+  const nonBGuidanceSection = showBookingGuidance
+    ? `如果問題涉及預約、詳細收費、或需要真人協助，請引導用戶：
+- 預約：https://edentcm.as.me/schedule.php
+- 時間表網頁：https://www.edenclinic.hk/timetable/
+
+重要提示：具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。`
+    : '除非用戶明確提出預約、收費、時間表或真人協助，否則先專注回答健康問題，唔好主動加入預約引流。';
 
   return `你係醫天圓中醫診所的 AI 體質顧問，角色設定係親切、專業的中醫健康助理。請用繁體中文（廣東話口語）回答用戶問題。
 
@@ -2258,11 +2284,7 @@ ${whatsappInfo}
 【收費參考】
 診金 $100/次，基本藥費 $80 起/劑，針灸 $300-500/次，正骨手法 $350-700/次，拔罐 $350/次
 ${mode !== 'B' ? `
-如果問題涉及預約、詳細收費、或需要真人協助，請引導用戶：
-- 預約：https://edentcm.as.me/schedule.php
-- 時間表網頁：https://www.edenclinic.hk/timetable/
-
-重要提示：具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。` : ''}`;
+${nonBGuidanceSection}` : ''}`;
 }
 
 async function buildSystemPrompt(
@@ -2281,7 +2303,7 @@ async function buildSystemPrompt(
 
   if (!isKnowledgeConstitutionType(type)) {
     return {
-      systemPrompt: await buildFallbackPrompt(type, mode, careContext, contentContext),
+      systemPrompt: await buildFallbackPrompt(type, mode, careContext, contentContext, latestUserText),
       knowledgeStats: createEmptyKnowledgeStats(type, mode),
     };
   }
@@ -2316,7 +2338,7 @@ async function buildSystemPrompt(
   const maxChars = getKnowledgeMaxChars(mode);
   if (!settings) {
     return {
-      systemPrompt: await buildFallbackPrompt(type, mode, careContext, contentContext),
+      systemPrompt: await buildFallbackPrompt(type, mode, careContext, contentContext, latestUserText),
       knowledgeStats: createEmptyKnowledgeStats(type, mode, candidateDocs.length),
     };
   }
