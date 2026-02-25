@@ -37,3 +37,13 @@ Supabase, Neon PostgreSQL, Google Calendar/Gmail APIs, and Gemini AI all require
 - The project uses Tailwind CSS v4 with `@tailwindcss/postcss` (not the classic `tailwindcss` PostCSS plugin).
 - Verification before push: run `npm run typecheck && npm run lint` (see `CLAUDE_CONTEXT.md` section 7 for details).
 - The homepage (`/`) requires Supabase credentials to render (it fetches articles/courses from Supabase server-side). The `/booking` and `/embed` pages are the safest for quick smoke-testing without external services.
+
+### Simulating the iOS mobile app on localhost
+
+The production iOS app is a Capacitor WebView that loads the Vercel deployment. The `PatientAppChrome` component (bottom tab bar: 問問/預約/養生/根源 + top bar) only renders when the browser user agent contains `Capacitor` (see `lib/platform.ts`). To simulate the mobile app experience locally:
+
+```bash
+google-chrome --user-agent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Capacitor/8.1.0" --window-size=430,932 "http://localhost:3000/chat"
+```
+
+This triggers the native app chrome (tab bar + route-specific top bar). The `/chat` and `/chat/symptoms` routes require Supabase auth (login gate). The `/booking` tab works without login.
