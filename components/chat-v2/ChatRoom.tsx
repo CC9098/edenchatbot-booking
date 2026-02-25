@@ -9,9 +9,9 @@ import { TendencyWhisper } from "./TendencyWhisper";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { createBrowserClient } from "@/lib/supabase-browser";
 import { useChatShell } from "./ChatShellContext";
+import { NARRATIVE } from "@/lib/narrative-copy";
 
-const WELCOME_MESSAGE =
-  "你好！我是醫天圓 AI 體質顧問。我會根據你嘅體質及照護資料，提供個人化嘅飲食、作息及調養建議。有什麼想了解的嗎？";
+const WELCOME_MESSAGE = NARRATIVE.chatWelcome;
 
 const STREAMING_ENABLED =
   process.env.NEXT_PUBLIC_CHAT_STREAMING_ENABLED === "true";
@@ -564,7 +564,7 @@ export function ChatRoom() {
           </div>
         </div>
 
-        <TendencyWhisper />
+        <TendencyWhisper userId={user?.id} />
 
         <div className="min-h-0 flex-1 overflow-hidden bg-[rgba(246,248,244,0.85)]">
           <MessageList messages={messages} loading={loading} sessionId={sessionId} />
