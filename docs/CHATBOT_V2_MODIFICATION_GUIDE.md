@@ -99,7 +99,7 @@
 - 只在邊界情況觸發（例如：最近有 booking intent 但最新訊息唔明確、G2/G3 訊號重疊、接近長度閾值）
 - 明確 booking/cancel keyword 會直接用 rules（避免多一次 call）
 - router 輸出嚴格 JSON：`mode + confidence + reasons`
-- `confidence >= CHAT_V2_SEMANTIC_ROUTER_CONFIDENCE`（預設 0.75）先覆蓋 rules
+- `confidence >= CHAT_V2_SEMANTIC_ROUTER_CONFIDENCE`（預設 0.72）先覆蓋 rules
 - 低信心、invalid JSON、timeout（預設 350ms）都 fallback 規則 mode
 
 ### 4.3 你應該改邊度

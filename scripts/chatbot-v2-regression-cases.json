@@ -222,6 +222,30 @@
         "modeIn": ["G2"],
         "disallowBookingNudge": true
       }
+    },
+    {
+      "id": "L9",
+      "title": "Deep-dive intent in colloquial Cantonese should enter G2",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "user", "content": "明白，可以講吓深入啲嘅" }
+      ],
+      "expect": {
+        "modeIn": ["G2"],
+        "disallowBookingNudge": true
+      }
+    },
+    {
+      "id": "L10",
+      "title": "Watermelon quantity should remain concise health mode",
+      "language": "zh-Hant",
+      "messages": [
+        { "role": "user", "content": "一日可以食幾多西瓜呢？" }
+      ],
+      "expect": {
+        "modeIn": ["G1"],
+        "disallowBookingNudge": true
+      }
     }
   ]
 }

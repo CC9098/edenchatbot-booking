@@ -162,6 +162,7 @@ const MODE_ROUTER_CONTEXT_MESSAGE_COUNT = 6;
 const RECENT_USER_INTENT_WINDOW = 3;
 const SEMANTIC_ROUTER_DEFAULT_BOUNDARY_MIN = 130;
 const SEMANTIC_ROUTER_DEFAULT_BOUNDARY_MAX = 200;
+const SEMANTIC_ROUTER_DEFAULT_GENERAL_MIN = 8;
 const KNOWLEDGE_TOP_K_BY_MODE: Record<Exclude<ChatMode, 'B'>, number> = {
   G1: 3,
   G2: 4,
@@ -222,7 +223,7 @@ function isG1ContextBudgetEnabled(): boolean {
 }
 
 function isSemanticRouterBoundaryOnlyEnabled(): boolean {
-  return process.env.CHAT_V2_SEMANTIC_ROUTER_BOUNDARY_ONLY_ENABLED !== 'false';
+  return process.env.CHAT_V2_SEMANTIC_ROUTER_BOUNDARY_ONLY_ENABLED === 'true';
 }
 
 function isNonToolTaskBypassEnabled(): boolean {
@@ -311,15 +312,22 @@ function getSemanticRouterBoundaryMaxLength(): number {
   );
 }
 
+function getSemanticRouterGeneralMinLength(): number {
+  return parsePositiveIntEnv(
+    process.env.CHAT_V2_SEMANTIC_ROUTER_GENERAL_MIN_LEN,
+    SEMANTIC_ROUTER_DEFAULT_GENERAL_MIN,
+  );
+}
+
 function getSemanticModeRouterConfidenceThreshold(): number {
-  const raw = Number(process.env.CHAT_V2_SEMANTIC_ROUTER_CONFIDENCE ?? '0.75');
-  if (!Number.isFinite(raw)) return 0.75;
+  const raw = Number(process.env.CHAT_V2_SEMANTIC_ROUTER_CONFIDENCE ?? '0.72');
+  if (!Number.isFinite(raw)) return 0.72;
   return Math.max(0, Math.min(1, raw));
 }
 
 function getSemanticModeRouterTimeoutMs(): number {
-  const raw = Number(process.env.CHAT_V2_SEMANTIC_ROUTER_TIMEOUT_MS ?? '220');
-  if (!Number.isFinite(raw) || raw <= 0) return 220;
+  const raw = Number(process.env.CHAT_V2_SEMANTIC_ROUTER_TIMEOUT_MS ?? '300');
+  if (!Number.isFinite(raw) || raw <= 0) return 300;
   return Math.round(raw);
 }
 
@@ -361,7 +369,11 @@ const BOOKING_KEYWORDS = [
 ];
 
 const G2_KEYWORDS = [
-  '點解', '原理', '理論', '詳細', '解釋', 'explain', 'why', '想知多啲',
+  '點解', '原理', '理論', '詳細', '詳細啲', '詳細些',
+  '深入', '深入啲', '深入些',
+  '解釋', '講解', '講多啲', '講多d', '再詳細',
+  '想知多啲', '想了解多啲', '想了解多些', '背後原因',
+  'explain', 'why',
 ];
 
 const G3_KEYWORDS = [
@@ -375,7 +387,12 @@ const BOOKING_TIME_HINTS = [
   'next', 'tomorrow', 'date',
 ];
 
-const G2_DEEP_DIVE_KEYWORDS = ['原理', '深入', '詳細', '解釋', '點解', 'why', '機制', '原因'];
+const G2_DEEP_DIVE_KEYWORDS = [
+  '原理', '深入', '深入啲', '深入些',
+  '詳細', '詳細啲', '詳細些',
+  '解釋', '講解', '點解', '機制', '原因', '背後原因',
+  'why',
+];
 const G2_DEEP_DIVE_EXPANSION_CUES = [
   '講多啲', '讲多点', '講多d', '再講', '再讲', '補充', '补充', '展開', '展开',
   '更多', '多一點', '多一点', '多一些',
@@ -390,15 +407,17 @@ const G2_DEEP_DIVE_OFFER_CUES = [
 const G2_AFFIRMATIVE_SHORT_REPLIES = new Set([
   '係', '系', '好', '要', '想', '想知', '可以', 'ok', 'okay', 'yes',
   'sure', 'yep', 'yeah', 'please', 'pls',
-  '嗯', '嗯嗯', '好呀', '好啊', '係呀', '係啊', '想呀', '想啊',
+  '嗯', '嗯嗯', '明白', '明白了',
+  '好呀', '好啊', '係呀', '係啊', '想呀', '想啊',
   '要呀', '要啊', '可以呀', '可以啊', '請講', '講', '講下', '講啦',
+  '可以講', '可以講下', '想聽', '想聽多啲',
   '再講', '再講下', '深入啲', '深入些', '深入',
   '講多啲', '讲多点', '可以再講', '可以再讲', '再詳細啲', '再详细点',
 ]);
 const G2_AFFIRMATIVE_REPLY_PREFIXES = [
   'yes', 'yeah', 'yep', 'sure', 'ok', 'okay',
-  '係', '系', '好', '要', '想', '可以',
-  '請講', '講', '再講', '講多', '深入',
+  '係', '系', '好', '要', '想', '可以', '明白',
+  '請講', '講', '再講', '講多', '深入', '想聽', '可以講',
 ];
 
 const TASK_REWRITE_KEYWORDS = ['改寫', '改写', 'rewrite', 'rephrase', '潤飾', '润色', 'polish'];
@@ -851,7 +870,7 @@ function shouldRunSemanticModeRouter(signals: ModeRuleSignals): boolean {
 
   if (!isSemanticRouterBoundaryOnlyEnabled()) {
     if (signals.hasRecentBookingIntent) return true;
-    return signals.latestLength >= 120 && signals.latestLength <= 220;
+    return signals.latestLength >= getSemanticRouterGeneralMinLength();
   }
 
   const minLen = getSemanticRouterBoundaryMinLength();

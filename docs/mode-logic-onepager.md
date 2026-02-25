@@ -56,12 +56,13 @@ Semantic 唔係每次跑，只有以下情況先跑：
 | 屬 G2 opt-in reply | 否 |
 | 有 recent booking intent（語境黏性） | 是 |
 | 同時有 G2 + G3 訊號 | 是 |
-| 長度介乎 120~220（邊界模糊） | 是 |
+| `BOUNDARY_ONLY=true` 且長度介乎 boundary range（預設 130~200） | 是 |
+| `BOUNDARY_ONLY=false` 且長度 >= general min（預設 8） | 是 |
 
 ## 5) Semantic 覆蓋規則
 
 - Router 輸出：`{ mode, confidence, reasons[] }`
-- 只有 `confidence >= threshold`（預設 `0.75`）先覆蓋 rules 結果。
+- 只有 `confidence >= threshold`（預設 `0.72`）先覆蓋 rules 結果。
 - 否則（低信心、timeout、JSON 失敗）全部 fallback 用 `ruleMode`。
 
 ## 6) 最終 mode 驗收題庫（21 題）
