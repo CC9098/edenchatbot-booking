@@ -1,8 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { ArrowLeft, CalendarDays, CheckCircle2, Loader2, UserRound } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ArrowLeft,
+  CalendarDays,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  UserRound,
+} from 'lucide-react';
 import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
 import { CLINICS, DOCTORS, type ClinicId, type DoctorId } from '@/shared/clinic-data';
 
@@ -33,6 +41,7 @@ type BookingFormErrors = Partial<Record<keyof BookingFormValues, string>>;
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const SLOT_INTERVAL_MINUTES = 15;
 const MAX_BOOKING_WINDOW_DAYS = 90;
+const WEEKDAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
 
 const PICKUP_LABELS: Record<PickupType, string> = {
   none: '不需要 None',
@@ -103,6 +112,81 @@ function formatDateForDisplay(dateIso: string): string {
   }).format(date);
 }
 
+function padTwo(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function toMonthKeyInHongKong(date: Date): string {
+  return toIsoDateInHongKong(date).slice(0, 7);
+}
+
+function toMonthKeyFromIsoDate(dateIso: string): string {
+  return dateIso.slice(0, 7);
+}
+
+function parseMonthKey(monthKey: string): { year: number; month: number } | null {
+  const match = monthKey.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return null;
+  }
+
+  return { year, month };
+}
+
+function shiftMonthKey(monthKey: string, deltaMonths: number): string {
+  const parsed = parseMonthKey(monthKey);
+  if (!parsed) return monthKey;
+
+  const shifted = new Date(Date.UTC(parsed.year, parsed.month - 1 + deltaMonths, 1));
+  return `${shifted.getUTCFullYear()}-${padTwo(shifted.getUTCMonth() + 1)}`;
+}
+
+function getDaysInMonth(monthKey: string): number {
+  const parsed = parseMonthKey(monthKey);
+  if (!parsed) return 30;
+
+  return new Date(Date.UTC(parsed.year, parsed.month, 0)).getUTCDate();
+}
+
+function isoDateFromMonthDay(monthKey: string, day: number): string {
+  return `${monthKey}-${padTwo(day)}`;
+}
+
+function getWeekdayIndexMondayFirst(dateIso: string): number {
+  const [yearStr, monthStr, dayStr] = dateIso.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+
+  if (!year || !month || !day) return 0;
+
+  const sundayFirst = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return (sundayFirst + 6) % 7;
+}
+
+function formatMonthLabel(monthKey: string): string {
+  const parsed = parseMonthKey(monthKey);
+  if (!parsed) return monthKey;
+
+  const date = new Date(Date.UTC(parsed.year, parsed.month - 1, 1));
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: HONG_KONG_TIMEZONE,
+    year: 'numeric',
+    month: 'long',
+  }).format(date);
+}
+
+function monthHasSelectableDate(monthKey: string, minDate: string, maxDate: string): boolean {
+  const daysInMonth = getDaysInMonth(monthKey);
+  const firstDate = isoDateFromMonthDay(monthKey, 1);
+  const lastDate = isoDateFromMonthDay(monthKey, daysInMonth);
+  return !(lastDate < minDate || firstDate > maxDate);
+}
+
 export function BookingTabFlow() {
   const [step, setStep] = useState<BookingStep>('setup');
   const [visitType, setVisitType] = useState<VisitType>('first');
@@ -114,6 +198,10 @@ export function BookingTabFlow() {
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotError, setSlotError] = useState('');
+  const [calendarMonthKey, setCalendarMonthKey] = useState(() => toMonthKeyInHongKong(new Date()));
+  const [bookableDatesInMonth, setBookableDatesInMonth] = useState<Record<string, boolean>>({});
+  const [bookableDatesLoading, setBookableDatesLoading] = useState(false);
+  const [bookableDatesError, setBookableDatesError] = useState('');
 
   const [formValues, setFormValues] = useState<BookingFormValues>(INITIAL_FORM_VALUES);
   const [formErrors, setFormErrors] = useState<BookingFormErrors>({});
@@ -155,6 +243,123 @@ export function BookingTabFlow() {
 
   const canContinueSetup = Boolean(doctorId && clinicId && visitType);
   const canContinueTimeslot = Boolean(selectedDate && selectedTime);
+  const previousMonthKey = shiftMonthKey(calendarMonthKey, -1);
+  const nextMonthKey = shiftMonthKey(calendarMonthKey, 1);
+  const canGoToPreviousMonth = monthHasSelectableDate(previousMonthKey, minDate, maxDate);
+  const canGoToNextMonth = monthHasSelectableDate(nextMonthKey, minDate, maxDate);
+
+  const calendarMonthLabel = useMemo(
+    () => formatMonthLabel(calendarMonthKey),
+    [calendarMonthKey]
+  );
+
+  const calendarCells = useMemo(() => {
+    const daysInMonth = getDaysInMonth(calendarMonthKey);
+    const leadingEmptyCellCount = getWeekdayIndexMondayFirst(
+      isoDateFromMonthDay(calendarMonthKey, 1)
+    );
+    const totalCellCount = Math.ceil((leadingEmptyCellCount + daysInMonth) / 7) * 7;
+
+    return Array.from({ length: totalCellCount }, (_, index) => {
+      const day = index - leadingEmptyCellCount + 1;
+      if (day < 1 || day > daysInMonth) return null;
+
+      const dateIso = isoDateFromMonthDay(calendarMonthKey, day);
+      return {
+        dateIso,
+        day,
+        isSelectable: dateIso >= minDate && dateIso <= maxDate,
+        hasAvailability: bookableDatesInMonth[dateIso] === true,
+      };
+    });
+  }, [bookableDatesInMonth, calendarMonthKey, maxDate, minDate]);
+
+  useEffect(() => {
+    if (step !== 'timeslot' || !doctorId || !clinicId) return;
+
+    const daysInMonth = getDaysInMonth(calendarMonthKey);
+    const datesToScan: string[] = [];
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const dateIso = isoDateFromMonthDay(calendarMonthKey, day);
+      if (dateIso >= minDate && dateIso <= maxDate) {
+        datesToScan.push(dateIso);
+      }
+    }
+
+    setBookableDatesInMonth({});
+    setBookableDatesError('');
+
+    if (datesToScan.length === 0) {
+      setBookableDatesLoading(false);
+      return;
+    }
+
+    let isCancelled = false;
+    setBookableDatesLoading(true);
+
+    const scanBookableDates = async () => {
+      const dateQueue = [...datesToScan];
+      const nextBookableDates: Record<string, boolean> = {};
+      let hasCalendarUnavailable = false;
+      const workerCount = Math.min(4, dateQueue.length);
+
+      await Promise.all(
+        Array.from({ length: workerCount }, async () => {
+          while (dateQueue.length > 0 && !isCancelled) {
+            const dateIso = dateQueue.shift();
+            if (!dateIso) break;
+
+            try {
+              const response = await fetch('/api/availability', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  doctorId,
+                  clinicId,
+                  date: dateIso,
+                  durationMinutes: SLOT_INTERVAL_MINUTES,
+                }),
+              });
+
+              const data = await response.json();
+              if (!response.ok) {
+                if (data?.errorCode === 'CALENDAR_UNAVAILABLE') {
+                  hasCalendarUnavailable = true;
+                }
+                nextBookableDates[dateIso] = false;
+                continue;
+              }
+
+              const slots = Array.isArray(data?.slots) ? data.slots : [];
+              const isClosedDay = Boolean(data?.isClosed || data?.isHoliday);
+              nextBookableDates[dateIso] = !isClosedDay && slots.length > 0;
+            } catch {
+              nextBookableDates[dateIso] = false;
+            }
+          }
+        })
+      );
+
+      if (isCancelled) return;
+
+      setBookableDatesInMonth(nextBookableDates);
+      setBookableDatesLoading(false);
+      setBookableDatesError(
+        hasCalendarUnavailable
+          ? '暫時未能完整讀取預約日曆，綠點可能未完全顯示。'
+          : ''
+      );
+    };
+
+    void scanBookableDates();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [calendarMonthKey, clinicId, doctorId, maxDate, minDate, step]);
 
   function resetSlotState() {
     setSelectedDate('');
@@ -162,6 +367,10 @@ export function BookingTabFlow() {
     setAvailableSlots([]);
     setSlotsLoading(false);
     setSlotError('');
+    setCalendarMonthKey(toMonthKeyInHongKong(new Date()));
+    setBookableDatesInMonth({});
+    setBookableDatesLoading(false);
+    setBookableDatesError('');
   }
 
   function resetSubmissionState() {
@@ -228,8 +437,13 @@ export function BookingTabFlow() {
 
       const slots = Array.isArray(data?.slots) ? data.slots : [];
       const isClosedDay = Boolean(data?.isClosed || data?.isHoliday);
+      const hasBookableSlots = !isClosedDay && slots.length > 0;
 
       setAvailableSlots(slots);
+      setBookableDatesInMonth((prev) => ({
+        ...prev,
+        [dateIso]: hasBookableSlots,
+      }));
 
       if (isClosedDay) {
         setSlotError('當日休診或公眾假期，請選擇其他日期。');
@@ -248,6 +462,7 @@ export function BookingTabFlow() {
 
   function handleDateChange(dateIso: string) {
     setSelectedDate(dateIso);
+    setCalendarMonthKey(toMonthKeyFromIsoDate(dateIso));
     void fetchAvailability(dateIso);
   }
 
@@ -548,20 +763,111 @@ export function BookingTabFlow() {
             <p className="mt-1">{visitType === 'first' ? '首診 First Visit' : '覆診 Follow-up Visit'}</p>
           </div>
 
-          <label className="space-y-2">
+          <div className="space-y-3">
             <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
               <CalendarDays className="h-4 w-4" />
               選擇日期
             </span>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(event) => handleDateChange(event.target.value)}
-              min={minDate}
-              max={maxDate}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-            />
-          </label>
+            <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-base font-semibold text-slate-900">{calendarMonthLabel}</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCalendarMonthKey(previousMonthKey)}
+                    disabled={!canGoToPreviousMonth || bookableDatesLoading}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="上一個月"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCalendarMonthKey(nextMonthKey)}
+                    disabled={!canGoToNextMonth || bookableDatesLoading}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="下一個月"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-slate-400">
+                {WEEKDAY_LABELS.map((weekday) => (
+                  <span key={weekday} className="py-1">
+                    {weekday}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-1 grid grid-cols-7 gap-1">
+                {calendarCells.map((cell, index) => {
+                  if (!cell) {
+                    return <div key={`empty-${index}`} className="h-12 rounded-lg" aria-hidden="true" />;
+                  }
+
+                  const isSelected = selectedDate === cell.dateIso;
+
+                  return (
+                    <button
+                      key={cell.dateIso}
+                      type="button"
+                      onClick={() => handleDateChange(cell.dateIso)}
+                      disabled={!cell.isSelectable}
+                      aria-label={`${cell.dateIso}${cell.hasAvailability ? '，可預約' : ''}`}
+                      className={`h-12 rounded-lg border text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                        !cell.isSelectable
+                          ? 'cursor-not-allowed border-transparent text-slate-300'
+                          : isSelected
+                            ? 'border-primary bg-primary text-white'
+                            : cell.hasAvailability
+                              ? 'border-emerald-300 bg-emerald-50 text-slate-900 hover:bg-emerald-100'
+                              : 'border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{cell.day}</span>
+                      <span
+                        className={`mx-auto mt-1 block h-1.5 w-1.5 rounded-full ${
+                          isSelected
+                            ? 'bg-white/90'
+                            : cell.hasAvailability
+                              ? 'bg-emerald-500'
+                              : 'bg-transparent'
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 text-xs text-slate-600">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span>綠點代表該日目前有可預約時段</span>
+              </div>
+            </div>
+
+            {bookableDatesLoading ? (
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                正在掃描本月可預約日子...
+              </div>
+            ) : null}
+
+            {!bookableDatesLoading && bookableDatesError ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {bookableDatesError}
+              </div>
+            ) : null}
+
+            {selectedDate ? (
+              <p className="text-sm text-slate-600">
+                已選日期：<span className="font-semibold text-slate-900">{formatDateForDisplay(selectedDate)}</span>
+              </p>
+            ) : (
+              <p className="text-sm text-slate-500">請先在日曆選擇日期，再選擇時段。</p>
+            )}
+          </div>
 
           <div className="space-y-2">
             <p className="text-sm font-semibold text-slate-700">可預約時段</p>
