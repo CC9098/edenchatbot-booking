@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { logSymptom } from '@/lib/symptom-conversation-helpers';
+import { isSymptomElement } from '@/lib/symptom-element';
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -15,6 +16,8 @@ const CONFIRM_SYMPTOM_SCHEMA = z.object({
     resolutionMethod: z.string().trim().min(1).max(120).optional(),
     resolutionNote: z.string().trim().min(1).max(500).optional(),
     resolutionDays: z.number().int().min(0).max(365).optional(),
+    elementCue: z.string().optional(),
+    elementTraits: z.record(z.unknown()).optional(),
   }),
 });
 
@@ -55,6 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     const draft = parsed.data.draft;
+    const normalizedCue = isSymptomElement(draft.elementCue) ? draft.elementCue : "undetermined";
     if (draft.endedAt && draft.endedAt < draft.startedAt) {
       return NextResponse.json(
         {
@@ -65,7 +69,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const saveResult = await logSymptom(user.id, draft);
+    const saveResult = await logSymptom(user.id, {
+      ...draft,
+      elementCue: normalizedCue,
+      elementTraits: draft.elementTraits || {
+        cue: normalizedCue,
+        source: "chat_quick_question_v1",
+      },
+    });
     if (!saveResult.success) {
       return NextResponse.json(
         {

@@ -6,6 +6,13 @@
  */
 
 import { createServiceClient } from '@/lib/supabase';
+import {
+  buildSymptomElementScores,
+  isSymptomElement,
+  resolveSeverityWeight,
+  resolveSuggestedElement,
+  type SymptomElement,
+} from '@/lib/symptom-element';
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_STATUSES = new Set(['active', 'resolved', 'recurring']);
@@ -27,6 +34,8 @@ export interface LogSymptomRequest {
   resolutionMethod?: string | null;
   resolutionNote?: string | null;
   resolutionDays?: number | string | null;
+  elementCue?: SymptomElement | null;
+  elementTraits?: Record<string, unknown> | null;
 }
 
 /**
@@ -142,6 +151,24 @@ export async function logSymptom(
       return { success: false, error: '提供好返資料時必須同時提供 endedAt' };
     }
 
+    const normalizedElementCue: SymptomElement =
+      isSymptomElement(request.elementCue) ? request.elementCue : 'undetermined';
+    const elementScores = buildSymptomElementScores(
+      normalizedElementCue,
+      request.severity ?? null,
+    );
+    const suggestedElement = resolveSuggestedElement(elementScores);
+    const normalizedElementTraits =
+      request.elementTraits && typeof request.elementTraits === 'object'
+        ? request.elementTraits
+        : {};
+    const elementTraitsPayload: Record<string, unknown> = {
+      ...normalizedElementTraits,
+      cue: normalizedElementCue,
+      scoringVersion: 'v1_severity_bucket',
+      severityWeight: resolveSeverityWeight(request.severity ?? null),
+    };
+
     const supabase = createServiceClient();
 
     // Prepare insert data
@@ -175,11 +202,17 @@ export async function logSymptom(
       }
     }
 
+    insertData.element_traits = elementTraitsPayload;
+    insertData.element_score_water = elementScores.water;
+    insertData.element_score_wind = elementScores.wind;
+    insertData.element_score_thunder = elementScores.thunder;
+    insertData.element_suggested_label = suggestedElement;
+
     // Insert symptom log
     const { data: inserted, error: insertError } = await supabase
       .from('symptom_logs')
       .insert(insertData)
-      .select('id, patient_user_id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at')
+      .select('id, patient_user_id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at, element_traits, element_score_water, element_score_wind, element_score_thunder, element_suggested_label, element_review_label, element_reviewed_by, element_reviewed_at')
       .single();
 
     if (insertError) {
@@ -458,6 +491,14 @@ export interface SymptomRecord {
   resolutionDays: number | null;
   loggedVia: string;
   createdAt: string;
+  elementTraits: Record<string, unknown> | null;
+  elementScoreWater: number;
+  elementScoreWind: number;
+  elementScoreThunder: number;
+  elementSuggestedLabel: SymptomElement;
+  elementReviewLabel: SymptomElement | null;
+  elementReviewedBy: string | null;
+  elementReviewedAt: string | null;
 }
 
 /**
@@ -476,7 +517,7 @@ export async function listSymptoms(
 
     let query = supabase
       .from('symptom_logs')
-      .select('id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at')
+      .select('id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at, element_traits, element_score_water, element_score_wind, element_score_thunder, element_suggested_label, element_review_label, element_reviewed_by, element_reviewed_at')
       .eq('patient_user_id', userId);
 
     // Apply filters
@@ -535,6 +576,21 @@ export async function listSymptoms(
       resolutionDays: s.resolution_days,
       loggedVia: s.logged_via,
       createdAt: s.created_at,
+      elementTraits:
+        s.element_traits && typeof s.element_traits === 'object'
+          ? (s.element_traits as Record<string, unknown>)
+          : null,
+      elementScoreWater: Number(s.element_score_water || 0),
+      elementScoreWind: Number(s.element_score_wind || 0),
+      elementScoreThunder: Number(s.element_score_thunder || 0),
+      elementSuggestedLabel: isSymptomElement(s.element_suggested_label)
+        ? s.element_suggested_label
+        : 'undetermined',
+      elementReviewLabel: isSymptomElement(s.element_review_label) ? s.element_review_label : null,
+      elementReviewedBy:
+        typeof s.element_reviewed_by === 'string' ? s.element_reviewed_by : null,
+      elementReviewedAt:
+        typeof s.element_reviewed_at === 'string' ? s.element_reviewed_at : null,
     }));
 
     // IMPORTANT: Gemini API requires object response, not array

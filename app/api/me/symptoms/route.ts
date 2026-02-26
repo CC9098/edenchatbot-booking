@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { createServiceClient } from "@/lib/supabase";
+import {
+  buildSymptomElementScores,
+  isSymptomElement,
+  resolveSeverityWeight,
+  resolveSuggestedElement,
+} from "@/lib/symptom-element";
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_STATUS_FILTERS = new Set(["all", "active", "resolved", "recurring"]);
@@ -41,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from("symptom_logs")
-      .select("id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at, updated_at", { count: "exact" })
+      .select("id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at, updated_at, element_traits, element_score_water, element_score_wind, element_score_thunder, element_suggested_label, element_review_label, element_reviewed_by, element_reviewed_at", { count: "exact" })
       .eq("patient_user_id", user.id);
 
     // Apply filters
@@ -80,6 +86,21 @@ export async function GET(request: NextRequest) {
         loggedVia: s.logged_via,
         createdAt: s.created_at,
         updatedAt: s.updated_at,
+        elementTraits:
+          s.element_traits && typeof s.element_traits === "object"
+            ? (s.element_traits as Record<string, unknown>)
+            : null,
+        elementScoreWater: Number(s.element_score_water || 0),
+        elementScoreWind: Number(s.element_score_wind || 0),
+        elementScoreThunder: Number(s.element_score_thunder || 0),
+        elementSuggestedLabel: isSymptomElement(s.element_suggested_label)
+          ? s.element_suggested_label
+          : "undetermined",
+        elementReviewLabel: isSymptomElement(s.element_review_label) ? s.element_review_label : null,
+        elementReviewedBy:
+          typeof s.element_reviewed_by === "string" ? s.element_reviewed_by : null,
+        elementReviewedAt:
+          typeof s.element_reviewed_at === "string" ? s.element_reviewed_at : null,
       })),
       total: count || 0,
     });
@@ -101,7 +122,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { category, description, severity, startedAt, endedAt, resolutionMethod, resolutionNote, resolutionDays } = body;
+    const { category, description, severity, startedAt, endedAt, resolutionMethod, resolutionNote, resolutionDays, elementCue, elementTraits } = body;
 
     // Validate required fields
     if (typeof category !== "string" || !category.trim()) {
@@ -207,6 +228,14 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createServiceClient();
+    const normalizedElementCue = isSymptomElement(elementCue) ? elementCue : "undetermined";
+    const elementScores = buildSymptomElementScores(
+      normalizedElementCue,
+      typeof severity === "number" ? severity : null,
+    );
+    const suggestedElement = resolveSuggestedElement(elementScores);
+    const normalizedElementTraits =
+      elementTraits && typeof elementTraits === "object" ? elementTraits : {};
 
     const insertData: Record<string, unknown> = {
       patient_user_id: user.id,
@@ -214,6 +243,16 @@ export async function POST(request: NextRequest) {
       status: normalizedEndedAt ? "resolved" : "active",
       started_at: startedAt,
       logged_via: "manual", // Logged via API (not chatbot)
+      element_traits: {
+        ...normalizedElementTraits,
+        cue: normalizedElementCue,
+        source: "manual_api",
+        severityWeight: resolveSeverityWeight(typeof severity === "number" ? severity : null),
+      },
+      element_score_water: elementScores.water,
+      element_score_wind: elementScores.wind,
+      element_score_thunder: elementScores.thunder,
+      element_suggested_label: suggestedElement,
     };
 
     if (typeof description === "string" && description.trim()) {
@@ -240,7 +279,7 @@ export async function POST(request: NextRequest) {
     const { data: inserted, error: insertError } = await supabase
       .from("symptom_logs")
       .insert(insertData)
-      .select("id, patient_user_id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at, updated_at")
+      .select("id, patient_user_id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at, updated_at, element_traits, element_score_water, element_score_wind, element_score_thunder, element_suggested_label, element_review_label, element_reviewed_by, element_reviewed_at")
       .single();
 
     if (insertError) {
@@ -278,6 +317,23 @@ export async function POST(request: NextRequest) {
       loggedVia: inserted.logged_via,
       createdAt: inserted.created_at,
       updatedAt: inserted.updated_at,
+      elementTraits:
+        inserted.element_traits && typeof inserted.element_traits === "object"
+          ? (inserted.element_traits as Record<string, unknown>)
+          : null,
+      elementScoreWater: Number(inserted.element_score_water || 0),
+      elementScoreWind: Number(inserted.element_score_wind || 0),
+      elementScoreThunder: Number(inserted.element_score_thunder || 0),
+      elementSuggestedLabel: isSymptomElement(inserted.element_suggested_label)
+        ? inserted.element_suggested_label
+        : "undetermined",
+      elementReviewLabel: isSymptomElement(inserted.element_review_label)
+        ? inserted.element_review_label
+        : null,
+      elementReviewedBy:
+        typeof inserted.element_reviewed_by === "string" ? inserted.element_reviewed_by : null,
+      elementReviewedAt:
+        typeof inserted.element_reviewed_at === "string" ? inserted.element_reviewed_at : null,
     }, { status: 201 });
   } catch (err) {
     console.error("[POST /api/me/symptoms] unexpected error:", err);

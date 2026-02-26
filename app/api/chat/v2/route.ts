@@ -195,6 +195,7 @@ const SYMPTOM_RESOLUTION_METHOD_MAX_CHARS = 120;
 const SYMPTOM_RESOLUTION_NOTE_MAX_CHARS = 500;
 const SYMPTOM_RESOLUTION_DAYS_MIN = 0;
 const SYMPTOM_RESOLUTION_DAYS_MAX = 365;
+const SYMPTOM_ELEMENT_VALUE_SET = new Set(["water", "wind", "thunder", "undetermined"]);
 
 // ---------------------------------------------------------------------------
 // Feature Flags
@@ -424,6 +425,15 @@ function buildPendingSymptomDraft(
     SYMPTOM_RESOLUTION_DAYS_MIN,
     SYMPTOM_RESOLUTION_DAYS_MAX,
   );
+  const elementCueCandidate = normalizeOptionalText(args.elementCue, 20);
+  const elementCue =
+    elementCueCandidate && SYMPTOM_ELEMENT_VALUE_SET.has(elementCueCandidate)
+      ? (elementCueCandidate as PendingSymptomDraft["elementCue"])
+      : undefined;
+  const elementTraits =
+    args.elementTraits && typeof args.elementTraits === "object"
+      ? (args.elementTraits as Record<string, unknown>)
+      : undefined;
 
   const draft: PendingSymptomDraft = {
     category,
@@ -436,6 +446,8 @@ function buildPendingSymptomDraft(
   if (resolutionMethod) draft.resolutionMethod = resolutionMethod;
   if (resolutionNote) draft.resolutionNote = resolutionNote;
   if (typeof resolutionDays === 'number') draft.resolutionDays = resolutionDays;
+  if (elementCue) draft.elementCue = elementCue;
+  if (elementTraits) draft.elementTraits = elementTraits;
 
   return draft;
 }

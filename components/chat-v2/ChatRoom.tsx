@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { Droplets, Loader2, Plus, Wind, Zap } from "lucide-react";
 import { ModeIndicator, type ChatMode } from "./ModeSelector";
 import { MessageList, type ChatMessage } from "./MessageList";
 import { ChatInputV2 } from "./ChatInputV2";
@@ -19,6 +19,24 @@ const HISTORY_FETCH_LIMIT = 300;
 const HISTORY_MESSAGE_LIMIT = 400;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
+type SymptomElement = "water" | "wind" | "thunder" | "undetermined";
+
+const ELEMENT_CUE_OPTIONS: Array<{
+  value: SymptomElement;
+  label: string;
+  shortLabel: string;
+  Icon?: typeof Droplets;
+}> = [
+  { value: "water", label: "有痰 / 偏黏", shortLabel: "水", Icon: Droplets },
+  { value: "wind", label: "偏乾 / 刺激", shortLabel: "風", Icon: Wind },
+  { value: "thunder", label: "熱氣 / 頂住", shortLabel: "雷", Icon: Zap },
+  { value: "undetermined", label: "未定 / 跳過", shortLabel: "未定" },
+];
+
+function isSymptomElement(value: unknown): value is SymptomElement {
+  return value === "water" || value === "wind" || value === "thunder" || value === "undetermined";
+}
+
 type ChatApiJsonResponse = {
   reply?: string;
   message?: string;
@@ -35,6 +53,8 @@ type PendingSymptomDraft = {
   resolutionMethod?: string;
   resolutionNote?: string;
   resolutionDays?: number;
+  elementCue?: SymptomElement;
+  elementTraits?: Record<string, unknown>;
 };
 
 type PendingSymptomDraftForm = {
@@ -193,6 +213,7 @@ export function ChatRoom() {
   const [sessionId, setSessionId] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingSymptomDraft, setPendingSymptomDraft] = useState<PendingSymptomDraft | null>(null);
+  const [pendingSymptomElementCue, setPendingSymptomElementCue] = useState<SymptomElement>("undetermined");
   const [confirmingSymptomDraft, setConfirmingSymptomDraft] = useState(false);
   const [editingSymptomDraft, setEditingSymptomDraft] = useState(false);
   const [pendingSymptomDraftForm, setPendingSymptomDraftForm] = useState<PendingSymptomDraftForm | null>(null);
@@ -212,6 +233,7 @@ export function ChatRoom() {
     setMessages([createWelcomeMessage()]);
     setSessionId(generateSessionId());
     setPendingSymptomDraft(null);
+    setPendingSymptomElementCue("undetermined");
     setConfirmingSymptomDraft(false);
     setEditingSymptomDraft(false);
     setPendingSymptomDraftForm(null);
@@ -231,12 +253,16 @@ export function ChatRoom() {
 
   useEffect(() => {
     if (!pendingSymptomDraft) {
+      setPendingSymptomElementCue("undetermined");
       setEditingSymptomDraft(false);
       setPendingSymptomDraftForm(null);
       setPendingSymptomDraftFormError("");
       return;
     }
 
+    setPendingSymptomElementCue(
+      isSymptomElement(pendingSymptomDraft.elementCue) ? pendingSymptomDraft.elementCue : "undetermined",
+    );
     setPendingSymptomDraftForm(toPendingSymptomDraftForm(pendingSymptomDraft));
     setEditingSymptomDraft(false);
     setPendingSymptomDraftFormError("");
@@ -643,7 +669,14 @@ export function ChatRoom() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          draft: pendingSymptomDraft,
+          draft: {
+            ...pendingSymptomDraft,
+            elementCue: pendingSymptomElementCue,
+            elementTraits: {
+              cue: pendingSymptomElementCue,
+              source: "chat_quick_question_v1",
+            },
+          },
         }),
       });
 
@@ -681,6 +714,7 @@ export function ChatRoom() {
     historySwitching,
     loading,
     mode,
+    pendingSymptomElementCue,
     pendingSymptomDraft,
     pendingSymptomSummary,
   ]);
@@ -790,6 +824,12 @@ export function ChatRoom() {
       ...(typeof pendingSymptomDraft.resolutionDays === "number"
         ? { resolutionDays: pendingSymptomDraft.resolutionDays }
         : {}),
+      ...(pendingSymptomDraft.elementCue
+        ? { elementCue: pendingSymptomDraft.elementCue }
+        : {}),
+      ...(pendingSymptomDraft.elementTraits
+        ? { elementTraits: pendingSymptomDraft.elementTraits }
+        : {}),
     };
 
     setPendingSymptomDraft(nextDraft);
@@ -832,6 +872,34 @@ export function ChatRoom() {
               {pendingSymptomDraft.description ? (
                 <p className="mt-1 text-xs text-amber-800/90">描述：{pendingSymptomDraft.description}</p>
               ) : null}
+
+              <div className="mt-3 rounded-xl border border-amber-200 bg-white/80 px-3 py-2.5">
+                <p className="text-xs font-semibold text-amber-900">快速判斷（可跳過）</p>
+                <p className="mt-0.5 text-xs text-amber-800/90">
+                  呢個症狀邊種感覺最明顯？系統會用嚴重度計分做建議標籤。
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ELEMENT_CUE_OPTIONS.map((option) => {
+                    const selected = pendingSymptomElementCue === option.value;
+                    const Icon = option.Icon;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setPendingSymptomElementCue(option.value)}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition ${
+                          selected
+                            ? "border-amber-500 bg-amber-100 text-amber-900"
+                            : "border-amber-200 bg-white text-amber-900 hover:bg-amber-100/70"
+                        }`}
+                      >
+                        {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               {editingSymptomDraft && pendingSymptomDraftForm ? (
                 <div className="mt-3 space-y-2 rounded-xl border border-amber-200 bg-white/80 p-3">
