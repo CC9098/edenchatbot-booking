@@ -44,7 +44,7 @@ export default function TendencyQuizPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">SOUL 風水雷旅程</h1>
+            <h1 className="text-lg font-semibold text-slate-900">風水雷・三勢探索</h1>
             <p className="mt-1 text-xs text-gray-500">以每日抉擇調整風、水、雷三勢，逐步尋回你的原初力量。</p>
           </div>
           <Link

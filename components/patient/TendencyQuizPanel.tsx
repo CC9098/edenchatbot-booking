@@ -48,6 +48,7 @@ const FORCE_META: Record<
     textClass: string;
     iconClass: string;
     hint: string;
+    gradient: string;
   }
 > = {
   J: {
@@ -56,6 +57,7 @@ const FORCE_META: Record<
     textClass: "text-[#2f6873]",
     iconClass: "text-[#3a7782]",
     hint: "流動、調頻、回氣",
+    gradient: "radial-gradient(ellipse at 30% 20%, rgba(78,138,150,0.12) 0%, rgba(78,138,150,0.04) 50%, transparent 80%)",
   },
   K: {
     name: "水勢",
@@ -63,6 +65,7 @@ const FORCE_META: Record<
     textClass: "text-[#343c62]",
     iconClass: "text-[#3b4368]",
     hint: "沉穩、聚養、修復",
+    gradient: "radial-gradient(ellipse at 70% 80%, rgba(74,82,120,0.12) 0%, rgba(74,82,120,0.04) 50%, transparent 80%)",
   },
   L: {
     name: "雷勢",
@@ -70,7 +73,14 @@ const FORCE_META: Record<
     textClass: "text-[#876d15]",
     iconClass: "text-[#9a7d1c]",
     hint: "決斷、突破、行動",
+    gradient: "radial-gradient(ellipse at 50% 30%, rgba(184,154,44,0.10) 0%, rgba(184,154,44,0.03) 50%, transparent 80%)",
   },
+};
+
+const FORCE_BORDER_COLOR: Record<TendencyKey, string> = {
+  J: "rgba(78,138,150,0.2)",
+  K: "rgba(74,82,120,0.2)",
+  L: "rgba(184,154,44,0.2)",
 };
 
 type BattleReportItem = {
@@ -244,7 +254,7 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
     setTendencyError(null);
     if (!tendencyState) return;
     if (!isBaseQuizComplete(baseAnswersDraft)) {
-      setTendencyError("請完成三段選擇，先建立 SOUL 原力盤。");
+      setTendencyError("請完成三段選擇，先建立原力盤。");
       return;
     }
 
@@ -305,13 +315,13 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
   }, [dailyOptionDraft, persistTendencyState, tendencyState, todayAnswerRecord, todayKey, todayQuestion]);
 
   if (!tendencyReady) {
-    return <p className="text-sm text-slate-500">初始化 SOUL 原力盤...</p>;
+    return <p className="text-sm text-slate-500">初始化原力盤...</p>;
   }
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-primary/15 bg-primary-light/35 p-4">
-        <p className="text-xs font-semibold tracking-wide text-primary">SOUL JOURNEY</p>
+        <p className="text-xs font-semibold tracking-wide text-primary">風水雷・三勢探索</p>
         <p className="mt-1 text-sm text-slate-700">
           你會喺日常抉擇中調整風、水、雷三勢，逐步搵返自己最穩定的原初力量。
         </p>
@@ -397,9 +407,18 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-            <p className="text-xs font-semibold tracking-wide text-slate-500">原力版圖</p>
+        <div
+          className="relative space-y-3 overflow-hidden rounded-2xl p-3 transition-colors duration-700"
+          style={{
+            background: primaryTendency
+              ? `${FORCE_META[primaryTendency].gradient}, linear-gradient(to bottom, rgba(248,250,246,0.9), rgba(255,255,255,0.95))`
+              : undefined,
+          }}
+        >
+          <div className="rounded-2xl border border-slate-200 bg-white/70 p-3 backdrop-blur-sm">
+            <p className={`text-xs font-semibold tracking-wide ${primaryTendency ? FORCE_META[primaryTendency].textClass : "text-slate-500"}`}>
+              {primaryTendency ? `${FORCE_META[primaryTendency].name}為主・原力版圖` : "原力版圖"}
+            </p>
             <div className="mt-2 overflow-hidden rounded-full bg-slate-200 ring-1 ring-slate-200">
               <div className="flex h-3 w-full">
                 {(Object.keys(FORCE_META) as TendencyKey[]).map((key, index, allKeys) => (
@@ -414,28 +433,39 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
               </div>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              {(Object.keys(FORCE_META) as TendencyKey[]).map((key) => (
-                <div key={key} className="rounded-xl border border-slate-200 bg-white/85 px-3 py-2">
-                  <p className={`inline-flex items-center gap-2 text-sm font-semibold ${FORCE_META[key].textClass}`}>
-                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white ring-1 ring-black/5">
-                      <ForceIcon force={key} className={`h-3.5 w-3.5 ${FORCE_META[key].iconClass}`} />
-                    </span>
-                    <span>{FORCE_META[key].name}</span>
-                  </p>
-                  <p className="mt-1 text-xs text-slate-600">
-                    {Math.round(tendencyPercentages[key])}% ・ {forceStateLabel(tendencyPercentages[key])}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">{FORCE_META[key].hint}</p>
-                </div>
-              ))}
+              {(Object.keys(FORCE_META) as TendencyKey[]).map((key) => {
+                const isPrimary = key === primaryTendency;
+                return (
+                  <div
+                    key={key}
+                    className={`rounded-xl border px-3 py-2 transition-all duration-500 ${
+                      isPrimary
+                        ? "border-current/15 bg-white/90 shadow-sm"
+                        : "border-slate-200 bg-white/70"
+                    }`}
+                    style={isPrimary ? { borderColor: FORCE_BORDER_COLOR[key] } : undefined}
+                  >
+                    <p className={`inline-flex items-center gap-2 text-sm font-semibold ${FORCE_META[key].textClass}`}>
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white ring-1 ring-black/5">
+                        <ForceIcon force={key} className={`h-3.5 w-3.5 ${FORCE_META[key].iconClass}`} />
+                      </span>
+                      <span>{FORCE_META[key].name}</span>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      {Math.round(tendencyPercentages[key])}% ・ {forceStateLabel(tendencyPercentages[key])}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">{FORCE_META[key].hint}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           {primaryTendency && secondaryTendency ? (
-            <>
+            <div className="rounded-xl bg-white/60 px-3 py-2 backdrop-blur-sm">
               <p className="text-xs text-slate-600">
                 目前主勢：
-                <span className={`mx-1 inline-flex items-center gap-1 ${FORCE_META[primaryTendency].textClass}`}>
+                <span className={`mx-1 inline-flex items-center gap-1 font-medium ${FORCE_META[primaryTendency].textClass}`}>
                   <ForceIcon force={primaryTendency} className={`h-3.5 w-3.5 ${FORCE_META[primaryTendency].iconClass}`} />
                   {FORCE_META[primaryTendency].name}
                 </span>
@@ -452,7 +482,7 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
               <p className="mt-1 text-xs leading-relaxed text-slate-500">
                 「{generateForceReading(primaryTendency, secondaryTendency, tendencyPercentages, isMixedTendency)}」
               </p>
-            </>
+            </div>
           ) : null}
         </div>
       )}
