@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { ArrowUpCircle } from "lucide-react";
 import { TendencyQuizPanel } from "@/components/patient/TendencyQuizPanel";
 
 type SymptomItem = {
@@ -45,6 +46,14 @@ type ResolveFormState = {
 type EditFormState = {
   description: string;
   severity: string;
+};
+
+type SymptomGroup = {
+  key: string;
+  label: string;
+  count: number;
+  latest: SymptomItem;
+  items: SymptomItem[];
 };
 
 type ConstitutionMeta = {
@@ -174,6 +183,14 @@ function constitutionSourceLabel(source: CareContextResponse["constitutionSource
   return "來源：未有完整資料";
 }
 
+function getSymptomLabel(symptom: SymptomItem): string {
+  return symptom.category?.trim() || "未命名症狀";
+}
+
+function toSymptomGroupKey(label: string): string {
+  return label.toLowerCase();
+}
+
 export default function MySymptomsPage() {
   const [symptoms, setSymptoms] = useState<SymptomItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -259,6 +276,32 @@ export default function MySymptomsPage() {
     return sortedSymptoms.filter((item) => item.status === statusFilter);
   }, [sortedSymptoms, statusFilter]);
 
+  const groupedSymptoms = useMemo<SymptomGroup[]>(() => {
+    const groups = new Map<string, SymptomGroup>();
+
+    for (const symptom of filteredSymptoms) {
+      const label = getSymptomLabel(symptom);
+      const key = toSymptomGroupKey(label);
+      const existing = groups.get(key);
+
+      if (!existing) {
+        groups.set(key, {
+          key,
+          label,
+          count: 1,
+          latest: symptom,
+          items: [symptom],
+        });
+        continue;
+      }
+
+      existing.count += 1;
+      existing.items.push(symptom);
+    }
+
+    return Array.from(groups.values());
+  }, [filteredSymptoms]);
+
   const stats = useMemo(() => {
     const now = new Date();
     const activeCount = sortedSymptoms.filter((s) => s.status === "active").length;
@@ -312,8 +355,8 @@ export default function MySymptomsPage() {
     setResolveError("");
   }
 
-  function toggleSymptomExpand(symptomId: string) {
-    setExpandedSymptomId((prev) => (prev === symptomId ? null : symptomId));
+  function toggleSymptomExpand(groupKey: string) {
+    setExpandedSymptomId((prev) => (prev === groupKey ? null : groupKey));
     setEditTargetId(null);
     setEditError("");
   }
@@ -373,7 +416,7 @@ export default function MySymptomsPage() {
 
       setEditTargetId(null);
       await loadSymptoms();
-      setExpandedSymptomId(symptom.id);
+      setExpandedSymptomId(toSymptomGroupKey(getSymptomLabel(symptom)));
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "更新症狀失敗");
     } finally {
@@ -557,32 +600,40 @@ export default function MySymptomsPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {filteredSymptoms.map((symptom) => {
-                    const isExpanded = expandedSymptomId === symptom.id;
-                    const isEditing = editTargetId === symptom.id;
-                    const canResolve = symptom.status === "active" || symptom.status === "recurring";
+                  {groupedSymptoms.map((group) => {
+                    const latest = group.latest;
+                    const isExpanded = expandedSymptomId === group.key;
+                    const isEditing = editTargetId === latest.id;
+                    const canResolve = latest.status === "active" || latest.status === "recurring";
 
                     return (
-                      <article key={symptom.id} className="px-4 py-3 sm:px-5">
+                      <article key={group.key} className="px-4 py-3 sm:px-5">
                         <div className="flex items-center gap-3">
                           <button
                             type="button"
-                            onClick={() => toggleSymptomExpand(symptom.id)}
+                            onClick={() => toggleSymptomExpand(group.key)}
                             className="flex min-w-0 flex-1 items-center gap-2 text-left"
                           >
                             <h2 className="truncate text-base font-semibold text-gray-900">
-                              {symptom.category?.trim() || "未命名症狀"}
+                              {group.label}
                             </h2>
+                            {group.count > 1 ? (
+                              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary/12 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+                                {group.count}
+                              </span>
+                            ) : null}
                             <span className="text-xs text-gray-400">{isExpanded ? "收起" : "展開"}</span>
                           </button>
 
                           {canResolve ? (
                             <button
                               type="button"
-                              onClick={() => openResolveModal(symptom)}
-                              className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                              onClick={() => openResolveModal(latest)}
+                              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                              aria-label={`標記「${group.label}」為好轉`}
+                              title="標記好轉"
                             >
-                              好轉
+                              <ArrowUpCircle className="h-4.5 w-4.5" />
                             </button>
                           ) : null}
                         </div>
@@ -592,52 +643,55 @@ export default function MySymptomsPage() {
                             <div className="flex flex-wrap items-center gap-2 text-xs">
                               <span
                                 className={`inline-flex rounded-full px-2.5 py-0.5 font-medium ${getStatusPillClass(
-                                  symptom.status,
+                                  latest.status,
                                 )}`}
                               >
-                                {getStatusLabel(symptom.status)}
+                                {getStatusLabel(latest.status)}
                               </span>
                               <span className="text-gray-500">
-                                嚴重程度：{symptom.severity ? `${symptom.severity}/5` : "未填"}
+                                嚴重程度：{latest.severity ? `${latest.severity}/5` : "未填"}
                               </span>
                               <span className="text-gray-400">
-                                更新於 {formatDateTime(symptom.updatedAt || symptom.createdAt)}
+                                更新於 {formatDateTime(latest.updatedAt || latest.createdAt)}
                               </span>
+                              {group.count > 1 ? (
+                                <span className="text-gray-500">共 {group.count} 次</span>
+                              ) : null}
                             </div>
 
-                            {symptom.description?.trim() ? (
+                            {latest.description?.trim() ? (
                               <p className="text-sm leading-relaxed text-gray-700">
-                                {symptom.description.trim()}
+                                {latest.description.trim()}
                               </p>
                             ) : (
                               <p className="text-sm text-gray-400">未有補充描述</p>
                             )}
 
-                            {(symptom.resolutionMethod ||
-                              (symptom.resolutionDays !== null && symptom.resolutionDays !== undefined) ||
-                              symptom.resolutionNote) ? (
+                            {(latest.resolutionMethod ||
+                              (latest.resolutionDays !== null && latest.resolutionDays !== undefined) ||
+                              latest.resolutionNote) ? (
                               <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-800">
-                                {symptom.resolutionMethod ? <p>點樣好返：{symptom.resolutionMethod}</p> : null}
-                                {symptom.resolutionDays !== null && symptom.resolutionDays !== undefined ? (
-                                  <p>幾耐好返：約 {symptom.resolutionDays} 日</p>
+                                {latest.resolutionMethod ? <p>點樣好返：{latest.resolutionMethod}</p> : null}
+                                {latest.resolutionDays !== null && latest.resolutionDays !== undefined ? (
+                                  <p>幾耐好返：約 {latest.resolutionDays} 日</p>
                                 ) : null}
-                                {symptom.resolutionNote ? (
-                                  <p className="whitespace-pre-wrap">補充：{symptom.resolutionNote}</p>
+                                {latest.resolutionNote ? (
+                                  <p className="whitespace-pre-wrap">補充：{latest.resolutionNote}</p>
                                 ) : null}
                               </div>
                             ) : null}
 
                             <p className="text-xs text-gray-400">
-                              {formatDate(symptom.startedAt)}
-                              {symptom.endedAt ? ` → ${formatDate(symptom.endedAt)}` : ""}
-                              {!symptom.endedAt && symptom.status === "active" ? " → 進行中" : ""}
+                              {formatDate(latest.startedAt)}
+                              {latest.endedAt ? ` → ${formatDate(latest.endedAt)}` : ""}
+                              {!latest.endedAt && latest.status === "active" ? " → 進行中" : ""}
                             </p>
 
                             {!isEditing ? (
                               <div className="flex items-center gap-2">
                                 <button
                                   type="button"
-                                  onClick={() => startEditSymptom(symptom)}
+                                  onClick={() => startEditSymptom(latest)}
                                   className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
                                 >
                                   修改
@@ -645,7 +699,7 @@ export default function MySymptomsPage() {
                               </div>
                             ) : (
                               <form
-                                onSubmit={(event) => void submitEditSymptom(event, symptom)}
+                                onSubmit={(event) => void submitEditSymptom(event, latest)}
                                 className="space-y-2 rounded-lg border border-gray-200 bg-white p-3"
                               >
                                 <div className="grid gap-2 sm:grid-cols-2">
@@ -707,7 +761,7 @@ export default function MySymptomsPage() {
 
             {!loading && !error && filteredSymptoms.length > 0 ? (
               <div className="rounded-xl border border-primary/10 bg-primary-light/30 px-4 py-3 text-xs text-gray-600">
-                提示：列表已簡化，點症狀先展開詳細；需要更新時可直接按「好轉」或「修改」。
+                提示：列表已簡化，點症狀先展開詳細；需要更新時可按右側圖示標記好轉，或在展開後修改。
               </div>
             ) : null}
           </>
