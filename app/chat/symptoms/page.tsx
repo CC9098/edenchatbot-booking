@@ -567,7 +567,7 @@ export default function MySymptomsPage() {
 
             {!loading && !error && filteredSymptoms.length > 0 ? (
               <div className="rounded-xl border border-primary/10 bg-primary-light/30 px-4 py-3 text-xs text-gray-600">
-                提示：你可以用「標記已好返」按鈕，或者喺聊天同 AI 講「好返咗」去更新狀態。系統亦會自動將較舊未更新的聊天症狀轉為「反覆」，減少「進行中」累積。
+                提示：你可以用「標記已好返」按鈕，或者喺聊天同 AI 講「好返咗」去更新狀態。
               </div>
             ) : null}
           </>

@@ -13,18 +13,6 @@ const RESOLUTION_METHOD_MAX = 120;
 const RESOLUTION_NOTE_MAX = 500;
 const RESOLUTION_DAYS_MIN = 0;
 const RESOLUTION_DAYS_MAX = 365;
-const AUTO_RECURRING_AFTER_DAYS = 30;
-
-function getHongKongDateDaysAgo(days: number): string {
-  const now = new Date();
-  const target = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Hong_Kong',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(target);
-}
 
 // ---------------------------------------------------------------------------
 // 1. Log Symptom
@@ -155,19 +143,6 @@ export async function logSymptom(
     }
 
     const supabase = createServiceClient();
-
-    // Auto tidy old chat-logged active symptoms to reduce "too many ongoing" pressure.
-    const staleCutoff = getHongKongDateDaysAgo(AUTO_RECURRING_AFTER_DAYS);
-    const { error: staleUpdateError } = await supabase
-      .from('symptom_logs')
-      .update({ status: 'recurring' })
-      .eq('patient_user_id', userId)
-      .eq('status', 'active')
-      .eq('logged_via', 'chat')
-      .lt('started_at', staleCutoff);
-    if (staleUpdateError) {
-      console.error('[logSymptom] stale active auto-recurring error:', staleUpdateError.message);
-    }
 
     // Prepare insert data
     const insertData: Record<string, unknown> = {
