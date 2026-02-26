@@ -48,7 +48,12 @@ const FORCE_META: Record<
     textClass: string;
     iconClass: string;
     hint: string;
-    gradient: string;
+    panelBg: string;
+    panelBorder: string;
+    primaryCardBg: string;
+    primaryCardBorder: string;
+    accentBar: string;
+    readingBg: string;
   }
 > = {
   J: {
@@ -57,7 +62,12 @@ const FORCE_META: Record<
     textClass: "text-[#2f6873]",
     iconClass: "text-[#3a7782]",
     hint: "流動、調頻、回氣",
-    gradient: "radial-gradient(ellipse at 30% 20%, rgba(78,138,150,0.12) 0%, rgba(78,138,150,0.04) 50%, transparent 80%)",
+    panelBg: "linear-gradient(135deg, #e6f3f5 0%, #f0f8f9 40%, #f8fbfc 100%)",
+    panelBorder: "rgba(78,138,150,0.3)",
+    primaryCardBg: "linear-gradient(135deg, #dff0f3 0%, #ecf6f8 100%)",
+    primaryCardBorder: "rgba(78,138,150,0.35)",
+    accentBar: "#4e8a96",
+    readingBg: "rgba(78,138,150,0.06)",
   },
   K: {
     name: "水勢",
@@ -65,7 +75,12 @@ const FORCE_META: Record<
     textClass: "text-[#343c62]",
     iconClass: "text-[#3b4368]",
     hint: "沉穩、聚養、修復",
-    gradient: "radial-gradient(ellipse at 70% 80%, rgba(74,82,120,0.12) 0%, rgba(74,82,120,0.04) 50%, transparent 80%)",
+    panelBg: "linear-gradient(135deg, #e8eaf2 0%, #eff0f6 40%, #f7f8fb 100%)",
+    panelBorder: "rgba(74,82,120,0.3)",
+    primaryCardBg: "linear-gradient(135deg, #e0e3ef 0%, #eceef6 100%)",
+    primaryCardBorder: "rgba(74,82,120,0.35)",
+    accentBar: "#4a5278",
+    readingBg: "rgba(74,82,120,0.06)",
   },
   L: {
     name: "雷勢",
@@ -73,14 +88,13 @@ const FORCE_META: Record<
     textClass: "text-[#876d15]",
     iconClass: "text-[#9a7d1c]",
     hint: "決斷、突破、行動",
-    gradient: "radial-gradient(ellipse at 50% 30%, rgba(184,154,44,0.10) 0%, rgba(184,154,44,0.03) 50%, transparent 80%)",
+    panelBg: "linear-gradient(135deg, #f5f0de 0%, #f9f6ea 40%, #fcfbf5 100%)",
+    panelBorder: "rgba(184,154,44,0.3)",
+    primaryCardBg: "linear-gradient(135deg, #f2ebd2 0%, #f7f3e4 100%)",
+    primaryCardBorder: "rgba(184,154,44,0.35)",
+    accentBar: "#b89a2c",
+    readingBg: "rgba(184,154,44,0.06)",
   },
-};
-
-const FORCE_BORDER_COLOR: Record<TendencyKey, string> = {
-  J: "rgba(78,138,150,0.2)",
-  K: "rgba(74,82,120,0.2)",
-  L: "rgba(184,154,44,0.2)",
 };
 
 type BattleReportItem = {
@@ -408,23 +422,31 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
         </div>
       ) : (
         <div
-          className="relative space-y-3 overflow-hidden rounded-2xl p-3 transition-colors duration-700"
+          className="relative space-y-3 overflow-hidden rounded-2xl p-3 transition-all duration-700"
           style={{
-            background: primaryTendency
-              ? `${FORCE_META[primaryTendency].gradient}, linear-gradient(to bottom, rgba(248,250,246,0.9), rgba(255,255,255,0.95))`
-              : undefined,
+            background: primaryTendency ? FORCE_META[primaryTendency].panelBg : undefined,
+            borderWidth: 1,
+            borderStyle: "solid",
+            borderColor: primaryTendency ? FORCE_META[primaryTendency].panelBorder : "rgb(226,232,240)",
           }}
         >
-          <div className="rounded-2xl border border-slate-200 bg-white/70 p-3 backdrop-blur-sm">
+          {primaryTendency ? (
+            <div
+              className="absolute left-0 top-0 h-1 w-full rounded-t-2xl transition-colors duration-700"
+              style={{ backgroundColor: FORCE_META[primaryTendency].accentBar }}
+            />
+          ) : null}
+
+          <div className="rounded-2xl border border-white/60 bg-white/75 p-3 shadow-sm backdrop-blur-sm">
             <p className={`text-xs font-semibold tracking-wide ${primaryTendency ? FORCE_META[primaryTendency].textClass : "text-slate-500"}`}>
               {primaryTendency ? `${FORCE_META[primaryTendency].name}為主・原力版圖` : "原力版圖"}
             </p>
-            <div className="mt-2 overflow-hidden rounded-full bg-slate-200 ring-1 ring-slate-200">
-              <div className="flex h-3 w-full">
+            <div className="mt-2 overflow-hidden rounded-full bg-white/80 ring-1 ring-slate-200">
+              <div className="flex h-3.5 w-full">
                 {(Object.keys(FORCE_META) as TendencyKey[]).map((key, index, allKeys) => (
                   <div
                     key={key}
-                    className={`h-3 transition-[width] duration-500 ${FORCE_META[key].fillClass} ${
+                    className={`h-3.5 transition-[width] duration-500 ${FORCE_META[key].fillClass} ${
                       index < allKeys.length - 1 ? "border-r border-white/60" : ""
                     }`}
                     style={{ width: `${tendencyPercentages[key]}%` }}
@@ -439,14 +461,26 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
                   <div
                     key={key}
                     className={`rounded-xl border px-3 py-2 transition-all duration-500 ${
-                      isPrimary
-                        ? "border-current/15 bg-white/90 shadow-sm"
-                        : "border-slate-200 bg-white/70"
+                      isPrimary ? "shadow-sm" : "border-slate-200/80 bg-white/60"
                     }`}
-                    style={isPrimary ? { borderColor: FORCE_BORDER_COLOR[key] } : undefined}
+                    style={
+                      isPrimary
+                        ? {
+                            background: FORCE_META[key].primaryCardBg,
+                            borderColor: FORCE_META[key].primaryCardBorder,
+                          }
+                        : undefined
+                    }
                   >
                     <p className={`inline-flex items-center gap-2 text-sm font-semibold ${FORCE_META[key].textClass}`}>
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white ring-1 ring-black/5">
+                      <span
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-md ring-1 ring-black/5"
+                        style={
+                          isPrimary
+                            ? { backgroundColor: `${FORCE_META[key].accentBar}15` }
+                            : { backgroundColor: "white" }
+                        }
+                      >
                         <ForceIcon force={key} className={`h-3.5 w-3.5 ${FORCE_META[key].iconClass}`} />
                       </span>
                       <span>{FORCE_META[key].name}</span>
@@ -462,7 +496,10 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
           </div>
 
           {primaryTendency && secondaryTendency ? (
-            <div className="rounded-xl bg-white/60 px-3 py-2 backdrop-blur-sm">
+            <div
+              className="rounded-xl px-3 py-2.5"
+              style={{ backgroundColor: FORCE_META[primaryTendency].readingBg }}
+            >
               <p className="text-xs text-slate-600">
                 目前主勢：
                 <span className={`mx-1 inline-flex items-center gap-1 font-medium ${FORCE_META[primaryTendency].textClass}`}>
