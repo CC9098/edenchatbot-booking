@@ -75,3 +75,35 @@ export function resolveFinalElementLabel(
   if (suggested && isSymptomElement(suggested)) return suggested;
   return "undetermined";
 }
+
+type PostgrestLikeError = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
+
+/**
+ * Backward-compat guard: production may not have new element_* columns yet.
+ */
+export function isMissingSymptomElementColumnsError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const candidate = error as PostgrestLikeError;
+  if (candidate.code === "PGRST204") return true;
+
+  const message = [candidate.message, candidate.details, candidate.hint]
+    .filter((part): part is string => typeof part === "string" && part.length > 0)
+    .join(" ")
+    .toLowerCase();
+
+  if (!message) return false;
+
+  const mentionsElementColumns = message.includes("element_");
+  const mentionsMissingColumn =
+    message.includes("column") ||
+    message.includes("schema cache") ||
+    message.includes("could not find");
+
+  return mentionsElementColumns && mentionsMissingColumn;
+}

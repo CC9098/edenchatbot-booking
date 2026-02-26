@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       elementCue: normalizedCue,
       elementTraits: draft.elementTraits || {
         cue: normalizedCue,
-        source: "chat_quick_question_v1",
+        source: "chat_natural_followup_v1",
       },
     });
     if (!saveResult.success) {

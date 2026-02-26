@@ -19,6 +19,12 @@ type SymptomItem = {
   loggedVia: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  elementTraits?: Record<string, unknown> | null;
+  elementScoreWater?: number | null;
+  elementScoreWind?: number | null;
+  elementScoreThunder?: number | null;
+  elementSuggestedLabel?: "water" | "wind" | "thunder" | "undetermined" | null;
+  elementReviewLabel?: "water" | "wind" | "thunder" | "undetermined" | null;
 };
 
 type SymptomApiResponse = {
@@ -123,6 +129,21 @@ function getStatusLabel(value: string | null): string {
 function getStatusPillClass(value: string | null): string {
   if (!value) return "bg-gray-100 text-gray-600";
   return STATUS_META[value as Exclude<StatusFilter, "all">]?.pillClass || "bg-gray-100 text-gray-600";
+}
+
+function resolveSeverityPoint(severity: number | null | undefined): number {
+  const normalizedSeverity = typeof severity === "number" ? severity : Number.NaN;
+  if (!Number.isInteger(normalizedSeverity)) return 1;
+  return normalizedSeverity >= 4 ? 2 : 1;
+}
+
+function resolveFinalElementLabel(symptom: SymptomItem): "water" | "wind" | "thunder" | "undetermined" {
+  const reviewed = symptom.elementReviewLabel;
+  if (reviewed === "water" || reviewed === "wind" || reviewed === "thunder") return reviewed;
+
+  const suggested = symptom.elementSuggestedLabel;
+  if (suggested === "water" || suggested === "wind" || suggested === "thunder") return suggested;
+  return "undetermined";
 }
 
 function toSafeDate(value: string | null): Date | null {
@@ -315,12 +336,44 @@ export default function MySymptomsPage() {
       return updated ? isSameMonth(updated, now) : false;
     }).length;
 
+    let waterScore = 0;
+    let windScore = 0;
+    let thunderScore = 0;
+    let undeterminedCount = 0;
+
+    for (const symptom of sortedSymptoms) {
+      const water = Number(symptom.elementScoreWater || 0);
+      const wind = Number(symptom.elementScoreWind || 0);
+      const thunder = Number(symptom.elementScoreThunder || 0);
+      const hasDbScores = water > 0 || wind > 0 || thunder > 0;
+
+      if (hasDbScores) {
+        waterScore += water;
+        windScore += wind;
+        thunderScore += thunder;
+      } else {
+        const finalLabel = resolveFinalElementLabel(symptom);
+        const fallbackPoint = resolveSeverityPoint(symptom.severity);
+        if (finalLabel === "water") waterScore += fallbackPoint;
+        if (finalLabel === "wind") windScore += fallbackPoint;
+        if (finalLabel === "thunder") thunderScore += fallbackPoint;
+      }
+
+      if (resolveFinalElementLabel(symptom) === "undetermined") {
+        undeterminedCount += 1;
+      }
+    }
+
     return {
       total: sortedSymptoms.length,
       activeCount,
       resolvedCount,
       recurringCount,
       improvedThisMonthCount,
+      waterScore,
+      windScore,
+      thunderScore,
+      undeterminedCount,
     };
   }, [sortedSymptoms]);
 
@@ -333,6 +386,33 @@ export default function MySymptomsPage() {
     ],
     [stats.activeCount, stats.recurringCount, stats.resolvedCount, stats.total],
   );
+
+  const elementBarRows = useMemo(() => {
+    const maxScore = Math.max(stats.waterScore, stats.windScore, stats.thunderScore, 1);
+    return [
+      {
+        key: "water",
+        label: "水",
+        value: stats.waterScore,
+        width: Math.round((stats.waterScore / maxScore) * 100),
+        barClass: "bg-cyan-500",
+      },
+      {
+        key: "wind",
+        label: "風",
+        value: stats.windScore,
+        width: Math.round((stats.windScore / maxScore) * 100),
+        barClass: "bg-emerald-500",
+      },
+      {
+        key: "thunder",
+        label: "雷",
+        value: stats.thunderScore,
+        width: Math.round((stats.thunderScore / maxScore) * 100),
+        barClass: "bg-amber-500",
+      },
+    ];
+  }, [stats.thunderScore, stats.waterScore, stats.windScore]);
 
   const constitutionKey = careContext?.constitution || "unknown";
   const constitutionMeta = CONSTITUTION_META[constitutionKey] || CONSTITUTION_META.unknown;
@@ -505,19 +585,28 @@ export default function MySymptomsPage() {
             </Link>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <div className="rounded-xl border border-primary/10 bg-primary-light/35 px-3 py-2">
-              <p className="text-[11px] text-slate-500">症狀總數</p>
-              <p className="mt-1 text-base font-semibold text-slate-900">{stats.total}</p>
+          <div className="mt-3 rounded-xl border border-primary/10 bg-primary-light/25 px-3 py-3">
+            <div className="mb-2 flex items-center justify-between text-[11px] text-slate-600">
+              <span>風水雷趨勢</span>
+              <span>
+                症狀 {stats.total} ・ 進行中 {stats.activeCount}
+              </span>
             </div>
-            <div className="rounded-xl border border-red-100 bg-red-50/70 px-3 py-2">
-              <p className="text-[11px] text-red-600">進行中</p>
-              <p className="mt-1 text-base font-semibold text-red-700">{stats.activeCount}</p>
+            <div className="space-y-2.5">
+              {elementBarRows.map((row) => (
+                <div key={row.key} className="grid grid-cols-[22px_1fr_auto] items-center gap-2">
+                  <span className="text-sm font-semibold text-slate-700">{row.label}</span>
+                  <div className="h-2 rounded-full bg-white">
+                    <div
+                      className={`h-full rounded-full transition-all ${row.barClass}`}
+                      style={{ width: `${row.width}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-slate-700">{row.value}</span>
+                </div>
+              ))}
             </div>
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2">
-              <p className="text-[11px] text-emerald-700">本月已好返</p>
-              <p className="mt-1 text-base font-semibold text-emerald-700">{stats.improvedThisMonthCount}</p>
-            </div>
+            <p className="mt-2 text-[11px] text-slate-500">未定：{stats.undeterminedCount}</p>
           </div>
 
           <div className="mt-4 flex items-center gap-2 rounded-full border border-primary/10 bg-primary-light/40 p-1">

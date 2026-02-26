@@ -8,6 +8,7 @@
 import { createServiceClient } from '@/lib/supabase';
 import {
   buildSymptomElementScores,
+  isMissingSymptomElementColumnsError,
   isSymptomElement,
   resolveSeverityWeight,
   resolveSuggestedElement,
@@ -20,6 +21,46 @@ const RESOLUTION_METHOD_MAX = 120;
 const RESOLUTION_NOTE_MAX = 500;
 const RESOLUTION_DAYS_MIN = 0;
 const RESOLUTION_DAYS_MAX = 365;
+const SYMPTOM_ELEMENT_COLUMNS =
+  'element_traits, element_score_water, element_score_wind, element_score_thunder, element_suggested_label, element_review_label, element_reviewed_by, element_reviewed_at';
+const SYMPTOM_INSERT_BASE_COLUMNS =
+  'id, patient_user_id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at';
+const SYMPTOM_LIST_BASE_COLUMNS =
+  'id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at';
+const SYMPTOM_INSERT_COLUMNS_WITH_ELEMENTS = `${SYMPTOM_INSERT_BASE_COLUMNS}, ${SYMPTOM_ELEMENT_COLUMNS}`;
+const SYMPTOM_LIST_COLUMNS_WITH_ELEMENTS = `${SYMPTOM_LIST_BASE_COLUMNS}, ${SYMPTOM_ELEMENT_COLUMNS}`;
+
+function mapSymptomRecordRow(row: Record<string, unknown>): SymptomRecord {
+  return {
+    id: row.id as string,
+    category: row.category as string,
+    description: (row.description as string | null) ?? null,
+    severity: (row.severity as number | null) ?? null,
+    status: row.status as string,
+    startedAt: row.started_at as string,
+    endedAt: (row.ended_at as string | null) ?? null,
+    resolutionMethod: (row.resolution_method as string | null) ?? null,
+    resolutionNote: (row.resolution_note as string | null) ?? null,
+    resolutionDays: (row.resolution_days as number | null) ?? null,
+    loggedVia: row.logged_via as string,
+    createdAt: row.created_at as string,
+    elementTraits:
+      row.element_traits && typeof row.element_traits === 'object'
+        ? (row.element_traits as Record<string, unknown>)
+        : null,
+    elementScoreWater: Number(row.element_score_water || 0),
+    elementScoreWind: Number(row.element_score_wind || 0),
+    elementScoreThunder: Number(row.element_score_thunder || 0),
+    elementSuggestedLabel: isSymptomElement(row.element_suggested_label)
+      ? row.element_suggested_label
+      : 'undetermined',
+    elementReviewLabel: isSymptomElement(row.element_review_label) ? row.element_review_label : null,
+    elementReviewedBy:
+      typeof row.element_reviewed_by === 'string' ? row.element_reviewed_by : null,
+    elementReviewedAt:
+      typeof row.element_reviewed_at === 'string' ? row.element_reviewed_at : null,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // 1. Log Symptom
@@ -172,7 +213,7 @@ export async function logSymptom(
     const supabase = createServiceClient();
 
     // Prepare insert data
-    const insertData: Record<string, unknown> = {
+    const baseInsertData: Record<string, unknown> = {
       patient_user_id: userId,
       category: request.category.trim(),
       status: 'active',
@@ -181,42 +222,55 @@ export async function logSymptom(
     };
 
     if (typeof request.description === 'string' && request.description.trim()) {
-      insertData.description = request.description.trim();
+      baseInsertData.description = request.description.trim();
     }
 
     if (request.severity !== undefined && request.severity !== null) {
-      insertData.severity = request.severity;
+      baseInsertData.severity = request.severity;
     }
 
     if (normalizedEndedAt) {
-      insertData.ended_at = normalizedEndedAt;
-      insertData.status = 'resolved'; // If ended_at is provided, mark as resolved
+      baseInsertData.ended_at = normalizedEndedAt;
+      baseInsertData.status = 'resolved'; // If ended_at is provided, mark as resolved
       if (normalizedResolutionMethod !== null) {
-        insertData.resolution_method = normalizedResolutionMethod.trim();
+        baseInsertData.resolution_method = normalizedResolutionMethod.trim();
       }
       if (normalizedResolutionNote !== null) {
-        insertData.resolution_note = normalizedResolutionNote.trim() || null;
+        baseInsertData.resolution_note = normalizedResolutionNote.trim() || null;
       }
       if (normalizedResolutionDays !== null) {
-        insertData.resolution_days = normalizedResolutionDays;
+        baseInsertData.resolution_days = normalizedResolutionDays;
       }
     }
 
-    insertData.element_traits = elementTraitsPayload;
-    insertData.element_score_water = elementScores.water;
-    insertData.element_score_wind = elementScores.wind;
-    insertData.element_score_thunder = elementScores.thunder;
-    insertData.element_suggested_label = suggestedElement;
+    const elementInsertData: Record<string, unknown> = {
+      element_traits: elementTraitsPayload,
+      element_score_water: elementScores.water,
+      element_score_wind: elementScores.wind,
+      element_score_thunder: elementScores.thunder,
+      element_suggested_label: suggestedElement,
+    };
 
-    // Insert symptom log
-    const { data: inserted, error: insertError } = await supabase
+    let { data: inserted, error: insertError } = await supabase
       .from('symptom_logs')
-      .insert(insertData)
-      .select('id, patient_user_id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at, element_traits, element_score_water, element_score_wind, element_score_thunder, element_suggested_label, element_review_label, element_reviewed_by, element_reviewed_at')
+      .insert({ ...baseInsertData, ...elementInsertData })
+      .select(SYMPTOM_INSERT_COLUMNS_WITH_ELEMENTS)
       .single();
+
+    if (insertError && isMissingSymptomElementColumnsError(insertError)) {
+      console.warn('[logSymptom] element columns missing, fallback to legacy insert');
+      ({ data: inserted, error: insertError } = await supabase
+        .from('symptom_logs')
+        .insert(baseInsertData)
+        .select(SYMPTOM_INSERT_BASE_COLUMNS)
+        .single());
+    }
 
     if (insertError) {
       console.error('[logSymptom] insert error:', insertError.message);
+      return { success: false, error: '記錄症狀時發生錯誤' };
+    }
+    if (!inserted) {
       return { success: false, error: '記錄症狀時發生錯誤' };
     }
 
@@ -515,47 +569,66 @@ export async function listSymptoms(
   try {
     const supabase = createServiceClient();
 
-    let query = supabase
-      .from('symptom_logs')
-      .select('id, category, description, severity, status, started_at, ended_at, resolution_method, resolution_note, resolution_days, logged_via, created_at, element_traits, element_score_water, element_score_wind, element_score_thunder, element_suggested_label, element_review_label, element_reviewed_by, element_reviewed_at')
-      .eq('patient_user_id', userId);
+    const buildQuery = (columns: string) => {
+      let query = supabase
+        .from('symptom_logs')
+        .select(columns)
+        .eq('patient_user_id', userId) as any;
 
-    // Apply filters
-    if (request.category !== undefined) {
-      if (typeof request.category !== 'string') {
-        return { success: false, error: 'category 格式無效' };
+      // Apply filters
+      if (request.category !== undefined) {
+        if (typeof request.category !== 'string') {
+          throw new Error('category 格式無效');
+        }
+        const category = request.category.trim();
+        if (category) {
+          query = query.eq('category', category);
+        }
       }
-      const category = request.category.trim();
-      if (category) {
-        query = query.eq('category', category);
+
+      if (request.status && request.status !== 'all') {
+        if (!VALID_STATUSES.has(request.status)) {
+          throw new Error('status 參數無效');
+        }
+        query = query.eq('status', request.status);
       }
+
+      // Order by most recent first
+      query = query.order('started_at', { ascending: false });
+
+      // Limit results
+      let limit = 10;
+      if (request.limit !== undefined) {
+        const parsedLimit =
+          typeof request.limit === 'number'
+            ? request.limit
+            : Number.parseInt(String(request.limit), 10);
+        if (!Number.isFinite(parsedLimit) || parsedLimit <= 0) {
+          throw new Error('limit 必須為正整數');
+        }
+        limit = Math.min(Math.floor(parsedLimit), 50);
+      }
+      return query.limit(limit);
+    };
+
+    let data: Record<string, unknown>[] | null = null;
+    let fetchError: { message: string } | null = null;
+    try {
+      const primary = await buildQuery(SYMPTOM_LIST_COLUMNS_WITH_ELEMENTS);
+      data = (primary.data as Record<string, unknown>[] | null) ?? null;
+      fetchError = primary.error;
+      if (fetchError && isMissingSymptomElementColumnsError(fetchError)) {
+        console.warn('[listSymptoms] element columns missing, fallback to legacy query');
+        const fallback = await buildQuery(SYMPTOM_LIST_BASE_COLUMNS);
+        data = (fallback.data as Record<string, unknown>[] | null) ?? null;
+        fetchError = fallback.error;
+      }
+    } catch (validationError) {
+      return {
+        success: false,
+        error: validationError instanceof Error ? validationError.message : '參數無效',
+      };
     }
-
-    if (request.status && request.status !== 'all') {
-      if (!VALID_STATUSES.has(request.status)) {
-        return { success: false, error: 'status 參數無效' };
-      }
-      query = query.eq('status', request.status);
-    }
-
-    // Order by most recent first
-    query = query.order('started_at', { ascending: false });
-
-    // Limit results
-    let limit = 10;
-    if (request.limit !== undefined) {
-      const parsedLimit =
-        typeof request.limit === 'number'
-          ? request.limit
-          : Number.parseInt(String(request.limit), 10);
-      if (!Number.isFinite(parsedLimit) || parsedLimit <= 0) {
-        return { success: false, error: 'limit 必須為正整數' };
-      }
-      limit = Math.min(Math.floor(parsedLimit), 50);
-    }
-    query = query.limit(limit);
-
-    const { data, error: fetchError } = await query;
 
     if (fetchError) {
       console.error('[listSymptoms] fetch error:', fetchError.message);
@@ -563,35 +636,7 @@ export async function listSymptoms(
     }
 
     // Transform to camelCase for API response
-    const symptoms: SymptomRecord[] = (data || []).map((s) => ({
-      id: s.id,
-      category: s.category,
-      description: s.description,
-      severity: s.severity,
-      status: s.status,
-      startedAt: s.started_at,
-      endedAt: s.ended_at,
-      resolutionMethod: s.resolution_method,
-      resolutionNote: s.resolution_note,
-      resolutionDays: s.resolution_days,
-      loggedVia: s.logged_via,
-      createdAt: s.created_at,
-      elementTraits:
-        s.element_traits && typeof s.element_traits === 'object'
-          ? (s.element_traits as Record<string, unknown>)
-          : null,
-      elementScoreWater: Number(s.element_score_water || 0),
-      elementScoreWind: Number(s.element_score_wind || 0),
-      elementScoreThunder: Number(s.element_score_thunder || 0),
-      elementSuggestedLabel: isSymptomElement(s.element_suggested_label)
-        ? s.element_suggested_label
-        : 'undetermined',
-      elementReviewLabel: isSymptomElement(s.element_review_label) ? s.element_review_label : null,
-      elementReviewedBy:
-        typeof s.element_reviewed_by === 'string' ? s.element_reviewed_by : null,
-      elementReviewedAt:
-        typeof s.element_reviewed_at === 'string' ? s.element_reviewed_at : null,
-    }));
+    const symptoms: SymptomRecord[] = (data || []).map((s) => mapSymptomRecordRow(s));
 
     // IMPORTANT: Gemini API requires object response, not array
     return {

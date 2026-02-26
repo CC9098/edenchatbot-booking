@@ -1518,7 +1518,9 @@ const SYMPTOM_RECORDING_GUIDANCE = `【症狀記錄功能】
 2. 回覆時要清楚講明「未正式儲存」，提醒用戶按確認儲存症狀按鈕先會寫入記錄；可自然補一句「方便醫師參考，你亦可以持續記錄你嘅健康情況」；之後可提供 1-2 句安全建議
 3. 當用戶「詢問」症狀原因時（例如「頭痛點算好」），先回答，再按語境決定是否建議記錄
 4. 如果用戶話症狀好返，call update_symptom 更新狀態；若用戶有講「點樣好返」或「幾多日好返」，一併寫入 resolutionMethod / resolutionDays / resolutionNote
-5. 如果用戶問歷史記錄，call list_my_symptoms`;
+5. 如果用戶問歷史記錄，call list_my_symptoms
+6. 元素判斷（風/水/雷）只可用自然追問，不要用固定選項題；問題要貼合症狀語境（例如胃脹就問脹悶、灼熱、竄痛等）
+7. 當資訊不足或語境不適合元素分類時，elementCue 留空或用 undetermined，避免硬套標籤`;
 
 const OUTPUT_FORMAT_RULES = `【輸出格式規則（必須遵守）】
 - 禁止使用 Markdown 星號格式（包括 *、**、***）。
@@ -2252,6 +2254,11 @@ const SYMPTOM_FUNCTIONS: FunctionDeclaration[] = [
         resolutionDays: {
           type: SchemaType.INTEGER,
           description: '（可選）大約幾多日好返，介乎 0-365。',
+        },
+        elementCue: {
+          type: SchemaType.STRING,
+          description:
+            '（可選）元素線索：water / wind / thunder / undetermined。只在語境明確時填寫，否則用 undetermined。',
         },
       },
       required: ['category', 'startedAt'],
