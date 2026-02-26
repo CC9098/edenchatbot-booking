@@ -17,6 +17,7 @@ const STREAMING_ENABLED =
   process.env.NEXT_PUBLIC_CHAT_STREAMING_ENABLED === "true";
 const HISTORY_FETCH_LIMIT = 300;
 const HISTORY_MESSAGE_LIMIT = 400;
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 type ChatApiJsonResponse = {
   reply?: string;
@@ -34,6 +35,14 @@ type PendingSymptomDraft = {
   resolutionMethod?: string;
   resolutionNote?: string;
   resolutionDays?: number;
+};
+
+type PendingSymptomDraftForm = {
+  category: string;
+  description: string;
+  severity: string;
+  startedAt: string;
+  endedAt: string;
 };
 
 type StreamPayload = {
@@ -118,6 +127,18 @@ function resolveMode(raw: string | null): ChatMode | undefined {
   return undefined;
 }
 
+function toPendingSymptomDraftForm(
+  draft: PendingSymptomDraft,
+): PendingSymptomDraftForm {
+  return {
+    category: draft.category || "",
+    description: draft.description || "",
+    severity: typeof draft.severity === "number" ? String(draft.severity) : "",
+    startedAt: draft.startedAt || "",
+    endedAt: draft.endedAt || "",
+  };
+}
+
 async function consumeNdjsonStream(
   response: Response,
   onPayload: (payload: StreamPayload) => void,
@@ -173,6 +194,9 @@ export function ChatRoom() {
   const [loading, setLoading] = useState(false);
   const [pendingSymptomDraft, setPendingSymptomDraft] = useState<PendingSymptomDraft | null>(null);
   const [confirmingSymptomDraft, setConfirmingSymptomDraft] = useState(false);
+  const [editingSymptomDraft, setEditingSymptomDraft] = useState(false);
+  const [pendingSymptomDraftForm, setPendingSymptomDraftForm] = useState<PendingSymptomDraftForm | null>(null);
+  const [pendingSymptomDraftFormError, setPendingSymptomDraftFormError] = useState("");
 
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -189,6 +213,9 @@ export function ChatRoom() {
     setSessionId(generateSessionId());
     setPendingSymptomDraft(null);
     setConfirmingSymptomDraft(false);
+    setEditingSymptomDraft(false);
+    setPendingSymptomDraftForm(null);
+    setPendingSymptomDraftFormError("");
     closeHistory();
   }, [closeHistory, historySwitching, loading]);
 
@@ -201,6 +228,19 @@ export function ChatRoom() {
     setMessages([createWelcomeMessage()]);
     setSessionId(generateSessionId());
   }, [authLoading]);
+
+  useEffect(() => {
+    if (!pendingSymptomDraft) {
+      setEditingSymptomDraft(false);
+      setPendingSymptomDraftForm(null);
+      setPendingSymptomDraftFormError("");
+      return;
+    }
+
+    setPendingSymptomDraftForm(toPendingSymptomDraftForm(pendingSymptomDraft));
+    setEditingSymptomDraft(false);
+    setPendingSymptomDraftFormError("");
+  }, [pendingSymptomDraft]);
 
   const loadHistoryList = useCallback(async () => {
     if (!user?.id) {
@@ -334,6 +374,9 @@ export function ChatRoom() {
         setSessionId(targetSessionId);
         setPendingSymptomDraft(null);
         setConfirmingSymptomDraft(false);
+        setEditingSymptomDraft(false);
+        setPendingSymptomDraftForm(null);
+        setPendingSymptomDraftFormError("");
         closeHistory();
       } catch (err) {
         setHistoryError(err instanceof Error ? err.message : "無法開啟歷史對話");
@@ -387,6 +430,9 @@ export function ChatRoom() {
       setMessages(updatedMessages);
       setPendingSymptomDraft(null);
       setConfirmingSymptomDraft(false);
+      setEditingSymptomDraft(false);
+      setPendingSymptomDraftForm(null);
+      setPendingSymptomDraftFormError("");
       setLoading(true);
 
       const appendErrorMessage = () => {
@@ -655,6 +701,102 @@ export function ChatRoom() {
     ]);
   }, [confirmingSymptomDraft, loading, mode, pendingSymptomDraft]);
 
+  const handleStartSymptomDraftEdit = useCallback(() => {
+    if (!pendingSymptomDraft || confirmingSymptomDraft || loading || historySwitching) return;
+    setPendingSymptomDraftForm(toPendingSymptomDraftForm(pendingSymptomDraft));
+    setPendingSymptomDraftFormError("");
+    setEditingSymptomDraft(true);
+  }, [confirmingSymptomDraft, historySwitching, loading, pendingSymptomDraft]);
+
+  const handleSymptomDraftFieldChange = useCallback(
+    (field: keyof PendingSymptomDraftForm, value: string) => {
+      setPendingSymptomDraftForm((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          [field]: value,
+        };
+      });
+      if (pendingSymptomDraftFormError) {
+        setPendingSymptomDraftFormError("");
+      }
+    },
+    [pendingSymptomDraftFormError],
+  );
+
+  const handleCancelSymptomDraftEdit = useCallback(() => {
+    if (!pendingSymptomDraft) return;
+    setPendingSymptomDraftForm(toPendingSymptomDraftForm(pendingSymptomDraft));
+    setPendingSymptomDraftFormError("");
+    setEditingSymptomDraft(false);
+  }, [pendingSymptomDraft]);
+
+  const handleApplySymptomDraftEdit = useCallback(() => {
+    if (!pendingSymptomDraft || !pendingSymptomDraftForm) return;
+
+    const category = pendingSymptomDraftForm.category.trim();
+    const description = pendingSymptomDraftForm.description.trim();
+    const startedAt = pendingSymptomDraftForm.startedAt.trim();
+    const endedAt = pendingSymptomDraftForm.endedAt.trim();
+    const severityRaw = pendingSymptomDraftForm.severity.trim();
+
+    if (!category) {
+      setPendingSymptomDraftFormError("症狀類別係必填。");
+      return;
+    }
+    if (category.length > 80) {
+      setPendingSymptomDraftFormError("症狀類別最多 80 字。");
+      return;
+    }
+    if (description.length > 500) {
+      setPendingSymptomDraftFormError("症狀描述最多 500 字。");
+      return;
+    }
+    if (!DATE_REGEX.test(startedAt)) {
+      setPendingSymptomDraftFormError("開始日期格式需為 YYYY-MM-DD。");
+      return;
+    }
+    if (endedAt && !DATE_REGEX.test(endedAt)) {
+      setPendingSymptomDraftFormError("結束日期格式需為 YYYY-MM-DD。");
+      return;
+    }
+    if (endedAt && endedAt < startedAt) {
+      setPendingSymptomDraftFormError("結束日期不可早於開始日期。");
+      return;
+    }
+
+    let parsedSeverity: number | undefined;
+    if (severityRaw) {
+      const parsed = Number.parseInt(severityRaw, 10);
+      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 5) {
+        setPendingSymptomDraftFormError("嚴重度需為 1-5。");
+        return;
+      }
+      parsedSeverity = parsed;
+    }
+
+    const nextDraft: PendingSymptomDraft = {
+      category,
+      startedAt,
+      ...(description ? { description } : {}),
+      ...(typeof parsedSeverity === "number" ? { severity: parsedSeverity } : {}),
+      ...(endedAt ? { endedAt } : {}),
+      ...(pendingSymptomDraft.resolutionMethod
+        ? { resolutionMethod: pendingSymptomDraft.resolutionMethod }
+        : {}),
+      ...(pendingSymptomDraft.resolutionNote
+        ? { resolutionNote: pendingSymptomDraft.resolutionNote }
+        : {}),
+      ...(typeof pendingSymptomDraft.resolutionDays === "number"
+        ? { resolutionDays: pendingSymptomDraft.resolutionDays }
+        : {}),
+    };
+
+    setPendingSymptomDraft(nextDraft);
+    setPendingSymptomDraftFormError("");
+    setEditingSymptomDraft(false);
+  }, [pendingSymptomDraft, pendingSymptomDraftForm]);
+
   return (
     <>
       <div className="flex h-full flex-col">
@@ -684,27 +826,125 @@ export function ChatRoom() {
             <div className="border-b border-amber-200 bg-amber-50/80 px-4 py-3">
               <p className="text-sm font-semibold text-amber-900">症狀待確認儲存</p>
               <p className="mt-1 text-sm text-amber-900/90">{pendingSymptomSummary}</p>
+              <p className="mt-1 text-xs text-amber-800/90">
+                確認後記錄會保留俾醫師參考，你亦可以持續記錄你嘅健康情況。
+              </p>
               {pendingSymptomDraft.description ? (
                 <p className="mt-1 text-xs text-amber-800/90">描述：{pendingSymptomDraft.description}</p>
               ) : null}
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void handleConfirmSymptomDraft()}
-                  disabled={confirmingSymptomDraft || loading || historySwitching}
-                  className="inline-flex items-center rounded-full bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {confirmingSymptomDraft ? "儲存中..." : "確認儲存症狀"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDismissSymptomDraft}
-                  disabled={confirmingSymptomDraft || loading}
-                  className="inline-flex items-center rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  今次唔儲存
-                </button>
-              </div>
+
+              {editingSymptomDraft && pendingSymptomDraftForm ? (
+                <div className="mt-3 space-y-2 rounded-xl border border-amber-200 bg-white/80 p-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="text-xs text-amber-900/90">
+                      症狀
+                      <input
+                        type="text"
+                        value={pendingSymptomDraftForm.category}
+                        onChange={(event) =>
+                          handleSymptomDraftFieldChange("category", event.target.value)
+                        }
+                        className="mt-1 w-full rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-amber-400"
+                      />
+                    </label>
+                    <label className="text-xs text-amber-900/90">
+                      嚴重度 (1-5)
+                      <input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={pendingSymptomDraftForm.severity}
+                        onChange={(event) =>
+                          handleSymptomDraftFieldChange("severity", event.target.value)
+                        }
+                        className="mt-1 w-full rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-amber-400"
+                      />
+                    </label>
+                    <label className="text-xs text-amber-900/90">
+                      開始日期
+                      <input
+                        type="date"
+                        value={pendingSymptomDraftForm.startedAt}
+                        onChange={(event) =>
+                          handleSymptomDraftFieldChange("startedAt", event.target.value)
+                        }
+                        className="mt-1 w-full rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-amber-400"
+                      />
+                    </label>
+                    <label className="text-xs text-amber-900/90">
+                      結束日期（可留空）
+                      <input
+                        type="date"
+                        value={pendingSymptomDraftForm.endedAt}
+                        onChange={(event) =>
+                          handleSymptomDraftFieldChange("endedAt", event.target.value)
+                        }
+                        className="mt-1 w-full rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-amber-400"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="block text-xs text-amber-900/90">
+                    描述
+                    <textarea
+                      value={pendingSymptomDraftForm.description}
+                      onChange={(event) =>
+                        handleSymptomDraftFieldChange("description", event.target.value)
+                      }
+                      rows={3}
+                      className="mt-1 w-full rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 outline-none focus:border-amber-400"
+                    />
+                  </label>
+
+                  {pendingSymptomDraftFormError ? (
+                    <p className="text-xs font-semibold text-red-600">{pendingSymptomDraftFormError}</p>
+                  ) : null}
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleApplySymptomDraftEdit}
+                      className="inline-flex items-center rounded-full bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-800"
+                    >
+                      套用修改
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelSymptomDraftEdit}
+                      className="inline-flex items-center rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
+                    >
+                      取消修改
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleConfirmSymptomDraft()}
+                    disabled={confirmingSymptomDraft || loading || historySwitching}
+                    className="inline-flex items-center rounded-full bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {confirmingSymptomDraft ? "儲存中..." : "確認儲存症狀"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleStartSymptomDraftEdit}
+                    disabled={confirmingSymptomDraft || loading || historySwitching}
+                    className="inline-flex items-center rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    修改草稿
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDismissSymptomDraft}
+                    disabled={confirmingSymptomDraft || loading}
+                    className="inline-flex items-center rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    今次唔儲存
+                  </button>
+                </div>
+              )}
             </div>
           ) : null}
           <ChatInputV2

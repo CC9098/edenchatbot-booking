@@ -455,6 +455,10 @@ function applyPendingSymptomReplyGuard(
     guarded = `${guarded}\n\n請按確認儲存症狀按鈕，確認後先會正式寫入記錄。`;
   }
 
+  if (!/(醫師參考|健康情況|健康狀況)/.test(guarded)) {
+    guarded = `${guarded}\n\n確認後記錄會保留俾醫師參考，你亦可以持續記錄你嘅健康情況。`;
+  }
+
   return guarded.trim();
 }
 
@@ -1499,7 +1503,7 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 const SYMPTOM_RECORDING_GUIDANCE = `【症狀記錄功能】
 你具備幫用戶記錄身體症狀的功能。注意以下原則：
 1. 當用戶「描述」自己的症狀時（例如「我今日頭痛」「我最近失眠」），先 call log_symptom 生成待確認草稿，再回覆
-2. 回覆時要清楚講明「未正式儲存」，提醒用戶按確認儲存症狀按鈕先會寫入記錄；之後可提供 1-2 句安全建議
+2. 回覆時要清楚講明「未正式儲存」，提醒用戶按確認儲存症狀按鈕先會寫入記錄；可自然補一句「方便醫師參考，你亦可以持續記錄你嘅健康情況」；之後可提供 1-2 句安全建議
 3. 當用戶「詢問」症狀原因時（例如「頭痛點算好」），先回答，再按語境決定是否建議記錄
 4. 如果用戶話症狀好返，call update_symptom 更新狀態；若用戶有講「點樣好返」或「幾多日好返」，一併寫入 resolutionMethod / resolutionDays / resolutionNote
 5. 如果用戶問歷史記錄，call list_my_symptoms`;
