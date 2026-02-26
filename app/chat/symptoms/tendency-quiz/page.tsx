@@ -10,12 +10,14 @@ type CareContextResponse = {
 };
 
 export default function TendencyQuizPage() {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const [userId, setUserId] = useState<string | undefined>("guest");
 
   const loadContext = useCallback(async () => {
-    try {
+    // TEMP: Skip authentication for testing
+    return;
+    /* try {
       setLoading(true);
       setError(null);
       const response = await fetch("/api/me/care-context");
@@ -32,7 +34,7 @@ export default function TendencyQuizPage() {
       setError(err instanceof Error ? err.message : "無法載入問卷");
     } finally {
       setLoading(false);
-    }
+    } */
   }, []);
 
   useEffect(() => {
