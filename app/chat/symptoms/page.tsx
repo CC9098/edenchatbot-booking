@@ -50,17 +50,17 @@ type ConstitutionMeta = {
 
 const CONSTITUTION_META: Record<string, ConstitutionMeta> = {
   depleting: {
-    label: "虛損",
+    label: "虛耗型",
     badgeClass: "bg-emerald-100 text-emerald-800",
     summary: "重點是補氣養血、減少過度勞累，飲食以溫和、易消化為主。",
   },
   crossing: {
-    label: "鬱結",
+    label: "交錯型",
     badgeClass: "bg-blue-100 text-blue-800",
     summary: "重點是疏導壓力、調節作息，飲食避免過度刺激與偏性太強。",
   },
   hoarding: {
-    label: "痰濕",
+    label: "屯積型",
     badgeClass: "bg-purple-100 text-purple-800",
     summary: "重點是化濕健脾，飲食以清淡為主，減少濕重與黏滯食物。",
   },

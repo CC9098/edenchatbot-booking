@@ -96,9 +96,9 @@ interface AuditLogItem {
    ================================================================ */
 
 const CONSTITUTION_OPTIONS = [
-  { value: "depleting", label: "虛損", color: "bg-emerald-100 text-emerald-800" },
-  { value: "crossing", label: "鬱結", color: "bg-blue-100 text-blue-800" },
-  { value: "hoarding", label: "痰濕", color: "bg-purple-100 text-purple-800" },
+  { value: "depleting", label: "虛耗型", color: "bg-emerald-100 text-emerald-800" },
+  { value: "crossing", label: "交錯型", color: "bg-blue-100 text-blue-800" },
+  { value: "hoarding", label: "屯積型", color: "bg-purple-100 text-purple-800" },
   { value: "mixed", label: "混合", color: "bg-orange-100 text-orange-800" },
   { value: "unknown", label: "未評估", color: "bg-gray-100 text-gray-600" },
 ];
@@ -476,9 +476,9 @@ function ConstitutionSection({
           <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-3">
             <p className="text-xs font-semibold text-gray-600">累積分數（由高到低）</p>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <p className="text-xs text-gray-700">虛損：{careProfile.constitutionScores.depleting}</p>
-              <p className="text-xs text-gray-700">鬱結：{careProfile.constitutionScores.crossing}</p>
-              <p className="text-xs text-gray-700">痰濕：{careProfile.constitutionScores.hoarding}</p>
+              <p className="text-xs text-gray-700">虛耗型：{careProfile.constitutionScores.depleting}</p>
+              <p className="text-xs text-gray-700">交錯型：{careProfile.constitutionScores.crossing}</p>
+              <p className="text-xs text-gray-700">屯積型：{careProfile.constitutionScores.hoarding}</p>
               <p className="text-xs text-gray-700">混合：{careProfile.constitutionScores.mixed}</p>
             </div>
           </div>

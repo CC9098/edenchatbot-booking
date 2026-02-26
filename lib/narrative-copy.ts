@@ -39,7 +39,7 @@ export const FORCE_NARRATIVE: Record<TendencyKey, ConstitutionNarrative> = {
   J: {
     forceName: "風",
     forceLabel: "風勢",
-    tcmLabel: "虛損",
+    tcmLabel: "虛耗型",
     shortHint: "留意回氣",
     bodyDescription:
       "你的身體容易消耗，\n需要更多回氣的空間。",
@@ -53,7 +53,7 @@ export const FORCE_NARRATIVE: Record<TendencyKey, ConstitutionNarrative> = {
   K: {
     forceName: "水",
     forceLabel: "水勢",
-    tcmLabel: "痰濕",
+    tcmLabel: "屯積型",
     shortHint: "讓它流動",
     bodyDescription:
       "你的身體偏向沉積，\n需要更多輕盈和流動。",
@@ -67,7 +67,7 @@ export const FORCE_NARRATIVE: Record<TendencyKey, ConstitutionNarrative> = {
   L: {
     forceName: "雷",
     forceLabel: "雷勢",
-    tcmLabel: "鬱結",
+    tcmLabel: "交錯型",
     shortHint: "鬆開張力",
     bodyDescription:
       "你的身體容易繃緊，\n需要更多空間讓張力散開。",

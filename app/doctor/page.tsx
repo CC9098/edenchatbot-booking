@@ -14,9 +14,9 @@ interface PatientItem {
 
 /* ---------- Constants ---------- */
 const CONSTITUTION_LABELS: Record<string, string> = {
-  depleting: "虛損",
-  crossing: "鬱結",
-  hoarding: "痰濕",
+  depleting: "虛耗型",
+  crossing: "交錯型",
+  hoarding: "屯積型",
   mixed: "混合",
   unknown: "未評估",
 };

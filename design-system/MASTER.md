@@ -214,9 +214,9 @@ focus:border-[#2d5016] focus:ring-1 focus:ring-[#2d5016] focus:outline-none
 
 | 體質 | 英文 | 顏色 | Tailwind Class |
 |------|------|------|----------------|
-| **虛損** | depleting | 綠色 | `bg-emerald-100 text-emerald-800` |
-| **鬱結** | crossing | 藍色 | `bg-blue-100 text-blue-800` |
-| **痰濕** | hoarding | 紫色 | `bg-purple-100 text-purple-800` |
+| **虛耗型** | depleting | 綠色 | `bg-emerald-100 text-emerald-800` |
+| **交錯型** | crossing | 藍色 | `bg-blue-100 text-blue-800` |
+| **屯積型** | hoarding | 紫色 | `bg-purple-100 text-purple-800` |
 | **混合** | mixed | 橙色 | `bg-orange-100 text-orange-800` |
 | **未評估** | unknown | 灰色 | `bg-gray-100 text-gray-600` |
 
