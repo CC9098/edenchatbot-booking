@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { ModeIndicator, type ChatMode } from "./ModeSelector";
 import { MessageList, type ChatMessage } from "./MessageList";
@@ -22,6 +22,18 @@ type ChatApiJsonResponse = {
   reply?: string;
   message?: string;
   mode?: ChatMode;
+  pendingSymptomDraft?: PendingSymptomDraft | null;
+};
+
+type PendingSymptomDraft = {
+  category: string;
+  description?: string;
+  severity?: number;
+  startedAt: string;
+  endedAt?: string;
+  resolutionMethod?: string;
+  resolutionNote?: string;
+  resolutionDays?: number;
 };
 
 type StreamPayload = {
@@ -30,6 +42,7 @@ type StreamPayload = {
   reply?: string;
   mode?: ChatMode;
   error?: string;
+  pendingSymptomDraft?: PendingSymptomDraft | null;
 };
 
 type HistoryRow = {
@@ -158,6 +171,8 @@ export function ChatRoom() {
   const [mode, setMode] = useState<ChatMode>("G1");
   const [sessionId, setSessionId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pendingSymptomDraft, setPendingSymptomDraft] = useState<PendingSymptomDraft | null>(null);
+  const [confirmingSymptomDraft, setConfirmingSymptomDraft] = useState(false);
 
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -172,6 +187,8 @@ export function ChatRoom() {
     setMode("G1");
     setMessages([createWelcomeMessage()]);
     setSessionId(generateSessionId());
+    setPendingSymptomDraft(null);
+    setConfirmingSymptomDraft(false);
     closeHistory();
   }, [closeHistory, historySwitching, loading]);
 
@@ -315,6 +332,8 @@ export function ChatRoom() {
         setMessages(fallbackMessages);
         setMode(lastAssistant?.mode || "G1");
         setSessionId(targetSessionId);
+        setPendingSymptomDraft(null);
+        setConfirmingSymptomDraft(false);
         closeHistory();
       } catch (err) {
         setHistoryError(err instanceof Error ? err.message : "無法開啟歷史對話");
@@ -347,8 +366,9 @@ export function ChatRoom() {
       const detectedMode: ChatMode = data.mode ?? "G1";
       const reply =
         data.reply ?? data.message ?? "抱歉，暫時無法回應，請稍後再試。";
+      const pendingDraft = data.pendingSymptomDraft ?? null;
 
-      return { detectedMode, reply };
+      return { detectedMode, reply, pendingDraft };
     },
     [sessionId],
   );
@@ -365,6 +385,8 @@ export function ChatRoom() {
 
       const updatedMessages = [...messages, userMessage];
       setMessages(updatedMessages);
+      setPendingSymptomDraft(null);
+      setConfirmingSymptomDraft(false);
       setLoading(true);
 
       const appendErrorMessage = () => {
@@ -378,8 +400,9 @@ export function ChatRoom() {
       };
 
       const appendJsonReply = async () => {
-        const { detectedMode, reply } = await sendJsonRequest(updatedMessages);
+        const { detectedMode, reply, pendingDraft } = await sendJsonRequest(updatedMessages);
         setMode(detectedMode);
+        setPendingSymptomDraft(pendingDraft);
 
         const assistantMessage: ChatMessage = {
           role: "assistant",
@@ -467,6 +490,7 @@ export function ChatRoom() {
           const detectedMode: ChatMode = data.mode ?? "G1";
           const reply =
             data.reply ?? data.message ?? "抱歉，暫時無法回應，請稍後再試。";
+          setPendingSymptomDraft(data.pendingSymptomDraft ?? null);
 
           setMode(detectedMode);
           setMessages((prev) => [
@@ -503,6 +527,7 @@ export function ChatRoom() {
               detectedMode = payload.mode;
               setMode(payload.mode);
             }
+            setPendingSymptomDraft(payload.pendingSymptomDraft ?? null);
             const finalReply =
               typeof payload.reply === "string" && payload.reply.length > 0
                 ? payload.reply
@@ -546,6 +571,90 @@ export function ChatRoom() {
     [messages, mode, sendJsonRequest, sessionId],
   );
 
+  const pendingSymptomSummary = useMemo(() => {
+    if (!pendingSymptomDraft) return "";
+    const details: string[] = [
+      `症狀：${pendingSymptomDraft.category}`,
+      `開始：${pendingSymptomDraft.startedAt}`,
+    ];
+
+    if (pendingSymptomDraft.endedAt) {
+      details.push(`結束：${pendingSymptomDraft.endedAt}`);
+    }
+    if (typeof pendingSymptomDraft.severity === "number") {
+      details.push(`嚴重度：${pendingSymptomDraft.severity}/5`);
+    }
+
+    return details.join("｜");
+  }, [pendingSymptomDraft]);
+
+  const handleConfirmSymptomDraft = useCallback(async () => {
+    if (!pendingSymptomDraft || loading || historySwitching || confirmingSymptomDraft) return;
+
+    setConfirmingSymptomDraft(true);
+    try {
+      const response = await fetch("/api/chat/v2/confirm-symptom", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draft: pendingSymptomDraft,
+        }),
+      });
+
+      const data = (await response.json()) as { success?: boolean; error?: string };
+      if (!response.ok || data.success !== true) {
+        throw new Error(data.error || "暫時無法儲存症狀");
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `已確認並儲存症狀：${pendingSymptomSummary}`,
+          mode,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      setPendingSymptomDraft(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "暫時無法儲存症狀";
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `未能儲存症狀：${message}`,
+          mode,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setConfirmingSymptomDraft(false);
+    }
+  }, [
+    confirmingSymptomDraft,
+    historySwitching,
+    loading,
+    mode,
+    pendingSymptomDraft,
+    pendingSymptomSummary,
+  ]);
+
+  const handleDismissSymptomDraft = useCallback(() => {
+    if (!pendingSymptomDraft || confirmingSymptomDraft || loading) return;
+
+    const dismissedCategory = pendingSymptomDraft.category;
+    setPendingSymptomDraft(null);
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: `明白，今次先唔儲存「${dismissedCategory}」症狀記錄。`,
+        mode,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+  }, [confirmingSymptomDraft, loading, mode, pendingSymptomDraft]);
+
   return (
     <>
       <div className="flex h-full flex-col">
@@ -571,6 +680,33 @@ export function ChatRoom() {
         </div>
 
         <div className="shrink-0 border-t border-primary/10 bg-white/95">
+          {pendingSymptomDraft ? (
+            <div className="border-b border-amber-200 bg-amber-50/80 px-4 py-3">
+              <p className="text-sm font-semibold text-amber-900">症狀待確認儲存</p>
+              <p className="mt-1 text-sm text-amber-900/90">{pendingSymptomSummary}</p>
+              {pendingSymptomDraft.description ? (
+                <p className="mt-1 text-xs text-amber-800/90">描述：{pendingSymptomDraft.description}</p>
+              ) : null}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleConfirmSymptomDraft()}
+                  disabled={confirmingSymptomDraft || loading || historySwitching}
+                  className="inline-flex items-center rounded-full bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {confirmingSymptomDraft ? "儲存中..." : "確認儲存症狀"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDismissSymptomDraft}
+                  disabled={confirmingSymptomDraft || loading}
+                  className="inline-flex items-center rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  今次唔儲存
+                </button>
+              </div>
+            </div>
+          ) : null}
           <ChatInputV2
             onSend={handleSend}
             disabled={loading || historySwitching}

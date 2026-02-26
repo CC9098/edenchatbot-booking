@@ -14,9 +14,9 @@ import {
   type MyBookingInfo,
 } from '@/lib/booking-conversation-helpers';
 import {
-  logSymptom,
   updateSymptom,
   listSymptoms,
+  type LogSymptomRequest,
 } from '@/lib/symptom-conversation-helpers';
 import { buildContentReferenceContext } from '@/lib/content-service';
 
@@ -152,6 +152,13 @@ interface BuildSystemPromptResult {
   knowledgeStats: KnowledgeSelectionStats;
 }
 
+type PendingSymptomDraft = LogSymptomRequest;
+
+interface FunctionCallResult {
+  response: object;
+  pendingSymptomDraft?: PendingSymptomDraft;
+}
+
 const EXPLICIT_DATE_REGEX = /\b\d{4}-\d{2}-\d{2}\b/;
 const TODAY_KEYWORDS = ['今日', '今天', '而家', '依家', '宜家', 'today', 'now'];
 const CHAT_MODES: ChatMode[] = ['G1', 'G2', 'G3', 'B'];
@@ -181,6 +188,13 @@ const KNOWLEDGE_MAX_CHARS_BY_MODE: Record<Exclude<ChatMode, 'B'>, number> = {
 };
 const KNOWLEDGE_SOURCES_MAX_ITEMS = 2;
 const KNOWLEDGE_SOURCE_TITLE_MAX_CHARS = 24;
+const SYMPTOM_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const SYMPTOM_CATEGORY_MAX_CHARS = 80;
+const SYMPTOM_DESCRIPTION_MAX_CHARS = 500;
+const SYMPTOM_RESOLUTION_METHOD_MAX_CHARS = 120;
+const SYMPTOM_RESOLUTION_NOTE_MAX_CHARS = 500;
+const SYMPTOM_RESOLUTION_DAYS_MIN = 0;
+const SYMPTOM_RESOLUTION_DAYS_MAX = 365;
 
 // ---------------------------------------------------------------------------
 // Feature Flags
@@ -355,6 +369,93 @@ function shouldForceTodayDate(userMessage: string): boolean {
   const hasTodayKeyword = TODAY_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()));
   if (!hasTodayKeyword) return false;
   return !EXPLICIT_DATE_REGEX.test(userMessage);
+}
+
+function normalizeOptionalText(value: unknown, maxChars: number): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, maxChars);
+}
+
+function normalizeOptionalInteger(value: unknown, min: number, max: number): number | undefined {
+  const parsed =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string'
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+  if (!Number.isInteger(parsed)) return undefined;
+  if (parsed < min || parsed > max) return undefined;
+  return parsed;
+}
+
+function buildPendingSymptomDraft(
+  args: Record<string, unknown>,
+  latestUserMessage?: string,
+): PendingSymptomDraft | null {
+  const category = normalizeOptionalText(args.category, SYMPTOM_CATEGORY_MAX_CHARS);
+  if (!category) return null;
+
+  const todayInHk = getTodayInHongKong();
+  let startedAt = normalizeOptionalText(args.startedAt, 10);
+  if (latestUserMessage && shouldForceTodayDate(latestUserMessage)) {
+    startedAt = todayInHk;
+  }
+  if (!startedAt || !SYMPTOM_DATE_REGEX.test(startedAt)) {
+    startedAt = todayInHk;
+  }
+
+  const endedAtCandidate = normalizeOptionalText(args.endedAt, 10);
+  const endedAt =
+    endedAtCandidate && SYMPTOM_DATE_REGEX.test(endedAtCandidate) && endedAtCandidate >= startedAt
+      ? endedAtCandidate
+      : undefined;
+
+  const description = normalizeOptionalText(args.description, SYMPTOM_DESCRIPTION_MAX_CHARS);
+  const severity = normalizeOptionalInteger(args.severity, 1, 5);
+  const resolutionMethod = normalizeOptionalText(
+    args.resolutionMethod,
+    SYMPTOM_RESOLUTION_METHOD_MAX_CHARS,
+  );
+  const resolutionNote = normalizeOptionalText(args.resolutionNote, SYMPTOM_RESOLUTION_NOTE_MAX_CHARS);
+  const resolutionDays = normalizeOptionalInteger(
+    args.resolutionDays,
+    SYMPTOM_RESOLUTION_DAYS_MIN,
+    SYMPTOM_RESOLUTION_DAYS_MAX,
+  );
+
+  const draft: PendingSymptomDraft = {
+    category,
+    startedAt,
+  };
+
+  if (description) draft.description = description;
+  if (typeof severity === 'number') draft.severity = severity;
+  if (endedAt) draft.endedAt = endedAt;
+  if (resolutionMethod) draft.resolutionMethod = resolutionMethod;
+  if (resolutionNote) draft.resolutionNote = resolutionNote;
+  if (typeof resolutionDays === 'number') draft.resolutionDays = resolutionDays;
+
+  return draft;
+}
+
+function applyPendingSymptomReplyGuard(
+  reply: string,
+  pendingSymptomDraft?: PendingSymptomDraft,
+): string {
+  if (!pendingSymptomDraft) return reply;
+
+  let guarded = reply;
+  guarded = guarded.replace(/我幫你記錄低咗/g, '我已幫你整理好症狀草稿');
+  guarded = guarded.replace(/我幫你記錄咗/g, '我已幫你整理好症狀草稿');
+  guarded = guarded.replace(/已經幫你記錄(?:咗|了)/g, '已經幫你整理好症狀草稿');
+
+  if (!/(確認|按鈕|儲存症狀|正式寫入)/.test(guarded)) {
+    guarded = `${guarded}\n\n請按確認儲存症狀按鈕，確認後先會正式寫入記錄。`;
+  }
+
+  return guarded.trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -1397,8 +1498,8 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 
 const SYMPTOM_RECORDING_GUIDANCE = `【症狀記錄功能】
 你具備幫用戶記錄身體症狀的功能。注意以下原則：
-1. 當用戶「描述」自己的症狀時（例如「我今日頭痛」「我最近失眠」），先 call log_symptom 記錄，再回覆
-2. 回覆時先自然提及「我幫你記錄低咗，醫師睇症時會參考」，再提供 1-2 句安全建議
+1. 當用戶「描述」自己的症狀時（例如「我今日頭痛」「我最近失眠」），先 call log_symptom 生成待確認草稿，再回覆
+2. 回覆時要清楚講明「未正式儲存」，提醒用戶按確認儲存症狀按鈕先會寫入記錄；之後可提供 1-2 句安全建議
 3. 當用戶「詢問」症狀原因時（例如「頭痛點算好」），先回答，再按語境決定是否建議記錄
 4. 如果用戶話症狀好返，call update_symptom 更新狀態；若用戶有講「點樣好返」或「幾多日好返」，一併寫入 resolutionMethod / resolutionDays / resolutionNote
 5. 如果用戶問歷史記錄，call list_my_symptoms`;
@@ -2100,7 +2201,7 @@ const BOOKING_FUNCTIONS: FunctionDeclaration[] = [
 const SYMPTOM_FUNCTIONS: FunctionDeclaration[] = [
   {
     name: 'log_symptom',
-    description: '記錄用戶的身體症狀。當用戶「描述」症狀時使用（例如「我今日頭痛」「我最近失眠」）。不要用於「詢問」症狀原因。',
+    description: '建立症狀待確認草稿（不會即時入庫）。當用戶「描述」症狀時使用（例如「我今日頭痛」「我最近失眠」）。不要用於「詢問」症狀原因。',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -2208,7 +2309,7 @@ async function handleFunctionCall(
   userId?: string,
   sessionId?: string,
   latestUserMessage?: string,
-): Promise<object> {
+): Promise<FunctionCallResult> {
   console.log(`[chat/v2] Calling function: ${functionName}`, functionArgs);
 
   const args = functionArgs as Record<string, unknown>;
@@ -2220,13 +2321,13 @@ async function handleFunctionCall(
         date: typeof args.date === 'string' ? args.date : undefined,
         clinicNameZh: typeof args.clinicNameZh === 'string' ? args.clinicNameZh : undefined,
       });
-      return result;
+      return { response: result };
     }
 
     // Legacy compatibility: keep old tool names to avoid breaking older prompts.
     case 'list_doctors': {
       const result = await listBookableDoctors();
-      return result;
+      return { response: result };
     }
 
     case 'get_available_slots': {
@@ -2236,7 +2337,7 @@ async function handleFunctionCall(
         date as string,
         clinicNameZh as string | undefined
       );
-      return result;
+      return { response: result };
     }
 
     case 'create_booking': {
@@ -2250,11 +2351,11 @@ async function handleFunctionCall(
         userId,
         sessionId,
       });
-      return result;
+      return { response: result };
     }
 
     case 'list_my_bookings': {
-      if (!userId) return { success: false, error: '需要登入才能查看預約紀錄' };
+      if (!userId) return { response: { success: false, error: '需要登入才能查看預約紀錄' } };
 
       const limitArg = args.limit;
       const parsedLimit =
@@ -2266,37 +2367,52 @@ async function handleFunctionCall(
         userEmail,
         limit: parsedLimit,
       });
-      return result;
+      return { response: result };
     }
 
     case 'log_symptom': {
-      if (!userId) return { success: false, error: '需要登入才能記錄症狀' };
-      const symptomArgs = { ...args };
-      if (latestUserMessage && shouldForceTodayDate(latestUserMessage)) {
-        symptomArgs.startedAt = getTodayInHongKong();
+      if (!userId) return { response: { success: false, error: '需要登入才能記錄症狀' } };
+
+      const pendingSymptomDraft = buildPendingSymptomDraft(args, latestUserMessage);
+      if (!pendingSymptomDraft) {
+        return {
+          response: {
+            success: false,
+            pendingConfirmation: false,
+            error: '症狀資料不足，請至少提供症狀類別。',
+          },
+        };
       }
-      const result = await logSymptom(userId, symptomArgs as any);
-      return result;
+
+      return {
+        response: {
+          success: true,
+          pendingConfirmation: true,
+          message: '症狀草稿已建立，等待用戶確認儲存。',
+          draft: pendingSymptomDraft,
+        },
+        pendingSymptomDraft,
+      };
     }
 
     case 'update_symptom': {
-      if (!userId) return { success: false, error: '需要登入才能更新症狀' };
+      if (!userId) return { response: { success: false, error: '需要登入才能更新症狀' } };
       const symptomArgs = { ...args };
       if (latestUserMessage && shouldForceTodayDate(latestUserMessage)) {
         symptomArgs.endedAt = getTodayInHongKong();
       }
       const result = await updateSymptom(userId, symptomArgs as any);
-      return result;
+      return { response: result };
     }
 
     case 'list_my_symptoms': {
-      if (!userId) return { success: false, error: '需要登入才能查看症狀記錄' };
+      if (!userId) return { response: { success: false, error: '需要登入才能查看症狀記錄' } };
       const result = await listSymptoms(userId, args as any);
-      return result;
+      return { response: result };
     }
 
     default:
-      return { error: `Unknown function: ${functionName}` };
+      return { response: { error: `Unknown function: ${functionName}` } };
   }
 }
 
@@ -2604,7 +2720,7 @@ export async function POST(request: NextRequest) {
       );
       logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
-      return NextResponse.json({ reply: fastReply, mode, type });
+      return NextResponse.json({ reply: fastReply, mode, type, pendingSymptomDraft: null });
     }
 
     // Fast path for reschedule / booking-record lookup:
@@ -2644,7 +2760,7 @@ export async function POST(request: NextRequest) {
       );
       logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
-      return NextResponse.json({ reply: fastReply, mode, type });
+      return NextResponse.json({ reply: fastReply, mode, type, pendingSymptomDraft: null });
     }
 
     const contentSearchStart = Date.now();
@@ -2856,6 +2972,7 @@ export async function POST(request: NextRequest) {
     let reply: string;
     let finalResponse: any;
     let functionCallRoundsUsed = 0;
+    let pendingSymptomDraft: PendingSymptomDraft | undefined;
     const geminiApiStart = Date.now();
 
     if (tools) {
@@ -2889,7 +3006,7 @@ export async function POST(request: NextRequest) {
         console.log(`[chat/v2] Function call round ${functionCallRounds}:`, functionName, functionArgs);
 
         // Execute the function
-        const functionResult = await handleFunctionCall(
+        const { response: functionResult, pendingSymptomDraft: nextPendingSymptomDraft } = await handleFunctionCall(
           functionName,
           functionArgs,
           userEmail,
@@ -2897,6 +3014,9 @@ export async function POST(request: NextRequest) {
           sessionId,
           latestUserMessage.content,
         );
+        if (nextPendingSymptomDraft) {
+          pendingSymptomDraft = nextPendingSymptomDraft;
+        }
 
         // Send function result back to Gemini
         result = await chat.sendMessage([{
@@ -2926,6 +3046,7 @@ export async function POST(request: NextRequest) {
     }
 
     reply = applyOutputContractGuard(reply, outputContract, mode, latestUserMessage.content);
+    reply = applyPendingSymptomReplyGuard(reply, pendingSymptomDraft);
 
     timings.geminiApiMs = Date.now() - geminiApiStart;
     const usage = getUsageMetadata(finalResponse);
@@ -2952,7 +3073,7 @@ export async function POST(request: NextRequest) {
     );
     logPerformanceSummary(mode, timings, metrics, isAuthenticated);
 
-    return NextResponse.json({ reply, mode, type });
+    return NextResponse.json({ reply, mode, type, pendingSymptomDraft: pendingSymptomDraft ?? null });
   } catch (error) {
     console.error('[chat/v2] Error:', error);
     return NextResponse.json(
