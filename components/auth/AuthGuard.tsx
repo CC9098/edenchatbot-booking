@@ -12,8 +12,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  // TEMP: Disable auth check for testing
-  /* useEffect(() => {
+  useEffect(() => {
     if (!loading && !user) {
       router.replace("/login");
     }
@@ -28,9 +27,8 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    // Will redirect in the effect above; render nothing to avoid flash.
     return null;
-  } */
+  }
 
   return <>{children}</>;
 }
