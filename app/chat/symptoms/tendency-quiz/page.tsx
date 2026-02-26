@@ -10,11 +10,30 @@ type CareContextResponse = {
 };
 
 export default function TendencyQuizPage() {
-  const [loading, setLoading] = useState(false);
-  const [error] = useState<string | null>(null);
-  const [userId] = useState<string | undefined>("guest");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | undefined>(undefined);
 
-  const loadContext = useCallback(async () => {}, []);
+  const loadContext = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch("/api/me/care-context");
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("請先登入，先可以使用問卷。");
+        }
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || "無法載入問卷");
+      }
+      const payload = (await response.json()) as CareContextResponse;
+      setUserId(payload.userId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "無法載入問卷");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     void loadContext();
