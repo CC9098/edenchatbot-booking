@@ -42,6 +42,11 @@ type ResolveFormState = {
   resolutionNote: string;
 };
 
+type EditFormState = {
+  description: string;
+  severity: string;
+};
+
 type ConstitutionMeta = {
   label: string;
   badgeClass: string;
@@ -169,26 +174,6 @@ function constitutionSourceLabel(source: CareContextResponse["constitutionSource
   return "來源：未有完整資料";
 }
 
-function severityBar(severity: number | null) {
-  if (!severity) return null;
-
-  const level = Math.min(5, Math.max(1, severity));
-  const filledClass =
-    level <= 2 ? "bg-amber-400" : level === 3 ? "bg-orange-400" : "bg-red-500";
-
-  return (
-    <div className="flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <div
-          key={n}
-          className={`h-2.5 w-4 rounded-sm ${n <= level ? filledClass : "bg-gray-200"}`}
-        />
-      ))}
-      <span className="ml-1 text-xs text-gray-500">{level}/5</span>
-    </div>
-  );
-}
-
 export default function MySymptomsPage() {
   const [symptoms, setSymptoms] = useState<SymptomItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,11 +181,19 @@ export default function MySymptomsPage() {
   const [careContext, setCareContext] = useState<CareContextResponse | null>(null);
   const [careLoading, setCareLoading] = useState(true);
   const [careError, setCareError] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [rootSection, setRootSection] = useState<RootSection>("symptoms");
   const [resolveTarget, setResolveTarget] = useState<SymptomItem | null>(null);
   const [resolveSaving, setResolveSaving] = useState(false);
   const [resolveError, setResolveError] = useState("");
+  const [expandedSymptomId, setExpandedSymptomId] = useState<string | null>(null);
+  const [editTargetId, setEditTargetId] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editForm, setEditForm] = useState<EditFormState>({
+    description: "",
+    severity: "",
+  });
   const [resolveForm, setResolveForm] = useState<ResolveFormState>({
     endedAt: todayInHongKongDate(),
     resolutionMethod: RESOLUTION_METHOD_OPTIONS[0],
@@ -317,6 +310,75 @@ export default function MySymptomsPage() {
     if (resolveSaving) return;
     setResolveTarget(null);
     setResolveError("");
+  }
+
+  function toggleSymptomExpand(symptomId: string) {
+    setExpandedSymptomId((prev) => (prev === symptomId ? null : symptomId));
+    setEditTargetId(null);
+    setEditError("");
+  }
+
+  function startEditSymptom(symptom: SymptomItem) {
+    setEditTargetId(symptom.id);
+    setEditSaving(false);
+    setEditError("");
+    setEditForm({
+      description: symptom.description || "",
+      severity: symptom.severity ? String(symptom.severity) : "",
+    });
+  }
+
+  function cancelEditSymptom() {
+    if (editSaving) return;
+    setEditTargetId(null);
+    setEditError("");
+  }
+
+  async function submitEditSymptom(e: FormEvent<HTMLFormElement>, symptom: SymptomItem) {
+    e.preventDefault();
+    if (editSaving) return;
+
+    const description = editForm.description.trim();
+    const severityRaw = editForm.severity.trim();
+
+    let severity: number | null = null;
+    if (severityRaw) {
+      const parsed = Number.parseInt(severityRaw, 10);
+      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 5) {
+        setEditError("嚴重程度要填 1 至 5。");
+        return;
+      }
+      severity = parsed;
+    }
+
+    try {
+      setEditSaving(true);
+      setEditError("");
+
+      const response = await fetch(`/api/me/symptoms/${symptom.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          description: description || null,
+          severity,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || "更新症狀失敗");
+      }
+
+      setEditTargetId(null);
+      await loadSymptoms();
+      setExpandedSymptomId(symptom.id);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "更新症狀失敗");
+    } finally {
+      setEditSaving(false);
+    }
   }
 
   async function submitResolveForm(e: FormEvent<HTMLFormElement>) {
@@ -495,79 +557,157 @@ export default function MySymptomsPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {filteredSymptoms.map((symptom) => (
-                    <article key={symptom.id} className="px-4 py-4 sm:px-5">
-                      <div className="space-y-2.5">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusPillClass(
-                                symptom.status,
-                              )}`}
-                            >
-                              {getStatusLabel(symptom.status)}
-                            </span>
-                            <h2 className="text-sm font-semibold text-gray-900">
+                  {filteredSymptoms.map((symptom) => {
+                    const isExpanded = expandedSymptomId === symptom.id;
+                    const isEditing = editTargetId === symptom.id;
+                    const canResolve = symptom.status === "active" || symptom.status === "recurring";
+
+                    return (
+                      <article key={symptom.id} className="px-4 py-3 sm:px-5">
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleSymptomExpand(symptom.id)}
+                            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                          >
+                            <h2 className="truncate text-base font-semibold text-gray-900">
                               {symptom.category?.trim() || "未命名症狀"}
                             </h2>
-                            <span className="text-xs text-gray-400">
-                              {symptom.loggedVia === "chat" ? "AI 對話記錄" : "手動記錄"}
-                            </span>
-                          </div>
-                          {(symptom.status === "active" || symptom.status === "recurring") && (
+                            <span className="text-xs text-gray-400">{isExpanded ? "收起" : "展開"}</span>
+                          </button>
+
+                          {canResolve ? (
                             <button
                               type="button"
                               onClick={() => openResolveModal(symptom)}
-                              className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100"
+                              className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
                             >
-                              標記已好返
+                              好轉
                             </button>
-                          )}
+                          ) : null}
                         </div>
 
-                        {symptom.description?.trim() ? (
-                          <p className="text-sm text-gray-700">{symptom.description.trim()}</p>
-                        ) : (
-                          <p className="text-sm text-gray-400">未有補充描述</p>
-                        )}
+                        {isExpanded ? (
+                          <div className="mt-3 space-y-3 rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-3">
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span
+                                className={`inline-flex rounded-full px-2.5 py-0.5 font-medium ${getStatusPillClass(
+                                  symptom.status,
+                                )}`}
+                              >
+                                {getStatusLabel(symptom.status)}
+                              </span>
+                              <span className="text-gray-500">
+                                嚴重程度：{symptom.severity ? `${symptom.severity}/5` : "未填"}
+                              </span>
+                              <span className="text-gray-400">
+                                更新於 {formatDateTime(symptom.updatedAt || symptom.createdAt)}
+                              </span>
+                            </div>
 
-                        {symptom.severity ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">嚴重程度</span>
-                            {severityBar(symptom.severity)}
+                            {symptom.description?.trim() ? (
+                              <p className="text-sm leading-relaxed text-gray-700">
+                                {symptom.description.trim()}
+                              </p>
+                            ) : (
+                              <p className="text-sm text-gray-400">未有補充描述</p>
+                            )}
+
+                            {(symptom.resolutionMethod ||
+                              (symptom.resolutionDays !== null && symptom.resolutionDays !== undefined) ||
+                              symptom.resolutionNote) ? (
+                              <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-800">
+                                {symptom.resolutionMethod ? <p>點樣好返：{symptom.resolutionMethod}</p> : null}
+                                {symptom.resolutionDays !== null && symptom.resolutionDays !== undefined ? (
+                                  <p>幾耐好返：約 {symptom.resolutionDays} 日</p>
+                                ) : null}
+                                {symptom.resolutionNote ? (
+                                  <p className="whitespace-pre-wrap">補充：{symptom.resolutionNote}</p>
+                                ) : null}
+                              </div>
+                            ) : null}
+
+                            <p className="text-xs text-gray-400">
+                              {formatDate(symptom.startedAt)}
+                              {symptom.endedAt ? ` → ${formatDate(symptom.endedAt)}` : ""}
+                              {!symptom.endedAt && symptom.status === "active" ? " → 進行中" : ""}
+                            </p>
+
+                            {!isEditing ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => startEditSymptom(symptom)}
+                                  className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
+                                >
+                                  修改
+                                </button>
+                              </div>
+                            ) : (
+                              <form
+                                onSubmit={(event) => void submitEditSymptom(event, symptom)}
+                                className="space-y-2 rounded-lg border border-gray-200 bg-white p-3"
+                              >
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  <label className="text-xs text-gray-600">
+                                    嚴重程度 (1-5)
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={5}
+                                      value={editForm.severity}
+                                      onChange={(event) =>
+                                        setEditForm((prev) => ({ ...prev, severity: event.target.value }))
+                                      }
+                                      className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                                    />
+                                  </label>
+                                </div>
+                                <label className="block text-xs text-gray-600">
+                                  描述
+                                  <textarea
+                                    rows={3}
+                                    value={editForm.description}
+                                    onChange={(event) =>
+                                      setEditForm((prev) => ({ ...prev, description: event.target.value }))
+                                    }
+                                    className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                                  />
+                                </label>
+                                {editError ? (
+                                  <p className="text-xs font-medium text-red-600">{editError}</p>
+                                ) : null}
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="submit"
+                                    disabled={editSaving}
+                                    className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#3d6b20] disabled:opacity-50"
+                                  >
+                                    {editSaving ? "儲存中..." : "儲存修改"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={cancelEditSymptom}
+                                    disabled={editSaving}
+                                    className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100 disabled:opacity-50"
+                                  >
+                                    取消
+                                  </button>
+                                </div>
+                              </form>
+                            )}
                           </div>
                         ) : null}
-
-                        {(symptom.resolutionMethod || symptom.resolutionDays !== null && symptom.resolutionDays !== undefined || symptom.resolutionNote) ? (
-                          <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-800">
-                            {symptom.resolutionMethod ? (
-                              <p>點樣好返：{symptom.resolutionMethod}</p>
-                            ) : null}
-                            {symptom.resolutionDays !== null && symptom.resolutionDays !== undefined ? (
-                              <p>幾耐好返：約 {symptom.resolutionDays} 日</p>
-                            ) : null}
-                            {symptom.resolutionNote ? (
-                              <p className="whitespace-pre-wrap">補充：{symptom.resolutionNote}</p>
-                            ) : null}
-                          </div>
-                        ) : null}
-
-                        <p className="text-xs text-gray-400">
-                          {formatDate(symptom.startedAt)}
-                          {symptom.endedAt ? ` → ${formatDate(symptom.endedAt)}` : ""}
-                          {!symptom.endedAt && symptom.status === "active" ? " → 進行中" : ""}
-                          {" ・ "}更新於 {formatDateTime(symptom.updatedAt || symptom.createdAt)}
-                        </p>
-                      </div>
-                    </article>
-                  ))}
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </div>
 
             {!loading && !error && filteredSymptoms.length > 0 ? (
               <div className="rounded-xl border border-primary/10 bg-primary-light/30 px-4 py-3 text-xs text-gray-600">
-                提示：你可以用「標記已好返」按鈕，或者喺聊天同 AI 講「好返咗」去更新狀態。
+                提示：列表已簡化，點症狀先展開詳細；需要更新時可直接按「好轉」或「修改」。
               </div>
             ) : null}
           </>
@@ -620,7 +760,7 @@ export default function MySymptomsPage() {
           <div className="w-full max-h-[92vh] overflow-y-auto rounded-t-2xl bg-white shadow-xl sm:max-w-lg sm:rounded-2xl">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-4 py-4">
               <h2 className="text-base font-semibold text-gray-900">
-                標記已好返：{resolveTarget.category?.trim() || "症狀"}
+                標記好轉：{resolveTarget.category?.trim() || "症狀"}
               </h2>
               <button
                 type="button"
@@ -721,7 +861,7 @@ export default function MySymptomsPage() {
                   disabled={resolveSaving}
                   className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
                 >
-                  {resolveSaving ? "儲存中..." : "確認好返"}
+                  {resolveSaving ? "儲存中..." : "確認好轉"}
                 </button>
               </div>
             </form>
