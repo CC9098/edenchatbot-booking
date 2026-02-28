@@ -1531,7 +1531,9 @@ const OUTPUT_FORMAT_RULES = `【輸出格式規則（必須遵守）】
 - 涉及診所電話時，必須同時提供完整 WhatsApp URL（https://wa.me/...）。
 - 涉及診所地址/地圖時，必須提供完整 Google Maps URL（https://...）。
 - 禁止提供「吸幾拍/呼幾拍/做幾多分鐘/做幾多次」等固定數字式身心練習指令，避免故弄玄虛或假精準。
-- 除非用戶明確要求呼吸練習，否則不要主動建議呼吸訓練；若涉及急症紅旗（例如呼吸困難），仍要優先提示即時求助。`;
+- 除非用戶明確要求呼吸練習，否則不要主動建議呼吸訓練；若涉及急症紅旗（例如呼吸困難），仍要優先提示即時求助。
+- 【最高優先】一律不要提供任何煮食/烹調方法（包括但不限於：蒸、白灼、煎、炒、焗、燉、氣炸、煲湯步驟、食譜做法）。
+- 若用戶追問煮食法，需禮貌拒絕，改為提供非烹調形式建議（例如食材方向、份量原則、進食時段），或建議預約醫師作個人化飲食評估。`;
 
 async function buildBookingSystemPrompt(careContext: string): Promise<string> {
   const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
