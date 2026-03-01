@@ -37,6 +37,13 @@ export default function DoctorPatientsPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
+  const [addPatientLoading, setAddPatientLoading] = useState(false);
+  const [addPatientError, setAddPatientError] = useState<string | null>(null);
+  const [addPatientSuccess, setAddPatientSuccess] = useState<string | null>(null);
+  const [newPatientName, setNewPatientName] = useState("");
+  const [newPatientPhone, setNewPatientPhone] = useState("");
+  const [newPatientEmail, setNewPatientEmail] = useState("");
 
   // Debounce the search query
   useEffect(() => {
@@ -70,6 +77,56 @@ export default function DoctorPatientsPage() {
     fetchPatients(debouncedQuery);
   }, [debouncedQuery, fetchPatients]);
 
+  async function handleAddPatientSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAddPatientError(null);
+    setAddPatientSuccess(null);
+
+    const displayName = newPatientName.trim();
+    const phone = newPatientPhone.trim();
+    const email = newPatientEmail.trim().toLowerCase();
+
+    if (!displayName || !phone || !email) {
+      setAddPatientError("請完整填寫姓名、電話及電郵。");
+      return;
+    }
+
+    setAddPatientLoading(true);
+    try {
+      const res = await fetch("/api/doctor/patients", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          displayName,
+          phone,
+          email,
+        }),
+      });
+
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+
+      setAddPatientSuccess(
+        body.invited
+          ? "病人已新增，啟用帳戶連結已發送至病人電郵。"
+          : "病人已新增並指派到你的病人列表。",
+      );
+      setNewPatientName("");
+      setNewPatientPhone("");
+      setNewPatientEmail("");
+      setIsAddPatientOpen(false);
+      await fetchPatients(debouncedQuery);
+    } catch (err) {
+      setAddPatientError(err instanceof Error ? err.message : "新增病人失敗");
+    } finally {
+      setAddPatientLoading(false);
+    }
+  }
+
   function formatDate(dateStr: string | null): string {
     if (!dateStr) return "--";
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
@@ -81,11 +138,24 @@ export default function DoctorPatientsPage() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">病人列表</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          管理您的病人護理記錄{!loading && !error ? `（共 ${patients.length} 位）` : ""}
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">病人列表</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            管理您的病人護理記錄{!loading && !error ? `（共 ${patients.length} 位）` : ""}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setIsAddPatientOpen((prev) => !prev);
+            setAddPatientError(null);
+            setAddPatientSuccess(null);
+          }}
+          className="inline-flex shrink-0 items-center rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+        >
+          {isAddPatientOpen ? "收起" : "新增病人"}
+        </button>
       </div>
 
       {/* Search */}
@@ -111,6 +181,97 @@ export default function DoctorPatientsPage() {
           className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </div>
+
+      {addPatientSuccess ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {addPatientSuccess}
+        </div>
+      ) : null}
+
+      {isAddPatientOpen ? (
+        <form
+          onSubmit={handleAddPatientSubmit}
+          className="space-y-4 rounded-lg border border-primary/20 bg-white p-4 shadow-sm"
+        >
+          <h2 className="text-sm font-semibold text-gray-900">新增病人</h2>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <label htmlFor="new-patient-name" className="text-xs font-medium text-gray-600">
+                姓名
+              </label>
+              <input
+                id="new-patient-name"
+                type="text"
+                value={newPatientName}
+                onChange={(e) => setNewPatientName(e.target.value)}
+                required
+                maxLength={80}
+                placeholder="例如：陳大文"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="new-patient-phone" className="text-xs font-medium text-gray-600">
+                電話
+              </label>
+              <input
+                id="new-patient-phone"
+                type="tel"
+                value={newPatientPhone}
+                onChange={(e) => setNewPatientPhone(e.target.value)}
+                required
+                maxLength={32}
+                placeholder="例如：91234567"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="new-patient-email" className="text-xs font-medium text-gray-600">
+                電郵
+              </label>
+              <input
+                id="new-patient-email"
+                type="email"
+                value={newPatientEmail}
+                onChange={(e) => setNewPatientEmail(e.target.value)}
+                required
+                maxLength={120}
+                placeholder="例如：patient@example.com"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
+
+          {addPatientError ? (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {addPatientError}
+            </div>
+          ) : null}
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsAddPatientOpen(false);
+                setAddPatientError(null);
+              }}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={addPatientLoading}
+              className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {addPatientLoading ? "新增中..." : "儲存並發送啟用連結"}
+            </button>
+          </div>
+        </form>
+      ) : null}
 
       {/* Content */}
       {loading ? (

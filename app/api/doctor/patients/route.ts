@@ -1,14 +1,256 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getCurrentUser, requireStaffRole, AuthError } from "@/lib/auth-helpers";
 import { createServiceClient } from "@/lib/supabase";
-import { normalizePhoneForSearch } from "@/lib/contact-utils";
+import { normalizePhoneForSearch, normalizePhoneForStorage } from "@/lib/contact-utils";
+import { getWebAuthCallbackUrl } from "@/lib/auth-redirect";
 
 export const dynamic = "force-dynamic";
 const MAX_SEARCH_PATIENT_SCAN = 2000;
+const AUTH_USER_SCAN_LIMIT = 10;
+const AUTH_USER_SCAN_PAGE_SIZE = 200;
+
+const createPatientSchema = z
+  .object({
+    displayName: z.string().min(2).max(80),
+    phone: z.string().min(8).max(32),
+    email: z.string().email(),
+  })
+  .strict();
 
 function includesIgnoreCase(source: string | null | undefined, query: string): boolean {
   if (!source || !query) return false;
   return source.toLowerCase().includes(query);
+}
+
+function isAlreadyRegisteredError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("already been registered") ||
+    normalized.includes("already exists") ||
+    normalized.includes("user already registered")
+  );
+}
+
+async function findAuthUserIdByEmail(
+  supabase: ReturnType<typeof createServiceClient>,
+  email: string,
+): Promise<string | null> {
+  for (let page = 1; page <= AUTH_USER_SCAN_LIMIT; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage: AUTH_USER_SCAN_PAGE_SIZE,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const matchedUser = data.users.find(
+      (item) => (item.email || "").toLowerCase() === email,
+    );
+    if (matchedUser?.id) {
+      return matchedUser.id;
+    }
+
+    if (data.users.length < AUTH_USER_SCAN_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return null;
+}
+
+async function cleanupAuthUser(
+  supabase: ReturnType<typeof createServiceClient>,
+  userId: string,
+) {
+  const { error } = await supabase.auth.admin.deleteUser(userId);
+  if (error) {
+    console.error("[POST /api/doctor/patients] cleanup auth user failed:", error.message);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const staffRole = await requireStaffRole(user.id);
+    const body = await request.json().catch(() => null);
+    const parsed = createPatientSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid input", details: parsed.error.flatten() },
+        { status: 400 },
+      );
+    }
+
+    const displayName = parsed.data.displayName.trim();
+    const email = parsed.data.email.trim().toLowerCase();
+    const phone = normalizePhoneForStorage(parsed.data.phone);
+    if (!phone) {
+      return NextResponse.json({ error: "Invalid phone format" }, { status: 400 });
+    }
+
+    const supabase = createServiceClient();
+    let patientUserId: string | null = null;
+    let invitedNewUser = false;
+
+    try {
+      patientUserId = await findAuthUserIdByEmail(supabase, email);
+    } catch (lookupError) {
+      const message =
+        lookupError instanceof Error ? lookupError.message : "Unknown lookup error";
+      console.warn(`[POST /api/doctor/patients] auth lookup warning: ${message}`);
+    }
+
+    if (!patientUserId) {
+      const { data: inviteData, error: inviteError } =
+        await supabase.auth.admin.inviteUserByEmail(email, {
+          data: {
+            display_name: displayName,
+            phone,
+          },
+          redirectTo: getWebAuthCallbackUrl("/chat"),
+        });
+
+      if (inviteError) {
+        if (isAlreadyRegisteredError(inviteError.message)) {
+          return NextResponse.json(
+            {
+              error:
+                "此電郵已存在帳戶，但系統暫未能自動關聯。請先讓病人自行登入一次，再由病人列表搜尋及指派。",
+            },
+            { status: 409 },
+          );
+        }
+
+        console.error(
+          "[POST /api/doctor/patients] invite user failed:",
+          inviteError.message,
+        );
+        return NextResponse.json(
+          { error: "Unable to create patient account" },
+          { status: 500 },
+        );
+      }
+
+      patientUserId = inviteData.user?.id ?? null;
+      invitedNewUser = true;
+
+      if (!patientUserId) {
+        return NextResponse.json(
+          { error: "Unable to resolve created patient user id" },
+          { status: 500 },
+        );
+      }
+    }
+
+    const now = new Date().toISOString();
+
+    const { error: profileError } = await supabase.from("profiles").upsert(
+      {
+        id: patientUserId,
+        display_name: displayName,
+        phone,
+        updated_at: now,
+      },
+      { onConflict: "id" },
+    );
+
+    if (profileError) {
+      if (invitedNewUser) {
+        await cleanupAuthUser(supabase, patientUserId);
+      }
+      console.error(
+        "[POST /api/doctor/patients] profile upsert failed:",
+        profileError.message,
+      );
+      return NextResponse.json({ error: "Unable to create patient profile" }, { status: 500 });
+    }
+
+    const { error: careTeamError } = await supabase.from("patient_care_team").upsert(
+      {
+        patient_user_id: patientUserId,
+        staff_user_id: user.id,
+        team_role: staffRole.role,
+        is_primary: true,
+      },
+      { onConflict: "patient_user_id,staff_user_id" },
+    );
+
+    if (careTeamError) {
+      if (invitedNewUser) {
+        await cleanupAuthUser(supabase, patientUserId);
+      }
+      console.error(
+        "[POST /api/doctor/patients] care team upsert failed:",
+        careTeamError.message,
+      );
+      return NextResponse.json({ error: "Unable to assign patient care team" }, { status: 500 });
+    }
+
+    const { error: careProfileError } = await supabase
+      .from("patient_care_profile")
+      .upsert(
+        {
+          patient_user_id: patientUserId,
+          constitution: "unknown",
+          updated_by: user.id,
+          updated_at: now,
+        },
+        { onConflict: "patient_user_id" },
+      );
+
+    if (careProfileError) {
+      if (invitedNewUser) {
+        await cleanupAuthUser(supabase, patientUserId);
+      }
+      console.error(
+        "[POST /api/doctor/patients] care profile upsert failed:",
+        careProfileError.message,
+      );
+      return NextResponse.json({ error: "Unable to initialize patient care profile" }, { status: 500 });
+    }
+
+    const { error: auditError } = await supabase.from("audit_logs").insert({
+      actor_user_id: user.id,
+      patient_user_id: patientUserId,
+      entity: "patient_care_team",
+      entity_id: `${patientUserId}:${user.id}`,
+      action: invitedNewUser ? "patient_created_by_staff" : "patient_linked_to_staff",
+      after_json: {
+        displayName,
+        email,
+        phone,
+        teamRole: staffRole.role,
+      },
+      created_at: now,
+    });
+
+    if (auditError) {
+      console.warn(
+        "[POST /api/doctor/patients] audit log insert warning:",
+        auditError.message,
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      patientUserId,
+      invited: invitedNewUser,
+    });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    console.error("[POST /api/doctor/patients] unexpected error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 export async function GET(request: NextRequest) {
