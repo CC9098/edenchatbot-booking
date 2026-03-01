@@ -165,7 +165,7 @@ export default function CareAdvicePage() {
 
   return (
     <main className="patient-pane text-slate-800">
-      <div className="mx-auto max-w-4xl space-y-8">
+      <div className="mx-auto max-w-4xl space-y-5">
         {/* ── Opening: time-aware greeting ── */}
         <header className="animate-eden-enter space-y-3 pb-4">
           <h1 className="text-[28px] font-semibold tracking-[-0.02em] text-primary sm:text-[32px]">養生</h1>
