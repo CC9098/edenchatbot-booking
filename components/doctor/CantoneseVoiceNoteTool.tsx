@@ -42,7 +42,19 @@ interface VoiceNoteResponse {
   error?: string;
 }
 
-export function CantoneseVoiceNoteTool() {
+export interface VoiceNotePatient {
+  patientUserId: string;
+  displayName: string | null;
+  phone: string | null;
+  constitution: string;
+  nextFollowUpDate: string | null;
+}
+
+interface CantoneseVoiceNoteToolProps {
+  selectedPatient: VoiceNotePatient | null;
+}
+
+export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteToolProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -131,6 +143,9 @@ export function CantoneseVoiceNoteTool() {
 
       const formData = new FormData();
       formData.append("audio", audioFile);
+      formData.append("patientUserId", selectedPatient?.patientUserId || "");
+      formData.append("patientDisplayName", selectedPatient?.displayName || "");
+      formData.append("patientPhone", selectedPatient?.phone || "");
 
       const response = await fetch("/api/doctor/voice-notes", {
         method: "POST",
@@ -157,6 +172,12 @@ export function CantoneseVoiceNoteTool() {
 
   async function startRecording() {
     if (!isSupported || isRecording || isProcessing) return;
+
+    if (!selectedPatient) {
+      setError("請先選擇病人，再開始錄音。");
+      return;
+    }
+
     setError(null);
     resetOutputs();
     setDurationSeconds(0);
@@ -228,6 +249,9 @@ export function CantoneseVoiceNoteTool() {
           <p className="mt-1 text-sm text-gray-600">
             錄音完成後會自動轉錄並整理為可貼入病歷的症狀摘要，結果請由醫師覆核。
           </p>
+          <p className="mt-1 text-xs text-gray-500">
+            當前病人：{selectedPatient?.displayName || "未選擇"}{selectedPatient?.phone ? `（${selectedPatient.phone}）` : ""}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {isRecording ? (
@@ -242,7 +266,7 @@ export function CantoneseVoiceNoteTool() {
             <button
               type="button"
               onClick={() => void startRecording()}
-              disabled={!isSupported || isProcessing}
+              disabled={!isSupported || isProcessing || !selectedPatient}
               className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               開始錄音

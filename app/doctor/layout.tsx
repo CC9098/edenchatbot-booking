@@ -10,6 +10,7 @@ function DoctorHeader() {
   const { user, signOut } = useAuth();
   const pathname = usePathname();
   const isPatientsActive = pathname === "/doctor" || pathname.startsWith("/doctor/patients/");
+  const isRecordActive = pathname.startsWith("/doctor/record");
   const isArticleContentActive = pathname.startsWith("/doctor/content/articles");
   const isCardContentActive = pathname.startsWith("/doctor/content/cards");
 
@@ -49,6 +50,16 @@ function DoctorHeader() {
               }`}
             >
               文章管理
+            </Link>
+            <Link
+              href="/doctor/record"
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                isRecordActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-gray-600 hover:text-primary hover:bg-primary/5"
+              }`}
+            >
+              語音記錄
             </Link>
             <Link
               href="/doctor/content/cards"

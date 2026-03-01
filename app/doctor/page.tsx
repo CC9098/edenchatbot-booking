@@ -3,8 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
-import { CantoneseVoiceNoteTool } from "@/components/doctor/CantoneseVoiceNoteTool";
-
 /* ---------- Types ---------- */
 interface PatientItem {
   patientUserId: string;
@@ -89,8 +87,6 @@ export default function DoctorPatientsPage() {
           管理您的病人護理記錄{!loading && !error ? `（共 ${patients.length} 位）` : ""}
         </p>
       </div>
-
-      <CantoneseVoiceNoteTool />
 
       {/* Search */}
       <div className="relative">

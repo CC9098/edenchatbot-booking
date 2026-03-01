@@ -49,6 +49,12 @@ interface SymptomExtraction {
   verificationItems: string[];
 }
 
+interface PatientContext {
+  patientUserId: string;
+  patientDisplayName: string;
+  patientPhone: string;
+}
+
 function parseJsonObject(rawText: string): Record<string, unknown> | null {
   const trimmed = rawText.trim();
   const candidates: string[] = [trimmed];
@@ -93,6 +99,19 @@ function sanitizeList(value: unknown, maxItems = 12, maxItemLength = 180): strin
     .slice(0, maxItems);
 }
 
+function sanitizeFormText(value: FormDataEntryValue | null, maxLength: number): string {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, maxLength);
+}
+
+function buildPatientHeader(patient: PatientContext): string[] {
+  return [
+    `病人ID：${patient.patientUserId || "未提供"}`,
+    `病人姓名：${patient.patientDisplayName || "未提供"}`,
+    `病人電話：${patient.patientPhone || "未提供"}`,
+  ];
+}
+
 function normalizeExtraction(data: Record<string, unknown> | null): SymptomExtraction {
   if (!data) {
     return {
@@ -122,8 +141,11 @@ function formatList(items: string[]): string {
   return items.map((item, index) => `${index + 1}. ${item}`).join("\n");
 }
 
-function buildRecordText(extraction: SymptomExtraction): string {
+function buildRecordText(extraction: SymptomExtraction, patient: PatientContext): string {
+  const patientHeader = buildPatientHeader(patient);
   return [
+    ...patientHeader,
+    "",
     `主訴：${extraction.chiefComplaint || "未明確提及"}`,
     "",
     `現病史摘要：${extraction.presentIllnessSummary || "未明確提及"}`,
@@ -174,15 +196,17 @@ async function transcribeAudio(
 
 async function extractSymptoms(
   model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
-  transcript: string
+  transcript: string,
+  patient: PatientContext
 ): Promise<SymptomExtraction> {
+  const patientBlock = buildPatientHeader(patient).join("\n");
   const result = await model.generateContent({
     contents: [
       {
         role: "user",
         parts: [
           {
-            text: `${EXTRACTION_PROMPT}\n\n【逐字稿開始】\n${transcript}\n【逐字稿結束】`,
+            text: `${EXTRACTION_PROMPT}\n\n【病人資料】\n${patientBlock}\n【病人資料結束】\n\n【逐字稿開始】\n${transcript}\n【逐字稿結束】`,
           },
         ],
       },
@@ -212,6 +236,16 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
+    const patientContext: PatientContext = {
+      patientUserId: sanitizeFormText(formData.get("patientUserId"), 80),
+      patientDisplayName: sanitizeFormText(formData.get("patientDisplayName"), 120),
+      patientPhone: sanitizeFormText(formData.get("patientPhone"), 40),
+    };
+
+    if (!patientContext.patientUserId) {
+      return NextResponse.json({ error: "patientUserId is required" }, { status: 400 });
+    }
+
     const audioInput = formData.get("audio");
     if (!(audioInput instanceof File)) {
       return NextResponse.json({ error: "audio file is required" }, { status: 400 });
@@ -244,10 +278,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "轉錄結果為空，請重試" }, { status: 502 });
     }
 
-    const extraction = await extractSymptoms(model, transcript);
-    const recordText = buildRecordText(extraction);
+    const extraction = await extractSymptoms(model, transcript, patientContext);
+    const recordText = buildRecordText(extraction, patientContext);
 
     return NextResponse.json({
+      patient: patientContext,
       transcript,
       extraction,
       recordText,
