@@ -1434,8 +1434,15 @@ const FALLBACK_CONSTITUTION_CONTEXT: Record<ConstitutionType, string> = {
   mixed:
     '用戶目前屬於「混合型」狀態，可能同時見到多種體質訊號。建議先聚焦最困擾症狀與近期變化，避免過度單一化判斷，再逐步微調飲食、作息與壓力管理。',
   unknown:
-    '用戶目前體質未明。回覆應保持中性、先做安全與可執行建議，避免直接套用單一體質結論。預設唔提問；只有缺少關鍵資料先問最多 1 條會改變建議嘅問題。',
+    '用戶目前未完成體質判定。不要直接下任何體質結論；先提供一般安全與可執行建議，並引導用戶先完成問卷或由醫師面診判定體質。',
 };
+
+const UNKNOWN_CONSTITUTION_GUARDRAIL = `【未完成體質判定（高優先）】
+- 用戶未有明確體質時，不可直接套用虛耗型/交錯型/累積型結論。
+- 先答當下問題，但只可提供一般性、保守建議。
+- 份量建議用彈性描述（如：可少量、按反應調整）；除非用戶明確問「幾多」，否則唔好硬塞固定數字。
+- 若用戶想要更精準體質建議、或症狀反覆：優先建議先完成「SOUL 原力圖・問卷」（/chat/symptoms/tendency-quiz），或者直接預約醫師由面診判定體質。
+- G1 除紅旗/高風險外，不主動追問；優先用「如果…就…」分流句。`;
 
 const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
   G1: '用簡短方式回答（2-3句）：先答結論，再給可執行做法（份量/時段/溫度）。預設唔提問；只有缺少關鍵資料時先可問 1 條會改變建議嘅問題。避免提及任何模式名。',
@@ -2493,6 +2500,8 @@ ${FALLBACK_MODE_PROMPTS[mode]}
 ${FALLBACK_CONSTITUTION_CONTEXT[type]}
 ${careContext}
 ${contentContext}
+
+${type === 'unknown' ? `\n${UNKNOWN_CONSTITUTION_GUARDRAIL}` : ''}
 
 【診所資訊】
 ${clinicInfo}
