@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Figtree, Noto_Sans_TC, Roboto_Mono } from "next/font/google";
+import { Figtree, Noto_Sans_TC, Noto_Serif_TC, Roboto_Mono } from "next/font/google";
 import { NativeOAuthListener } from "@/components/auth/NativeOAuthListener";
 import { PatientAppChrome } from "@/components/patient/PatientAppChrome";
 import "./globals.css";
@@ -19,6 +19,12 @@ const sans = Noto_Sans_TC({
 const mono = Roboto_Mono({
   variable: "--font-eden-mono",
   subsets: ["latin"],
+});
+
+const serif = Noto_Serif_TC({
+  variable: "--font-eden-serif",
+  subsets: ["latin"],
+  weight: ["400", "600"],
 });
 
 export const metadata: Metadata = {
@@ -45,7 +51,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${display.variable} ${sans.variable} ${mono.variable} antialiased`}
+        className={`${display.variable} ${sans.variable} ${mono.variable} ${serif.variable} antialiased`}
       >
         <NativeOAuthListener />
         <PatientAppChrome>{children}</PatientAppChrome>

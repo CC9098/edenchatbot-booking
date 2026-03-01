@@ -23,6 +23,7 @@
 
   --font-body: var(--font-eden-sans), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --font-display: var(--font-eden-display), var(--font-body);
+  --font-serif: var(--font-eden-serif), "Noto Serif TC", "Songti TC", serif;
   /* Cross-device strategy: safe-area + baseline floor to avoid notch clipping. */
   --chat-topbar-safe-offset: max(56px, calc(env(safe-area-inset-top, 0px) + 20px));
   --chat-content-top-offset: calc(var(--chat-topbar-safe-offset) + 74px);
@@ -53,7 +54,9 @@
 
 body {
   background:
-    radial-gradient(120% 85% at 50% -15%, #bdd2c1 0%, #ecf2eb 52%, #f4f6f1 100%);
+    radial-gradient(ellipse 140% 60% at 50% -20%, rgba(189, 210, 193, 0.45) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 50% at 80% 100%, rgba(78, 138, 150, 0.06) 0%, transparent 50%),
+    #f4f6f1;
   color: var(--foreground);
   font-family: var(--font-body);
   -webkit-text-size-adjust: 100%;
@@ -111,7 +114,7 @@ h3 {
   font-size: 13px;
   line-height: 1.1;
   font-weight: 600;
-  transition: all 0.2s ease;
+  transition: color 0.25s ease, background 0.3s ease, box-shadow 0.3s ease;
   cursor: pointer;
 }
 
@@ -120,8 +123,9 @@ h3 {
 }
 
 .patient-tab--active {
-  color: #3f784d;
-  background: rgba(70, 126, 83, 0.12);
+  color: #2f6240;
+  background: linear-gradient(180deg, rgba(70, 126, 83, 0.08) 0%, rgba(70, 126, 83, 0.14) 100%);
+  box-shadow: inset 0 -2px 0 rgba(70, 126, 83, 0.3);
 }
 
 .patient-tab:focus-visible {
@@ -137,10 +141,10 @@ h3 {
 }
 
 .patient-card {
-  border: 1px solid rgba(79, 123, 87, 0.18);
+  border: 1px solid rgba(79, 123, 87, 0.10);
   border-radius: var(--radius-card);
   background: rgba(255, 255, 255, 0.9);
-  box-shadow: var(--shadow-soft);
+  box-shadow: 0 4px 24px rgba(24, 40, 26, 0.05), 0 1px 3px rgba(24, 40, 26, 0.03);
 }
 
 .patient-pill {
@@ -475,4 +479,55 @@ html, body {
   textarea {
     font-size: 16px;
   }
+}
+
+/* ── Eden narrative typography ── */
+.text-narrative {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  line-height: 1.8;
+  letter-spacing: 0.02em;
+  color: rgba(60, 72, 60, 0.65);
+}
+
+/* ── Eden entrance animations ── */
+@keyframes eden-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-eden-enter {
+  animation: eden-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-eden-enter-delay-1 {
+  animation: eden-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.animate-eden-enter-delay-2 {
+  animation: eden-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.16s both;
+}
+
+.animate-eden-enter-delay-3 {
+  animation: eden-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
+}
+
+.animate-eden-enter-delay-4 {
+  animation: eden-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.32s both;
+}
+
+/* ── Eden breathing animation (for loading states) ── */
+@keyframes eden-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.97); }
+  50% { opacity: 0.65; transform: scale(1.0); }
+}
+
+.animate-breathe {
+  animation: eden-breathe 2.4s ease-in-out infinite;
 }

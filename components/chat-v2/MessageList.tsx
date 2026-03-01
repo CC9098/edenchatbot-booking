@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMode } from "./ModeSelector";
-import { Check, Copy, Loader2, Share2, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Check, Copy, Share2, ThumbsDown, ThumbsUp } from "lucide-react";
 
 export type ChatMessage = {
   role: "user" | "assistant";
@@ -269,9 +269,13 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
         {/* Loading indicator */}
         {loading && (
           <div className="flex justify-start">
-            <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-white px-4 py-3 shadow-sm ring-1 ring-black/5">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              <span className="text-sm text-gray-400">正在思考...</span>
+            <div className="animate-breathe rounded-2xl rounded-bl-md bg-white px-5 py-4 shadow-sm ring-1 ring-black/5">
+              <span
+                className="text-sm text-slate-400"
+                style={{ fontFamily: "var(--font-serif)" }}
+              >
+                正在聆聽...
+              </span>
             </div>
           </div>
         )}

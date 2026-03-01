@@ -12,6 +12,16 @@ import {
 import { DailyTipCard } from "@/components/patient/DailyTipCard";
 import { DailySensePrompt } from "@/components/patient/DailySensePrompt";
 
+function getTimeGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 6) return "夜深了，記得早休息。";
+  if (hour < 11) return "早安，今天的節奏由你決定。";
+  if (hour < 14) return "午間稍息，讓身體回氣。";
+  if (hour < 18) return "下午好，保持你的步調。";
+  if (hour < 21) return "黃昏時分，讓一天慢慢收束。";
+  return "晚安，身體記得今天的一切。";
+}
+
 type CareInstruction = {
   id: string;
   instructionType: string;
@@ -155,18 +165,28 @@ export default function CareAdvicePage() {
 
   return (
     <main className="patient-pane text-slate-800">
-      <div className="mx-auto max-w-4xl space-y-5">
-        {/* ── Opening: quiet quote ── */}
-        <header className="space-y-4 pb-1">
-          <h1 className="text-2xl font-semibold text-primary sm:text-3xl">養生</h1>
-          <p className="whitespace-pre-line text-sm leading-relaxed text-slate-500">
-            「{NARRATIVE.carePageQuote}」
+      <div className="mx-auto max-w-4xl space-y-8">
+        {/* ── Opening: time-aware greeting ── */}
+        <header className="animate-eden-enter space-y-3 pb-4">
+          <h1 className="text-[28px] font-semibold tracking-[-0.02em] text-primary sm:text-[32px]">養生</h1>
+          <p
+            className="text-sm leading-relaxed text-slate-400"
+            style={{ fontFamily: "var(--font-serif)" }}
+          >
+            {getTimeGreeting()}
           </p>
         </header>
 
         {loading ? (
-          <section className="patient-card px-6 py-10 text-center">
-            <p className="text-sm text-slate-500">載入中...</p>
+          <section className="py-16 text-center">
+            <div className="animate-breathe">
+              <p
+                className="text-sm text-slate-400"
+                style={{ fontFamily: "var(--font-serif)" }}
+              >
+                正在準備你的養生空間...
+              </p>
+            </div>
           </section>
         ) : error ? (
           <section className="patient-card px-6 py-10 text-center">
@@ -190,10 +210,12 @@ export default function CareAdvicePage() {
         ) : (
           <>
             {/* ── Daily tip card (one quiet thought per day) ── */}
-            <DailyTipCard constitution={constitutionKey} accentBg={accentBg} />
+            <div className="animate-eden-enter-delay-1">
+              <DailyTipCard constitution={constitutionKey} accentBg={accentBg} />
+            </div>
 
             {/* ── Constitution card (dual-track: force name + TCM label) ── */}
-            <section className="patient-card p-5 sm:p-6">
+            <section className="animate-eden-enter-delay-2 patient-card p-5 sm:p-6">
               <div className="flex items-start gap-3">
                 {tendencyKey ? (
                   <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100">
@@ -226,7 +248,7 @@ export default function CareAdvicePage() {
             </section>
 
             {/* ── Diet recommendations ── */}
-            <section className="patient-card p-5 sm:p-6">
+            <section className="animate-eden-enter-delay-3 patient-card p-5 sm:p-6">
               <h2 className="text-base font-semibold text-slate-900">養生飲食方針</h2>
               <p className="mt-2 text-sm text-slate-500">{dietIntro}</p>
 
@@ -250,7 +272,7 @@ export default function CareAdvicePage() {
             </section>
 
             {/* ── Diet avoidances ── */}
-            <section className="patient-card p-5 sm:p-6">
+            <section className="animate-eden-enter-delay-4 patient-card p-5 sm:p-6">
               <h2 className="text-base font-semibold text-slate-900">醫師戒口提醒</h2>
               {dietAvoidItems.length > 0 ? (
                 <div className="mt-4 space-y-3">

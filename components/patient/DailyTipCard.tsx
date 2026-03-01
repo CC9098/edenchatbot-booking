@@ -30,13 +30,18 @@ export function DailyTipCard({ constitution, accentBg = "bg-primary-light/30" }:
   if (!tip) return null;
 
   return (
-    <div className={`rounded-2xl ${accentBg} px-5 py-6`}>
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+    <div className={`relative overflow-hidden rounded-[20px] ${accentBg} px-6 py-8`}>
+      <div className="absolute left-1/2 top-4 h-px w-10 -translate-x-1/2 bg-primary/12" />
+      <p
+        className="whitespace-pre-wrap text-center text-[15px] leading-[1.9] text-slate-600"
+        style={{ fontFamily: "var(--font-serif)" }}
+      >
         「{tip}」
       </p>
-      <p className="mt-3 text-right text-xs text-slate-400">
+      <p className="mt-5 text-center text-xs tracking-[0.12em] text-slate-400">
         {NARRATIVE.dailyTipLabel}
       </p>
+      <div className="absolute bottom-4 left-1/2 h-px w-10 -translate-x-1/2 bg-primary/12" />
     </div>
   );
 }

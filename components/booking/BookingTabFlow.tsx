@@ -652,13 +652,13 @@ export function BookingTabFlow() {
 
   return (
     <div className="patient-card mx-auto max-w-2xl p-6 sm:p-8">
-      <div className="mb-6 space-y-3">
-        <p className="patient-pill inline-flex px-3 py-1 text-xs font-semibold text-primary">
-          App 內預約
-        </p>
-        <h1 className="text-2xl font-semibold text-primary sm:text-3xl">預約服務</h1>
-        <p className="text-sm leading-relaxed text-slate-600 sm:text-base">
-          預約流程已整合在手機 App 內，不需要跳到外部瀏覽器。
+      <div className="mb-8 space-y-3">
+        <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-primary sm:text-[30px]">預約服務</h1>
+        <p
+          className="text-sm leading-relaxed text-slate-400"
+          style={{ fontFamily: "var(--font-serif)" }}
+        >
+          「每一次預約，都是照顧自己的開始。」
         </p>
       </div>
 
@@ -1148,15 +1148,20 @@ export function BookingTabFlow() {
       )}
 
       {step === 'success' && (
-        <div className="space-y-6 text-center">
-          <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-700">
-            <CheckCircle2 className="h-8 w-8" />
+        <div className="animate-eden-enter space-y-8 py-4 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center">
+            <CheckCircle2 className="h-10 w-10 text-primary/70" strokeWidth={1.5} />
           </div>
 
-          <div>
-            <h2 className="text-2xl font-semibold text-slate-900">預約成功</h2>
-            <p className="mt-2 text-sm text-slate-600">已完成預約，確認電郵將發送到你提供的信箱。</p>
-            <p className="mt-3 text-xs text-slate-400">每一次回來，身體都記得。</p>
+          <div className="space-y-3">
+            <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-slate-800">預約成功</h2>
+            <p className="text-sm text-slate-500">確認電郵將發送到你提供的信箱。</p>
+            <p
+              className="mt-4 text-[14px] leading-[1.8] text-slate-400"
+              style={{ fontFamily: "var(--font-serif)" }}
+            >
+              「每一次回來，身體都記得。」
+            </p>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-sm text-slate-700">

@@ -75,15 +75,20 @@ export function TendencyWhisper({ userId }: TendencyWhisperProps) {
   const narrative = FORCE_NARRATIVE[primaryKey];
 
   return (
-    <div className="flex items-center justify-center gap-1.5 px-3 py-1.5">
+    <div className="flex items-center justify-center gap-2 border-b border-primary/5 px-3 py-2.5">
       {primaryKey === "J" ? (
-        <Wind className="h-3 w-3 text-slate-400" strokeWidth={1.8} />
+        <Wind className="h-3.5 w-3.5 text-slate-400/70" strokeWidth={1.6} />
       ) : primaryKey === "K" ? (
-        <Droplet className="h-3 w-3 text-slate-400" strokeWidth={1.8} />
+        <Droplet className="h-3.5 w-3.5 text-slate-400/70" strokeWidth={1.6} />
       ) : (
-        <Zap className="h-3 w-3 text-slate-400" strokeWidth={1.8} />
+        <Zap className="h-3.5 w-3.5 text-slate-400/70" strokeWidth={1.6} />
       )}
-      <span className="text-xs text-slate-400">{narrative.whisperLine}</span>
+      <span
+        className="text-[13px] tracking-[0.03em] text-slate-400/80"
+        style={{ fontFamily: "var(--font-serif)" }}
+      >
+        {narrative.whisperLine}
+      </span>
     </div>
   );
 }
