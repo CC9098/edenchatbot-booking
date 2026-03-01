@@ -79,7 +79,7 @@ export default function DoctorRecordPage() {
       <div>
         <h1 className="text-xl font-bold text-gray-900">語音病歷記錄</h1>
         <p className="mt-1 text-sm text-gray-600">
-          先勾選病人，再進行廣東話問診錄音與病歷摘要整理。
+          可直接錄音；若先勾選病人，分析後可一鍵寫入該病人記錄。
         </p>
       </div>
 
@@ -88,7 +88,7 @@ export default function DoctorRecordPage() {
           <div>
             <h2 className="text-base font-semibold text-gray-900">選取病人</h2>
             <p className="mt-1 text-sm text-gray-600">
-              請先選擇本次問診病人，語音摘要會附上病人基本標記。
+              這一步可選。若選了病人，語音摘要可直接寫入該病人症狀記錄。
             </p>
           </div>
           {selectedPatient ? (
@@ -185,7 +185,7 @@ export default function DoctorRecordPage() {
           </div>
         ) : (
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            請先勾選病人，才可開始錄音。
+            未勾選病人：你仍可開始錄音；之後可先複製摘要再自行貼上。
           </div>
         )}
       </section>

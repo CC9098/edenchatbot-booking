@@ -105,6 +105,11 @@ function sanitizeFormText(value: FormDataEntryValue | null, maxLength: number): 
 }
 
 function buildPatientHeader(patient: PatientContext): string[] {
+  const hasAnyPatientInfo = Boolean(
+    patient.patientUserId || patient.patientDisplayName || patient.patientPhone
+  );
+  if (!hasAnyPatientInfo) return [];
+
   return [
     `病人ID：${patient.patientUserId || "未提供"}`,
     `病人姓名：${patient.patientDisplayName || "未提供"}`,
@@ -144,8 +149,7 @@ function formatList(items: string[]): string {
 function buildRecordText(extraction: SymptomExtraction, patient: PatientContext): string {
   const patientHeader = buildPatientHeader(patient);
   return [
-    ...patientHeader,
-    "",
+    ...(patientHeader.length > 0 ? [...patientHeader, ""] : []),
     `主訴：${extraction.chiefComplaint || "未明確提及"}`,
     "",
     `現病史摘要：${extraction.presentIllnessSummary || "未明確提及"}`,
@@ -199,14 +203,18 @@ async function extractSymptoms(
   transcript: string,
   patient: PatientContext
 ): Promise<SymptomExtraction> {
-  const patientBlock = buildPatientHeader(patient).join("\n");
+  const patientHeader = buildPatientHeader(patient);
+  const patientBlock =
+    patientHeader.length > 0
+      ? `\n\n【病人資料】\n${patientHeader.join("\n")}\n【病人資料結束】`
+      : "";
   const result = await model.generateContent({
     contents: [
       {
         role: "user",
         parts: [
           {
-            text: `${EXTRACTION_PROMPT}\n\n【病人資料】\n${patientBlock}\n【病人資料結束】\n\n【逐字稿開始】\n${transcript}\n【逐字稿結束】`,
+            text: `${EXTRACTION_PROMPT}${patientBlock}\n\n【逐字稿開始】\n${transcript}\n【逐字稿結束】`,
           },
         ],
       },
@@ -241,10 +249,6 @@ export async function POST(request: Request) {
       patientDisplayName: sanitizeFormText(formData.get("patientDisplayName"), 120),
       patientPhone: sanitizeFormText(formData.get("patientPhone"), 40),
     };
-
-    if (!patientContext.patientUserId) {
-      return NextResponse.json({ error: "patientUserId is required" }, { status: 400 });
-    }
 
     const audioInput = formData.get("audio");
     if (!(audioInput instanceof File)) {
@@ -282,7 +286,10 @@ export async function POST(request: Request) {
     const recordText = buildRecordText(extraction, patientContext);
 
     return NextResponse.json({
-      patient: patientContext,
+      patient:
+        patientContext.patientUserId || patientContext.patientDisplayName || patientContext.patientPhone
+          ? patientContext
+          : null,
       transcript,
       extraction,
       recordText,

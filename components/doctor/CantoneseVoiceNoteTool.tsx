@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const MAX_AUDIO_FILE_BYTES = 15 * 1024 * 1024;
 
@@ -42,6 +43,11 @@ interface VoiceNoteResponse {
   error?: string;
 }
 
+interface SaveToRecordResponse {
+  symptom?: { id?: string };
+  error?: string;
+}
+
 export interface VoiceNotePatient {
   patientUserId: string;
   displayName: string | null;
@@ -55,6 +61,7 @@ interface CantoneseVoiceNoteToolProps {
 }
 
 export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteToolProps) {
+  const router = useRouter();
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -70,6 +77,9 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
   const [transcript, setTranscript] = useState("");
   const [recordText, setRecordText] = useState("");
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const [savingToPatientRecord, setSavingToPatientRecord] = useState(false);
+  const [saveRecordStatus, setSaveRecordStatus] = useState<string | null>(null);
+  const [saveRecordError, setSaveRecordError] = useState<string | null>(null);
 
   useEffect(() => {
     const hasSupport =
@@ -90,6 +100,11 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     };
   }, []);
 
+  useEffect(() => {
+    setSaveRecordStatus(null);
+    setSaveRecordError(null);
+  }, [selectedPatient?.patientUserId]);
+
   function clearTimer() {
     if (!timerRef.current) return;
     clearInterval(timerRef.current);
@@ -105,6 +120,8 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     setTranscript("");
     setRecordText("");
     setCopyStatus(null);
+    setSaveRecordStatus(null);
+    setSaveRecordError(null);
   }
 
   function replacePreviewUrl(nextUrl: string | null) {
@@ -135,6 +152,8 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
 
     setIsProcessing(true);
     setError(null);
+    setSaveRecordStatus(null);
+    setSaveRecordError(null);
 
     try {
       const extension = fileExtensionForMime(mimeType);
@@ -172,11 +191,6 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
 
   async function startRecording() {
     if (!isSupported || isRecording || isProcessing) return;
-
-    if (!selectedPatient) {
-      setError("請先選擇病人，再開始錄音。");
-      return;
-    }
 
     setError(null);
     resetOutputs();
@@ -241,6 +255,53 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     recorder.stop();
   }
 
+  async function saveToPatientRecord() {
+    if (!selectedPatient) {
+      setSaveRecordError("未勾選病人，未能寫入病人記錄。");
+      return;
+    }
+    if (!recordText.trim()) {
+      setSaveRecordError("未有可寫入內容。");
+      return;
+    }
+
+    setSavingToPatientRecord(true);
+    setSaveRecordStatus(null);
+    setSaveRecordError(null);
+
+    const today = new Date();
+    const startedAt = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(today.getDate()).padStart(2, "0")}`;
+
+    try {
+      const response = await fetch(
+        `/api/doctor/patients/${selectedPatient.patientUserId}/symptoms`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: "語音問診摘要",
+            description: recordText,
+            status: "active",
+            startedAt,
+          }),
+        }
+      );
+      const payload = (await response.json().catch(() => ({}))) as SaveToRecordResponse;
+      if (!response.ok) {
+        throw new Error(payload.error || `HTTP ${response.status}`);
+      }
+
+      setSaveRecordStatus("已寫入病人症狀記錄。");
+    } catch (saveError) {
+      setSaveRecordError(saveError instanceof Error ? saveError.message : "寫入病人記錄失敗");
+    } finally {
+      setSavingToPatientRecord(false);
+    }
+  }
+
   return (
     <section className="rounded-xl border border-primary/20 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -250,7 +311,8 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
             錄音完成後會自動轉錄並整理為可貼入病歷的症狀摘要，結果請由醫師覆核。
           </p>
           <p className="mt-1 text-xs text-gray-500">
-            當前病人：{selectedPatient?.displayName || "未選擇"}{selectedPatient?.phone ? `（${selectedPatient.phone}）` : ""}
+            當前病人：{selectedPatient?.displayName || "未選擇（可直接錄音）"}
+            {selectedPatient?.phone ? `（${selectedPatient.phone}）` : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -266,7 +328,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
             <button
               type="button"
               onClick={() => void startRecording()}
-              disabled={!isSupported || isProcessing || !selectedPatient}
+              disabled={!isSupported || isProcessing}
               className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               開始錄音
@@ -303,9 +365,21 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
         <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       ) : null}
 
+      {saveRecordError ? (
+        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {saveRecordError}
+        </div>
+      ) : null}
+
       {copyStatus ? (
         <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           {copyStatus}
+        </div>
+      ) : null}
+
+      {saveRecordStatus ? (
+        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          {saveRecordStatus}
         </div>
       ) : null}
 
@@ -318,17 +392,43 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
 
       {recordText ? (
         <div className="mt-4 space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-gray-900">可貼入病歷之症狀摘要</h3>
-            <button
-              type="button"
-              onClick={() => void copyText(recordText, "record")}
-              className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100"
-            >
-              複製摘要
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void copyText(recordText, "record")}
+                className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100"
+              >
+                複製摘要
+              </button>
+              {selectedPatient ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void saveToPatientRecord()}
+                    disabled={savingToPatientRecord}
+                    className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingToPatientRecord ? "寫入中..." : "寫入病人記錄"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/doctor/patients/${selectedPatient.patientUserId}`)}
+                    className="rounded-md border border-primary/30 bg-white px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/5"
+                  >
+                    打開病人記錄
+                  </button>
+                </>
+              ) : null}
+            </div>
           </div>
           <pre className="whitespace-pre-wrap text-sm leading-6 text-gray-800">{recordText}</pre>
+          {!selectedPatient ? (
+            <p className="text-xs text-amber-700">
+              目前未勾選病人；你可先複製使用。若想一鍵寫入，先在上方選取病人。
+            </p>
+          ) : null}
         </div>
       ) : null}
 
