@@ -1840,35 +1840,16 @@ function isG1DirectActionIntent(latestUserText: string): boolean {
   const normalized = normalizeIntentText(latestUserText);
   if (!normalized) return false;
 
-  const scopeKeywords = ['食', '飲', '煮', '湯', '水果', '份量', '一日', '每日', '作息', '凍嘢', '冷飲'];
-  const intentKeywords = [
-    '可唔可以',
-    '可不可以',
-    '可以',
-    '可否',
-    '可食',
-    '可飲',
-    '食唔食得',
-    '飲唔飲得',
-    '得唔得',
-    '能唔能夠',
-    '幾多',
-    '點煮',
-    '點食',
-    '幾時',
-    '最好',
-    '建議',
-    '點樣',
-    '怎样',
-  ];
-  const canCueKeywords = ['可', '可以', '可否', '可唔可', '可不可以', '得唔得', '食唔食得', '飲唔飲得', '能唔能夠'];
+  const scopeKeywords = ['食', '飲', '煮', '湯', '水果', '份量', '一日', '每日', '作息'];
+  const intentKeywords = ['可唔可以', '可以', '幾多', '點煮', '點食', '幾時', '最好', '建議', '點樣', '怎样'];
   const hasScope = scopeKeywords.some((kw) => normalized.includes(normalizeIntentText(kw)));
   const hasIntent = intentKeywords.some((kw) => normalized.includes(normalizeIntentText(kw)));
-  const hasQuestionTone = /[？?]/.test(latestUserText);
-  const hasCanCue = canCueKeywords.some((kw) => normalized.includes(normalizeIntentText(kw)));
-  const startsWithCanCue = /^(我)?可/.test(latestUserText.trim());
-  const hasQuestionDrivenCanCue = hasQuestionTone && (hasCanCue || startsWithCanCue);
-  return hasScope && (hasIntent || hasQuestionDrivenCanCue);
+  if (hasScope && hasIntent) return true;
+
+  // Fallback for very short Cantonese yes/no style prompts (e.g.「我可食西瓜？」).
+  const isShortQuestion = normalized.length <= 18 && /[？?]/.test(latestUserText);
+  const hasInterrogativeCue = /[可得點幾嗎么]/.test(latestUserText);
+  return hasScope && isShortQuestion && hasInterrogativeCue;
 }
 
 function stripQuestionSentencesFromReply(text: string): string {
