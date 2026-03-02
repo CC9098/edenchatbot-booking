@@ -1,5 +1,6 @@
 const DEFAULT_PUBLIC_WEB_URL = "https://edenchatbot-booking.vercel.app";
 const DEFAULT_MOBILE_SCHEME = "com.cc9098.edenchatbotbooking";
+const DEFAULT_AUTH_NEXT = "/chat";
 
 function normalizeBaseUrl(value?: string | null): string | null {
   if (!value) return null;
@@ -22,9 +23,19 @@ export function getPublicWebBaseUrl() {
   return DEFAULT_PUBLIC_WEB_URL;
 }
 
-export function getWebAuthCallbackUrl(next = "/chat") {
+export function sanitizeAuthNextPath(next?: string | null, fallback = DEFAULT_AUTH_NEXT) {
+  if (!next) return fallback;
+
+  const trimmed = next.trim();
+  if (!trimmed) return fallback;
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return fallback;
+
+  return trimmed;
+}
+
+export function getWebAuthCallbackUrl(next = DEFAULT_AUTH_NEXT) {
   const url = new URL("/api/auth/callback", getPublicWebBaseUrl());
-  url.searchParams.set("next", next);
+  url.searchParams.set("next", sanitizeAuthNextPath(next));
   return url.toString();
 }
 
@@ -33,6 +44,8 @@ export function getMobileUrlScheme() {
   return scheme || DEFAULT_MOBILE_SCHEME;
 }
 
-export function getNativeAuthCallbackUrl() {
-  return `${getMobileUrlScheme()}://auth/callback`;
+export function getNativeAuthCallbackUrl(next = DEFAULT_AUTH_NEXT) {
+  const url = new URL(`${getMobileUrlScheme()}://auth/callback`);
+  url.searchParams.set("next", sanitizeAuthNextPath(next));
+  return url.toString();
 }

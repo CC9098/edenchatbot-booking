@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 
 /**
@@ -11,12 +11,17 @@ import { useAuth } from "./AuthProvider";
 export function AuthGuard({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!loading && !user) {
-      router.replace("/login");
+      const search = typeof window !== "undefined" ? window.location.search : "";
+      const next = pathname ? `${pathname}${search}` : "/chat";
+      const params = new URLSearchParams();
+      params.set("next", next);
+      router.replace(`/login?${params.toString()}`);
     }
-  }, [user, loading, router]);
+  }, [user, loading, pathname, router]);
 
   if (loading) {
     return (

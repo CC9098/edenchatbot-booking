@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { sanitizeAuthNextPath } from "@/lib/auth-redirect";
 
 /**
  * OAuth callback handler.
@@ -10,14 +11,13 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const nextParam = searchParams.get("next");
-  const next =
-    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
-      ? nextParam
-      : "/chat";
+  const next = sanitizeAuthNextPath(searchParams.get("next"));
+  const loginUrl = new URL("/login", origin);
+  loginUrl.searchParams.set("error", "auth");
+  loginUrl.searchParams.set("next", next);
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=auth`);
+    return NextResponse.redirect(loginUrl);
   }
 
   const cookieStore = cookies();
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error("[auth/callback] Code exchange failed:", error.message);
-    return NextResponse.redirect(`${origin}/login?error=auth`);
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.redirect(`${origin}${next}`);

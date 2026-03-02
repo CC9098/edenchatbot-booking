@@ -5,7 +5,7 @@ import { App, type URLOpenListenerEvent } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 import { createBrowserClient } from "@/lib/supabase-browser";
-import { getMobileUrlScheme } from "@/lib/auth-redirect";
+import { getMobileUrlScheme, sanitizeAuthNextPath } from "@/lib/auth-redirect";
 
 function isNativeOAuthCallback(url: string) {
   const expectedPrefix = `${getMobileUrlScheme()}://auth/callback`;
@@ -21,9 +21,10 @@ export function NativeOAuthListener() {
 
       const callbackUrl = new URL(event.url);
       const code = callbackUrl.searchParams.get("code");
+      const next = sanitizeAuthNextPath(callbackUrl.searchParams.get("next"));
 
       if (!code) {
-        window.location.href = "/login?error=auth";
+        window.location.href = `/login?error=auth&next=${encodeURIComponent(next)}`;
         return;
       }
 
@@ -32,7 +33,7 @@ export function NativeOAuthListener() {
 
       if (error) {
         console.error("[native-oauth] Code exchange failed:", error.message);
-        window.location.href = "/login?error=auth";
+        window.location.href = `/login?error=auth&next=${encodeURIComponent(next)}`;
         return;
       }
 
@@ -42,7 +43,7 @@ export function NativeOAuthListener() {
         // Browser may already be closed; ignore.
       }
 
-      window.location.href = "/chat";
+      window.location.href = next;
     };
 
     const listenerPromise = App.addListener("appUrlOpen", handler);

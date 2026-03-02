@@ -6,7 +6,11 @@ import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
 import { createBrowserClient } from "@/lib/supabase-browser";
-import { getNativeAuthCallbackUrl, getWebAuthCallbackUrl } from "@/lib/auth-redirect";
+import {
+  getNativeAuthCallbackUrl,
+  getWebAuthCallbackUrl,
+  sanitizeAuthNextPath,
+} from "@/lib/auth-redirect";
 
 type EmailAuthMode = "signin" | "signup";
 
@@ -46,6 +50,9 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const authError = searchParams.get("error") === "auth";
+  const nextPath = sanitizeAuthNextPath(searchParams.get("next"));
+  const isDoctorEntry =
+    nextPath === "/doctor" || nextPath.startsWith("/doctor/") || nextPath.startsWith("/doctor?");
   const [activeMethod, setActiveMethod] = useState<"google" | "email">("google");
   const [emailAuthMode, setEmailAuthMode] = useState<EmailAuthMode>("signin");
   const [email, setEmail] = useState("");
@@ -61,7 +68,7 @@ function LoginForm() {
 
     supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       if (active && session?.user) {
-        router.replace("/chat");
+        router.replace(nextPath);
       }
     });
 
@@ -69,7 +76,7 @@ function LoginForm() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       if (session?.user) {
-        router.replace("/chat");
+        router.replace(nextPath);
       }
     });
 
@@ -77,7 +84,7 @@ function LoginForm() {
       active = false;
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [nextPath, router]);
 
   async function handleGoogleLogin() {
     setErrorMessage(null);
@@ -89,7 +96,7 @@ function LoginForm() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: getNativeAuthCallbackUrl(),
+          redirectTo: getNativeAuthCallbackUrl(nextPath),
           skipBrowserRedirect: true,
           queryParams: {
             prompt: "select_account",
@@ -117,7 +124,7 @@ function LoginForm() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: getWebAuthCallbackUrl("/chat"),
+        redirectTo: getWebAuthCallbackUrl(nextPath),
       },
     });
 
@@ -159,7 +166,7 @@ function LoginForm() {
       } else {
         setSuccessMessage("登入成功，正在跳轉...");
         setPendingConfirmationEmail(null);
-        router.replace("/chat");
+        router.replace(nextPath);
       }
       setLoading(false);
       return;
@@ -169,7 +176,7 @@ function LoginForm() {
       email: trimmedEmail,
       password,
       options: {
-        emailRedirectTo: getWebAuthCallbackUrl("/chat"),
+        emailRedirectTo: getWebAuthCallbackUrl(nextPath),
       },
     });
 
@@ -200,7 +207,7 @@ function LoginForm() {
 
     setSuccessMessage("註冊成功，已自動登入。");
     setPendingConfirmationEmail(null);
-    router.replace("/chat");
+    router.replace(nextPath);
     setLoading(false);
   }
 
@@ -216,7 +223,7 @@ function LoginForm() {
       type: "signup",
       email: pendingConfirmationEmail,
       options: {
-        emailRedirectTo: getWebAuthCallbackUrl("/chat"),
+        emailRedirectTo: getWebAuthCallbackUrl(nextPath),
       },
     });
 
@@ -246,9 +253,24 @@ function LoginForm() {
         {/* Card */}
         <div className="patient-card space-y-6 p-8">
           <div className="text-center">
-            <h2 className="text-lg font-semibold text-slate-900">登入帳號</h2>
-            <p className="mt-1 text-sm text-slate-500">選擇登入方式以繼續</p>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {isDoctorEntry ? "登入醫師控制台" : "登入帳號"}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {isDoctorEntry ? "登入後會直接返回病人列表及醫師工具" : "選擇登入方式以繼續"}
+            </p>
           </div>
+
+          {isDoctorEntry ? (
+            <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-left">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">
+                Doctor Portal
+              </p>
+              <p className="mt-1 text-sm text-slate-700">
+                你而家登入嘅係醫師入口，成功登入後會直接前往病人列表，不會跳去病人 chat。
+              </p>
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-2 gap-2 rounded-full bg-slate-100 p-1">
             <button
