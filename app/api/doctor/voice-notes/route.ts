@@ -55,6 +55,8 @@ interface PatientContext {
   patientPhone: string;
 }
 
+type VoiceNoteMode = "transcribe-audio" | "extract-transcript" | "transcribe-and-extract";
+
 function parseJsonObject(rawText: string): Record<string, unknown> | null {
   const trimmed = rawText.trim();
   const candidates: string[] = [trimmed];
@@ -102,6 +104,12 @@ function sanitizeList(value: unknown, maxItems = 12, maxItemLength = 180): strin
 function sanitizeFormText(value: FormDataEntryValue | null, maxLength: number): string {
   if (typeof value !== "string") return "";
   return value.trim().slice(0, maxLength);
+}
+
+function getRequestedMode(rawMode: string): VoiceNoteMode {
+  if (rawMode === "transcribe-audio") return rawMode;
+  if (rawMode === "extract-transcript") return rawMode;
+  return "transcribe-and-extract";
 }
 
 function buildPatientHeader(patient: PatientContext): string[] {
@@ -244,11 +252,39 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
+    const mode = getRequestedMode(sanitizeFormText(formData.get("mode"), 40));
     const patientContext: PatientContext = {
       patientUserId: sanitizeFormText(formData.get("patientUserId"), 80),
       patientDisplayName: sanitizeFormText(formData.get("patientDisplayName"), 120),
       patientPhone: sanitizeFormText(formData.get("patientPhone"), 40),
     };
+
+    const patientPayload =
+      patientContext.patientUserId || patientContext.patientDisplayName || patientContext.patientPhone
+        ? patientContext
+        : null;
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: getModelName() });
+
+    if (mode === "extract-transcript") {
+      const transcript = sanitizeFormText(formData.get("transcript"), 100_000);
+      if (transcript.length < 3) {
+        return NextResponse.json({ error: "transcript is required" }, { status: 400 });
+      }
+
+      const extraction = await extractSymptoms(model, transcript, patientContext);
+      const recordText = buildRecordText(extraction, patientContext);
+
+      return NextResponse.json({
+        patient: patientPayload,
+        transcript,
+        extraction,
+        recordText,
+        mode,
+        model: getModelName(),
+      });
+    }
 
     const audioInput = formData.get("audio");
     if (!(audioInput instanceof File)) {
@@ -274,25 +310,29 @@ export async function POST(request: Request) {
     const audioBase64 = audioBuffer.toString("base64");
     const mimeType = audioInput.type;
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: getModelName() });
-
     const transcript = await transcribeAudio(model, mimeType, audioBase64);
     if (!transcript) {
       return NextResponse.json({ error: "轉錄結果為空，請重試" }, { status: 502 });
+    }
+
+    if (mode === "transcribe-audio") {
+      return NextResponse.json({
+        patient: patientPayload,
+        transcript,
+        mode,
+        model: getModelName(),
+      });
     }
 
     const extraction = await extractSymptoms(model, transcript, patientContext);
     const recordText = buildRecordText(extraction, patientContext);
 
     return NextResponse.json({
-      patient:
-        patientContext.patientUserId || patientContext.patientDisplayName || patientContext.patientPhone
-          ? patientContext
-          : null,
+      patient: patientPayload,
       transcript,
       extraction,
       recordText,
+      mode,
       model: getModelName(),
     });
   } catch (error) {
