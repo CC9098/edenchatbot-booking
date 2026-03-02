@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowUpCircle } from "lucide-react";
-import { TendencyQuizPanel } from "@/components/patient/TendencyQuizPanel";
+import { ArrowRight, ArrowUpCircle, ChevronRight } from "lucide-react";
+import { getLocalDateKey, isBaseQuizComplete, type BaseQuizAnswers } from "@/lib/constitution-tendency";
 
 type SymptomItem = {
   id: string;
@@ -41,7 +41,7 @@ type CareContextResponse = {
 };
 
 type StatusFilter = "all" | "active" | "resolved" | "recurring";
-type RootSection = "symptoms" | "force";
+
 type ResolveFormState = {
   endedAt: string;
   resolutionMethod: string;
@@ -59,7 +59,6 @@ type SymptomGroup = {
   label: string;
   count: number;
   latest: SymptomItem;
-  items: SymptomItem[];
 };
 
 type ConstitutionMeta = {
@@ -67,6 +66,13 @@ type ConstitutionMeta = {
   badgeClass: string;
   summary: string;
 };
+
+type JourneyAction = {
+  label: string;
+  hint: string;
+};
+
+type ElementKey = "water" | "wind" | "thunder";
 
 const CONSTITUTION_META: Record<string, ConstitutionMeta> = {
   depleting: {
@@ -93,6 +99,35 @@ const CONSTITUTION_META: Record<string, ConstitutionMeta> = {
     label: "未評估",
     badgeClass: "bg-gray-100 text-gray-700",
     summary: "尚未建立完整體質評估，先採用清淡、規律、少刺激的基本原則。",
+  },
+};
+
+const ELEMENT_META: Record<
+  ElementKey,
+  {
+    label: string;
+    barClass: string;
+    badgeClass: string;
+    summary: string;
+  }
+> = {
+  water: {
+    label: "水勢",
+    barClass: "bg-cyan-500",
+    badgeClass: "bg-cyan-100 text-cyan-800",
+    summary: "回養與修復訊號較明顯。",
+  },
+  wind: {
+    label: "風勢",
+    barClass: "bg-emerald-500",
+    badgeClass: "bg-emerald-100 text-emerald-800",
+    summary: "節奏與流動訊號較明顯。",
+  },
+  thunder: {
+    label: "雷勢",
+    barClass: "bg-amber-500",
+    badgeClass: "bg-amber-100 text-amber-800",
+    summary: "壓力與繃緊訊號較明顯。",
   },
 };
 
@@ -131,13 +166,20 @@ function getStatusPillClass(value: string | null): string {
   return STATUS_META[value as Exclude<StatusFilter, "all">]?.pillClass || "bg-gray-100 text-gray-600";
 }
 
+function getSymptomPriority(value: string | null): number {
+  if (value === "active") return 0;
+  if (value === "recurring") return 1;
+  if (value === "resolved") return 2;
+  return 3;
+}
+
 function resolveSeverityPoint(severity: number | null | undefined): number {
   const normalizedSeverity = typeof severity === "number" ? severity : Number.NaN;
   if (!Number.isInteger(normalizedSeverity)) return 1;
   return normalizedSeverity >= 4 ? 2 : 1;
 }
 
-function resolveFinalElementLabel(symptom: SymptomItem): "water" | "wind" | "thunder" | "undetermined" {
+function resolveFinalElementLabel(symptom: SymptomItem): ElementKey | "undetermined" {
   const reviewed = symptom.elementReviewLabel;
   if (reviewed === "water" || reviewed === "wind" || reviewed === "thunder") return reviewed;
 
@@ -163,10 +205,7 @@ function todayInHongKongDate(): string {
 }
 
 function isSameMonth(date: Date, monthBase: Date): boolean {
-  return (
-    date.getFullYear() === monthBase.getFullYear() &&
-    date.getMonth() === monthBase.getMonth()
-  );
+  return date.getFullYear() === monthBase.getFullYear() && date.getMonth() === monthBase.getMonth();
 }
 
 function formatDateTime(value: string | null): string {
@@ -198,10 +237,10 @@ function formatDate(value: string | null): string {
 }
 
 function constitutionSourceLabel(source: CareContextResponse["constitutionSource"]): string {
-  if (source === "patient_care_profile") return "來源：醫師評估";
-  if (source === "profiles") return "來源：帳號體質檔案";
-  if (source === "chat_sessions") return "來源：登入帳號對話紀錄";
-  return "來源：未有完整資料";
+  if (source === "patient_care_profile") return "醫師評估";
+  if (source === "profiles") return "帳號體質檔案";
+  if (source === "chat_sessions") return "對話紀錄";
+  return "尚未同步";
 }
 
 function getSymptomLabel(symptom: SymptomItem): string {
@@ -212,6 +251,86 @@ function toSymptomGroupKey(label: string): string {
   return label.toLowerCase();
 }
 
+function groupSymptoms(symptoms: SymptomItem[]): SymptomGroup[] {
+  const groups = new Map<string, SymptomGroup>();
+
+  for (const symptom of symptoms) {
+    const label = getSymptomLabel(symptom);
+    const key = toSymptomGroupKey(label);
+    const existing = groups.get(key);
+
+    if (!existing) {
+      groups.set(key, {
+        key,
+        label,
+        count: 1,
+        latest: symptom,
+      });
+      continue;
+    }
+
+    existing.count += 1;
+  }
+
+  return Array.from(groups.values());
+}
+
+function trimCopy(value: string, limit = 60): string {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit).trim()}...`;
+}
+
+function getLeadingElement(stats: {
+  waterScore: number;
+  windScore: number;
+  thunderScore: number;
+}): ElementKey | null {
+  const entries: Array<{ key: ElementKey; value: number }> = [
+    { key: "water", value: stats.waterScore },
+    { key: "wind", value: stats.windScore },
+    { key: "thunder", value: stats.thunderScore },
+  ];
+
+  const leader = entries.sort((a, b) => b.value - a.value)[0];
+  if (!leader || leader.value <= 0) return null;
+  return leader.key;
+}
+
+function resolveJourneyAction(raw: string | null): JourneyAction {
+  const fallback = {
+    label: "開始體質問卷",
+    hint: "先做 3 題，建立你的身體基線。",
+  };
+
+  if (!raw) return fallback;
+
+  try {
+    const parsed = JSON.parse(raw) as {
+      baseAnswers?: BaseQuizAnswers;
+      answeredDaily?: Record<string, { optionId: string }>;
+    };
+
+    if (!parsed.baseAnswers || !isBaseQuizComplete(parsed.baseAnswers)) {
+      return fallback;
+    }
+
+    const todayKey = getLocalDateKey();
+    if (!parsed.answeredDaily?.[todayKey]) {
+      return {
+        label: "回答今日題",
+        hint: "用 1 題更新今天狀態。",
+      };
+    }
+
+    return {
+      label: "查看今日旅程",
+      hint: "今日題已完成，可查看最新傾向。",
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 export default function MySymptomsPage() {
   const [symptoms, setSymptoms] = useState<SymptomItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -220,7 +339,11 @@ export default function MySymptomsPage() {
   const [careLoading, setCareLoading] = useState(true);
   const [careError, setCareError] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
-  const [rootSection, setRootSection] = useState<RootSection>("symptoms");
+  const [showSymptomDrawer, setShowSymptomDrawer] = useState(false);
+  const [journeyAction, setJourneyAction] = useState<JourneyAction>({
+    label: "開始體質問卷",
+    hint: "先做 3 題，建立你的身體基線。",
+  });
   const [resolveTarget, setResolveTarget] = useState<SymptomItem | null>(null);
   const [resolveSaving, setResolveSaving] = useState(false);
   const [resolveError, setResolveError] = useState("");
@@ -282,6 +405,13 @@ export default function MySymptomsPage() {
     void loadCareContext();
   }, [loadSymptoms, loadCareContext]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const tendencyStorageKey = `eden:tendency:v1:${careContext?.userId || "guest"}`;
+    const storedRaw = window.localStorage.getItem(tendencyStorageKey);
+    setJourneyAction(resolveJourneyAction(storedRaw));
+  }, [careContext?.userId]);
+
   const sortedSymptoms = useMemo(
     () =>
       [...symptoms].sort((a, b) => {
@@ -297,31 +427,21 @@ export default function MySymptomsPage() {
     return sortedSymptoms.filter((item) => item.status === statusFilter);
   }, [sortedSymptoms, statusFilter]);
 
-  const groupedSymptoms = useMemo<SymptomGroup[]>(() => {
-    const groups = new Map<string, SymptomGroup>();
+  const groupedSymptoms = useMemo(() => groupSymptoms(filteredSymptoms), [filteredSymptoms]);
 
-    for (const symptom of filteredSymptoms) {
-      const label = getSymptomLabel(symptom);
-      const key = toSymptomGroupKey(label);
-      const existing = groups.get(key);
+  const dashboardSymptomGroups = useMemo(
+    () =>
+      groupSymptoms(sortedSymptoms).sort((a, b) => {
+        const byStatus = getSymptomPriority(a.latest.status) - getSymptomPriority(b.latest.status);
+        if (byStatus !== 0) return byStatus;
+        const aTime = toSafeDate(a.latest.updatedAt || a.latest.createdAt)?.getTime() || 0;
+        const bTime = toSafeDate(b.latest.updatedAt || b.latest.createdAt)?.getTime() || 0;
+        return bTime - aTime;
+      }),
+    [sortedSymptoms],
+  );
 
-      if (!existing) {
-        groups.set(key, {
-          key,
-          label,
-          count: 1,
-          latest: symptom,
-          items: [symptom],
-        });
-        continue;
-      }
-
-      existing.count += 1;
-      existing.items.push(symptom);
-    }
-
-    return Array.from(groups.values());
-  }, [filteredSymptoms]);
+  const previewSymptoms = useMemo(() => dashboardSymptomGroups.slice(0, 2), [dashboardSymptomGroups]);
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -391,31 +511,56 @@ export default function MySymptomsPage() {
     const maxScore = Math.max(stats.waterScore, stats.windScore, stats.thunderScore, 1);
     return [
       {
-        key: "water",
-        label: "水",
+        key: "water" as const,
+        label: ELEMENT_META.water.label,
         value: stats.waterScore,
         width: Math.round((stats.waterScore / maxScore) * 100),
-        barClass: "bg-cyan-500",
+        barClass: ELEMENT_META.water.barClass,
       },
       {
-        key: "wind",
-        label: "風",
+        key: "wind" as const,
+        label: ELEMENT_META.wind.label,
         value: stats.windScore,
         width: Math.round((stats.windScore / maxScore) * 100),
-        barClass: "bg-emerald-500",
+        barClass: ELEMENT_META.wind.barClass,
       },
       {
-        key: "thunder",
-        label: "雷",
+        key: "thunder" as const,
+        label: ELEMENT_META.thunder.label,
         value: stats.thunderScore,
         width: Math.round((stats.thunderScore / maxScore) * 100),
-        barClass: "bg-amber-500",
+        barClass: ELEMENT_META.thunder.barClass,
       },
     ];
   }, [stats.thunderScore, stats.waterScore, stats.windScore]);
 
+  const leadingElement = useMemo(
+    () =>
+      getLeadingElement({
+        waterScore: stats.waterScore,
+        windScore: stats.windScore,
+        thunderScore: stats.thunderScore,
+      }),
+    [stats.thunderScore, stats.waterScore, stats.windScore],
+  );
+
   const constitutionKey = careContext?.constitution || "unknown";
   const constitutionMeta = CONSTITUTION_META[constitutionKey] || CONSTITUTION_META.unknown;
+
+  const careSummaryCopy = useMemo(() => {
+    if (careLoading) return "整理體質資料中，先用最近症狀歸納今日重點。";
+    if (careError) return "體質資料暫未同步，先用症狀幫你整理今日狀態。";
+    return trimCopy(careContext?.constitutionNote?.trim() || constitutionMeta.summary);
+  }, [careContext?.constitutionNote, careError, careLoading, constitutionMeta.summary]);
+
+  const dashboardStats = useMemo(
+    () => [
+      { label: "進行中", value: stats.activeCount },
+      { label: "已記錄", value: stats.total },
+      { label: "今月好轉", value: stats.improvedThisMonthCount },
+    ],
+    [stats.activeCount, stats.improvedThisMonthCount, stats.total],
+  );
 
   function openResolveModal(symptom: SymptomItem) {
     setResolveTarget(symptom);
@@ -427,6 +572,19 @@ export default function MySymptomsPage() {
       customMethod: "",
       resolutionNote: "",
     });
+  }
+
+  function openSymptomDrawer(groupKey?: string | null) {
+    setShowSymptomDrawer(true);
+    if (typeof groupKey === "string") {
+      setExpandedSymptomId(groupKey);
+    }
+  }
+
+  function closeSymptomDrawer() {
+    setShowSymptomDrawer(false);
+    setEditTargetId(null);
+    setEditError("");
   }
 
   function closeResolveModal() {
@@ -509,9 +667,7 @@ export default function MySymptomsPage() {
     if (!resolveTarget) return;
 
     const normalizedMethod =
-      resolveForm.resolutionMethod === "其他"
-        ? resolveForm.customMethod.trim()
-        : resolveForm.resolutionMethod;
+      resolveForm.resolutionMethod === "其他" ? resolveForm.customMethod.trim() : resolveForm.resolutionMethod;
 
     if (!resolveForm.endedAt) {
       setResolveError("請輸入好返日期");
@@ -523,7 +679,6 @@ export default function MySymptomsPage() {
       return;
     }
 
-    // Auto-calculate recovery days from start date → end date
     let normalizedDays: number | null = null;
     if (resolveTarget.startedAt && resolveForm.endedAt) {
       const start = toSafeDate(resolveTarget.startedAt);
@@ -567,336 +722,422 @@ export default function MySymptomsPage() {
   }
 
   return (
-    <div className="mx-auto h-full w-full max-w-4xl flex-1 overflow-y-auto p-4 sm:p-6">
-      <div className="space-y-4">
-        <section className="rounded-2xl border border-primary/10 bg-white p-4 sm:p-5">
+    <div className="mx-auto flex h-full w-full max-w-4xl flex-1 flex-col overflow-hidden p-4 sm:p-6">
+      <div className="flex h-full flex-col gap-3">
+        <section className="rounded-[28px] border border-primary/10 bg-white/95 p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-lg font-semibold text-slate-900">根源</h1>
-              <p className="mt-1 text-xs text-gray-500">
-                先睇症狀，再按需要切去原力圖與問卷，手機會更清晰。
-              </p>
+              <p className="text-xs font-semibold tracking-[0.18em] text-primary">ROOT</p>
+              <h1 className="mt-1 text-xl font-semibold text-slate-900">身體狀態</h1>
+              <p className="mt-1 text-xs text-slate-500">重點留在首屏，深入內容改用按鈕打開。</p>
             </div>
             <Link
               href="/chat"
-              className="rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
+              className="inline-flex items-center rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
             >
-              去問問 AI
+              問 AI
             </Link>
           </div>
 
-          <div className="mt-3 rounded-xl border border-primary/10 bg-primary-light/25 px-3 py-3">
-            <div className="mb-2 flex items-center justify-between text-[11px] text-slate-600">
-              <span>風水雷趨勢</span>
-              <span>
-                症狀 {stats.total} ・ 進行中 {stats.activeCount}
-              </span>
-            </div>
-            <div className="space-y-2.5">
-              {elementBarRows.map((row) => (
-                <div key={row.key} className="grid grid-cols-[22px_1fr_auto] items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-700">{row.label}</span>
-                  <div className="h-2 rounded-full bg-white">
-                    <div
-                      className={`h-full rounded-full transition-all ${row.barClass}`}
-                      style={{ width: `${row.width}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-semibold text-slate-700">{row.value}</span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-2 text-[11px] text-slate-500">未定：{stats.undeterminedCount}</p>
-          </div>
-
-          <div className="mt-4 flex items-center gap-2 rounded-full border border-primary/10 bg-primary-light/40 p-1">
-            <button
-              type="button"
-              onClick={() => setRootSection("symptoms")}
-              className={`flex-1 rounded-full px-3 py-2 text-xs font-semibold transition ${
-                rootSection === "symptoms" ? "bg-white text-primary shadow-sm" : "text-slate-600"
-              }`}
-              aria-pressed={rootSection === "symptoms"}
-            >
-              我的症狀
-            </button>
-            <button
-              type="button"
-              onClick={() => setRootSection("force")}
-              className={`flex-1 rounded-full px-3 py-2 text-xs font-semibold transition ${
-                rootSection === "force" ? "bg-white text-primary shadow-sm" : "text-slate-600"
-              }`}
-              aria-pressed={rootSection === "force"}
-            >
-              原力圖・問卷
-            </button>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {dashboardStats.map((item) => (
+              <div key={item.label} className="rounded-2xl border border-primary/10 bg-primary-light/30 px-3 py-2.5">
+                <p className="text-[11px] font-medium text-slate-500">{item.label}</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">{item.value}</p>
+              </div>
+            ))}
           </div>
         </section>
 
-        {rootSection === "symptoms" ? (
-          <>
-            <div className="overflow-x-auto">
-              <div className="flex min-w-max items-center gap-2 rounded-2xl border border-primary/10 bg-white p-2">
-                {filterChips.map((chip) => {
-                  const active = statusFilter === chip.value;
-                  return (
-                    <button
-                      key={chip.value}
-                      type="button"
-                      onClick={() => setStatusFilter(chip.value)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                        active
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      {chip.label} ({chip.count})
-                    </button>
-                  );
-                })}
+        <section className="rounded-[28px] border border-primary/10 bg-white/95 p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold tracking-[0.18em] text-primary">BODY TREND</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-semibold text-slate-900">
+                  {leadingElement ? `${ELEMENT_META[leadingElement].label}較明顯` : "等待更多記錄"}
+                </h2>
+                {leadingElement ? (
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${ELEMENT_META[leadingElement].badgeClass}`}
+                  >
+                    {ELEMENT_META[leadingElement].summary}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            {!careLoading && !careError ? (
+              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${constitutionMeta.badgeClass}`}>
+                {constitutionMeta.label}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="mt-3 space-y-2.5">
+            {elementBarRows.map((row) => (
+              <div key={row.key} className="grid grid-cols-[44px_1fr_auto] items-center gap-2">
+                <span className="text-xs font-semibold text-slate-600">{row.label}</span>
+                <div className="h-2.5 rounded-full bg-slate-100">
+                  <div
+                    className={`h-full rounded-full transition-all ${row.barClass}`}
+                    style={{ width: `${row.width}%` }}
+                  />
+                </div>
+                <span className="text-xs font-semibold text-slate-700">{row.value}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+            <span className="truncate">{constitutionSourceLabel(careContext?.constitutionSource)}</span>
+            <span>未定 {stats.undeterminedCount}</span>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-slate-600">{careSummaryCopy}</p>
+        </section>
+
+        <section className="rounded-[28px] border border-primary/10 bg-white/95 p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold tracking-[0.18em] text-primary">SYMPTOMS</p>
+              <h2 className="mt-1 text-base font-semibold text-slate-900">目前最值得跟進</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => openSymptomDrawer()}
+              className="inline-flex items-center rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
+            >
+              管理
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="mt-3 rounded-2xl border border-primary/10 bg-primary-light/20 px-3 py-4 text-sm text-slate-500">
+              載入症狀中...
+            </div>
+          ) : error ? (
+            <div className="mt-3 rounded-2xl border border-red-200 bg-red-50/70 px-3 py-4 text-sm text-red-700">
+              <p>{error}</p>
+              <button
+                type="button"
+                onClick={() => void loadSymptoms()}
+                className="mt-3 inline-flex rounded-full bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-800 transition hover:bg-red-200"
+              >
+                重試
+              </button>
+            </div>
+          ) : previewSymptoms.length === 0 ? (
+            <div className="mt-3 rounded-2xl border border-primary/10 bg-primary-light/20 px-3 py-4 text-sm text-slate-600">
+              <p className="font-medium text-slate-900">暫時未有症狀紀錄</p>
+              <p className="mt-1 text-xs text-slate-500">你可以喺聊天時描述症狀，系統會自動幫你整理。</p>
+            </div>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {previewSymptoms.map((group) => {
+                const latest = group.latest;
+                return (
+                  <button
+                    key={group.key}
+                    type="button"
+                    onClick={() => openSymptomDrawer(group.key)}
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3 text-left transition hover:border-primary/30 hover:bg-primary-light/20"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-slate-900">{group.label}</p>
+                        {group.count > 1 ? (
+                          <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary/12 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+                            {group.count}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${getStatusPillClass(latest.status)}`}>
+                          {getStatusLabel(latest.status)}
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          更新於 {formatDate(latest.updatedAt || latest.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                  </button>
+                );
+              })}
+              {dashboardSymptomGroups.length > previewSymptoms.length ? (
+                <button
+                  type="button"
+                  onClick={() => openSymptomDrawer()}
+                  className="text-left text-[11px] font-medium text-slate-500 transition hover:text-primary"
+                >
+                  另有 {dashboardSymptomGroups.length - previewSymptoms.length} 項，按此查看全部症狀。
+                </button>
+              ) : null}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-auto grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => openSymptomDrawer()}
+            className="rounded-[24px] border border-primary/10 bg-white/95 px-4 py-4 text-left shadow-sm transition hover:border-primary/25 hover:bg-primary-light/20"
+          >
+            <p className="text-sm font-semibold text-slate-900">管理症狀</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">查看完整記錄、修改內容或標記好轉。</p>
+          </button>
+
+          <Link
+            href="/chat/symptoms/tendency-quiz"
+            className="rounded-[24px] bg-primary px-4 py-4 text-left text-white shadow-sm transition hover:bg-primary-hover"
+          >
+            <p className="inline-flex items-center gap-1 text-sm font-semibold">
+              {journeyAction.label}
+              <ArrowRight className="h-4 w-4" />
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-white/80">{journeyAction.hint}</p>
+          </Link>
+        </section>
+      </div>
+
+      {showSymptomDrawer ? (
+        <div className="fixed inset-0 z-[105] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+          <div className="flex h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-[30px] bg-white shadow-xl sm:h-[82vh] sm:rounded-[30px]">
+            <div className="border-b border-gray-100 px-4 py-4 sm:px-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">症狀明細</h2>
+                  <p className="mt-1 text-xs text-slate-500">點症狀可展開詳細、修改內容，或標記好轉。</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeSymptomDrawer}
+                  className="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                  aria-label="關閉症狀明細"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-primary/10 bg-white shadow-sm">
-              {loading ? (
-                <div className="px-4 py-8 text-sm text-gray-500">載入中...</div>
-              ) : error ? (
-                <div className="px-4 py-8 text-center">
-                  <p className="text-sm text-red-600">{error}</p>
-                  <button
-                    type="button"
-                    onClick={loadSymptoms}
-                    className="mt-3 rounded-md bg-red-100 px-4 py-1.5 text-sm font-medium text-red-800 transition hover:bg-red-200"
-                  >
-                    重試
-                  </button>
+            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+              <div className="space-y-4">
+                <div className="overflow-x-auto">
+                  <div className="flex min-w-max items-center gap-2 rounded-2xl border border-primary/10 bg-white p-2">
+                    {filterChips.map((chip) => {
+                      const active = statusFilter === chip.value;
+                      return (
+                        <button
+                          key={chip.value}
+                          type="button"
+                          onClick={() => setStatusFilter(chip.value)}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                            active
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                          }`}
+                        >
+                          {chip.label} ({chip.count})
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              ) : sortedSymptoms.length === 0 ? (
-                <div className="px-4 py-12 text-center">
-                  <p className="text-sm font-medium text-gray-900">暫時未有症狀紀錄</p>
-                  <p className="mt-1 text-xs text-gray-500">你可以喺聊天時描述症狀，系統會自動幫你整理。</p>
-                  <Link
-                    href="/chat"
-                    className="mt-4 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-[#3d6b20]"
-                  >
-                    去 AI 對話記錄首個症狀
-                  </Link>
-                </div>
-              ) : filteredSymptoms.length === 0 ? (
-                <div className="px-4 py-12 text-center">
-                  <p className="text-sm font-medium text-gray-900">呢個篩選暫時未有資料</p>
-                  <p className="mt-1 text-xs text-gray-500">可以切換其他狀態查看。</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {groupedSymptoms.map((group) => {
-                    const latest = group.latest;
-                    const isExpanded = expandedSymptomId === group.key;
-                    const isEditing = editTargetId === latest.id;
-                    const canResolve = latest.status === "active" || latest.status === "recurring";
 
-                    return (
-                      <article key={group.key} className="px-4 py-3 sm:px-5">
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => toggleSymptomExpand(group.key)}
-                            className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                          >
-                            <h2 className="truncate text-base font-semibold text-gray-900">
-                              {group.label}
-                            </h2>
-                            {group.count > 1 ? (
-                              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary/12 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
-                                {group.count}
-                              </span>
-                            ) : null}
-                            <span className="text-xs text-gray-400">{isExpanded ? "收起" : "展開"}</span>
-                          </button>
+                <div className="overflow-hidden rounded-2xl border border-primary/10 bg-white shadow-sm">
+                  {loading ? (
+                    <div className="px-4 py-8 text-sm text-gray-500">載入中...</div>
+                  ) : error ? (
+                    <div className="px-4 py-8 text-center">
+                      <p className="text-sm text-red-600">{error}</p>
+                      <button
+                        type="button"
+                        onClick={loadSymptoms}
+                        className="mt-3 rounded-md bg-red-100 px-4 py-1.5 text-sm font-medium text-red-800 transition hover:bg-red-200"
+                      >
+                        重試
+                      </button>
+                    </div>
+                  ) : sortedSymptoms.length === 0 ? (
+                    <div className="px-4 py-12 text-center">
+                      <p className="text-sm font-medium text-gray-900">暫時未有症狀紀錄</p>
+                      <p className="mt-1 text-xs text-gray-500">你可以喺聊天時描述症狀，系統會自動幫你整理。</p>
+                      <Link
+                        href="/chat"
+                        className="mt-4 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-hover"
+                      >
+                        去 AI 對話記錄首個症狀
+                      </Link>
+                    </div>
+                  ) : filteredSymptoms.length === 0 ? (
+                    <div className="px-4 py-12 text-center">
+                      <p className="text-sm font-medium text-gray-900">呢個篩選暫時未有資料</p>
+                      <p className="mt-1 text-xs text-gray-500">可以切換其他狀態查看。</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {groupedSymptoms.map((group) => {
+                        const latest = group.latest;
+                        const isExpanded = expandedSymptomId === group.key;
+                        const isEditing = editTargetId === latest.id;
+                        const canResolve = latest.status === "active" || latest.status === "recurring";
 
-                          {canResolve ? (
-                            <button
-                              type="button"
-                              onClick={() => openResolveModal(latest)}
-                              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
-                              aria-label={`標記「${group.label}」為好轉`}
-                              title="標記好轉"
-                            >
-                              <ArrowUpCircle className="h-4.5 w-4.5" />
-                            </button>
-                          ) : null}
-                        </div>
-
-                        {isExpanded ? (
-                          <div className="mt-3 space-y-3 rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-3">
-                            <div className="flex flex-wrap items-center gap-2 text-xs">
-                              <span
-                                className={`inline-flex rounded-full px-2.5 py-0.5 font-medium ${getStatusPillClass(
-                                  latest.status,
-                                )}`}
+                        return (
+                          <article key={group.key} className="px-4 py-3 sm:px-5">
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => toggleSymptomExpand(group.key)}
+                                className="flex min-w-0 flex-1 items-center gap-2 text-left"
                               >
-                                {getStatusLabel(latest.status)}
-                              </span>
-                              <span className="text-gray-500">
-                                嚴重程度：{latest.severity ? `${latest.severity}/5` : "未填"}
-                              </span>
-                              <span className="text-gray-400">
-                                更新於 {formatDateTime(latest.updatedAt || latest.createdAt)}
-                              </span>
-                              {group.count > 1 ? (
-                                <span className="text-gray-500">共 {group.count} 次</span>
+                                <h3 className="truncate text-base font-semibold text-gray-900">{group.label}</h3>
+                                {group.count > 1 ? (
+                                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary/12 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+                                    {group.count}
+                                  </span>
+                                ) : null}
+                                <span className="text-xs text-gray-400">{isExpanded ? "收起" : "展開"}</span>
+                              </button>
+
+                              {canResolve ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openResolveModal(latest)}
+                                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                                  aria-label={`標記「${group.label}」為好轉`}
+                                  title="標記好轉"
+                                >
+                                  <ArrowUpCircle className="h-4.5 w-4.5" />
+                                </button>
                               ) : null}
                             </div>
 
-                            {latest.description?.trim() ? (
-                              <p className="text-sm leading-relaxed text-gray-700">
-                                {latest.description.trim()}
-                              </p>
-                            ) : (
-                              <p className="text-sm text-gray-400">未有補充描述</p>
-                            )}
+                            {isExpanded ? (
+                              <div className="mt-3 space-y-3 rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-3">
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                  <span
+                                    className={`inline-flex rounded-full px-2.5 py-0.5 font-medium ${getStatusPillClass(
+                                      latest.status,
+                                    )}`}
+                                  >
+                                    {getStatusLabel(latest.status)}
+                                  </span>
+                                  <span className="text-gray-500">
+                                    嚴重程度：{latest.severity ? `${latest.severity}/5` : "未填"}
+                                  </span>
+                                  <span className="text-gray-400">
+                                    更新於 {formatDateTime(latest.updatedAt || latest.createdAt)}
+                                  </span>
+                                  {group.count > 1 ? <span className="text-gray-500">共 {group.count} 次</span> : null}
+                                </div>
 
-                            {(latest.resolutionMethod ||
-                              (latest.resolutionDays !== null && latest.resolutionDays !== undefined) ||
-                              latest.resolutionNote) ? (
-                              <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-800">
-                                {latest.resolutionMethod ? <p>點樣好返：{latest.resolutionMethod}</p> : null}
-                                {latest.resolutionDays !== null && latest.resolutionDays !== undefined ? (
-                                  <p>幾耐好返：約 {latest.resolutionDays} 日</p>
+                                {latest.description?.trim() ? (
+                                  <p className="text-sm leading-relaxed text-gray-700">{latest.description.trim()}</p>
+                                ) : (
+                                  <p className="text-sm text-gray-400">未有補充描述</p>
+                                )}
+
+                                {(latest.resolutionMethod ||
+                                  (latest.resolutionDays !== null && latest.resolutionDays !== undefined) ||
+                                  latest.resolutionNote) ? (
+                                  <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-800">
+                                    {latest.resolutionMethod ? <p>點樣好返：{latest.resolutionMethod}</p> : null}
+                                    {latest.resolutionDays !== null && latest.resolutionDays !== undefined ? (
+                                      <p>幾耐好返：約 {latest.resolutionDays} 日</p>
+                                    ) : null}
+                                    {latest.resolutionNote ? (
+                                      <p className="whitespace-pre-wrap">補充：{latest.resolutionNote}</p>
+                                    ) : null}
+                                  </div>
                                 ) : null}
-                                {latest.resolutionNote ? (
-                                  <p className="whitespace-pre-wrap">補充：{latest.resolutionNote}</p>
-                                ) : null}
+
+                                <p className="text-xs text-gray-400">
+                                  {formatDate(latest.startedAt)}
+                                  {latest.endedAt ? ` → ${formatDate(latest.endedAt)}` : ""}
+                                  {!latest.endedAt && latest.status === "active" ? " → 進行中" : ""}
+                                </p>
+
+                                {!isEditing ? (
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditSymptom(latest)}
+                                      className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
+                                    >
+                                      修改
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <form
+                                    onSubmit={(event) => void submitEditSymptom(event, latest)}
+                                    className="space-y-2 rounded-lg border border-gray-200 bg-white p-3"
+                                  >
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                      <label className="text-xs text-gray-600">
+                                        嚴重程度 (1-5)
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          max={5}
+                                          value={editForm.severity}
+                                          onChange={(event) =>
+                                            setEditForm((prev) => ({ ...prev, severity: event.target.value }))
+                                          }
+                                          className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                                        />
+                                      </label>
+                                    </div>
+                                    <label className="block text-xs text-gray-600">
+                                      描述
+                                      <textarea
+                                        rows={3}
+                                        value={editForm.description}
+                                        onChange={(event) =>
+                                          setEditForm((prev) => ({ ...prev, description: event.target.value }))
+                                        }
+                                        className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                                      />
+                                    </label>
+                                    {editError ? <p className="text-xs font-medium text-red-600">{editError}</p> : null}
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        type="submit"
+                                        disabled={editSaving}
+                                        className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary-hover disabled:opacity-50"
+                                      >
+                                        {editSaving ? "儲存中..." : "儲存修改"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={cancelEditSymptom}
+                                        disabled={editSaving}
+                                        className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100 disabled:opacity-50"
+                                      >
+                                        取消
+                                      </button>
+                                    </div>
+                                  </form>
+                                )}
                               </div>
                             ) : null}
-
-                            <p className="text-xs text-gray-400">
-                              {formatDate(latest.startedAt)}
-                              {latest.endedAt ? ` → ${formatDate(latest.endedAt)}` : ""}
-                              {!latest.endedAt && latest.status === "active" ? " → 進行中" : ""}
-                            </p>
-
-                            {!isEditing ? (
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => startEditSymptom(latest)}
-                                  className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
-                                >
-                                  修改
-                                </button>
-                              </div>
-                            ) : (
-                              <form
-                                onSubmit={(event) => void submitEditSymptom(event, latest)}
-                                className="space-y-2 rounded-lg border border-gray-200 bg-white p-3"
-                              >
-                                <div className="grid gap-2 sm:grid-cols-2">
-                                  <label className="text-xs text-gray-600">
-                                    嚴重程度 (1-5)
-                                    <input
-                                      type="number"
-                                      min={1}
-                                      max={5}
-                                      value={editForm.severity}
-                                      onChange={(event) =>
-                                        setEditForm((prev) => ({ ...prev, severity: event.target.value }))
-                                      }
-                                      className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                                    />
-                                  </label>
-                                </div>
-                                <label className="block text-xs text-gray-600">
-                                  描述
-                                  <textarea
-                                    rows={3}
-                                    value={editForm.description}
-                                    onChange={(event) =>
-                                      setEditForm((prev) => ({ ...prev, description: event.target.value }))
-                                    }
-                                    className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                                  />
-                                </label>
-                                {editError ? (
-                                  <p className="text-xs font-medium text-red-600">{editError}</p>
-                                ) : null}
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="submit"
-                                    disabled={editSaving}
-                                    className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#3d6b20] disabled:opacity-50"
-                                  >
-                                    {editSaving ? "儲存中..." : "儲存修改"}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={cancelEditSymptom}
-                                    disabled={editSaving}
-                                    className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-100 disabled:opacity-50"
-                                  >
-                                    取消
-                                  </button>
-                                </div>
-                              </form>
-                            )}
-                          </div>
-                        ) : null}
-                      </article>
-                    );
-                  })}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {!loading && !error && filteredSymptoms.length > 0 ? (
+                  <div className="rounded-xl border border-primary/10 bg-primary-light/30 px-4 py-3 text-xs text-gray-600">
+                    提示：點症狀先展開詳細；需要更新時可按右側圖示標記好轉，或在展開後修改。
+                  </div>
+                ) : null}
+              </div>
             </div>
-
-            {!loading && !error && filteredSymptoms.length > 0 ? (
-              <div className="rounded-xl border border-primary/10 bg-primary-light/30 px-4 py-3 text-xs text-gray-600">
-                提示：列表已簡化，點症狀先展開詳細；需要更新時可按右側圖示標記好轉，或在展開後修改。
-              </div>
-            ) : null}
-          </>
-        ) : (
-          <section className="rounded-2xl border border-primary/10 bg-white p-4 sm:p-5">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">SOUL 原力圖・問卷</p>
-                <p className="mt-1 text-xs text-gray-500">
-                  問卷同原力圖會留喺呢一層，避免同症狀清單爭首屏位置。
-                </p>
-              </div>
-              <Link
-                href="/chat/symptoms/tendency-quiz"
-                className="rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
-              >
-                專注模式
-              </Link>
-            </div>
-
-            {careLoading ? (
-              <div className="mb-4 rounded-xl border border-primary/10 bg-primary-light/30 px-3 py-2 text-xs text-slate-600">
-                載入體質資料...
-              </div>
-            ) : careError ? (
-              <div className="mb-4 rounded-xl border border-red-200 bg-red-50/70 px-3 py-2 text-xs text-red-700">
-                {careError}
-              </div>
-            ) : (
-              <div className="mb-4 rounded-xl border border-primary/10 bg-primary-light/35 px-3 py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${constitutionMeta.badgeClass}`}>
-                    {constitutionMeta.label}
-                  </span>
-                  <span className="text-[11px] text-slate-500">{constitutionSourceLabel(careContext?.constitutionSource)}</span>
-                </div>
-                <p className="mt-2 text-xs leading-relaxed text-slate-700">
-                  {careContext?.constitutionNote?.trim() || constitutionMeta.summary}
-                </p>
-              </div>
-            )}
-
-            <TendencyQuizPanel userId={careContext?.userId} />
-          </section>
-        )}
-      </div>
+          </div>
+        </div>
+      ) : null}
 
       {resolveTarget ? (
         <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
@@ -919,21 +1160,17 @@ export default function MySymptomsPage() {
 
             <form onSubmit={submitResolveForm} className="flex flex-col">
               <div className="space-y-4 px-4 py-4">
-                {/* 好返日期 */}
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">好返日期</label>
                   <input
                     type="date"
                     value={resolveForm.endedAt}
-                    onChange={(e) =>
-                      setResolveForm((prev) => ({ ...prev, endedAt: e.target.value }))
-                    }
+                    onChange={(e) => setResolveForm((prev) => ({ ...prev, endedAt: e.target.value }))}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     required
                   />
                 </div>
 
-                {/* 點樣好返 — chip selection */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">點樣好返</label>
                   <div className="flex flex-wrap gap-2">
@@ -961,16 +1198,13 @@ export default function MySymptomsPage() {
                     <input
                       type="text"
                       value={resolveForm.customMethod}
-                      onChange={(e) =>
-                        setResolveForm((prev) => ({ ...prev, customMethod: e.target.value }))
-                      }
+                      onChange={(e) => setResolveForm((prev) => ({ ...prev, customMethod: e.target.value }))}
                       placeholder="自行填寫方式"
                       className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   ) : null}
                 </div>
 
-                {/* 備注（可選） */}
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">
                     備注 <span className="font-normal text-gray-400">（可留空）</span>
@@ -978,9 +1212,7 @@ export default function MySymptomsPage() {
                   <input
                     type="text"
                     value={resolveForm.resolutionNote}
-                    onChange={(e) =>
-                      setResolveForm((prev) => ({ ...prev, resolutionNote: e.target.value }))
-                    }
+                    onChange={(e) => setResolveForm((prev) => ({ ...prev, resolutionNote: e.target.value }))}
                     placeholder="有咩想補充？"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
@@ -989,7 +1221,6 @@ export default function MySymptomsPage() {
                 {resolveError ? <p className="text-sm text-red-600">{resolveError}</p> : null}
               </div>
 
-              {/* Sticky action buttons */}
               <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t border-gray-100 bg-white px-4 pb-[calc(env(safe-area-inset-bottom,0px)+16px)] pt-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
@@ -1002,7 +1233,7 @@ export default function MySymptomsPage() {
                 <button
                   type="submit"
                   disabled={resolveSaving}
-                  className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#3d6b20] disabled:opacity-50 sm:w-auto"
+                  className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary-hover disabled:opacity-50 sm:w-auto"
                 >
                   {resolveSaving ? "儲存中..." : "確認好轉"}
                 </button>

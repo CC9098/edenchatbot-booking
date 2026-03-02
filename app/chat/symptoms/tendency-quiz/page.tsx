@@ -44,14 +44,14 @@ export default function TendencyQuizPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">SOUL 風水雷旅程</h1>
-            <p className="mt-1 text-xs text-gray-500">以每日抉擇調整風、水、雷三勢，逐步尋回你的原初力量。</p>
+            <h1 className="text-lg font-semibold text-slate-900">體質旅程</h1>
+            <p className="mt-1 text-xs text-gray-500">以問卷與每日一題整理風、水、雷三勢，逐步看清你而家的身體傾向。</p>
           </div>
           <Link
             href="/chat/symptoms"
             className="rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
           >
-            返回我的
+            返回狀態
           </Link>
         </div>
 

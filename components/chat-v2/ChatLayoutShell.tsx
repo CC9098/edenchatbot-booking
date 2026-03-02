@@ -25,7 +25,7 @@ function ChatLayoutFrame({ children }: { children: React.ReactNode }) {
   const isChatHome = pathname === "/chat";
   const isSymptomsPage = pathname.startsWith("/chat/symptoms");
   const actionHref = isSymptomsPage ? "/chat" : "/chat/symptoms";
-  const actionLabel = isSymptomsPage ? "返回聊天" : "我的症狀";
+  const actionLabel = isSymptomsPage ? "返回聊天" : "身體狀態";
 
   const handleSignOut = useCallback(async () => {
     if (signingOut) return;
