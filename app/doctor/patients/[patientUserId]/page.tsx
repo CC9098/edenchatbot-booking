@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 
+import { PatientQuestionSuggestions } from "@/components/doctor/PatientQuestionSuggestions";
+
 /* ================================================================
    Types
    ================================================================ */
@@ -334,6 +336,11 @@ export default function PatientDetailPage() {
       </button>
 
       <PatientIdentitySection identity={data.patientIdentity} />
+
+      <PatientQuestionSuggestions
+        patientUserId={patientUserId}
+        patientName={data.patientIdentity.displayName}
+      />
 
       {/* Section A: Constitution */}
       <ConstitutionSection

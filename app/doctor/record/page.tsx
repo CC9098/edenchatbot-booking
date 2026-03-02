@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CantoneseVoiceNoteTool, type VoiceNotePatient } from "@/components/doctor/CantoneseVoiceNoteTool";
+import { PatientQuestionSuggestions } from "@/components/doctor/PatientQuestionSuggestions";
 
 const CONSTITUTION_LABELS: Record<string, string> = {
   depleting: "虛耗型",
@@ -189,6 +190,20 @@ export default function DoctorRecordPage() {
           </div>
         )}
       </section>
+
+      {selectedPatient ? (
+        <PatientQuestionSuggestions
+          patientUserId={selectedPatient.patientUserId}
+          patientName={selectedPatient.displayName}
+        />
+      ) : (
+        <section className="rounded-xl border border-dashed border-cyan-200 bg-cyan-50/60 p-4 shadow-sm sm:p-5">
+          <h2 className="text-base font-semibold text-gray-900">AI 問診建議</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            先勾選病人，系統先可按最近症狀、體質、覆診同護理指引產生問題卡。
+          </p>
+        </section>
+      )}
 
       <CantoneseVoiceNoteTool selectedPatient={selectedPatient} />
     </div>

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 const MAX_AUDIO_FILE_BYTES = 15 * 1024 * 1024;
 const CHUNK_TIMESLICE_MS = 30_000;
+const DRAFT_SUMMARY_INTERVAL_SECONDS = 5 * 60;
 
 type CopyTarget = "transcript" | "record";
 
@@ -82,6 +83,8 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
   const recordingPatientRef = useRef<VoiceNotePatient | null>(null);
   const chunkCounterRef = useRef(0);
   const failedChunkCountRef = useRef(0);
+  const durationSecondsRef = useRef(0);
+  const nextDraftDueSecondsRef = useRef(DRAFT_SUMMARY_INTERVAL_SECONDS);
 
   const [isSupported, setIsSupported] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -90,6 +93,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [transcript, setTranscript] = useState("");
+  const [draftRecordText, setDraftRecordText] = useState("");
   const [recordText, setRecordText] = useState("");
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [savingToPatientRecord, setSavingToPatientRecord] = useState(false);
@@ -98,6 +102,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
   const [transcribedChunkCount, setTranscribedChunkCount] = useState(0);
   const [failedChunkCount, setFailedChunkCount] = useState(0);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
+  const [draftSummaryMinuteMark, setDraftSummaryMinuteMark] = useState<number | null>(null);
 
   useEffect(() => {
     const hasSupport =
@@ -110,8 +115,8 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      streamRef.current?.getTracks().forEach((track) => track.stop());
+      clearTimer();
+      stopStream();
       if (previewUrlRef.current) {
         URL.revokeObjectURL(previewUrlRef.current);
       }
@@ -148,19 +153,22 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     uploadQueueRef.current = Promise.resolve();
     chunkCounterRef.current = 0;
     failedChunkCountRef.current = 0;
+    durationSecondsRef.current = 0;
+    nextDraftDueSecondsRef.current = DRAFT_SUMMARY_INTERVAL_SECONDS;
     setTranscribedChunkCount(0);
     setFailedChunkCount(0);
+    setDraftSummaryMinuteMark(null);
     setProcessingStatus(null);
   }
 
   function resetOutputs() {
     setTranscript("");
+    setDraftRecordText("");
     setRecordText("");
     setCopyStatus(null);
     setSaveRecordStatus(null);
     setSaveRecordError(null);
     setError(null);
-    setProcessingStatus(null);
     replacePreviewUrl(null);
     resetSessionState();
   }
@@ -214,40 +222,6 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     return data.transcript || "";
   }
 
-  function enqueueChunkUpload(blob: Blob, mimeType: string, sessionId: number) {
-    const patientAtStart = recordingPatientRef.current;
-    const chunkNumber = chunkCounterRef.current + 1;
-    chunkCounterRef.current = chunkNumber;
-    previewChunksRef.current.push(blob);
-
-    uploadQueueRef.current = uploadQueueRef.current.then(async () => {
-      if (sessionIdRef.current !== sessionId) return;
-
-      try {
-        const isStillRecording = mediaRecorderRef.current?.state === "recording";
-        setProcessingStatus(
-          isStillRecording
-            ? `分段轉錄中：正在處理第 ${chunkNumber} 段`
-            : `停止錄音，正在補傳第 ${chunkNumber} 段`
-        );
-        const chunkTranscript = await transcribeChunk(blob, mimeType, patientAtStart);
-        if (sessionIdRef.current !== sessionId) return;
-        if (chunkTranscript.trim()) {
-          transcriptPartsRef.current.push(chunkTranscript.trim());
-          setTranscribedChunkCount(transcriptPartsRef.current.length);
-          setTranscript(combineTranscriptParts(transcriptPartsRef.current));
-        }
-      } catch (chunkError) {
-        if (sessionIdRef.current !== sessionId) return;
-        failedChunkCountRef.current += 1;
-        setFailedChunkCount(failedChunkCountRef.current);
-        setError(
-          chunkError instanceof Error ? chunkError.message : `第 ${chunkNumber} 段轉錄失敗`
-        );
-      }
-    });
-  }
-
   async function analyzeTranscript(transcriptText: string, patient: VoiceNotePatient | null) {
     const formData = new FormData();
     formData.append("mode", "extract-transcript");
@@ -265,6 +239,76 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     }
 
     return data;
+  }
+
+  async function maybeGenerateDraftSummary(
+    sessionId: number,
+    combinedTranscript: string,
+    elapsedSeconds: number,
+    patient: VoiceNotePatient | null
+  ) {
+    if (mediaRecorderRef.current?.state !== "recording") return;
+    if (elapsedSeconds < nextDraftDueSecondsRef.current) return;
+    if (combinedTranscript.trim().length < 20) return;
+
+    const dueSeconds = nextDraftDueSecondsRef.current;
+    nextDraftDueSecondsRef.current += DRAFT_SUMMARY_INTERVAL_SECONDS;
+    const minuteMark = Math.floor(dueSeconds / 60);
+    setProcessingStatus(`已錄音 ${minuteMark} 分鐘，正在更新暫時病歷摘要...`);
+
+    try {
+      const analysis = await analyzeTranscript(combinedTranscript, patient);
+      if (sessionIdRef.current !== sessionId) return;
+      if (analysis.recordText) {
+        setDraftRecordText(analysis.recordText);
+        setDraftSummaryMinuteMark(minuteMark);
+        setProcessingStatus(`暫時病歷摘要已更新至 ${minuteMark} 分鐘`);
+      }
+    } catch (draftError) {
+      if (sessionIdRef.current !== sessionId) return;
+      setError(draftError instanceof Error ? draftError.message : "暫時病歷摘要更新失敗");
+      setProcessingStatus("逐字稿仍會繼續更新，暫時摘要將於下一個時間點再試。");
+    }
+  }
+
+  function enqueueChunkUpload(blob: Blob, mimeType: string, sessionId: number) {
+    const patientAtStart = recordingPatientRef.current;
+    const chunkNumber = chunkCounterRef.current + 1;
+    chunkCounterRef.current = chunkNumber;
+    previewChunksRef.current.push(blob);
+
+    uploadQueueRef.current = uploadQueueRef.current.then(async () => {
+      if (sessionIdRef.current !== sessionId) return;
+
+      try {
+        const isStillRecording = mediaRecorderRef.current?.state === "recording";
+        setProcessingStatus(
+          isStillRecording
+            ? `分段轉錄中：正在處理第 ${chunkNumber} 段`
+            : `停止錄音，正在補傳第 ${chunkNumber} 段`
+        );
+
+        const chunkTranscript = await transcribeChunk(blob, mimeType, patientAtStart);
+        if (sessionIdRef.current !== sessionId) return;
+        if (!chunkTranscript.trim()) return;
+
+        transcriptPartsRef.current.push(chunkTranscript.trim());
+        const combinedTranscript = combineTranscriptParts(transcriptPartsRef.current);
+        setTranscribedChunkCount(transcriptPartsRef.current.length);
+        setTranscript(combinedTranscript);
+
+        const elapsedSeconds = Math.max(
+          durationSecondsRef.current,
+          Math.floor((chunkNumber * CHUNK_TIMESLICE_MS) / 1000)
+        );
+        await maybeGenerateDraftSummary(sessionId, combinedTranscript, elapsedSeconds, patientAtStart);
+      } catch (chunkError) {
+        if (sessionIdRef.current !== sessionId) return;
+        failedChunkCountRef.current += 1;
+        setFailedChunkCount(failedChunkCountRef.current);
+        setError(chunkError instanceof Error ? chunkError.message : `第 ${chunkNumber} 段轉錄失敗`);
+      }
+    });
   }
 
   async function finalizeRecording(sessionId: number) {
@@ -288,10 +332,12 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
         throw new Error("未能從錄音取得逐字稿，請重試。若問題持續，我可再改成更短分段。");
       }
 
-      setProcessingStatus("逐字稿完成，正在整理病歷摘要...");
+      setProcessingStatus("逐字稿完成，正在整理最終病歷摘要...");
       const analysis = await analyzeTranscript(combinedTranscript, recordingPatientRef.current);
       if (sessionIdRef.current !== sessionId) return;
 
+      setDraftRecordText("");
+      setDraftSummaryMinuteMark(null);
       setTranscript(analysis.transcript || combinedTranscript);
       setRecordText(analysis.recordText || "");
 
@@ -303,7 +349,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
         setError(null);
       }
 
-      setProcessingStatus("分析完成");
+      setProcessingStatus("最終病歷摘要已完成");
     } catch (finalError) {
       if (sessionIdRef.current !== sessionId) return;
       setError(finalError instanceof Error ? finalError.message : "語音分析失敗");
@@ -319,9 +365,10 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     if (!isSupported || isRecording || isProcessing) return;
 
     sessionIdRef.current += 1;
-    recordingPatientRef.current = selectedPatient;
     resetOutputs();
+    recordingPatientRef.current = selectedPatient;
     setDurationSeconds(0);
+    durationSecondsRef.current = 0;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -335,7 +382,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
       const chosenMimeType = recorder.mimeType || preferredMimeType || "audio/webm";
       activeMimeTypeRef.current = chosenMimeType;
       mediaRecorderRef.current = recorder;
-      setProcessingStatus("錄音已開始，系統會每 30 秒自動分段上傳。");
+      setProcessingStatus("錄音已開始，系統會每 30 秒自動分段轉錄，並於每 5 分鐘更新暫時摘要。");
 
       recorder.ondataavailable = (event: BlobEvent) => {
         if (event.data.size <= 0) return;
@@ -346,6 +393,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
         setError("錄音過程出錯，請重試。");
         setProcessingStatus(null);
         setIsRecording(false);
+        mediaRecorderRef.current = null;
         clearTimer();
         stopStream();
       };
@@ -354,6 +402,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
         const finishedSessionId = sessionIdRef.current;
         clearTimer();
         setIsRecording(false);
+        mediaRecorderRef.current = null;
         stopStream();
         void finalizeRecording(finishedSessionId);
       };
@@ -361,11 +410,16 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
       recorder.start(CHUNK_TIMESLICE_MS);
       setIsRecording(true);
       timerRef.current = setInterval(() => {
-        setDurationSeconds((current) => current + 1);
+        setDurationSeconds((current) => {
+          const next = current + 1;
+          durationSecondsRef.current = next;
+          return next;
+        });
       }, 1000);
     } catch {
       setError("無法啟動咪高峰，請檢查瀏覽器權限。");
       setProcessingStatus(null);
+      mediaRecorderRef.current = null;
       stopStream();
       setIsRecording(false);
     }
@@ -399,19 +453,16 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     )}-${String(today.getDate()).padStart(2, "0")}`;
 
     try {
-      const response = await fetch(
-        `/api/doctor/patients/${selectedPatient.patientUserId}/symptoms`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            category: "語音問診摘要",
-            description: recordText,
-            status: "active",
-            startedAt,
-          }),
-        }
-      );
+      const response = await fetch(`/api/doctor/patients/${selectedPatient.patientUserId}/symptoms`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: "語音問診摘要",
+          description: recordText,
+          status: "active",
+          startedAt,
+        }),
+      });
       const payload = (await response.json().catch(() => ({}))) as SaveToRecordResponse;
       if (!response.ok) {
         throw new Error(payload.error || `HTTP ${response.status}`);
@@ -433,13 +484,11 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
         <div>
           <h2 className="text-base font-semibold text-gray-900">語音病歷工具（廣東話）</h2>
           <p className="mt-1 text-sm text-gray-600">
-            已升級為長錄音模式：每 30 秒自動分段轉錄，停止後再整體整理病歷摘要。
+            已升級為長錄音模式：每 30 秒自動分段轉錄，並於每 5 分鐘更新一次暫時病歷摘要。
           </p>
           <p className="mt-1 text-xs text-gray-500">
             錄音綁定病人：{displayedPatient?.displayName || "未選擇（可直接錄音）"}
-            {displayedPatient?.phone
-              ? `（${displayedPatient.phone}）`
-              : ""}
+            {displayedPatient?.phone ? `（${displayedPatient.phone}）` : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -476,10 +525,12 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
         <span className="rounded-full bg-primary/[0.06] px-2.5 py-1 text-xs text-primary">
           自動分段：每 30 秒
         </span>
-        <span className="text-xs text-gray-500">適合 15-20 分鐘問診，不再整段一次過上傳。</span>
+        <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-xs text-cyan-800">
+          暫時摘要：每 5 分鐘
+        </span>
       </div>
 
-      {(transcribedChunkCount > 0 || failedChunkCount > 0) ? (
+      {transcribedChunkCount > 0 || failedChunkCount > 0 ? (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
           <span className="rounded-full bg-gray-100 px-2.5 py-1">已轉錄 {transcribedChunkCount} 段</span>
           {failedChunkCount > 0 ? (
@@ -501,7 +552,9 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
       ) : null}
 
       {error ? (
-        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
       ) : null}
 
       {saveRecordError ? (
@@ -529,10 +582,37 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
         </div>
       ) : null}
 
+      {draftRecordText && !recordText ? (
+        <div className="mt-4 space-y-2 rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50 via-white to-emerald-50 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">暫時病歷摘要</h3>
+              <p className="text-xs text-gray-600">
+                {draftSummaryMinuteMark ? `已整理至第 ${draftSummaryMinuteMark} 分鐘` : "錄音中間版本"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void copyText(draftRecordText, "record")}
+              className="rounded-md border border-cyan-200 bg-white px-2.5 py-1 text-xs font-medium text-cyan-900 transition-colors hover:bg-cyan-50"
+            >
+              複製暫時摘要
+            </button>
+          </div>
+          <pre className="whitespace-pre-wrap text-sm leading-6 text-gray-800">{draftRecordText}</pre>
+          <p className="text-xs text-cyan-900">
+            只供醫師即場追問參考；停止錄音後，系統會再整理一次最終版。
+          </p>
+        </div>
+      ) : null}
+
       {recordText ? (
         <div className="mt-4 space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-gray-900">可貼入病歷之症狀摘要</h3>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">最終病歷摘要</h3>
+              <p className="text-xs text-gray-600">停止錄音後整段整理，可直接貼入病歷系統。</p>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -574,7 +654,10 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
       {transcript ? (
         <div className="mt-4 space-y-2 rounded-lg border border-gray-200 bg-white p-3">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-gray-900">逐字稿（完整對話）</h3>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">逐字稿（完整對話）</h3>
+              <p className="text-xs text-gray-600">每 30 秒持續累積，停止錄音後補齊最後一段。</p>
+            </div>
             <button
               type="button"
               onClick={() => void copyText(transcript, "transcript")}
