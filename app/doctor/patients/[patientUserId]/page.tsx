@@ -4,6 +4,10 @@ import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { PatientQuestionSuggestions } from "@/components/doctor/PatientQuestionSuggestions";
+import {
+  SymptomFollowUpTrendPanel,
+  type SymptomFollowUpAnswer,
+} from "@/components/doctor/SymptomFollowUpTrendPanel";
 
 /* ================================================================
    Types
@@ -78,6 +82,7 @@ interface PatientProfile {
   activeInstructions: CareInstruction[];
   pendingFollowUps: FollowUp[];
   recentSymptoms: SymptomLog[];
+  recentFollowUpAnswers: SymptomFollowUpAnswer[];
 }
 
 interface AuditLogItem {
@@ -275,8 +280,10 @@ export default function PatientDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   /* ---------- Fetch ---------- */
-  const fetchProfile = useCallback(async () => {
-    setLoading(true);
+  const fetchProfile = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const res = await fetch(`/api/doctor/patients/${patientUserId}/profile`);
@@ -311,7 +318,7 @@ export default function PatientDetailPage() {
       <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-10 text-center">
         <p className="text-sm text-red-700">{error}</p>
         <button
-          onClick={fetchProfile}
+          onClick={() => void fetchProfile()}
           className="mt-3 rounded-md bg-red-100 px-4 py-1.5 text-sm font-medium text-red-800 hover:bg-red-200"
         >
           重試
@@ -340,6 +347,8 @@ export default function PatientDetailPage() {
       <PatientQuestionSuggestions
         patientUserId={patientUserId}
         patientName={data.patientIdentity.displayName}
+        onAnswersSaved={() => fetchProfile(false)}
+        sourceScreen="doctor_patient_page"
       />
 
       {/* Section A: Constitution */}
@@ -366,6 +375,7 @@ export default function PatientDetailPage() {
       {/* Section D: Symptoms */}
       <SymptomsSection
         symptoms={data.recentSymptoms}
+        followUpAnswers={data.recentFollowUpAnswers}
       />
 
       <AuditLogsSection patientUserId={patientUserId} />
@@ -1228,22 +1238,28 @@ function EditFollowUpModal({
 
 function SymptomsSection({
   symptoms,
+  followUpAnswers,
 }: {
   symptoms: SymptomLog[];
+  followUpAnswers: SymptomFollowUpAnswer[];
 }) {
   return (
     <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="flex flex-col gap-2 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <h2 className="text-base font-semibold text-gray-900">症狀記錄</h2>
         <div className="text-xs text-gray-500">
-          最近 30 天（病人自行記錄）
+          最近 30 天症狀 + 醫師問診跟進
         </div>
       </div>
 
-      <div className="divide-y divide-gray-100">
+      <div className="space-y-4 px-4 py-4 sm:px-5">
+        <SymptomFollowUpTrendPanel answers={followUpAnswers} />
+      </div>
+
+      <div className="divide-y divide-gray-100 border-t border-gray-100">
         {symptoms.length === 0 ? (
           <div className="px-5 py-10 text-center">
-            <p className="text-sm text-gray-400">暫無症狀記錄</p>
+            <p className="text-sm text-gray-400">暫無病人自行症狀記錄</p>
           </div>
         ) : (
           symptoms.map((symptom) => (

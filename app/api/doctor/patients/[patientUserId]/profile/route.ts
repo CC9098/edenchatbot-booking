@@ -99,6 +99,20 @@ export async function GET(
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 
+    const { data: followUpAnswers, error: followUpAnswersError } = await supabase
+      .from("symptom_follow_up_answers")
+      .select(
+        "id, symptom_key, symptom_label, question_text, answer_type, answer_value_text, answer_value_number, source, asked_at, recorded_by, metadata, created_at"
+      )
+      .eq("patient_user_id", patientUserId)
+      .order("asked_at", { ascending: false })
+      .limit(24);
+
+    if (followUpAnswersError) {
+      console.error("[GET patient profile] follow-up answers error:", followUpAnswersError.message);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+
     return NextResponse.json({
       patientIdentity: {
         displayName: profileRow?.display_name || latestBookingContact?.patient_name || null,
@@ -159,6 +173,20 @@ export async function GET(
         resolutionDays: s.resolution_days,
         loggedVia: s.logged_via,
         createdAt: s.created_at,
+      })),
+      recentFollowUpAnswers: (followUpAnswers || []).map((answer) => ({
+        id: answer.id,
+        symptomKey: answer.symptom_key,
+        symptomLabel: answer.symptom_label,
+        questionText: answer.question_text,
+        answerType: answer.answer_type,
+        answerValueText: answer.answer_value_text,
+        answerValueNumber: answer.answer_value_number,
+        source: answer.source,
+        askedAt: answer.asked_at,
+        recordedBy: answer.recorded_by,
+        metadata: answer.metadata,
+        createdAt: answer.created_at,
       })),
     });
   } catch (err) {

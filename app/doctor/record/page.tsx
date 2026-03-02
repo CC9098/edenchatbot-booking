@@ -195,6 +195,7 @@ export default function DoctorRecordPage() {
         <PatientQuestionSuggestions
           patientUserId={selectedPatient.patientUserId}
           patientName={selectedPatient.displayName}
+          sourceScreen="doctor_record_page"
         />
       ) : (
         <section className="rounded-xl border border-dashed border-cyan-200 bg-cyan-50/60 p-4 shadow-sm sm:p-5">

@@ -49,6 +49,7 @@ interface SuggestionCard {
   question: string;
   answerType: SuggestionAnswerType;
   symptomKey: string;
+  symptomLabel: string;
   reason: string;
   note: string;
 }
@@ -114,11 +115,14 @@ function normalizeSuggestionCard(raw: unknown, index: number): SuggestionCard | 
   if (!question) return null;
 
   const symptomKey = sanitizeText(card.symptomKey, 80) || `suggestion-${index + 1}`;
+  const symptomLabel =
+    sanitizeText(card.symptomLabel, 80) || symptomKey || question.slice(0, 40);
   return {
     id: `${slugify(symptomKey)}-${index + 1}`,
     question,
     answerType: sanitizeAnswerType(card.answerType),
     symptomKey,
+    symptomLabel,
     reason: sanitizeText(card.reason, 160),
     note: sanitizeText(card.note, 160),
   };
@@ -163,6 +167,7 @@ function buildSymptomQuestion(symptom: PatientQuestionContext["recentSymptoms"][
     question,
     answerType,
     symptomKey: symptomName,
+    symptomLabel: symptomName,
     reason: `最近症狀記錄：${symptomName}，${symptomStatusLabel(symptom.status)}。`,
     note: "可再追問持續時間、誘因、緩解因素。",
   };
@@ -176,6 +181,7 @@ function constitutionFallbackQuestions(constitution: string | null | undefined):
         question: "最近睡眠同精神點樣？朝早起身有冇特別攰？",
         answerType: "trend",
         symptomKey: "sleep-energy",
+        symptomLabel: "睡眠精神",
         reason: "體質偏虛耗型，先跟進睡眠與體力變化。",
         note: "若病人話攰，可再問氣短、心悸、出汗。",
       },
@@ -189,6 +195,7 @@ function constitutionFallbackQuestions(constitution: string | null | undefined):
         question: "近排頭脹、胸悶或者情緒繃緊有冇再出現？",
         answerType: "trend",
         symptomKey: "stress-head",
+        symptomLabel: "頭脹胸悶",
         reason: "體質偏交錯型，宜先追問氣機不舒相關症狀。",
         note: "可再問與壓力、經期、睡眠有無關係。",
       },
@@ -202,6 +209,7 @@ function constitutionFallbackQuestions(constitution: string | null | undefined):
         question: "胃口、大便同身體困重感而家點樣？",
         answerType: "trend",
         symptomKey: "appetite-bowel",
+        symptomLabel: "胃口大便",
         reason: "體質偏屯積型，宜先問消化與痰濕表現。",
         note: "可再問腹脹、口黏、痰多、便黏。",
       },
@@ -214,6 +222,7 @@ function constitutionFallbackQuestions(constitution: string | null | undefined):
       question: "今日最困擾你嘅症狀，和上次相比係好咗定差咗？",
       answerType: "trend",
       symptomKey: "main-concern",
+      symptomLabel: "主訴變化",
       reason: "病歷脈絡未夠完整，先問主訴變化。",
       note: "之後再補問分數、時間、誘因。",
     },
@@ -234,6 +243,7 @@ function buildFallbackSuggestions(context: PatientQuestionContext): SuggestionPa
       question: `上次交代嘅覆診重點，病人而家跟進成點？${followUp.reason ? `特別係「${sanitizeText(followUp.reason, 50)}」` : ""}`,
       answerType: "trend",
       symptomKey: "follow-up-plan",
+      symptomLabel: "覆診跟進",
       reason: `有待跟進計劃：${followUp.suggestedDate || "未有日期"}`,
       note: "可補問有冇中斷、是否已安排覆診。",
     });
@@ -246,6 +256,7 @@ function buildFallbackSuggestions(context: PatientQuestionContext): SuggestionPa
       question: `最近跟住「${sanitizeText(instruction.title, 40)}」之後，症狀有冇明顯變化？`,
       answerType: "trend",
       symptomKey: "instruction-response",
+      symptomLabel: "護理反應",
       reason: "病人目前有生效中護理指引，可直接問執行後反應。",
       note: "若病人無跟，可再問阻礙點。",
     });
@@ -340,6 +351,7 @@ function buildContextPrompt(patientUserId: string, context: PatientQuestionConte
     '      "question": "string",',
     '      "answerType": "yes_no|scale_0_10|trend|frequency|free_text",',
     '      "symptomKey": "string",',
+    '      "symptomLabel": "string",',
     '      "reason": "string",',
     '      "note": "string"',
     "    }",
@@ -349,9 +361,10 @@ function buildContextPrompt(patientUserId: string, context: PatientQuestionConte
     "1) summary 只需一句，提示醫師先問咩。",
     "2) 每條 question 最多 40 字左右，夠醫師即問。",
     "3) answerType 只可使用指定值。",
-    "4) reason 係俾醫師睇，說明點解要問。",
-    "5) note 係一句短提示，說明答完可再點追問。",
-    "6) 若資料不足，可以問主訴、睡眠、胃口、大便，但仍要貼近病人已知脈絡。",
+    "4) symptomLabel 要用簡短中文，方便之後做症狀趨勢圖，例如『頭痛』、『睡眠精神』。",
+    "5) reason 係俾醫師睇，說明點解要問。",
+    "6) note 係一句短提示，說明答完可再點追問。",
+    "7) 若資料不足，可以問主訴、睡眠、胃口、大便，但仍要貼近病人已知脈絡。",
     `\n【病人 ID】\n${patientUserId}`,
     `\n【病人稱呼】\n${context.patientIdentity.displayName || "未提供"}`,
     `\n【體質】\n${constitutionBlock}`,

@@ -9,6 +9,7 @@ interface QuestionSuggestion {
   question: string;
   answerType: SuggestionAnswerType;
   symptomKey: string;
+  symptomLabel: string;
   reason: string;
   note: string;
 }
@@ -19,6 +20,11 @@ interface QuestionSuggestionResponse {
   usedFallback?: boolean;
   model?: string | null;
   generatedAt?: string;
+  error?: string;
+}
+
+interface SaveFollowUpResponse {
+  insertedCount?: number;
   error?: string;
 }
 
@@ -49,15 +55,22 @@ function formatGeneratedAt(dateString: string | undefined): string {
 export function PatientQuestionSuggestions({
   patientUserId,
   patientName,
+  onAnswersSaved,
+  sourceScreen = "doctor_patient_page",
 }: {
   patientUserId: string;
   patientName: string | null;
+  onAnswersSaved?: () => void | Promise<void>;
+  sourceScreen?: string;
 }) {
   const [data, setData] = useState<QuestionSuggestionResponse | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const fetchSuggestions = useCallback(async () => {
     setLoading(true);
@@ -78,6 +91,8 @@ export function PatientQuestionSuggestions({
         generatedAt: payload.generatedAt,
       });
       setAnswers({});
+      setSaveStatus(null);
+      setSaveError(null);
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "問診建議載入失敗");
       setData(null);
@@ -90,12 +105,34 @@ export function PatientQuestionSuggestions({
     void fetchSuggestions();
   }, [fetchSuggestions]);
 
+  const answeredSuggestions = useMemo(() => {
+    if (!data) return [];
+
+    return data.suggestions
+      .map((suggestion) => {
+        const answerValueText = (answers[suggestion.id] || "").trim();
+        if (!answerValueText) return null;
+        return {
+          suggestion,
+          answerValueText,
+        };
+      })
+      .filter(
+        (
+          item
+        ): item is {
+          suggestion: QuestionSuggestion;
+          answerValueText: string;
+        } => Boolean(item)
+      );
+  }, [answers, data]);
+
   const copyBundleText = useMemo(() => {
     if (!data) return "";
 
     const lines = data.suggestions.map((suggestion, index) => {
       const answer = answers[suggestion.id]?.trim();
-      return `${index + 1}. ${suggestion.question}${answer ? `\n暫記答案：${answer}` : ""}`;
+      return `${index + 1}. [${suggestion.symptomLabel}] ${suggestion.question}${answer ? `\n暫記答案：${answer}` : ""}`;
     });
 
     const heading = patientName ? `${patientName}｜AI 問診建議` : "AI 問診建議";
@@ -115,11 +152,66 @@ export function PatientQuestionSuggestions({
     }
   }
 
+  async function copySingleQuestion(question: string) {
+    try {
+      await navigator.clipboard.writeText(question);
+      setCopyStatus("問題已複製");
+      setTimeout(() => setCopyStatus(null), 2000);
+    } catch {
+      setCopyStatus("複製失敗，請手動選取文字");
+      setTimeout(() => setCopyStatus(null), 2500);
+    }
+  }
+
+  async function saveAnswers() {
+    if (answeredSuggestions.length === 0) return;
+
+    setSaving(true);
+    setSaveStatus(null);
+    setSaveError(null);
+
+    try {
+      const response = await fetch(`/api/doctor/patients/${patientUserId}/symptom-follow-ups`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          answers: answeredSuggestions.map(({ suggestion, answerValueText }) => ({
+            suggestionId: suggestion.id,
+            symptomKey: suggestion.symptomKey,
+            symptomLabel: suggestion.symptomLabel,
+            questionText: suggestion.question,
+            answerType: suggestion.answerType,
+            answerValueText,
+            reason: suggestion.reason,
+            note: suggestion.note,
+            sourceScreen,
+          })),
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as SaveFollowUpResponse;
+      if (!response.ok) {
+        throw new Error(payload.error || `HTTP ${response.status}`);
+      }
+
+      setSaveStatus(`已寫入 ${payload.insertedCount || answeredSuggestions.length} 筆跟進記錄。`);
+      setAnswers({});
+      if (onAnswersSaved) {
+        await onAnswersSaved();
+      }
+    } catch (saveRequestError) {
+      setSaveError(saveRequestError instanceof Error ? saveRequestError.message : "寫入跟進記錄失敗");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function setAnswer(suggestionId: string, value: string) {
     setAnswers((current) => ({
       ...current,
       [suggestionId]: value,
     }));
+    setSaveStatus(null);
+    setSaveError(null);
   }
 
   function renderAnswerControls(suggestion: QuestionSuggestion) {
@@ -216,7 +308,7 @@ export function PatientQuestionSuggestions({
           <button
             type="button"
             onClick={() => void fetchSuggestions()}
-            disabled={loading}
+            disabled={loading || saving}
             className="min-h-11 rounded-md border border-cyan-200 bg-white px-3 py-2 text-sm font-medium text-cyan-900 transition-colors hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "更新中..." : "重新產生"}
@@ -225,9 +317,17 @@ export function PatientQuestionSuggestions({
             type="button"
             onClick={() => void copyBundle()}
             disabled={!data || data.suggestions.length === 0}
-            className="min-h-11 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             複製問題卡
+          </button>
+          <button
+            type="button"
+            onClick={() => void saveAnswers()}
+            disabled={saving || answeredSuggestions.length === 0}
+            className="min-h-11 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? "寫入中..." : `寫入跟進記錄${answeredSuggestions.length > 0 ? ` (${answeredSuggestions.length})` : ""}`}
           </button>
         </div>
       </div>
@@ -263,15 +363,29 @@ export function PatientQuestionSuggestions({
                   <span className="text-xs text-gray-500">更新時間：{formatGeneratedAt(data.generatedAt)}</span>
                 ) : null}
               </div>
-              <p className="mt-2 text-sm leading-6 text-gray-700">{data.summary || "先從目前最困擾症狀開始，逐步追問分數與變化。"}</p>
+              <p className="mt-2 text-sm leading-6 text-gray-700">
+                {data.summary || "先從目前最困擾症狀開始，逐步追問分數與變化。"}
+              </p>
               <p className="mt-2 text-xs text-gray-500">
-                目前為醫師即場提詞版；答案暫存在此頁，未自動寫入 chart 或症狀資料庫。
+                答完之後可直接寫入結構化跟進記錄，病人症狀區會同步更新 0-10 趨勢圖。
               </p>
             </div>
 
             {copyStatus ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                 {copyStatus}
+              </div>
+            ) : null}
+
+            {saveStatus ? (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                {saveStatus}
+              </div>
+            ) : null}
+
+            {saveError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {saveError}
               </div>
             ) : null}
 
@@ -285,6 +399,9 @@ export function PatientQuestionSuggestions({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-gray-900 px-2.5 py-1 text-xs font-semibold text-white">
                         問題 {index + 1}
+                      </span>
+                      <span className="rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-medium text-cyan-900">
+                        {suggestion.symptomLabel}
                       </span>
                       <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
                         {answerTypeLabel(suggestion.answerType)}
@@ -303,7 +420,9 @@ export function PatientQuestionSuggestions({
 
                   <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">點解問</p>
-                    <p className="mt-1 text-sm leading-6 text-gray-700">{suggestion.reason || "按現有病歷脈絡建議先跟進。"}</p>
+                    <p className="mt-1 text-sm leading-6 text-gray-700">
+                      {suggestion.reason || "按現有病歷脈絡建議先跟進。"}
+                    </p>
                   </div>
 
                   <div className="mt-3">
@@ -317,18 +436,7 @@ export function PatientQuestionSuggestions({
                     </p>
                     <button
                       type="button"
-                      onClick={() => {
-                        void navigator.clipboard
-                          .writeText(suggestion.question)
-                          .then(() => {
-                            setCopyStatus("問題已複製");
-                            setTimeout(() => setCopyStatus(null), 2000);
-                          })
-                          .catch(() => {
-                            setCopyStatus("複製失敗，請手動選取文字");
-                            setTimeout(() => setCopyStatus(null), 2500);
-                          });
-                      }}
+                      onClick={() => void copySingleQuestion(suggestion.question)}
                       className="min-h-11 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                     >
                       複製此題
