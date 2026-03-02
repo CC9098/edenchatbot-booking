@@ -3,13 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { isNativeAppRuntime, isNativeAppUserAgent } from "@/lib/platform";
+import {
+  isMobileBrowserUserAgent,
+  isNativeAppRuntime,
+  isNativeAppUserAgent,
+} from "@/lib/platform";
 import {
   Sparkles,
   CalendarCheck2,
   Leaf,
   UserRound,
 } from "lucide-react";
+
+const MOBILE_CHROME_MAX_WIDTH = 1024;
 
 type TabItem = {
   id: "chat" | "booking" | "care" | "profile";
@@ -206,9 +212,11 @@ function ProfileCompletionPrompt({ enabled }: { enabled: boolean }) {
 
 export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [isNativeApp, setIsNativeApp] = useState(() => {
-    if (typeof navigator === "undefined") return false;
-    return isNativeAppUserAgent(navigator.userAgent);
+  const [showMobileChrome, setShowMobileChrome] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const userAgent = window.navigator.userAgent;
+    const mobileBrowser = isMobileBrowserUserAgent(userAgent) && window.innerWidth <= MOBILE_CHROME_MAX_WIDTH;
+    return isNativeAppUserAgent(userAgent) || mobileBrowser;
   });
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 
@@ -216,31 +224,37 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return;
     let cancelled = false;
 
-    const syncNativeState = () => {
+    const syncChromeState = () => {
       if (cancelled) return;
       // Native bridge availability can lag behind first render in WebView.
-      setIsNativeApp((previous) => previous || isNativeAppRuntime());
+      const nativeRuntime = isNativeAppRuntime();
+      const mobileBrowserRuntime =
+        isMobileBrowserUserAgent(window.navigator.userAgent) &&
+        window.innerWidth <= MOBILE_CHROME_MAX_WIDTH;
+      setShowMobileChrome(nativeRuntime || mobileBrowserRuntime);
     };
 
-    syncNativeState();
+    syncChromeState();
     const retryDelays = [120, 320, 760, 1600];
-    const retryTimers = retryDelays.map((delay) => window.setTimeout(syncNativeState, delay));
+    const retryTimers = retryDelays.map((delay) => window.setTimeout(syncChromeState, delay));
 
-    window.addEventListener("focus", syncNativeState);
-    window.addEventListener("pageshow", syncNativeState);
-    document.addEventListener("visibilitychange", syncNativeState);
+    window.addEventListener("focus", syncChromeState);
+    window.addEventListener("pageshow", syncChromeState);
+    window.addEventListener("resize", syncChromeState);
+    document.addEventListener("visibilitychange", syncChromeState);
 
     return () => {
       cancelled = true;
       retryTimers.forEach((timer) => window.clearTimeout(timer));
-      window.removeEventListener("focus", syncNativeState);
-      window.removeEventListener("pageshow", syncNativeState);
-      document.removeEventListener("visibilitychange", syncNativeState);
+      window.removeEventListener("focus", syncChromeState);
+      window.removeEventListener("pageshow", syncChromeState);
+      window.removeEventListener("resize", syncChromeState);
+      document.removeEventListener("visibilitychange", syncChromeState);
     };
   }, []);
 
-  // Keep the mobile chrome exclusive to the native Capacitor app.
-  const patientRoute = isNativeApp && isPatientRoute(pathname);
+  // Show patient mobile chrome in native app and mobile browsers.
+  const patientRoute = showMobileChrome && isPatientRoute(pathname);
   const isChatRoute = patientRoute && pathname.startsWith("/chat");
 
   const activeTab = getActiveTab(pathname);

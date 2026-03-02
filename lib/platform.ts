@@ -3,6 +3,11 @@ export function isNativeAppUserAgent(userAgent: string | null | undefined): bool
   return /\bCapacitor\b/i.test(userAgent);
 }
 
+export function isMobileBrowserUserAgent(userAgent: string | null | undefined): boolean {
+  if (!userAgent) return false;
+  return /\b(Android|iPhone|iPad|iPod|Mobile|Windows Phone)\b/i.test(userAgent);
+}
+
 type CapacitorBridge = {
   isNativePlatform?: () => boolean;
   getPlatform?: () => string;
