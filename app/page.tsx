@@ -5,6 +5,13 @@ import { createServerClient } from "@/lib/supabase-server";
 import { isNativeAppUserAgent } from "@/lib/platform";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import {
+  ArrowRight,
+  BookOpenText,
+  CalendarCheck2,
+  GraduationCap,
+  Sparkles,
+} from "lucide-react";
 
 export const dynamic = 'force-dynamic';
 
@@ -47,63 +54,93 @@ export default async function Home() {
           </Link>
         </div>
 
-        <section className="rounded-3xl border border-primary/15 bg-white/85 p-6 shadow-sm sm:p-8">
+        <section className="grid gap-6 rounded-3xl border border-primary/15 bg-white/90 p-6 shadow-sm sm:p-8 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
           <div className="max-w-4xl space-y-6">
             <p className="inline-flex items-center rounded-full bg-primary-light px-3 py-1 text-xs font-semibold text-primary">
-              醫天圓中醫診所 · 一站式內容 + AI + 預約
+              醫天圓中醫診所 · 病人入口
             </p>
             <h1 className="text-3xl font-semibold leading-tight text-primary sm:text-5xl">
-              電子課程、健康文章、AI 諮詢與預約 已在同一平台
+              身體有疑問，先問 AI；準備好，就直接預約
             </h1>
             <p className="max-w-3xl text-base leading-relaxed text-slate-600 sm:text-lg">
-              你可以先閱讀文章、再睇課程、即時用 AI 追問，最後直接完成預約。右下角浮動按鈕可隨時打開醫天圓小助手。
+              首頁只保留兩條主要路線：如果你想快啲約診，直接揀時段；如果你仲未肯定，先用 AI 梳理情況，再轉去預約。文章同課程會放喺後面慢慢睇，唔會阻住你開始。
             </p>
             <div className="flex flex-wrap gap-3">
               <Link
-                href="/articles"
-                className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-hover"
-              >
-                閱讀健康文章
-              </Link>
-              <Link
-                href="/courses"
-                className="inline-flex items-center rounded-xl border border-primary/20 bg-white px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary-light"
-              >
-                進入電子課程
-              </Link>
-              <Link
                 href="/booking"
-                className="inline-flex items-center rounded-xl border border-primary/20 bg-white px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary-light"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-white transition hover:bg-primary-hover"
               >
-                立即預約 / AI 諮詢
+                <CalendarCheck2 className="h-4 w-4" />
+                立即預約
               </Link>
+              <Link
+                href="/chat"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/20 bg-white px-5 py-2.5 text-sm font-medium text-primary transition hover:bg-primary-light"
+              >
+                <Sparkles className="h-4 w-4" />
+                先問 AI 體質諮詢
+              </Link>
+            </div>
+            <div className="rounded-2xl border border-primary/10 bg-primary-pale p-4 text-sm text-slate-600">
+              <p className="font-medium text-primary">想先了解再決定？</p>
+              <div className="mt-3 flex flex-wrap gap-4">
+                <Link href="/articles" className="inline-flex items-center gap-2 font-medium text-primary hover:underline">
+                  <BookOpenText className="h-4 w-4" />
+                  健康文章
+                </Link>
+                <Link href="/courses" className="inline-flex items-center gap-2 font-medium text-primary hover:underline">
+                  <GraduationCap className="h-4 w-4" />
+                  電子課程
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="rounded-2xl border border-primary/15 bg-primary-pale p-5">
+              <p className="text-xs font-semibold tracking-wide text-primary">最快開始方式</p>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">兩步入主流程</h2>
+              <ol className="mt-4 space-y-3 text-sm text-slate-600">
+                <li className="rounded-xl bg-white/80 px-4 py-3">
+                  <span className="font-semibold text-slate-900">1. 揀路線</span>
+                  <p className="mt-1">想快啲約診就去預約，未肯定就先問 AI。</p>
+                </li>
+                <li className="rounded-xl bg-white/80 px-4 py-3">
+                  <span className="font-semibold text-slate-900">2. 完成下一步</span>
+                  <p className="mt-1">AI 會導去預約，預約頁就直接揀醫師、診所同時段。</p>
+                </li>
+              </ol>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+              <div className="rounded-2xl border border-primary-light bg-white/95 p-4 shadow-sm">
+                <p className="text-xs font-semibold tracking-wide text-primary">已發佈文章</p>
+                <p className="mt-2 text-3xl font-semibold text-slate-900">{articles.length}</p>
+                <p className="mt-1 text-sm text-slate-600">作為延伸閱讀，不再搶主入口</p>
+              </div>
+              <div className="rounded-2xl border border-primary-light bg-white/95 p-4 shadow-sm">
+                <p className="text-xs font-semibold tracking-wide text-primary">已發佈課程</p>
+                <p className="mt-2 text-3xl font-semibold text-slate-900">{courses.length}</p>
+                <p className="mt-1 text-sm text-slate-600">想先了解內容，可以稍後再睇</p>
+              </div>
+              <div className="rounded-2xl border border-primary-light bg-white/95 p-4 shadow-sm">
+                <p className="text-xs font-semibold tracking-wide text-primary">主流程</p>
+                <p className="mt-2 text-xl font-semibold text-slate-900">AI / 預約</p>
+                <p className="mt-1 text-sm text-slate-600">先幫你開始，而唔係先叫你揀內容分類</p>
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-primary-light bg-white/90 p-4 shadow-sm">
-            <p className="text-xs font-semibold tracking-wide text-primary">已發佈文章</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{articles.length}</p>
-            <p className="mt-1 text-sm text-slate-600">由 Supabase 內容庫讀取</p>
-          </div>
-          <div className="rounded-2xl border border-primary-light bg-white/90 p-4 shadow-sm">
-            <p className="text-xs font-semibold tracking-wide text-primary">已發佈課程</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{courses.length}</p>
-            <p className="mt-1 text-sm text-slate-600">內容、課堂與 AI 導流整合</p>
-          </div>
-          <div className="rounded-2xl border border-primary-light bg-white/90 p-4 shadow-sm">
-            <p className="text-xs font-semibold tracking-wide text-primary">互動入口</p>
-            <p className="mt-2 text-xl font-semibold text-slate-900">文章 → AI → 預約</p>
-            <p className="mt-1 text-sm text-slate-600">同一網址完成整個流程</p>
-          </div>
-        </section>
-
         <section className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-2xl font-semibold text-primary">最新健康文章</h2>
-            <Link href="/articles" className="text-sm font-medium text-primary hover:underline">
-              查看全部 →
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-primary">延伸內容</p>
+              <h2 className="text-2xl font-semibold text-primary">想先了解，再慢慢決定</h2>
+            </div>
+            <Link href="/articles" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+              查看全部文章
+              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           {articles.length === 0 ? (
@@ -128,10 +165,14 @@ export default async function Home() {
         </section>
 
         <section className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-2xl font-semibold text-primary">最新電子課程</h2>
-            <Link href="/courses" className="text-sm font-medium text-primary hover:underline">
-              查看全部 →
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-primary">進一步學習</p>
+              <h2 className="text-2xl font-semibold text-primary">電子課程會留喺第二步</h2>
+            </div>
+            <Link href="/courses" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+              查看全部課程
+              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           {courses.length === 0 ? (
