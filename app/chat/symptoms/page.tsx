@@ -553,15 +553,6 @@ export default function MySymptomsPage() {
     return trimCopy(careContext?.constitutionNote?.trim() || constitutionMeta.summary);
   }, [careContext?.constitutionNote, careError, careLoading, constitutionMeta.summary]);
 
-  const dashboardStats = useMemo(
-    () => [
-      { label: "進行中", value: stats.activeCount },
-      { label: "已記錄", value: stats.total },
-      { label: "今月好轉", value: stats.improvedThisMonthCount },
-    ],
-    [stats.activeCount, stats.improvedThisMonthCount, stats.total],
-  );
-
   function openResolveModal(symptom: SymptomItem) {
     setResolveTarget(symptom);
     setResolveSaving(false);
@@ -737,15 +728,6 @@ export default function MySymptomsPage() {
             >
               問 AI
             </Link>
-          </div>
-
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {dashboardStats.map((item) => (
-              <div key={item.label} className="rounded-2xl border border-primary/10 bg-primary-light/30 px-3 py-2.5">
-                <p className="text-[11px] font-medium text-slate-500">{item.label}</p>
-                <p className="mt-1 text-lg font-semibold text-slate-900">{item.value}</p>
-              </div>
-            ))}
           </div>
         </section>
 
