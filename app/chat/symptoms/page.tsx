@@ -507,28 +507,28 @@ export default function MySymptomsPage() {
     [stats.activeCount, stats.recurringCount, stats.resolvedCount, stats.total],
   );
 
-  const elementBarRows = useMemo(() => {
-    const maxScore = Math.max(stats.waterScore, stats.windScore, stats.thunderScore, 1);
+  const elementBarSegments = useMemo(() => {
+    const totalScore = stats.waterScore + stats.windScore + stats.thunderScore;
     return [
       {
         key: "water" as const,
         label: ELEMENT_META.water.label,
         value: stats.waterScore,
-        width: Math.round((stats.waterScore / maxScore) * 100),
+        width: totalScore > 0 ? Math.round((stats.waterScore / totalScore) * 100) : 0,
         barClass: ELEMENT_META.water.barClass,
       },
       {
         key: "wind" as const,
         label: ELEMENT_META.wind.label,
         value: stats.windScore,
-        width: Math.round((stats.windScore / maxScore) * 100),
+        width: totalScore > 0 ? Math.round((stats.windScore / totalScore) * 100) : 0,
         barClass: ELEMENT_META.wind.barClass,
       },
       {
         key: "thunder" as const,
         label: ELEMENT_META.thunder.label,
         value: stats.thunderScore,
-        width: Math.round((stats.thunderScore / maxScore) * 100),
+        width: totalScore > 0 ? Math.round((stats.thunderScore / totalScore) * 100) : 0,
         barClass: ELEMENT_META.thunder.barClass,
       },
     ];
@@ -717,26 +717,11 @@ export default function MySymptomsPage() {
       <div className="flex h-full flex-col gap-3">
         <section className="rounded-[28px] border border-primary/10 bg-white/95 p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold tracking-[0.18em] text-primary">ROOT</p>
               <h1 className="mt-1 text-xl font-semibold text-slate-900">身體狀態</h1>
-              <p className="mt-1 text-xs text-slate-500">重點留在首屏，深入內容改用按鈕打開。</p>
-            </div>
-            <Link
-              href="/chat"
-              className="inline-flex items-center rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
-            >
-              問 AI
-            </Link>
-          </div>
-        </section>
-
-        <section className="rounded-[28px] border border-primary/10 bg-white/95 p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold tracking-[0.18em] text-primary">BODY TREND</p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <h2 className="text-base font-semibold text-slate-900">
+                <h2 className="text-sm font-semibold text-slate-900">
                   {leadingElement ? `${ELEMENT_META[leadingElement].label}較明顯` : "等待更多記錄"}
                 </h2>
                 {leadingElement ? (
@@ -747,25 +732,44 @@ export default function MySymptomsPage() {
                   </span>
                 ) : null}
               </div>
+              <p className="mt-1 text-xs text-slate-500">重點留在首屏，深入內容改用按鈕打開。</p>
             </div>
-            {!careLoading && !careError ? (
-              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${constitutionMeta.badgeClass}`}>
-                {constitutionMeta.label}
-              </span>
-            ) : null}
+            <div className="flex flex-col items-end gap-2">
+              <Link
+                href="/chat"
+                className="inline-flex items-center rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
+              >
+                問 AI
+              </Link>
+              {!careLoading && !careError ? (
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${constitutionMeta.badgeClass}`}
+                >
+                  {constitutionMeta.label}
+                </span>
+              ) : null}
+            </div>
           </div>
 
-          <div className="mt-3 space-y-2.5">
-            {elementBarRows.map((row) => (
-              <div key={row.key} className="grid grid-cols-[44px_1fr_auto] items-center gap-2">
-                <span className="text-xs font-semibold text-slate-600">{row.label}</span>
-                <div className="h-2.5 rounded-full bg-slate-100">
-                  <div
-                    className={`h-full rounded-full transition-all ${row.barClass}`}
-                    style={{ width: `${row.width}%` }}
-                  />
+          <div className="mt-4 overflow-hidden rounded-full bg-slate-100">
+            <div className="flex h-3 w-full">
+              {elementBarSegments.map((segment) => (
+                <div
+                  key={segment.key}
+                  className={`h-full transition-all ${segment.barClass}`}
+                  style={{ width: `${segment.width}%` }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {elementBarSegments.map((segment) => (
+              <div key={segment.key} className="rounded-2xl border border-slate-200 bg-slate-50/90 px-2.5 py-2">
+                <div className="flex items-center justify-between gap-2 text-[11px]">
+                  <span className="font-semibold text-slate-700">{segment.label}</span>
+                  <span className="font-semibold text-slate-500">{segment.width}%</span>
                 </div>
-                <span className="text-xs font-semibold text-slate-700">{row.value}</span>
               </div>
             ))}
           </div>
