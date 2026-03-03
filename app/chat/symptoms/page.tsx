@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { ArrowRight, ArrowUpCircle, ChevronRight } from "lucide-react";
 import { getLocalDateKey, isBaseQuizComplete, type BaseQuizAnswers } from "@/lib/constitution-tendency";
+import { constitutionToTendencyKey, FORCE_NARRATIVE } from "@/lib/narrative-copy";
 
 type SymptomItem = {
   id: string;
@@ -546,6 +547,8 @@ export default function MySymptomsPage() {
 
   const constitutionKey = careContext?.constitution || "unknown";
   const constitutionMeta = CONSTITUTION_META[constitutionKey] || CONSTITUTION_META.unknown;
+  const tendencyKey = constitutionToTendencyKey(constitutionKey);
+  const accentBg = tendencyKey ? FORCE_NARRATIVE[tendencyKey].accentBg : "bg-primary-light/30";
 
   const careSummaryCopy = useMemo(() => {
     if (careLoading) return "整理體質資料中，先用最近症狀歸納今日重點。";
@@ -715,11 +718,10 @@ export default function MySymptomsPage() {
   return (
     <div className="mx-auto flex h-full w-full max-w-4xl flex-1 flex-col overflow-hidden p-4 sm:p-6">
       <div className="flex h-full flex-col gap-3">
-        <section className="rounded-[28px] border border-primary/10 bg-white/95 p-4 shadow-sm">
+        <section className={`rounded-[28px] border border-primary/10 p-4 shadow-sm ${accentBg}`}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-semibold tracking-[0.18em] text-primary">ROOT</p>
-              <h1 className="mt-1 text-xl font-semibold text-slate-900">身體狀態</h1>
+              <h1 className="text-xl font-semibold text-slate-900">身體狀態</h1>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <h2 className="text-sm font-semibold text-slate-900">
                   {leadingElement ? `${ELEMENT_META[leadingElement].label}較明顯` : "等待更多記錄"}
@@ -732,7 +734,6 @@ export default function MySymptomsPage() {
                   </span>
                 ) : null}
               </div>
-              <p className="mt-1 text-xs text-slate-500">重點留在首屏，深入內容改用按鈕打開。</p>
             </div>
             <div className="flex flex-col items-end gap-2">
               <Link
@@ -784,8 +785,7 @@ export default function MySymptomsPage() {
         <section className="rounded-[28px] border border-primary/10 bg-white/95 p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold tracking-[0.18em] text-primary">SYMPTOMS</p>
-              <h2 className="mt-1 text-base font-semibold text-slate-900">目前最值得跟進</h2>
+              <h2 className="text-base font-semibold text-slate-900">目前最值得跟進</h2>
             </div>
             <button
               type="button"
