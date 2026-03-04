@@ -261,7 +261,7 @@ function parsePositiveIntEnv(value: string | undefined, fallback: number): numbe
 }
 
 function getPromptBudgetBMaxTurns(): number {
-  return parsePositiveIntEnv(process.env.CHAT_V2_PROMPT_BUDGET_B_MAX_TURNS, 6);
+  return parsePositiveIntEnv(process.env.CHAT_V2_PROMPT_BUDGET_B_MAX_TURNS, 10);
 }
 
 function getPromptBudgetGMaxTurns(): number {
@@ -269,7 +269,7 @@ function getPromptBudgetGMaxTurns(): number {
 }
 
 function getPromptBudgetBMaxChars(): number {
-  return parsePositiveIntEnv(process.env.CHAT_V2_PROMPT_BUDGET_B_MAX_CHARS, 2200);
+  return parsePositiveIntEnv(process.env.CHAT_V2_PROMPT_BUDGET_B_MAX_CHARS, 4200);
 }
 
 function getPromptBudgetGMaxChars(): number {
@@ -277,7 +277,7 @@ function getPromptBudgetGMaxChars(): number {
 }
 
 function getBToolMaxRounds(): number {
-  return parsePositiveIntEnv(process.env.CHAT_V2_B_TOOL_MAX_ROUNDS, 1);
+  return parsePositiveIntEnv(process.env.CHAT_V2_B_TOOL_MAX_ROUNDS, 5);
 }
 
 function getBResponseMaxSentences(): number {
@@ -549,6 +549,9 @@ const TASK_JSON_KEYWORDS = ['json', '只輸出json', '只返回json', '只回傳
 const TASK_BULLET_KEYWORDS = ['點列', '点列', '條列', 'bullet', 'bullets', '列出'];
 const B_SHORT_FOLLOWUP_KEYWORDS = ['下周', '下週', '下星期', 'tomorrow', 'next week', '聽日', '明日', '明天'];
 const B_ASSISTANT_PROGRESS_KEYWORDS = ['醫師', '诊所', '診所', '時段', '时间', '日期', '預約', '预约'];
+const B_LOW_SIGNAL_ASSISTANT_PATTERNS = [
+  '我已收到你嘅預約需求。請先確認你想預約邊位醫師同日期，我會用最少步驟幫你完成。',
+];
 const BOOKING_NUDGE_REGEX = /(預約|预约|book|booking|appointment|時段|诊所|診所|醫師|医师|doctor|\bdr\b)/i;
 const NON_B_BOOKING_GUIDANCE_KEYWORDS = [
   '收費', '收费', '價錢', '价钱', '幾錢', '几钱', '價目', '价格', 'price', 'cost',
@@ -1145,6 +1148,38 @@ function buildBShortFollowUpReply(latestUserText: string): string {
   return '明白，我幫你跟進。請先講你想預約邊位醫師。';
 }
 
+function isLowSignalBookingAssistantMessage(text: string): boolean {
+  const normalized = normalizeIntentText(text);
+  if (!normalized) return false;
+  return B_LOW_SIGNAL_ASSISTANT_PATTERNS.some((pattern) =>
+    normalized.includes(normalizeIntentText(pattern))
+  );
+}
+
+function pruneLowSignalBookingHistory(messages: ChatMessagePayload[]): ChatMessagePayload[] {
+  if (messages.length <= 1) return messages;
+
+  const seenLowSignalAssistantMessages = new Set<string>();
+  const reversedKept: ChatMessagePayload[] = [];
+
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+
+    if (message.role !== 'assistant' || !isLowSignalBookingAssistantMessage(message.content)) {
+      reversedKept.push(message);
+      continue;
+    }
+
+    const key = normalizeIntentText(message.content);
+    if (seenLowSignalAssistantMessages.has(key)) continue;
+
+    seenLowSignalAssistantMessages.add(key);
+    reversedKept.push(message);
+  }
+
+  return reversedKept.reverse();
+}
+
 function compactContextByChars(context: string, maxChars: number): string {
   if (!context || context.length <= maxChars) return context;
   return `${context.slice(0, maxChars).trim()}\n（以下內容已因篇幅限制省略）`;
@@ -1165,6 +1200,9 @@ function applyPromptBudget(messages: ChatMessagePayload[], mode: ChatMode): Prom
   const maxChars = mode === 'B' ? getPromptBudgetBMaxChars() : getPromptBudgetGMaxChars();
 
   let history = messages.slice(-maxTurns);
+  if (mode === 'B') {
+    history = pruneLowSignalBookingHistory(history);
+  }
   const trimmedByTurns = history.length < messages.length;
   let totalChars = history.reduce((acc, msg) => acc + msg.content.length, 0);
   let trimmedByChars = false;
