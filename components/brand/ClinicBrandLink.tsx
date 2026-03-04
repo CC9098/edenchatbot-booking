@@ -12,7 +12,7 @@ type ClinicBrandLinkProps = {
 export function ClinicBrandLink({
   href = "/chat",
   className = "",
-  subtitle = "調養・預約・諮詢",
+  subtitle,
 }: ClinicBrandLinkProps) {
   const linkClassName = ["chat-fixed-topbar__brand", className].filter(Boolean).join(" ");
 
@@ -29,7 +29,7 @@ export function ClinicBrandLink({
       </span>
       <span className="chat-fixed-topbar__brand-copy">
         <span className="chat-fixed-topbar__brand-title">醫天圓</span>
-        <span className="chat-fixed-topbar__brand-subtitle">{subtitle}</span>
+        {subtitle ? <span className="chat-fixed-topbar__brand-subtitle">{subtitle}</span> : null}
       </span>
     </Link>
   );
