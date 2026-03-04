@@ -34,53 +34,53 @@ export const TENDENCY_LABELS: Record<TendencyKey, string> = {
 
 export const BASE_QUESTION_COPY = {
   group1: {
-    prompt: "當你面對新挑戰，最自然反應係邊個？",
+    prompt: "【腹】遇到突發情況，你第一個本能反應係？",
     options: [
       {
         id: "A",
-        text: "我想發揮影響力，不喜歡無所事事；知道自己想要什麼，會主動推進。",
+        text: "我會即刻想掌握局面，身體會收緊向前衝；未處理好會坐立不安。",
       },
       {
         id: "B",
-        text: "我容易投入想像世界，偏向安靜觀察；在人群中有時會選擇獨處。",
+        text: "我會先退後觀察，腦內先整理情境；比起即刻行動，我想先想清楚。",
       },
       {
         id: "C",
-        text: "我會先完成責任，即使要先放低自己；有空先休息或做想做的事。",
+        text: "我會先頂住責任同現場需要，習慣照顧好大家先；自己感受通常放後。",
       },
     ] as const,
   },
   group2: {
-    prompt: "壓力升高時，你通常會點應對？",
+    prompt: "【腦】壓力升高時，你腦入面最常見邊種狀態？",
     options: [
       {
         id: "X",
-        text: "我會先保持正面，唔開心都盡量唔俾人睇到；有時會拖住未處理的問題。",
+        text: "我會同自己講「再撐下先」，傾向維持表面穩定；真正難題有時會拖住。",
       },
       {
         id: "Y",
-        text: "我情緒反應比較直接，唔舒服時通常睇得出；我希望自己決定做法。",
+        text: "我反應來得快又直接，腦會即刻判斷想點做；被限制時特別易急。",
       },
       {
         id: "Z",
-        text: "我偏向理性同效率，遇到衝突會抽離情緒先處理，但有時會被覺得太冷靜。",
+        text: "我會先分析同拆解問題，感受先擺一邊；效率高但有時被人覺得太冷。",
       },
     ] as const,
   },
   group3: {
-    prompt: "最近身體狀態，邊句最貼近你？",
+    prompt: "【心】最近兩星期，壓力上來時你最常見邊種身心反應？",
     options: [
       {
         id: "J",
-        text: "我常覺得腦袋停不下來，精神容易繃緊；睡眠偏淺或容易早醒，忙一陣子就有被掏空感。",
+        text: "腦停唔到，夜晚易醒或早醒；忙完一輪會有明顯被掏空感。",
       },
       {
         id: "K",
-        text: "我常覺得身體重重的、提不起勁；飯後容易昏沉，整體像卡住，不太想動。",
+        text: "人偏沉重同慢，飯後特別易昏沉；成日似卡住咁，想郁都難起步。",
       },
       {
         id: "L",
-        text: "我常有一直在撐的感覺；肩頸、胸口或腹部容易緊、脹、頂住，壓力上來時易煩躁或睡不沉。",
+        text: "成日有「撐住」感，胸口或上腹容易繃緊頂住；壓力高時易躁、瞓唔沉。",
       },
     ] as const,
   },
@@ -109,45 +109,45 @@ export const DAILY_CHECKIN_QUESTIONS: DailyCheckinQuestion[] = [
     id: "sleep",
     prompt: "昨晚休息之後，你今朝最接近邊種狀態？",
     options: [
-      { id: "sleep_j", text: "偏淺眠、易醒，瞓完都有耗損感。", delta: { J: 5 } },
-      { id: "sleep_k", text: "瞓好多但仍然沉重、醒來未清。", delta: { K: 5 } },
-      { id: "sleep_l", text: "帶住緊張或壓力入睡，夜晚易躁醒。", delta: { L: 5 } },
+      { id: "sleep_j", text: "半夜醒兩次以上或太早醒，起身後仍覺得心神被耗住。", delta: { J: 5 } },
+      { id: "sleep_k", text: "瞓夠時間都頭重身重，起身後一段時間都未清醒。", delta: { K: 5 } },
+      { id: "sleep_l", text: "帶住緊張入睡，夜晚因心口/上腹繃住或煩躁而醒。", delta: { L: 5 } },
     ],
   },
   {
     id: "body_signal",
-    prompt: "今日最明顯的身體訊號係？",
+    prompt: "今日「腹 / 腦 / 心」三區之中，邊個訊號最明顯？",
     options: [
-      { id: "body_j", text: "偏乾、偏緊，像一直耗緊。", delta: { J: 4 } },
-      { id: "body_k", text: "偏重、偏滯，像卡住唔郁。", delta: { K: 4 } },
-      { id: "body_l", text: "偏脹、偏頂，像有壓力未散。", delta: { L: 4 } },
+      { id: "body_j", text: "【腦】眼同頭容易攰，專注一陣就乾耗，腦內停唔到。", delta: { J: 4 } },
+      { id: "body_k", text: "【腹】腹脹同身重較明顯，坐耐少少就滯住唔想郁。", delta: { K: 4 } },
+      { id: "body_l", text: "【心】胸口或上腹有繃住頂住感，要深呼吸先鬆到。", delta: { L: 4 } },
     ],
   },
   {
     id: "after_meal",
     prompt: "食完飯後，你最常見反應係？",
     options: [
-      { id: "meal_j", text: "偏快耗，想靠提神先頂到。", delta: { J: 4, L: 1 } },
-      { id: "meal_k", text: "偏困倦、偏脹，節奏慢落嚟。", delta: { K: 5 } },
-      { id: "meal_l", text: "偏焗、偏躁，胸腹有頂住感。", delta: { L: 5 } },
+      { id: "meal_j", text: "1-2 小時內已經再虛，專注力跌，要靠咖啡或甜食頂住。", delta: { J: 4, L: 1 } },
+      { id: "meal_k", text: "飯後明顯眼瞓兼腹脹，個人慢半拍。", delta: { K: 5 } },
+      { id: "meal_l", text: "食後有焗悶或頂住感，胸腹唔太舒展，情緒易急。", delta: { L: 5 } },
     ],
   },
   {
     id: "stress",
     prompt: "工作或生活壓力高時，你最易進入邊種狀態？",
     options: [
-      { id: "stress_j", text: "腦不停轉，心神耗得快。", delta: { J: 5 } },
-      { id: "stress_k", text: "人會拖住，動力跌落去。", delta: { K: 5 } },
-      { id: "stress_l", text: "人會繃住，火氣同張力上升。", delta: { L: 5 } },
+      { id: "stress_j", text: "腦內對話停唔到，越諗越攰，夜晚仲會重播。", delta: { J: 5 } },
+      { id: "stress_k", text: "會拖延同收埋自己，明知要做都提唔起勁。", delta: { K: 5 } },
+      { id: "stress_l", text: "語速同火氣上升，胸腹收緊，想即刻處理晒先安心。", delta: { L: 5 } },
     ],
   },
   {
     id: "stable",
     prompt: "以今日整體狀態計，邊句最貼近？",
     options: [
-      { id: "stable_j", text: "仍然偏乾耗，需要慢落嚟。", delta: { J: 3 } },
-      { id: "stable_k", text: "仍然偏沉滯，需要動起來。", delta: { K: 3 } },
-      { id: "stable_l", text: "仍然偏高壓，需要鬆開張力。", delta: { L: 3 } },
+      { id: "stable_j", text: "今日最需要回神同補氣，否則好快透支。", delta: { J: 3 } },
+      { id: "stable_k", text: "今日最需要啟動循環，否則越坐越滯。", delta: { K: 3 } },
+      { id: "stable_l", text: "今日最需要降壓鬆開胸腹，否則容易繃住上火。", delta: { L: 3 } },
     ],
   },
 ];
