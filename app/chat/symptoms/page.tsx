@@ -4,6 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { ArrowUpCircle, ChevronRight } from "lucide-react";
 import { constitutionToTendencyKey, FORCE_NARRATIVE } from "@/lib/narrative-copy";
+import {
+  getTendencyStorageKey,
+  parseStoredTendencyState,
+  resolveStoredQuizConstitution,
+} from "@/lib/tendency-storage";
 
 type SymptomItem = {
   id: string;
@@ -39,6 +44,11 @@ type CareContextResponse = {
   constitutionNote: string | null;
   error?: string;
 };
+
+type DisplayConstitutionSource =
+  | "patient_care_profile"
+  | "default"
+  | "tendency_quiz";
 
 type StatusFilter = "all" | "active" | "resolved" | "recurring";
 
@@ -148,6 +158,12 @@ const STATUS_META: Record<Exclude<StatusFilter, "all">, { label: string; pillCla
     pillClass: "bg-orange-100 text-orange-700",
   },
 };
+
+function constitutionSourceLabel(source: DisplayConstitutionSource): string {
+  if (source === "patient_care_profile") return "體質檔案";
+  if (source === "tendency_quiz") return "問卷即時判讀";
+  return "未有正式體質";
+}
 
 function getStatusLabel(value: string | null): string {
   if (!value) return "未分類";
@@ -282,6 +298,9 @@ export default function MySymptomsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [careContext, setCareContext] = useState<CareContextResponse | null>(null);
+  const [quizConstitution, setQuizConstitution] = useState<
+    ReturnType<typeof resolveStoredQuizConstitution> | null
+  >(null);
   const [careLoading, setCareLoading] = useState(true);
   const [careError, setCareError] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
@@ -346,6 +365,17 @@ export default function MySymptomsPage() {
     void loadSymptoms();
     void loadCareContext();
   }, [loadSymptoms, loadCareContext]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!careContext?.userId) {
+      setQuizConstitution(null);
+      return;
+    }
+
+    const stored = parseStoredTendencyState(window.localStorage.getItem(getTendencyStorageKey(careContext.userId)));
+    setQuizConstitution(resolveStoredQuizConstitution(stored));
+  }, [careContext?.userId]);
 
   const sortedSymptoms = useMemo(
     () =>
@@ -469,10 +499,21 @@ export default function MySymptomsPage() {
     ];
   }, [stats.thunderScore, stats.waterScore, stats.windScore]);
 
-  const constitutionKey = careContext?.constitution || "unknown";
+  const hasFormalConstitution = Boolean(careContext?.constitution && careContext.constitution !== "unknown");
+  const constitutionKey = hasFormalConstitution
+    ? careContext?.constitution || "unknown"
+    : quizConstitution?.constitution || careContext?.constitution || "unknown";
+  const constitutionSource: DisplayConstitutionSource =
+    hasFormalConstitution && careContext?.constitutionSource === "patient_care_profile"
+      ? "patient_care_profile"
+      : quizConstitution
+        ? "tendency_quiz"
+        : "default";
   const constitutionMeta = CONSTITUTION_META[constitutionKey] || CONSTITUTION_META.unknown;
   const tendencyKey = constitutionToTendencyKey(constitutionKey);
   const accentBg = tendencyKey ? FORCE_NARRATIVE[tendencyKey].accentBg : "bg-primary-light/30";
+  const showQuizButton = !careLoading && !careError && careContext?.constitution === "unknown";
+  const quizButtonLabel = quizConstitution ? "更新體質問卷" : "做體質問卷";
   const hasSymptomRecords = stats.total > 0;
   const hasSymptomSignal = elementBarSegments.some((segment) => segment.value > 0);
   const displayElementSegments = hasSymptomSignal ? elementBarSegments : null;
@@ -670,11 +711,21 @@ export default function MySymptomsPage() {
               )}
             </div>
             {!careLoading && !careError ? (
-              <span
-                className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${constitutionMeta.badgeClass}`}
-              >
-                {constitutionMeta.label}
-              </span>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${constitutionMeta.badgeClass}`}
+                >
+                  {constitutionMeta.label}
+                </span>
+                {showQuizButton ? (
+                  <Link
+                    href="/chat/symptoms/tendency-quiz"
+                    className="inline-flex min-h-11 items-center rounded-full border border-primary/20 bg-white/85 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-white"
+                  >
+                    {quizButtonLabel}
+                  </Link>
+                ) : null}
+              </div>
             ) : null}
           </div>
 
@@ -702,6 +753,13 @@ export default function MySymptomsPage() {
                 ))}
               </div>
             </>
+          ) : null}
+
+          {!careLoading && !careError ? (
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-500">
+              <span>體質來源：{constitutionSourceLabel(constitutionSource)}</span>
+              {showQuizButton ? <span>完成三條問題後，會即時更新這裡。</span> : null}
+            </div>
           ) : null}
         </section>
 

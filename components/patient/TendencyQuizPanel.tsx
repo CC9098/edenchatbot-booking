@@ -19,26 +19,18 @@ import {
   type BaseQuizAnswers,
   type ScoreDelta,
   type TendencyKey,
-  type TendencyScore,
 } from "@/lib/constitution-tendency";
 import { generateForceReading } from "@/lib/narrative-copy";
+import {
+  getTendencyStorageKey,
+  hydrateTendencyState,
+  parseStoredTendencyState,
+  type TendencyStorageState,
+} from "@/lib/tendency-storage";
 
 type TendencyQuizPanelProps = {
   userId?: string;
 };
-
-type TendencyStorageState = {
-  version: 1;
-  baseAnswers: BaseQuizAnswers;
-  baseScore: TendencyScore;
-  liveScore: TendencyScore;
-  personalityCode: string | null;
-  answeredDaily: Record<string, { questionId: string; optionId: string; at: string }>;
-  lastDecayDate: string | null;
-  updatedAt: string;
-};
-
-const TENDENCY_STORAGE_VERSION = 1;
 
 const FORCE_META: Record<
   TendencyKey,
@@ -96,49 +88,6 @@ function ForceIcon({ force, className = "h-4 w-4 text-primary" }: ForceIconProps
   return <Zap className={className} strokeWidth={1.9} aria-hidden="true" />;
 }
 
-function createInitialTendencyState(): TendencyStorageState {
-  return {
-    version: TENDENCY_STORAGE_VERSION,
-    baseAnswers: {},
-    baseScore: createEmptyScore(),
-    liveScore: createEmptyScore(),
-    personalityCode: null,
-    answeredDaily: {},
-    lastDecayDate: null,
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-function parseStoredTendencyState(raw: string | null): TendencyStorageState | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<TendencyStorageState>;
-    if (parsed.version !== TENDENCY_STORAGE_VERSION) return null;
-    if (!parsed.baseScore || !parsed.liveScore || !parsed.answeredDaily) return null;
-    return {
-      version: TENDENCY_STORAGE_VERSION,
-      baseAnswers: parsed.baseAnswers || {},
-      baseScore: {
-        J: Number(parsed.baseScore.J || 0),
-        K: Number(parsed.baseScore.K || 0),
-        L: Number(parsed.baseScore.L || 0),
-      },
-      liveScore: {
-        J: Number(parsed.liveScore.J || 0),
-        K: Number(parsed.liveScore.K || 0),
-        L: Number(parsed.liveScore.L || 0),
-      },
-      personalityCode: typeof parsed.personalityCode === "string" ? parsed.personalityCode : null,
-      answeredDaily:
-        typeof parsed.answeredDaily === "object" && parsed.answeredDaily !== null ? parsed.answeredDaily : {},
-      lastDecayDate: typeof parsed.lastDecayDate === "string" ? parsed.lastDecayDate : null,
-      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
-    };
-  } catch {
-    return null;
-  }
-}
-
 function buildDeltaBattleReport(delta: ScoreDelta): BattleReportItem[] {
   const items: BattleReportItem[] = [];
   (Object.keys(FORCE_META) as TendencyKey[]).forEach((key) => {
@@ -169,7 +118,7 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
 
   const todayKey = useMemo(() => getLocalDateKey(), []);
   const todayQuestion = useMemo(() => getDailyCheckinQuestion(todayKey), [todayKey]);
-  const tendencyStorageKey = useMemo(() => `eden:tendency:v1:${userId || "guest"}`, [userId]);
+  const tendencyStorageKey = useMemo(() => getTendencyStorageKey(userId), [userId]);
   const todayAnswerOptionId = tendencyState?.answeredDaily?.[todayKey]?.optionId;
 
   const persistTendencyState = useCallback(
@@ -187,16 +136,7 @@ export function TendencyQuizPanel({ userId }: TendencyQuizPanelProps) {
 
     const storedRaw = window.localStorage.getItem(tendencyStorageKey);
     const stored = parseStoredTendencyState(storedRaw);
-    const baseState = stored || createInitialTendencyState();
-    const span = getDaySpan(baseState.lastDecayDate, todayKey);
-    const liveScore = applyDailyDecay(baseState.liveScore, span);
-
-    const nextState: TendencyStorageState = {
-      ...baseState,
-      liveScore,
-      lastDecayDate: todayKey,
-      updatedAt: new Date().toISOString(),
-    };
+    const nextState = hydrateTendencyState(stored, todayKey);
 
     window.localStorage.setItem(tendencyStorageKey, JSON.stringify(nextState));
     setTendencyState(nextState);

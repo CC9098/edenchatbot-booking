@@ -2,9 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  type BaseQuizAnswers,
-  type TendencyScore,
-  DAILY_CHECKIN_QUESTIONS,
   applyDailyDecay,
   applyDelta,
   getDailyCheckinQuestion,
@@ -13,19 +10,11 @@ import {
   isBaseQuizComplete,
 } from "@/lib/constitution-tendency";
 import { NARRATIVE } from "@/lib/narrative-copy";
-
-type StoredAnsweredDaily = Record<string, { questionId: string; optionId: string; at: string }>;
-
-type TendencyStorageState = {
-  version: 1;
-  baseAnswers: BaseQuizAnswers;
-  baseScore: TendencyScore;
-  liveScore: TendencyScore;
-  personalityCode: string | null;
-  answeredDaily: StoredAnsweredDaily;
-  lastDecayDate: string | null;
-  updatedAt: string;
-};
+import {
+  getTendencyStorageKey,
+  parseStoredTendencyState,
+  type TendencyStorageState,
+} from "@/lib/tendency-storage";
 
 type DailySensePromptProps = {
   userId?: string;
@@ -45,7 +34,7 @@ export function DailySensePrompt({ userId }: DailySensePromptProps) {
 
   const todayKey = useMemo(() => getLocalDateKey(), []);
   const todayQuestion = useMemo(() => getDailyCheckinQuestion(todayKey), [todayKey]);
-  const storageKey = useMemo(() => `eden:tendency:v1:${userId || "guest"}`, [userId]);
+  const storageKey = useMemo(() => getTendencyStorageKey(userId), [userId]);
 
   // Load state from localStorage on mount
   useEffect(() => {
@@ -55,18 +44,12 @@ export function DailySensePrompt({ userId }: DailySensePromptProps) {
     }
 
     try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (!raw) {
-        setState("hidden");
-        return;
-      }
-      const parsed = JSON.parse(raw) as Partial<TendencyStorageState>;
-      if (parsed.version !== 1) {
+      const parsed = parseStoredTendencyState(window.localStorage.getItem(storageKey));
+      if (!parsed) {
         setState("hidden");
         return;
       }
 
-      // Must have completed base quiz
       if (!isBaseQuizComplete(parsed.baseAnswers || {})) {
         setState("hidden");
         return;

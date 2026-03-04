@@ -9,6 +9,11 @@ import {
   NARRATIVE,
   constitutionToTendencyKey,
 } from "@/lib/narrative-copy";
+import {
+  getTendencyStorageKey,
+  parseStoredTendencyState,
+  resolveStoredQuizConstitution,
+} from "@/lib/tendency-storage";
 import { DailyTipCard } from "@/components/patient/DailyTipCard";
 import { DailySensePrompt } from "@/components/patient/DailySensePrompt";
 
@@ -43,6 +48,7 @@ type NextFollowUp = {
 };
 
 type CareContextResponse = {
+  userId?: string;
   constitution: string;
   constitutionSource?: "patient_care_profile" | "default";
   constitutionNote: string | null;
@@ -50,6 +56,11 @@ type CareContextResponse = {
   nextFollowUp: NextFollowUp | null;
   error?: string;
 };
+
+type DisplayConstitutionSource =
+  | "patient_care_profile"
+  | "default"
+  | "tendency_quiz";
 
 function ForceIcon({ tendencyKey, className }: { tendencyKey: string; className?: string }) {
   const cls = className ?? "h-4 w-4";
@@ -95,8 +106,9 @@ function instructionMetaText(item: CareInstruction): string {
   return `${formatInstructionDateRange(item)} ・ 醫師：${doctorName} ・ 更新：${updatedAt}`;
 }
 
-function constitutionSourceLabel(source: CareContextResponse["constitutionSource"]): string {
+function constitutionSourceLabel(source: DisplayConstitutionSource | undefined): string {
   if (source === "patient_care_profile") return "來源：體質檔案";
+  if (source === "tendency_quiz") return "來源：問卷即時判讀";
   return "來源：未有正式體質資料";
 }
 
@@ -104,6 +116,9 @@ export default function CareAdvicePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<CareContextResponse | null>(null);
+  const [quizConstitution, setQuizConstitution] = useState<
+    ReturnType<typeof resolveStoredQuizConstitution> | null
+  >(null);
 
   const loadCareContext = useCallback(async () => {
     try {
@@ -130,9 +145,30 @@ export default function CareAdvicePage() {
     void loadCareContext();
   }, [loadCareContext]);
 
-  const constitutionKey = data?.constitution ?? "unknown";
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!data?.userId) {
+      setQuizConstitution(null);
+      return;
+    }
+
+    const stored = parseStoredTendencyState(window.localStorage.getItem(getTendencyStorageKey(data.userId)));
+    setQuizConstitution(resolveStoredQuizConstitution(stored));
+  }, [data?.userId]);
+
+  const hasFormalConstitution = Boolean(data?.constitution && data.constitution !== "unknown");
+  const constitutionKey = hasFormalConstitution
+    ? data?.constitution ?? "unknown"
+    : quizConstitution?.constitution ?? data?.constitution ?? "unknown";
+  const constitutionSource: DisplayConstitutionSource =
+    hasFormalConstitution && data?.constitutionSource === "patient_care_profile"
+      ? "patient_care_profile"
+      : quizConstitution
+        ? "tendency_quiz"
+        : "default";
   const tendencyKey = constitutionToTendencyKey(constitutionKey);
   const narrative = tendencyKey ? FORCE_NARRATIVE[tendencyKey] : null;
+  const quizButtonLabel = quizConstitution ? "更新體質問卷" : "做體質問卷";
 
   const fallbackDietTips = useMemo(
     () => getConstitutionDietTips(constitutionKey),
@@ -228,10 +264,22 @@ export default function CareAdvicePage() {
                     {bodyDescription}
                   </p>
                   <p className="mt-3 text-xs text-slate-400">
-                    中醫稱為「{tcmLabel}」 · {constitutionSourceLabel(data?.constitutionSource)}
+                    中醫稱為「{tcmLabel}」 · {constitutionSourceLabel(constitutionSource)}
                   </p>
                 </div>
               </div>
+
+              {constitutionSource !== "patient_care_profile" ? (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <Link
+                    href="/chat/symptoms/tendency-quiz"
+                    className="inline-flex min-h-11 items-center rounded-full border border-primary/20 bg-white/85 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-white"
+                  >
+                    {quizButtonLabel}
+                  </Link>
+                  <p className="text-xs text-slate-500">完成三條問題後，會即時更新此頁顯示。</p>
+                </div>
+              ) : null}
 
               {data?.constitutionNote ? (
                 <div className="mt-4 rounded-2xl border border-primary/10 bg-primary-light/40 p-4">
@@ -288,7 +336,7 @@ export default function CareAdvicePage() {
             </section>
 
             {/* ── Daily sense prompt (gentle check-in at the bottom) ── */}
-            <DailySensePrompt />
+            <DailySensePrompt userId={data?.userId} />
 
             {/* ── Navigation links ── */}
             <section className="flex flex-wrap gap-3 pb-2">
