@@ -164,6 +164,12 @@ interface FunctionCallResult {
   pendingSymptomDraft?: PendingSymptomDraft;
 }
 
+interface BookingExecutionAudit {
+  createBookingCalled: boolean;
+  createBookingSucceeded: boolean;
+  createBookingError?: string;
+}
+
 const EXPLICIT_DATE_REGEX = /\b\d{4}-\d{2}-\d{2}\b/;
 const TODAY_KEYWORDS = ['今日', '今天', '而家', '依家', '宜家', 'today', 'now'];
 const CHAT_MODES: ChatMode[] = ['G1', 'G2', 'G3', 'B'];
@@ -548,9 +554,17 @@ const TASK_SUMMARY_KEYWORDS = ['總結', '总结', '摘要', '總結重點', 'su
 const TASK_JSON_KEYWORDS = ['json', '只輸出json', '只返回json', '只回傳json', 'only output json', 'return json only'];
 const TASK_BULLET_KEYWORDS = ['點列', '点列', '條列', 'bullet', 'bullets', '列出'];
 const B_SHORT_FOLLOWUP_KEYWORDS = ['下周', '下週', '下星期', 'tomorrow', 'next week', '聽日', '明日', '明天'];
+const B_SHORT_CONFIRMATION_KEYWORDS = ['係', '系', '好', '冇錯', '無錯', '啱', '啱呀', 'ok', 'okay', 'yes', '可以', '得'];
 const B_ASSISTANT_PROGRESS_KEYWORDS = ['醫師', '诊所', '診所', '時段', '时间', '日期', '預約', '预约'];
 const B_LOW_SIGNAL_ASSISTANT_PATTERNS = [
   '我已收到你嘅預約需求。請先確認你想預約邊位醫師同日期，我會用最少步驟幫你完成。',
+];
+const BOOKING_SUCCESS_CLAIM_PATTERNS = [
+  /預約(?:已)?成功/,
+  /已(?:經)?幫你(?:完成|成功)(?:預約|登記)/,
+  /已成功為你預約/,
+  /我會用你[嘅的]登記電郵/,
+  /完成最後確認/,
 ];
 const BOOKING_NUDGE_REGEX = /(預約|预约|book|booking|appointment|時段|诊所|診所|醫師|医师|doctor|\bdr\b)/i;
 const NON_B_BOOKING_GUIDANCE_KEYWORDS = [
@@ -1123,14 +1137,40 @@ function isBookingProgressAssistantMessage(text: string): boolean {
   return B_ASSISTANT_PROGRESS_KEYWORDS.some((kw) => normalized.includes(normalizeIntentText(kw)));
 }
 
+function isShortBookingTimeReply(text: string): boolean {
+  const compact = text
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/：/g, ':')
+    .replace(/[。！？，、,.!?]/g, '');
+
+  if (!compact || compact.length > 12) return false;
+
+  // 13:00 / 1300 / 900
+  if (/^(?:[01]?\d|2[0-3]):?[0-5]\d$/.test(compact)) return true;
+  // 1pm / 1:30pm
+  if (/^(?:[1-9]|1[0-2])(?::[0-5]\d)?(?:am|pm)$/.test(compact)) return true;
+  // 13點 / 13點30
+  if (/^(?:[01]?\d|2[0-3])點(?:[0-5]?\d)?$/.test(compact)) return true;
+
+  return false;
+}
+
 function isBModeShortFollowUpMessage(messages: ChatMessagePayload[], latestUserText: string): boolean {
   const normalized = normalizeIntentText(latestUserText);
   if (!normalized || normalized.length > 14) return false;
 
-  const hasCue = B_SHORT_FOLLOWUP_KEYWORDS.some((kw) =>
+  const hasKeywordCue = B_SHORT_FOLLOWUP_KEYWORDS.some((kw) =>
     normalized.includes(normalizeIntentText(kw))
   );
-  if (!hasCue) return false;
+  const hasShortConfirmationCue =
+    isShortAffirmativeReply(latestUserText)
+    || B_SHORT_CONFIRMATION_KEYWORDS.some((kw) =>
+      normalized.includes(normalizeIntentText(kw))
+    );
+  const hasTimeCue = isShortBookingTimeReply(latestUserText);
+  if (!hasKeywordCue && !hasShortConfirmationCue && !hasTimeCue) return false;
 
   const previousAssistant = findPreviousAssistantMessage(messages);
   if (!previousAssistant) return false;
@@ -1325,6 +1365,60 @@ function buildDeterministicBookingOptionsReply(
   if (errorMessage) return errorMessage;
 
   return '我已收到你嘅預約需求。請先確認你想預約邊位醫師同日期，我會用最少步驟幫你完成。';
+}
+
+function createEmptyBookingExecutionAudit(): BookingExecutionAudit {
+  return {
+    createBookingCalled: false,
+    createBookingSucceeded: false,
+  };
+}
+
+function isLikelyBookingContextMessage(messages: ChatMessagePayload[], latestUserText: string): boolean {
+  const normalized = normalizeIntentText(latestUserText);
+
+  if (containsNormalizedKeyword(normalized, BOOKING_KEYWORDS)) return true;
+  if (hasDoctorAndTimeHints(latestUserText, normalized)) return true;
+  if (hasRecentUserBookingIntent(messages)) return true;
+  if (isBModeShortFollowUpMessage(messages, latestUserText)) return true;
+
+  const previousAssistant = findPreviousAssistantMessage(messages);
+  return previousAssistant ? isBookingProgressAssistantMessage(previousAssistant.content) : false;
+}
+
+function isBookingSuccessClaim(reply: string): boolean {
+  return BOOKING_SUCCESS_CLAIM_PATTERNS.some((pattern) => pattern.test(reply));
+}
+
+function sanitizeBookingErrorMessage(rawError: string): string {
+  return rawError.replace(/\s+/g, ' ').trim().slice(0, 120);
+}
+
+function applyBookingCompletionGuard(
+  reply: string,
+  mode: ChatMode,
+  messages: ChatMessagePayload[],
+  latestUserText: string,
+  userEmail: string | undefined,
+  audit: BookingExecutionAudit,
+): string {
+  if (!isBookingSuccessClaim(reply)) return reply;
+  if (audit.createBookingSucceeded) return reply;
+  if (mode !== 'B' && !isLikelyBookingContextMessage(messages, latestUserText)) return reply;
+
+  if (audit.createBookingCalled) {
+    const errorNote = audit.createBookingError
+      ? `（系統回報：${sanitizeBookingErrorMessage(audit.createBookingError)}）`
+      : '';
+
+    return `我啱啱未能完成正式落單${errorNote}，所以暫時未有預約記錄、Google Calendar 事件同確認電郵。請你確認一次想要嘅時段，我而家再幫你重試。`;
+  }
+
+  const emailHint = userEmail
+    ? `我會直接用你登入電郵 ${userEmail}。`
+    : '如果你未登入，請一併提供 email。';
+
+  return `我啱啱仲未完成正式落單，所以暫時未有預約記錄、Google Calendar 事件同確認電郵。請先提供姓名、電話、首診或覆診、收據需求同取藥方法；${emailHint}`;
 }
 
 async function buildDeterministicBookingFallbackReply(
@@ -3046,6 +3140,14 @@ export async function POST(request: NextRequest) {
                 finalReply = finalResponse.text();
               }
 
+              finalReply = applyBookingCompletionGuard(
+                finalReply,
+                mode,
+                messages,
+                latestUserMessage.content,
+                userEmail,
+                createEmptyBookingExecutionAudit(),
+              );
               finalReply = applyOutputContractGuard(finalReply, outputContract, mode, latestUserMessage.content);
 
               timings.geminiApiMs = Date.now() - geminiApiStart;
@@ -3153,6 +3255,7 @@ export async function POST(request: NextRequest) {
     let finalResponse: any;
     let functionCallRoundsUsed = 0;
     let pendingSymptomDraft: PendingSymptomDraft | undefined;
+    const bookingExecutionAudit = createEmptyBookingExecutionAudit();
     const geminiApiStart = Date.now();
 
     if (tools) {
@@ -3197,6 +3300,14 @@ export async function POST(request: NextRequest) {
         if (nextPendingSymptomDraft) {
           pendingSymptomDraft = nextPendingSymptomDraft;
         }
+        if (functionName === 'create_booking') {
+          bookingExecutionAudit.createBookingCalled = true;
+          const bookingResult = functionResult as { success?: unknown; error?: unknown };
+          bookingExecutionAudit.createBookingSucceeded = bookingResult?.success === true;
+          if (typeof bookingResult?.error === 'string' && bookingResult.error.trim()) {
+            bookingExecutionAudit.createBookingError = bookingResult.error;
+          }
+        }
 
         // Send function result back to Gemini
         result = await chat.sendMessage([{
@@ -3228,6 +3339,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    reply = applyBookingCompletionGuard(
+      reply,
+      mode,
+      messages,
+      latestUserMessage.content,
+      userEmail,
+      bookingExecutionAudit,
+    );
     reply = applyOutputContractGuard(reply, outputContract, mode, latestUserMessage.content);
     reply = applyPendingSymptomReplyGuard(reply, pendingSymptomDraft);
 
