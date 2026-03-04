@@ -496,8 +496,10 @@ export default function MySymptomsPage() {
   const constitutionMeta = CONSTITUTION_META[constitutionKey] || CONSTITUTION_META.unknown;
   const tendencyKey = constitutionToTendencyKey(constitutionKey);
   const accentBg = tendencyKey ? FORCE_NARRATIVE[tendencyKey].accentBg : "bg-primary-light/30";
+  const hasSymptomRecords = stats.total > 0;
   const symptomActionLabel =
     dashboardSymptomGroups.length > previewSymptoms.length ? `查看全部 (${dashboardSymptomGroups.length})` : "管理";
+  const emptyStateActionLabel = showBaseQuizPrompt ? "做體質問卷" : "更新今日狀態";
 
   function openResolveModal(symptom: SymptomItem) {
     setResolveTarget(symptom);
@@ -665,14 +667,26 @@ export default function MySymptomsPage() {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-medium text-slate-600">身體狀態</p>
-              <div className="mt-2 flex items-end gap-3">
-                <span className="text-5xl font-semibold leading-none text-slate-900">
-                  {leadingElement ? ELEMENT_META[leadingElement].shortLabel : "—"}
-                </span>
-                <p className="pb-1 text-sm font-semibold text-slate-900">
-                  {leadingElement ? `${ELEMENT_META[leadingElement].label}較明顯` : "等待更多記錄"}
-                </p>
-              </div>
+              {hasSymptomRecords ? (
+                <div className="mt-2 flex items-end gap-3">
+                  <span className="text-5xl font-semibold leading-none text-slate-900">
+                    {leadingElement ? ELEMENT_META[leadingElement].shortLabel : "—"}
+                  </span>
+                  <p className="pb-1 text-sm font-semibold text-slate-900">
+                    {leadingElement ? `${ELEMENT_META[leadingElement].label}較明顯` : "等待更多記錄"}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-3">
+                  <Link
+                    href="/chat/symptoms/tendency-quiz"
+                    className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-white/70 px-3 py-1.5 text-sm font-semibold text-primary transition hover:bg-white"
+                  >
+                    {emptyStateActionLabel}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              )}
             </div>
             {!careLoading && !careError ? (
               <span
@@ -683,27 +697,33 @@ export default function MySymptomsPage() {
             ) : null}
           </div>
 
-          <div className="mt-4 overflow-hidden rounded-full bg-slate-100">
-            <div className="flex h-3 w-full">
-              {elementBarSegments.map((segment) => (
-                <div
-                  key={segment.key}
-                  className={`h-full transition-all ${segment.barClass}`}
-                  style={{ width: `${segment.width}%` }}
-                />
-              ))}
-            </div>
-          </div>
+          {hasSymptomRecords ? (
+            <>
+              <div className="mt-4 overflow-hidden rounded-full bg-slate-100">
+                <div className="flex h-3 w-full">
+                  {elementBarSegments.map((segment) => (
+                    <div
+                      key={segment.key}
+                      className={`h-full transition-all ${segment.barClass}`}
+                      style={{ width: `${segment.width}%` }}
+                    />
+                  ))}
+                </div>
+              </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-medium text-slate-600">
-            {elementBarSegments.map((segment) => (
-              <span key={segment.key} className="inline-flex items-center gap-1.5">
-                <span className={`h-2 w-2 rounded-full ${segment.barClass}`} />
-                <span>{segment.label}</span>
-                <span className="text-slate-500">{segment.width}%</span>
-              </span>
-            ))}
-          </div>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-medium text-slate-600">
+                {elementBarSegments.map((segment) => (
+                  <span key={segment.key} className="inline-flex items-center gap-1.5">
+                    <span className={`h-2 w-2 rounded-full ${segment.barClass}`} />
+                    <span>{segment.label}</span>
+                    <span className="text-slate-500">{segment.width}%</span>
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="mt-3 text-sm text-slate-600">未有記錄。</p>
+          )}
         </section>
 
         <section className="rounded-[28px] border border-primary/10 bg-white/95 p-4 shadow-sm">
@@ -776,7 +796,7 @@ export default function MySymptomsPage() {
           )}
         </section>
 
-        {showBaseQuizPrompt ? (
+        {showBaseQuizPrompt && hasSymptomRecords ? (
           <Link
             href="/chat/symptoms/tendency-quiz"
             className="mt-auto rounded-[24px] border border-primary/10 bg-primary-light/35 px-4 py-4 text-left shadow-sm transition hover:border-primary/25 hover:bg-primary-light/55"
