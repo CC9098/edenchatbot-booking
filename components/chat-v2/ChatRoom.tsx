@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { ModeIndicator, type ChatMode } from "./ModeSelector";
-import { MessageList, type ChatMessage } from "./MessageList";
+import { MessageList, type ChatMessage, type ChatMessageAction } from "./MessageList";
 import { ChatInputV2 } from "./ChatInputV2";
 import { TendencyWhisper } from "./TendencyWhisper";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -26,6 +26,7 @@ type ChatApiJsonResponse = {
   message?: string;
   mode?: ChatMode;
   pendingSymptomDraft?: PendingSymptomDraft | null;
+  callToAction?: ChatMessageAction | null;
 };
 
 type PendingSymptomDraft = {
@@ -414,8 +415,9 @@ export function ChatRoom() {
       const reply =
         data.reply ?? data.message ?? "抱歉，暫時無法回應，請稍後再試。";
       const pendingDraft = data.pendingSymptomDraft ?? null;
+      const callToAction = data.callToAction ?? null;
 
-      return { detectedMode, reply, pendingDraft };
+      return { detectedMode, reply, pendingDraft, callToAction };
     },
     [sessionId],
   );
@@ -450,7 +452,7 @@ export function ChatRoom() {
       };
 
       const appendJsonReply = async () => {
-        const { detectedMode, reply, pendingDraft } = await sendJsonRequest(updatedMessages);
+        const { detectedMode, reply, pendingDraft, callToAction } = await sendJsonRequest(updatedMessages);
         setMode(detectedMode);
         setPendingSymptomDraft(pendingDraft);
 
@@ -458,6 +460,7 @@ export function ChatRoom() {
           role: "assistant",
           content: reply,
           mode: detectedMode,
+          ...(callToAction ? { action: callToAction } : {}),
           createdAt: new Date().toISOString(),
         };
 
@@ -540,6 +543,7 @@ export function ChatRoom() {
           const detectedMode: ChatMode = data.mode ?? "G1";
           const reply =
             data.reply ?? data.message ?? "抱歉，暫時無法回應，請稍後再試。";
+          const callToAction = data.callToAction ?? null;
           setPendingSymptomDraft(data.pendingSymptomDraft ?? null);
 
           setMode(detectedMode);
@@ -549,6 +553,7 @@ export function ChatRoom() {
               role: "assistant",
               content: reply,
               mode: detectedMode,
+              ...(callToAction ? { action: callToAction } : {}),
               createdAt: new Date().toISOString(),
             },
           ]);

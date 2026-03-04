@@ -38,6 +38,11 @@ interface ChatMessagePayload {
   content: string;
 }
 
+interface ChatCallToAction {
+  label: string;
+  href: string;
+}
+
 const CHAT_MESSAGE_SCHEMA = z.object({
   role: z.enum(['user', 'assistant']),
   content: z.string(),
@@ -175,6 +180,10 @@ const TODAY_KEYWORDS = ['今日', '今天', '而家', '依家', '宜家', 'today
 const CHAT_MODES: ChatMode[] = ['G1', 'G2', 'G3', 'B'];
 const CANCEL_KEYWORDS = ['不用', '唔使', '取消', '取消預約', '取消预约', '算了', '改日', '唔約', '唔想約', 'cancel'];
 const G2_BOOKING_NUDGE_KEYWORDS = ['預約', '約診', '睇醫師', '見醫師', '面診', 'book', 'booking', '安排睇症'];
+const DIRECT_BOOKING_CALL_TO_ACTION: ChatCallToAction = {
+  label: '立即預約',
+  href: '/booking',
+};
 const G2_MIN_SENTENCES_BETWEEN_BOOKING_NUDGES = 6;
 const MODE_ROUTER_CONTEXT_MESSAGE_COUNT = 6;
 const RECENT_USER_INTENT_WINDOW = 3;
@@ -1129,6 +1138,23 @@ function isRescheduleOrBookingLookupIntent(text: string): boolean {
     'list my bookings',
   ];
   return intentKeywords.some((kw) => normalized.includes(normalizeIntentText(kw)));
+}
+
+function shouldOfferDirectBookingCallToAction(
+  messages: ChatMessagePayload[],
+  latestUserText: string,
+): boolean {
+  const normalized = normalizeIntentText(latestUserText);
+  if (!normalized) return false;
+  if (containsNormalizedKeyword(normalized, CANCEL_KEYWORDS)) return false;
+  if (isRescheduleOrBookingLookupIntent(latestUserText)) return false;
+
+  return (
+    containsNormalizedKeyword(normalized, BOOKING_KEYWORDS)
+    || hasDoctorAndTimeHints(latestUserText, normalized)
+    || hasAvailabilityFollowUpCue(latestUserText)
+    || isAvailabilityFollowUpMessage(messages)
+  );
 }
 
 function isBookingProgressAssistantMessage(text: string): boolean {
@@ -3049,6 +3075,37 @@ export async function POST(request: NextRequest) {
       // Not authenticated — continue with defaults
     } finally {
       timings.userContextMs = Date.now() - userContextStart;
+    }
+
+    if (mode === 'B' && shouldOfferDirectBookingCallToAction(messages, latestUserMessage.content)) {
+      const directBookingReply = '請問你係咪想預約？你可以直接去預約頁面揀醫師、診所同時段。';
+      const durationMs = Date.now() - startTime;
+      const metrics = resolveTokenMetrics(undefined, latestUserMessage.content, directBookingReply, durationMs);
+      await logChatMessages(
+        sessionId,
+        latestUserMessage.content,
+        directBookingReply,
+        mode,
+        type,
+        userId,
+        metrics,
+        {
+          modeDecision,
+          timings,
+          outputContract,
+          promptBudgetApplied: false,
+          functionCallRounds: 0,
+        },
+      );
+      logPerformanceSummary(mode, timings, metrics, isAuthenticated);
+
+      return NextResponse.json({
+        reply: directBookingReply,
+        mode,
+        type,
+        pendingSymptomDraft: null,
+        callToAction: DIRECT_BOOKING_CALL_TO_ACTION,
+      });
     }
 
     // Fast path for ultra-short booking follow-up to reduce B completion tokens.

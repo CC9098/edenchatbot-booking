@@ -4,10 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMode } from "./ModeSelector";
 import { Check, Copy, Share2, ThumbsDown, ThumbsUp } from "lucide-react";
 
+export type ChatMessageAction = {
+  label: string;
+  href: string;
+};
+
 export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   mode?: ChatMode;
+  action?: ChatMessageAction;
   createdAt: string;
 };
 
@@ -172,6 +178,14 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
                   <p className="whitespace-pre-wrap break-words">
                     {renderMessageContent(msg.content, isUser)}
                   </p>
+                  {!isUser && msg.action ? (
+                    <a
+                      href={msg.action.href}
+                      className="mt-3 inline-flex rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-hover"
+                    >
+                      {msg.action.label}
+                    </a>
+                  ) : null}
                 </div>
 
                 {canShowActions && (
