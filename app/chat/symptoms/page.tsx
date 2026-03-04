@@ -37,11 +37,19 @@ type SymptomApiResponse = {
   error?: string;
 };
 
+type CareConstitutionScores = {
+  depleting: number;
+  crossing: number;
+  hoarding: number;
+  mixed: number;
+};
+
 type CareContextResponse = {
   userId?: string;
   constitution: string;
   constitutionSource?: "patient_care_profile" | "default";
   constitutionNote: string | null;
+  constitutionScores?: CareConstitutionScores | null;
   error?: string;
 };
 
@@ -182,21 +190,6 @@ function getSymptomPriority(value: string | null): number {
   return 3;
 }
 
-function resolveSeverityPoint(severity: number | null | undefined): number {
-  const normalizedSeverity = typeof severity === "number" ? severity : Number.NaN;
-  if (!Number.isInteger(normalizedSeverity)) return 1;
-  return normalizedSeverity >= 4 ? 2 : 1;
-}
-
-function resolveFinalElementLabel(symptom: SymptomItem): ElementKey | "undetermined" {
-  const reviewed = symptom.elementReviewLabel;
-  if (reviewed === "water" || reviewed === "wind" || reviewed === "thunder") return reviewed;
-
-  const suggested = symptom.elementSuggestedLabel;
-  if (suggested === "water" || suggested === "wind" || suggested === "thunder") return suggested;
-  return "undetermined";
-}
-
 function toSafeDate(value: string | null): Date | null {
   if (!value) return null;
   const date = new Date(value);
@@ -298,6 +291,42 @@ function tendencyToElement(tendencyKey: ReturnType<typeof constitutionToTendency
   if (tendencyKey === "K") return "water";
   if (tendencyKey === "L") return "thunder";
   return null;
+}
+
+function buildElementSegments(scores: {
+  water: number;
+  wind: number;
+  thunder: number;
+}): ElementSegment[] | null {
+  const water = Number(scores.water || 0);
+  const wind = Number(scores.wind || 0);
+  const thunder = Number(scores.thunder || 0);
+  const total = water + wind + thunder;
+  if (total <= 0) return null;
+
+  return [
+    {
+      key: "water",
+      label: ELEMENT_META.water.label,
+      value: water,
+      width: Math.round((water / total) * 100),
+      barClass: ELEMENT_META.water.barClass,
+    },
+    {
+      key: "wind",
+      label: ELEMENT_META.wind.label,
+      value: wind,
+      width: Math.round((wind / total) * 100),
+      barClass: ELEMENT_META.wind.barClass,
+    },
+    {
+      key: "thunder",
+      label: ELEMENT_META.thunder.label,
+      value: thunder,
+      width: Math.round((thunder / total) * 100),
+      barClass: ELEMENT_META.thunder.barClass,
+    },
+  ];
 }
 
 export default function MySymptomsPage() {
@@ -428,44 +457,12 @@ export default function MySymptomsPage() {
       return updated ? isSameMonth(updated, now) : false;
     }).length;
 
-    let waterScore = 0;
-    let windScore = 0;
-    let thunderScore = 0;
-    let undeterminedCount = 0;
-
-    for (const symptom of sortedSymptoms) {
-      const water = Number(symptom.elementScoreWater || 0);
-      const wind = Number(symptom.elementScoreWind || 0);
-      const thunder = Number(symptom.elementScoreThunder || 0);
-      const hasDbScores = water > 0 || wind > 0 || thunder > 0;
-
-      if (hasDbScores) {
-        waterScore += water;
-        windScore += wind;
-        thunderScore += thunder;
-      } else {
-        const finalLabel = resolveFinalElementLabel(symptom);
-        const fallbackPoint = resolveSeverityPoint(symptom.severity);
-        if (finalLabel === "water") waterScore += fallbackPoint;
-        if (finalLabel === "wind") windScore += fallbackPoint;
-        if (finalLabel === "thunder") thunderScore += fallbackPoint;
-      }
-
-      if (resolveFinalElementLabel(symptom) === "undetermined") {
-        undeterminedCount += 1;
-      }
-    }
-
     return {
       total: sortedSymptoms.length,
       activeCount,
       resolvedCount,
       recurringCount,
       improvedThisMonthCount,
-      waterScore,
-      windScore,
-      thunderScore,
-      undeterminedCount,
     };
   }, [sortedSymptoms]);
 
@@ -479,33 +476,6 @@ export default function MySymptomsPage() {
     [stats.activeCount, stats.recurringCount, stats.resolvedCount, stats.total],
   );
 
-  const elementBarSegments = useMemo<ElementSegment[]>(() => {
-    const totalScore = stats.waterScore + stats.windScore + stats.thunderScore;
-    return [
-      {
-        key: "water" as const,
-        label: ELEMENT_META.water.label,
-        value: stats.waterScore,
-        width: totalScore > 0 ? Math.round((stats.waterScore / totalScore) * 100) : 0,
-        barClass: ELEMENT_META.water.barClass,
-      },
-      {
-        key: "wind" as const,
-        label: ELEMENT_META.wind.label,
-        value: stats.windScore,
-        width: totalScore > 0 ? Math.round((stats.windScore / totalScore) * 100) : 0,
-        barClass: ELEMENT_META.wind.barClass,
-      },
-      {
-        key: "thunder" as const,
-        label: ELEMENT_META.thunder.label,
-        value: stats.thunderScore,
-        width: totalScore > 0 ? Math.round((stats.thunderScore / totalScore) * 100) : 0,
-        barClass: ELEMENT_META.thunder.barClass,
-      },
-    ];
-  }, [stats.thunderScore, stats.waterScore, stats.windScore]);
-
   const hasFormalConstitution = Boolean(careContext?.constitution && careContext.constitution !== "unknown");
   const constitutionKey = hasFormalConstitution
     ? careContext?.constitution || "unknown"
@@ -518,11 +488,35 @@ export default function MySymptomsPage() {
         : "default";
   const constitutionMeta = CONSTITUTION_META[constitutionKey] || CONSTITUTION_META.unknown;
   const tendencyKey = constitutionToTendencyKey(constitutionKey);
-  const accentBg = tendencyKey ? FORCE_NARRATIVE[tendencyKey].accentBg : "bg-primary-light/30";
-  const showQuizButton = !careLoading && !careError && careContext?.constitution === "unknown";
+  const accentTendencyKey = tendencyKey || quizConstitution?.primaryTendency || null;
+  const accentBg = accentTendencyKey ? FORCE_NARRATIVE[accentTendencyKey].accentBg : "bg-primary-light/30";
   const quizButtonLabel = quizConstitution ? "更新體質問卷" : "做體質問卷";
-  const hasSymptomRecords = stats.total > 0;
-  const hasSymptomSignal = elementBarSegments.some((segment) => segment.value > 0);
+  const careProfileElementSegments = useMemo<ElementSegment[] | null>(
+    () =>
+      buildElementSegments({
+        water: Number(careContext?.constitutionScores?.hoarding || 0),
+        wind: Number(careContext?.constitutionScores?.depleting || 0),
+        thunder: Number(careContext?.constitutionScores?.crossing || 0),
+      }),
+    [
+      careContext?.constitutionScores?.crossing,
+      careContext?.constitutionScores?.depleting,
+      careContext?.constitutionScores?.hoarding,
+    ],
+  );
+  const quizElementSegments = useMemo<ElementSegment[] | null>(
+    () =>
+      buildElementSegments({
+        water: Number(quizConstitution?.percentages?.K || 0),
+        wind: Number(quizConstitution?.percentages?.J || 0),
+        thunder: Number(quizConstitution?.percentages?.L || 0),
+      }),
+    [
+      quizConstitution?.percentages?.J,
+      quizConstitution?.percentages?.K,
+      quizConstitution?.percentages?.L,
+    ],
+  );
   const constitutionFallbackElement = useMemo(() => tendencyToElement(tendencyKey), [tendencyKey]);
   const constitutionFallbackSegments = useMemo<ElementSegment[] | null>(() => {
     if (!constitutionFallbackElement) return null;
@@ -534,8 +528,11 @@ export default function MySymptomsPage() {
       barClass: ELEMENT_META[key].barClass,
     }));
   }, [constitutionFallbackElement]);
-  const isUsingConstitutionFallback = !hasSymptomSignal && Boolean(constitutionFallbackSegments);
-  const displayElementSegments = hasSymptomSignal ? elementBarSegments : constitutionFallbackSegments;
+  const isUsingConstitutionFallback =
+    !careProfileElementSegments && !quizElementSegments && Boolean(constitutionFallbackSegments);
+  const displayElementSegments =
+    careProfileElementSegments || quizElementSegments || constitutionFallbackSegments;
+  const showQuizButton = !careLoading && !careError && (careContext?.constitution === "unknown" || !displayElementSegments);
   const displayLeadingElement = useMemo(
     () =>
       displayElementSegments
@@ -726,7 +723,7 @@ export default function MySymptomsPage() {
                   </p>
                 </div>
               ) : (
-                <p className="mt-3 text-sm text-slate-600">未有足夠資料。</p>
+                <p className="mt-3 text-sm text-slate-600">未有足夠資料。請填問卷以瞭解體質。</p>
               )}
             </div>
             {!careLoading && !careError ? (
@@ -777,7 +774,8 @@ export default function MySymptomsPage() {
           {!careLoading && !careError ? (
             <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-500">
               <span>體質來源：{constitutionSourceLabel(constitutionSource)}</span>
-              {isUsingConstitutionFallback ? <span>身體狀態暫按體質估算，記錄症狀後會更新。</span> : null}
+              {isUsingConstitutionFallback ? <span>三力比例暫按單一體質估算。</span> : null}
+              {!displayElementSegments ? <span>請填問卷以瞭解體質。</span> : null}
               {showQuizButton ? <span>完成三條問題後，會即時更新這裡。</span> : null}
             </div>
           ) : null}
