@@ -207,62 +207,53 @@ h3 {
 
 .chat-fixed-topbar__brand {
   justify-self: center;
-  width: min(100%, 168px);
-  min-height: 48px;
+  width: min(100%, 186px);
+  min-height: 46px;
   min-width: 0;
-  padding: 0 16px 0 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(53, 104, 66, 0.95);
-  background: linear-gradient(180deg, #4b8158 0%, #3f784d 100%);
+  padding: 0 16px;
+  border-radius: 15px;
+  border: 1px solid rgba(79, 123, 87, 0.24);
+  background: linear-gradient(180deg, rgba(248, 251, 246, 0.98) 0%, rgba(239, 246, 239, 0.98) 100%);
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  justify-content: flex-start;
+  gap: 11px;
+  justify-content: center;
   white-space: nowrap;
-  color: #f7fbf5;
-  box-shadow: 0 8px 18px rgba(35, 56, 39, 0.16);
+  color: #2d5b39;
+  box-shadow: 0 8px 18px rgba(35, 56, 39, 0.1);
   text-decoration: none;
 }
 
-.chat-fixed-topbar__brand-mark {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .chat-fixed-topbar__brand-logo {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
   object-fit: contain;
-  filter: brightness(0) invert(1);
 }
 
 .chat-fixed-topbar__brand-copy {
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-direction: row;
+  align-items: center;
   justify-content: center;
   line-height: 1;
 }
 
 .chat-fixed-topbar__brand-title {
-  font-family: var(--font-body);
-  font-size: 16px;
+  font-family: var(--font-serif);
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #ffffff;
+  letter-spacing: 0.06em;
+  color: #2d5b39;
 }
 
 .chat-fixed-topbar__brand-subtitle {
-  margin-top: 3px;
-  font-size: 9px;
+  margin-left: 8px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.12em;
-  color: rgba(247, 251, 245, 0.8);
+  letter-spacing: 0.08em;
+  color: rgba(45, 91, 57, 0.75);
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -323,13 +314,13 @@ h3 {
 
 @media (max-width: 440px) {
   .chat-fixed-topbar__brand {
-    width: min(100%, 148px);
-    padding-right: 14px;
+    width: min(100%, 172px);
+    gap: 9px;
   }
 
   .chat-fixed-topbar__brand-title {
     font-size: 16px;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
   }
 
   .chat-fixed-topbar__brand-subtitle {
