@@ -18,15 +18,13 @@ export function ClinicBrandLink({
 
   return (
     <Link href={href} className={linkClassName} aria-label="返回醫天圓">
-      <span className="chat-fixed-topbar__brand-mark" aria-hidden="true">
-        <Image
-          src="/logo-eden.png"
-          alt=""
-          width={28}
-          height={28}
-          className="chat-fixed-topbar__brand-logo"
-        />
-      </span>
+      <Image
+        src="/logo-eden.png"
+        alt=""
+        width={28}
+        height={28}
+        className="chat-fixed-topbar__brand-logo"
+      />
       <span className="chat-fixed-topbar__brand-copy">
         <span className="chat-fixed-topbar__brand-title">醫天圓</span>
         {subtitle ? <span className="chat-fixed-topbar__brand-subtitle">{subtitle}</span> : null}

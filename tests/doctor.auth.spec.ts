@@ -43,3 +43,32 @@ test("/login?next=/doctor 已登入時應返回醫師控制台", async ({ browse
     await context.close();
   }
 });
+
+test("/doctor 已登入但無 staff 權限時應被阻擋", async ({ browser }) => {
+  const missing = getMissingRoleEnvVars(["unrelated"]);
+  test.skip(missing.length > 0, `Missing env: ${missing.join(", ")}`);
+
+  let context: Awaited<ReturnType<typeof createAuthenticatedContext>>;
+  try {
+    context = await createAuthenticatedContext(browser, "unrelated");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    test.skip(
+      /invalid login credentials/i.test(message),
+      "Invalid E2E_UNRELATED credentials; skipping non-staff guard regression."
+    );
+    throw error;
+  }
+
+  const page = await context.newPage();
+
+  try {
+    await page.goto("/doctor");
+
+    await expect(page.getByRole("heading", { name: "無法進入醫師控制台" })).toBeVisible();
+    await expect(page.getByText("未有 staff 權限", { exact: false })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "病人列表" })).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+});

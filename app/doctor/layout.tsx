@@ -2,6 +2,7 @@
 
 import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import { StaffGuard } from "@/components/auth/StaffGuard";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -95,12 +96,14 @@ export default function DoctorLayout({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
       <AuthGuard>
-        <div className="min-h-screen bg-[#f5f9f2]">
-          <DoctorHeader />
-          <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
-            {children}
-          </main>
-        </div>
+        <StaffGuard>
+          <div className="min-h-screen bg-[#f5f9f2]">
+            <DoctorHeader />
+            <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+              {children}
+            </main>
+          </div>
+        </StaffGuard>
       </AuthGuard>
     </AuthProvider>
   );
