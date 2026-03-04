@@ -215,7 +215,7 @@ export default function CareAdvicePage() {
             </div>
 
             {/* ── Constitution card (dual-track: force name + TCM label) ── */}
-            <section className="animate-eden-enter-delay-2 patient-card p-5 sm:p-6">
+            <section className={`animate-eden-enter-delay-2 rounded-[28px] border border-primary/10 shadow-sm p-5 sm:p-6 ${accentBg}`}>
               <div className="flex items-start gap-3">
                 {tendencyKey ? (
                   <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100">
