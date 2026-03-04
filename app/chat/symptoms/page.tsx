@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { ArrowRight, ArrowUpCircle, ChevronRight } from "lucide-react";
-import { isBaseQuizComplete } from "@/lib/constitution-tendency";
+import { blendTendencyScores, isBaseQuizComplete, normalizeToPercentages, type BaseQuizAnswers, type TendencyScore } from "@/lib/constitution-tendency";
 import { constitutionToTendencyKey, FORCE_NARRATIVE } from "@/lib/narrative-copy";
 
 type SymptomItem = {
@@ -62,12 +62,26 @@ type SymptomGroup = {
   latest: SymptomItem;
 };
 
+type ElementSegment = {
+  key: ElementKey;
+  label: string;
+  value: number;
+  width: number;
+  barClass: string;
+};
+
 type ConstitutionMeta = {
   label: string;
   badgeClass: string;
 };
 
 type ElementKey = "water" | "wind" | "thunder";
+
+type QuizStorageState = {
+  baseAnswers?: BaseQuizAnswers;
+  baseScore?: Partial<TendencyScore>;
+  liveScore?: Partial<TendencyScore>;
+};
 
 const CONSTITUTION_META: Record<string, ConstitutionMeta> = {
   depleting: {
@@ -282,6 +296,53 @@ function needsBaseQuizPrompt(raw: string | null): boolean {
   }
 }
 
+function toCompleteScore(score?: Partial<TendencyScore> | null): TendencyScore {
+  return {
+    J: Number(score?.J || 0),
+    K: Number(score?.K || 0),
+    L: Number(score?.L || 0),
+  };
+}
+
+function getQuizElementSegments(raw: string | null): ElementSegment[] | null {
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as QuizStorageState;
+    if (!parsed.baseAnswers || !isBaseQuizComplete(parsed.baseAnswers)) {
+      return null;
+    }
+
+    const percentages = normalizeToPercentages(blendTendencyScores(toCompleteScore(parsed.baseScore), toCompleteScore(parsed.liveScore)));
+
+    return [
+      {
+        key: "water",
+        label: ELEMENT_META.water.label,
+        value: percentages.K,
+        width: percentages.K,
+        barClass: ELEMENT_META.water.barClass,
+      },
+      {
+        key: "wind",
+        label: ELEMENT_META.wind.label,
+        value: percentages.J,
+        width: percentages.J,
+        barClass: ELEMENT_META.wind.barClass,
+      },
+      {
+        key: "thunder",
+        label: ELEMENT_META.thunder.label,
+        value: percentages.L,
+        width: percentages.L,
+        barClass: ELEMENT_META.thunder.barClass,
+      },
+    ];
+  } catch {
+    return null;
+  }
+}
+
 export default function MySymptomsPage() {
   const [symptoms, setSymptoms] = useState<SymptomItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -292,6 +353,7 @@ export default function MySymptomsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [showSymptomDrawer, setShowSymptomDrawer] = useState(false);
   const [showBaseQuizPrompt, setShowBaseQuizPrompt] = useState(false);
+  const [quizElementSegments, setQuizElementSegments] = useState<ElementSegment[] | null>(null);
   const [resolveTarget, setResolveTarget] = useState<SymptomItem | null>(null);
   const [resolveSaving, setResolveSaving] = useState(false);
   const [resolveError, setResolveError] = useState("");
@@ -358,6 +420,7 @@ export default function MySymptomsPage() {
     const tendencyStorageKey = `eden:tendency:v1:${careContext?.userId || "guest"}`;
     const storedRaw = window.localStorage.getItem(tendencyStorageKey);
     setShowBaseQuizPrompt(needsBaseQuizPrompt(storedRaw));
+    setQuizElementSegments(getQuizElementSegments(storedRaw));
   }, [careContext?.userId]);
 
   const sortedSymptoms = useMemo(
@@ -455,7 +518,7 @@ export default function MySymptomsPage() {
     [stats.activeCount, stats.recurringCount, stats.resolvedCount, stats.total],
   );
 
-  const elementBarSegments = useMemo(() => {
+  const elementBarSegments = useMemo<ElementSegment[]>(() => {
     const totalScore = stats.waterScore + stats.windScore + stats.thunderScore;
     return [
       {
@@ -482,24 +545,26 @@ export default function MySymptomsPage() {
     ];
   }, [stats.thunderScore, stats.waterScore, stats.windScore]);
 
-  const leadingElement = useMemo(
-    () =>
-      getLeadingElement({
-        waterScore: stats.waterScore,
-        windScore: stats.windScore,
-        thunderScore: stats.thunderScore,
-      }),
-    [stats.thunderScore, stats.waterScore, stats.windScore],
-  );
-
   const constitutionKey = careContext?.constitution || "unknown";
   const constitutionMeta = CONSTITUTION_META[constitutionKey] || CONSTITUTION_META.unknown;
   const tendencyKey = constitutionToTendencyKey(constitutionKey);
   const accentBg = tendencyKey ? FORCE_NARRATIVE[tendencyKey].accentBg : "bg-primary-light/30";
   const hasSymptomRecords = stats.total > 0;
+  const hasSymptomSignal = elementBarSegments.some((segment) => segment.value > 0);
+  const displayElementSegments = hasSymptomSignal ? elementBarSegments : quizElementSegments;
+  const displayLeadingElement = useMemo(
+    () =>
+      displayElementSegments
+        ? getLeadingElement({
+            waterScore: displayElementSegments.find((segment) => segment.key === "water")?.value || 0,
+            windScore: displayElementSegments.find((segment) => segment.key === "wind")?.value || 0,
+            thunderScore: displayElementSegments.find((segment) => segment.key === "thunder")?.value || 0,
+          })
+        : null,
+    [displayElementSegments],
+  );
   const symptomActionLabel =
     dashboardSymptomGroups.length > previewSymptoms.length ? `查看全部 (${dashboardSymptomGroups.length})` : "管理";
-  const emptyStateActionLabel = showBaseQuizPrompt ? "做體質問卷" : "更新今日狀態";
 
   function openResolveModal(symptom: SymptomItem) {
     setResolveTarget(symptom);
@@ -667,25 +732,27 @@ export default function MySymptomsPage() {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-medium text-slate-600">身體狀態</p>
-              {hasSymptomRecords ? (
+              {displayLeadingElement ? (
                 <div className="mt-2 flex items-end gap-3">
                   <span className="text-5xl font-semibold leading-none text-slate-900">
-                    {leadingElement ? ELEMENT_META[leadingElement].shortLabel : "—"}
+                    {ELEMENT_META[displayLeadingElement].shortLabel}
                   </span>
                   <p className="pb-1 text-sm font-semibold text-slate-900">
-                    {leadingElement ? `${ELEMENT_META[leadingElement].label}較明顯` : "等待更多記錄"}
+                    {ELEMENT_META[displayLeadingElement].label}較明顯
                   </p>
                 </div>
-              ) : (
+              ) : showBaseQuizPrompt ? (
                 <div className="mt-3">
                   <Link
                     href="/chat/symptoms/tendency-quiz"
                     className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-white/70 px-3 py-1.5 text-sm font-semibold text-primary transition hover:bg-white"
                   >
-                    {emptyStateActionLabel}
+                    做體質問卷
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
+              ) : (
+                <p className="mt-3 text-sm text-slate-600">未有足夠資料。</p>
               )}
             </div>
             {!careLoading && !careError ? (
@@ -697,11 +764,11 @@ export default function MySymptomsPage() {
             ) : null}
           </div>
 
-          {hasSymptomRecords ? (
+          {displayElementSegments ? (
             <>
               <div className="mt-4 overflow-hidden rounded-full bg-slate-100">
                 <div className="flex h-3 w-full">
-                  {elementBarSegments.map((segment) => (
+                  {displayElementSegments.map((segment) => (
                     <div
                       key={segment.key}
                       className={`h-full transition-all ${segment.barClass}`}
@@ -712,7 +779,7 @@ export default function MySymptomsPage() {
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-medium text-slate-600">
-                {elementBarSegments.map((segment) => (
+                {displayElementSegments.map((segment) => (
                   <span key={segment.key} className="inline-flex items-center gap-1.5">
                     <span className={`h-2 w-2 rounded-full ${segment.barClass}`} />
                     <span>{segment.label}</span>
@@ -721,9 +788,7 @@ export default function MySymptomsPage() {
                 ))}
               </div>
             </>
-          ) : (
-            <p className="mt-3 text-sm text-slate-600">未有記錄。</p>
-          )}
+          ) : null}
         </section>
 
         <section className="rounded-[28px] border border-primary/10 bg-white/95 p-4 shadow-sm">
