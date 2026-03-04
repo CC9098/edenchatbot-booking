@@ -14,6 +14,11 @@ import {
   type MyBookingInfo,
 } from '@/lib/booking-conversation-helpers';
 import {
+  extractBookingConversationContext,
+  hasAvailabilityFollowUpCue,
+  isAvailabilityFollowUpMessage,
+} from '@/lib/booking-chat-context';
+import {
   updateSymptom,
   listSymptoms,
   type LogSymptomRequest,
@@ -1215,6 +1220,93 @@ function buildRescheduleLookupReply(
   return isRescheduleOrCancel
     ? `我查到你嚟緊嘅預約係：${latestBooking}。請確認你係咪想更改呢一個預約？`
     : `我查到你嚟緊嘅預約係：${latestBooking}。請確認你想處理呢一個預約嗎？`;
+}
+
+function formatBookingDateLabel(date: string): string {
+  const matched = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!matched) return date;
+
+  return `${Number(matched[2])}月${Number(matched[3])}號`;
+}
+
+function formatClinicLabelForReply(clinicNameZh?: string): string | undefined {
+  if (!clinicNameZh) return undefined;
+  return clinicNameZh === '網上' ? '網上應診' : `${clinicNameZh}診所`;
+}
+
+function buildBookingContextPhrase(context: {
+  doctorNameZh?: string;
+  clinicNameZh?: string;
+  date?: string;
+}): string {
+  const doctorName = context.doctorNameZh || '呢個預約';
+  const dateLabel = context.date ? formatBookingDateLabel(context.date) : undefined;
+  const clinicLabel = formatClinicLabelForReply(context.clinicNameZh);
+
+  let phrase = doctorName;
+  if (dateLabel) {
+    phrase += `喺${dateLabel}`;
+  }
+  if (clinicLabel) {
+    phrase += ` ${clinicLabel}`;
+  }
+
+  return phrase;
+}
+
+function buildDeterministicBookingOptionsReply(
+  result: Awaited<ReturnType<typeof getBookingOptions>>,
+  context: {
+    doctorNameZh?: string;
+    clinicNameZh?: string;
+    date?: string;
+  },
+): string {
+  const resolvedContext = {
+    doctorNameZh: result.selectedDoctor ?? context.doctorNameZh,
+    clinicNameZh: context.clinicNameZh,
+    date: context.date,
+  };
+
+  if (Array.isArray(result.availableSlots) && result.availableSlots.length > 0) {
+    const slots = result.availableSlots.join('、');
+    return `${buildBookingContextPhrase(resolvedContext)}有以下時段：${slots}。請問你想揀邊個時段？`;
+  }
+
+  if (Array.isArray(result.availableSlots) && result.availableSlots.length === 0) {
+    return `${buildBookingContextPhrase(resolvedContext)}暫時冇可用時段，想唔想轉另一日？`;
+  }
+
+  const errorMessage = result.error?.trim();
+  const nextQuestion = result.nextQuestion?.trim();
+  if (errorMessage && nextQuestion) {
+    const suffix = /[。！？!?]$/.test(errorMessage) ? '' : '。';
+    return `${errorMessage}${suffix}${nextQuestion}`;
+  }
+  if (nextQuestion) return nextQuestion;
+  if (errorMessage) return errorMessage;
+
+  return '我已收到你嘅預約需求。請先確認你想預約邊位醫師同日期，我會用最少步驟幫你完成。';
+}
+
+async function buildDeterministicBookingFallbackReply(
+  messages: ChatMessagePayload[],
+  latestUserText: string,
+): Promise<string | null> {
+  const normalized = normalizeIntentText(latestUserText);
+  const shouldAttempt =
+    containsNormalizedKeyword(normalized, BOOKING_KEYWORDS)
+    || hasDoctorAndTimeHints(latestUserText, normalized)
+    || hasAvailabilityFollowUpCue(latestUserText)
+    || isAvailabilityFollowUpMessage(messages);
+
+  if (!shouldAttempt) return null;
+  if (containsNormalizedKeyword(normalized, CANCEL_KEYWORDS)) return null;
+  if (isRescheduleOrBookingLookupIntent(latestUserText)) return null;
+
+  const context = extractBookingConversationContext(messages, getTodayInHongKong());
+  const result = await getBookingOptions(context);
+  return buildDeterministicBookingOptionsReply(result, context);
 }
 
 function buildSemanticRouterPrompt(
@@ -3090,9 +3182,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (!reply || !reply.trim()) {
-      reply = mode === 'B'
-        ? '我已收到你嘅預約需求。請先確認你想預約邊位醫師同日期，我會用最少步驟幫你完成。'
-        : '我整理好重點先：你可再講一次你最想我處理嘅目標格式。';
+      if (mode === 'B') {
+        reply = await buildDeterministicBookingFallbackReply(messages, latestUserMessage.content)
+          || '我已收到你嘅預約需求。請先確認你想預約邊位醫師同日期，我會用最少步驟幫你完成。';
+      } else {
+        reply = '我整理好重點先：你可再講一次你最想我處理嘅目標格式。';
+      }
     }
 
     reply = applyOutputContractGuard(reply, outputContract, mode, latestUserMessage.content);
