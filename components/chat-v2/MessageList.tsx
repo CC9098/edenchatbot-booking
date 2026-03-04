@@ -163,7 +163,7 @@ export function MessageList({ messages, loading, sessionId }: MessageListProps) 
 
                 {/* Message bubble */}
                 <div
-                  className={`rounded-[22px] px-4 py-3 text-base leading-relaxed shadow-sm ${
+                  className={`rounded-[22px] px-4 py-3 text-[15px] leading-relaxed shadow-sm ${
                     isUser
                       ? "rounded-br-lg bg-primary text-white"
                       : "rounded-bl-lg border border-primary/10 bg-white text-slate-800"
