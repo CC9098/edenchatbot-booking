@@ -83,7 +83,7 @@ export const DOCTORS: DoctorProfile[] = [
   { id: 'lee', nameZh: '李芊霖醫師', nameEn: 'Dr. Lee', bookingUrl: 'https://edentcm.as.me/DrLEE' },
   { id: 'hon', nameZh: '韓曉恩醫師', nameEn: 'Dr. Hon', bookingUrl: 'https://edentcm.as.me/DrHon' },
   { id: 'chau', nameZh: '周德健醫師', nameEn: 'Dr. Chau', bookingUrl: 'https://edentcm.as.me/DrChau' },
-  { id: 'cheung', nameZh: '張天慧醫師', nameEn: 'Dr. Cheung', bookingNote: '視像診症服務，暫停開放預約，請聯絡診所姑娘查詢。' },
+  { id: 'cheung', nameZh: '張天慧醫師', nameEn: 'Dr. Cheung' },
   { id: 'leung', nameZh: '梁仲威醫師', nameEn: 'Dr. Leung' },
 ];
 

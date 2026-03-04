@@ -36,7 +36,7 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     schedule: {
       0: null,
       1: null,
-      2: [{ start: "11:00", end: "14:00" }],
+      2: null,
       3: null,
       4: null,
       5: [{ start: "11:00", end: "14:00" }],
@@ -51,7 +51,7 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     schedule: {
       0: null,
       1: null,
-      2: [{ start: "15:30", end: "19:30" }],
+      2: null,
       3: null,
       4: null,
       5: null,
@@ -82,8 +82,8 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: [{ start: "15:30", end: "19:30" }],
-      2: [{ start: "15:30", end: "19:30" }],
+      1: null,
+      2: [{ start: "11:00", end: "14:00" }, { start: "15:30", end: "19:30" }],
       3: [{ start: "11:00", end: "14:00" }, { start: "15:30", end: "19:30" }],
       4: null,
       5: null,
@@ -97,8 +97,8 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: [{ start: "11:00", end: "14:00" }],
-      2: [{ start: "11:00", end: "14:00" }],
+      1: null,
+      2: null,
       3: null,
       4: null,
       5: [{ start: "15:30", end: "19:30" }],
@@ -112,7 +112,7 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: null,
+      1: [{ start: "10:30", end: "14:00" }, { start: "15:30", end: "19:00" }],
       2: null,
       3: null,
       4: [{ start: "10:30", end: "14:00" }, { start: "15:30", end: "19:00" }],
@@ -206,10 +206,10 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: null,
+      1: [{ start: "15:30", end: "19:30" }],
       2: null,
       3: null,
-      4: [{ start: "15:30", end: "19:30" }],
+      4: null,
       5: [{ start: "15:30", end: "19:30" }],
       6: null,
     }
@@ -221,7 +221,7 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: null,
+      1: [{ start: "15:30", end: "19:30" }],
       2: null,
       3: [{ start: "11:00", end: "14:00" }, { start: "15:30", end: "19:30" }],
       4: null,
@@ -236,7 +236,7 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: [{ start: "10:30", end: "14:00" }, { start: "15:30", end: "19:00" }],
-      1: [{ start: "10:30", end: "14:00" }, { start: "15:30", end: "19:00" }],
+      1: null,
       2: null,
       3: null,
       4: null,
@@ -268,11 +268,11 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: null,
+      1: [{ start: "15:30", end: "19:30" }],
       2: null,
       3: null,
       4: null,
-      5: null,
+      5: [{ start: "15:30", end: "19:30" }],
       6: null,
     }
   },
@@ -283,11 +283,11 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: null,
-      2: null,
-      3: null,
+      1: [{ start: "11:00", end: "14:00" }],
+      2: [{ start: "11:00", end: "14:00" }, { start: "15:30", end: "19:00" }],
+      3: [{ start: "11:00", end: "14:00" }, { start: "15:30", end: "19:00" }],
       4: null,
-      5: null,
+      5: [{ start: "11:00", end: "14:00" }],
       6: null,
     }
   },
@@ -303,7 +303,7 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
       1: null,
       2: null,
       3: null,
-      4: null,
+      4: [{ start: "15:30", end: "19:30" }],
       5: null,
       6: null,
     }
@@ -315,10 +315,10 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     isActive: true,
     schedule: {
       0: null,
-      1: null,
+      1: [{ start: "11:00", end: "14:00" }],
       2: null,
-      3: null,
-      4: null,
+      3: [{ start: "11:00", end: "14:00" }],
+      4: [{ start: "11:00", end: "14:00" }],
       5: null,
       6: null,
     }
@@ -329,7 +329,7 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     calendarId: "ibk3t07kqhdvp5lfvpim401vqo@group.calendar.google.com", 
     isActive: true,
     schedule: {
-      0: null,
+      0: [{ start: "10:30", end: "14:00" }],
       1: null,
       2: null,
       3: null,
