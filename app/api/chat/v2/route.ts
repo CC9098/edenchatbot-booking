@@ -1430,7 +1430,8 @@ async function buildDeterministicBookingFallbackReply(
     containsNormalizedKeyword(normalized, BOOKING_KEYWORDS)
     || hasDoctorAndTimeHints(latestUserText, normalized)
     || hasAvailabilityFollowUpCue(latestUserText)
-    || isAvailabilityFollowUpMessage(messages);
+    || isAvailabilityFollowUpMessage(messages)
+    || isBModeShortFollowUpMessage(messages, latestUserText);
 
   if (!shouldAttempt) return null;
   if (containsNormalizedKeyword(normalized, CANCEL_KEYWORDS)) return null;
@@ -2973,7 +2974,9 @@ export async function POST(request: NextRequest) {
       && isBShortFollowUpFastPathEnabled()
       && isBModeShortFollowUpMessage(messages, latestUserMessage.content)
     ) {
-      const fastReply = buildBShortFollowUpReply(latestUserMessage.content);
+      const fastReply =
+        (await buildDeterministicBookingFallbackReply(messages, latestUserMessage.content))
+        || buildBShortFollowUpReply(latestUserMessage.content);
       const durationMs = Date.now() - startTime;
       const metrics = resolveTokenMetrics(undefined, latestUserMessage.content, fastReply, durationMs);
       await logChatMessages(
