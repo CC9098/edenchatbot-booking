@@ -55,12 +55,13 @@ export async function GET(
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 
-    // Fetch active care instructions
+    // Fetch active care instructions (most recently updated first)
     const { data: instructions, error: instrError } = await supabase
       .from("care_instructions")
       .select("id, instruction_type, title, content_md, status, start_date, end_date, created_by, created_at, updated_at")
       .eq("patient_user_id", patientUserId)
       .eq("status", "active")
+      .order("updated_at", { ascending: false })
       .order("created_at", { ascending: false });
 
     if (instrError) {

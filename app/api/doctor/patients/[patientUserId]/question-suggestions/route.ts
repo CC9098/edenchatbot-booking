@@ -417,6 +417,7 @@ export async function GET(
     await requirePatientAccess(user.id, patientUserId);
 
     const supabase = createServiceClient();
+    const today = new Date().toISOString().split("T")[0];
 
     const [profileResult, bookingResult, careProfileResult, instructionsResult, followUpsResult, symptomsResult] =
       await Promise.all([
@@ -440,6 +441,9 @@ export async function GET(
           .select("title, instruction_type, content_md")
           .eq("patient_user_id", patientUserId)
           .eq("status", "active")
+          .or(`start_date.is.null,start_date.lte.${today}`)
+          .or(`end_date.is.null,end_date.gte.${today}`)
+          .order("updated_at", { ascending: false })
           .order("created_at", { ascending: false })
           .limit(4),
         supabase

@@ -28,6 +28,9 @@ export interface UserContext {
   }>;
 }
 
+const ACTIVE_CARE_INSTRUCTION_PRIORITY_GUIDANCE =
+  '- 如以下醫師有效指示與一般體質建議有衝突，請以醫師指示為準，唔好同時提供互相矛盾嘅建議。';
+
 function parseDateOnlyToUtc(dateStr: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
   if (!match) return null;
@@ -56,12 +59,14 @@ export async function gatherUserContext(userId: string): Promise<UserContext> {
   const today = new Date().toISOString().split('T')[0];
   const { data: instructions } = await supabase
     .from('care_instructions')
-    .select('title, content_md')
+    .select('title, content_md, updated_at, created_at')
     .eq('patient_user_id', userId)
     .eq('status', 'active')
     .or(`start_date.is.null,start_date.lte.${today}`)
     .or(`end_date.is.null,end_date.gte.${today}`)
-    .limit(10);
+    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(5);
 
   // 3. Next pending follow-up plan
   const { data: followUp } = await supabase
@@ -193,7 +198,8 @@ ${userContext.constitutionNote ? `- 體質備註：${userContext.constitutionNot
 ${userContext.lastBooking ? `- 上次就診：${userContext.lastBooking.date}，由${userContext.lastBooking.doctorName}診治` : ''}
 ${userContext.nextFollowUp ? `- 醫師建議覆診：${userContext.nextFollowUp.date}${userContext.nextFollowUp.reason ? `（${userContext.nextFollowUp.reason}）` : ''}` : ''}
 
-${userContext.activeInstructions.length > 0 ? `【醫師設定的護理指引】
+${userContext.activeInstructions.length > 0 ? `【醫師設定的護理指引（高優先）】
+${ACTIVE_CARE_INSTRUCTION_PRIORITY_GUIDANCE}
 ${userContext.activeInstructions.map((i) => `- ${i.title}：${i.content}`).join('\n')}` : ''}
 
 ${userContext.recentSymptoms.length > 0 ? `【用戶近期症狀記錄】

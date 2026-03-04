@@ -1531,6 +1531,20 @@ const OUTPUT_FORMAT_RULES = `【輸出格式規則（必須遵守）】
 - 【最高優先】一律不要提供任何煮食/烹調方法（包括但不限於：蒸、白灼、煎、炒、焗、燉、氣炸、煲湯步驟、食譜做法）。
 - 若用戶追問煮食法，需禮貌拒絕，改為提供非烹調形式建議（例如食材方向、份量原則、進食時段），或建議預約醫師作個人化飲食評估。`;
 
+const CARE_INSTRUCTION_PRIORITY_LINES = [
+  '個人化照護優先規則：',
+  '- 如以下仍然生效的醫師照護指示，與一般體質建議或站內知識庫內容不一致，必須以醫師照護指示為最高優先。',
+  '- 不要同時輸出互相矛盾的建議。',
+  '- 如醫師指示過於簡短或含糊，先提供保守建議，並建議病人聯絡診所或覆診確認。',
+];
+
+function formatInstructionEffectiveWindow(startDate: string | null, endDate: string | null): string {
+  if (startDate && endDate) return `${startDate} 至 ${endDate}`;
+  if (startDate) return `${startDate} 起`;
+  if (endDate) return `至 ${endDate}`;
+  return '目前生效';
+}
+
 async function buildBookingSystemPrompt(careContext: string): Promise<string> {
   const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
   const doctorInfo = (await getPromptDoctorInfoLinesServer()).map((line) => `- ${line}`).join('\n');
@@ -1603,11 +1617,13 @@ async function fetchCareContext(userId: string): Promise<string> {
       .maybeSingle(),
     supabase
       .from('care_instructions')
-      .select('title, content_md')
+      .select('title, content_md, start_date, end_date, updated_at, created_at')
       .eq('patient_user_id', userId)
       .eq('status', 'active')
       .or(`start_date.is.null,start_date.lte.${today}`)
       .or(`end_date.is.null,end_date.gte.${today}`)
+      .order('updated_at', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(5),
     supabase
       .from('follow_up_plans')
@@ -1636,9 +1652,10 @@ async function fetchCareContext(userId: string): Promise<string> {
   }
 
   if (instructions && instructions.length > 0) {
-    lines.push('目前照護指示：');
+    lines.push(...CARE_INSTRUCTION_PRIORITY_LINES);
+    lines.push('目前照護指示（已按最近更新排序）：');
     for (const inst of instructions) {
-      lines.push(`- ${inst.title}: ${inst.content_md}`);
+      lines.push(`- ${inst.title}（${formatInstructionEffectiveWindow(inst.start_date, inst.end_date)}）: ${inst.content_md}`);
     }
   }
 

@@ -37,13 +37,17 @@ export async function GET() {
       : "unknown";
     const constitutionSource: "patient_care_profile" | "default" =
       resolvedConstitution !== "unknown" ? "patient_care_profile" : "default";
+    const today = new Date().toISOString().split("T")[0];
 
-    // Fetch active care instructions
+    // Fetch currently effective care instructions
     const { data: instructions, error: instrError } = await supabase
       .from("care_instructions")
       .select("id, instruction_type, title, content_md, status, start_date, end_date, created_by, created_at, updated_at")
       .eq("patient_user_id", user.id)
       .eq("status", "active")
+      .or(`start_date.is.null,start_date.lte.${today}`)
+      .or(`end_date.is.null,end_date.gte.${today}`)
+      .order("updated_at", { ascending: false })
       .order("created_at", { ascending: false });
 
     if (instrError) {
