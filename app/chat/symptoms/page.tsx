@@ -293,6 +293,13 @@ function getLeadingElement(stats: {
   return leader.key;
 }
 
+function tendencyToElement(tendencyKey: ReturnType<typeof constitutionToTendencyKey>): ElementKey | null {
+  if (tendencyKey === "J") return "wind";
+  if (tendencyKey === "K") return "water";
+  if (tendencyKey === "L") return "thunder";
+  return null;
+}
+
 export default function MySymptomsPage() {
   const [symptoms, setSymptoms] = useState<SymptomItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -516,7 +523,19 @@ export default function MySymptomsPage() {
   const quizButtonLabel = quizConstitution ? "更新體質問卷" : "做體質問卷";
   const hasSymptomRecords = stats.total > 0;
   const hasSymptomSignal = elementBarSegments.some((segment) => segment.value > 0);
-  const displayElementSegments = hasSymptomSignal ? elementBarSegments : null;
+  const constitutionFallbackElement = useMemo(() => tendencyToElement(tendencyKey), [tendencyKey]);
+  const constitutionFallbackSegments = useMemo<ElementSegment[] | null>(() => {
+    if (!constitutionFallbackElement) return null;
+    return (["water", "wind", "thunder"] as const).map((key) => ({
+      key,
+      label: ELEMENT_META[key].label,
+      value: key === constitutionFallbackElement ? 1 : 0,
+      width: key === constitutionFallbackElement ? 100 : 0,
+      barClass: ELEMENT_META[key].barClass,
+    }));
+  }, [constitutionFallbackElement]);
+  const isUsingConstitutionFallback = !hasSymptomSignal && Boolean(constitutionFallbackSegments);
+  const displayElementSegments = hasSymptomSignal ? elementBarSegments : constitutionFallbackSegments;
   const displayLeadingElement = useMemo(
     () =>
       displayElementSegments
@@ -758,6 +777,7 @@ export default function MySymptomsPage() {
           {!careLoading && !careError ? (
             <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-500">
               <span>體質來源：{constitutionSourceLabel(constitutionSource)}</span>
+              {isUsingConstitutionFallback ? <span>身體狀態暫按體質估算，記錄症狀後會更新。</span> : null}
               {showQuizButton ? <span>完成三條問題後，會即時更新這裡。</span> : null}
             </div>
           ) : null}
