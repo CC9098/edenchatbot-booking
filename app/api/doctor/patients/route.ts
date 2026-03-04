@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 const MAX_SEARCH_PATIENT_SCAN = 2000;
 const AUTH_USER_SCAN_LIMIT = 10;
 const AUTH_USER_SCAN_PAGE_SIZE = 200;
+const PATIENT_SOURCE_SCAN_LIMIT = 5000;
 
 const createPatientSchema = z
   .object({
@@ -69,6 +70,80 @@ async function cleanupAuthUser(
   if (error) {
     console.error("[POST /api/doctor/patients] cleanup auth user failed:", error.message);
   }
+}
+
+async function fetchAllVisiblePatientIds(
+  supabase: ReturnType<typeof createServiceClient>,
+  scanLimit: number,
+): Promise<string[]> {
+  const [
+    { data: activeStaffRows, error: activeStaffError },
+    { data: careTeamRows, error: careTeamError },
+    { data: careProfileRows, error: careProfileError },
+    { data: bookingIntakeRows, error: bookingIntakeError },
+    { data: symptomRows, error: symptomError },
+    { data: followUpRows, error: followUpError },
+    { data: instructionRows, error: instructionError },
+  ] = await Promise.all([
+    supabase.from("staff_roles").select("user_id").eq("is_active", true).limit(scanLimit),
+    supabase.from("patient_care_team").select("patient_user_id").limit(scanLimit),
+    supabase.from("patient_care_profile").select("patient_user_id").limit(scanLimit),
+    supabase
+      .from("booking_intake")
+      .select("user_id")
+      .not("user_id", "is", null)
+      .limit(scanLimit),
+    supabase
+      .from("symptom_logs")
+      .select("patient_user_id")
+      .limit(scanLimit),
+    supabase
+      .from("follow_up_plans")
+      .select("patient_user_id")
+      .limit(scanLimit),
+    supabase
+      .from("care_instructions")
+      .select("patient_user_id")
+      .limit(scanLimit),
+  ]);
+
+  const firstError =
+    activeStaffError ||
+    careTeamError ||
+    careProfileError ||
+    bookingIntakeError ||
+    symptomError ||
+    followUpError ||
+    instructionError;
+
+  if (firstError) {
+    throw firstError;
+  }
+
+  const staffIds = new Set(
+    (activeStaffRows || [])
+      .map((row) => row.user_id)
+      .filter((id): id is string => typeof id === "string" && id.length > 0),
+  );
+
+  const patientIds = new Set<string>();
+  const appendIds = (rows: Array<Record<string, unknown>> | null | undefined, key: string) => {
+    for (const row of rows || []) {
+      const value = row[key];
+      if (typeof value !== "string" || value.length === 0) continue;
+      if (staffIds.has(value)) continue;
+      patientIds.add(value);
+    }
+  };
+
+  appendIds(careTeamRows as Array<Record<string, unknown>> | null, "patient_user_id");
+  appendIds(careProfileRows as Array<Record<string, unknown>> | null, "patient_user_id");
+  appendIds(bookingIntakeRows as Array<Record<string, unknown>> | null, "user_id");
+  appendIds(symptomRows as Array<Record<string, unknown>> | null, "patient_user_id");
+  appendIds(followUpRows as Array<Record<string, unknown>> | null, "patient_user_id");
+  appendIds(instructionRows as Array<Record<string, unknown>> | null, "patient_user_id");
+
+  return Array.from(patientIds).sort();
 }
 
 export async function POST(request: NextRequest) {
@@ -272,44 +347,34 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // Get patient_user_ids assigned to this staff member
-    let teamQuery = supabase
-      .from("patient_care_team")
-      .select("patient_user_id")
-      .eq("staff_user_id", user.id)
-      .order("patient_user_id", { ascending: true });
+    const visiblePatientIds = await fetchAllVisiblePatientIds(
+      supabase,
+      isSearching ? MAX_SEARCH_PATIENT_SCAN : PATIENT_SOURCE_SCAN_LIMIT,
+    );
 
-    if (isSearching) {
-      teamQuery = teamQuery.limit(MAX_SEARCH_PATIENT_SCAN);
-    } else {
-      teamQuery = teamQuery.limit(limit + 1); // fetch one extra for cursor
-    }
-
-    if (!isSearching && cursor) {
-      teamQuery = teamQuery.gt("patient_user_id", cursor);
-    }
-
-    const { data: teamRows, error: teamError } = await teamQuery;
-
-    if (teamError) {
-      console.error("[GET /api/doctor/patients] team query error:", teamError.message);
-      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-    }
-
-    if (!teamRows || teamRows.length === 0) {
+    if (visiblePatientIds.length === 0) {
       return NextResponse.json({ items: [], nextCursor: null });
     }
 
-    const hasMore = !isSearching && teamRows.length > limit;
-    const candidatePatientIds = (isSearching ? teamRows : teamRows.slice(0, limit)).map((r) => r.patient_user_id);
+    const cursorFilteredIds =
+      !isSearching && cursor
+        ? visiblePatientIds.filter((patientId) => patientId > cursor)
+        : visiblePatientIds;
+    const candidatePatientIds = isSearching
+      ? cursorFilteredIds
+      : cursorFilteredIds.slice(0, limit + 1);
+
     if (candidatePatientIds.length === 0) {
       return NextResponse.json({ items: [], nextCursor: null });
     }
 
+    const hasMore = !isSearching && candidatePatientIds.length > limit;
+    const patientIdsToInspect = !isSearching ? candidatePatientIds.slice(0, limit) : candidatePatientIds;
+
     const { data: profiles, error: profileError } = await supabase
       .from("profiles")
       .select("id, display_name, phone")
-      .in("id", candidatePatientIds);
+      .in("id", patientIdsToInspect);
 
     if (profileError) {
       console.error("[GET /api/doctor/patients] profile query error:", profileError.message);
@@ -322,7 +387,7 @@ export async function GET(request: NextRequest) {
     const { data: bookingContacts, error: bookingContactsError } = await supabase
       .from("booking_intake")
       .select("user_id, patient_name, phone, email, created_at")
-      .in("user_id", candidatePatientIds)
+      .in("user_id", patientIdsToInspect)
       .order("created_at", { ascending: false });
 
     if (bookingContactsError) {
@@ -347,8 +412,8 @@ export async function GET(request: NextRequest) {
     }
 
     const matchedIds = !isSearching
-      ? candidatePatientIds
-      : candidatePatientIds.filter((id) => {
+      ? patientIdsToInspect
+      : patientIdsToInspect.filter((id) => {
           const profile = profileMap.get(id);
           const intakeContact = bookingContactMap.get(id);
 
@@ -403,7 +468,7 @@ export async function GET(request: NextRequest) {
       nextFollowUpDate: followUpMap.get(id) || null,
     }));
 
-    const nextCursor = hasMore && !isSearching ? matchedIds[matchedIds.length - 1] : null;
+    const nextCursor = hasMore && !isSearching ? patientIdsToInspect[patientIdsToInspect.length - 1] : null;
 
     return NextResponse.json({ items, nextCursor });
   } catch (err) {

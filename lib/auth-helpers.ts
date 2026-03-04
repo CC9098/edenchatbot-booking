@@ -44,32 +44,24 @@ export async function requireStaffRole(userId: string) {
 }
 
 /**
- * Verifies that a staff member has access to a specific patient.
- * Queries the `patient_care_team` table using the service client (bypasses RLS).
- * Throws a structured error if the relationship does not exist.
+ * Verifies that the user is active staff before opening a patient record.
+ *
+ * The current clinic workflow gives all active staff global read/write access
+ * to patient records inside the doctor console, so this helper no longer gates
+ * by `patient_care_team`.
  */
 export async function requirePatientAccess(
   staffUserId: string,
   patientUserId: string
 ) {
-  const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("patient_care_team")
-    .select("patient_user_id, staff_user_id, team_role, is_primary")
-    .eq("staff_user_id", staffUserId)
-    .eq("patient_user_id", patientUserId)
-    .maybeSingle();
+  const staffRole = await requireStaffRole(staffUserId);
 
-  if (error) {
-    console.error("[requirePatientAccess] DB error:", error.message);
-    throw new AuthError(500, "Internal server error");
-  }
-
-  if (!data) {
-    throw new AuthError(403, "Forbidden: no access to this patient");
-  }
-
-  return data;
+  return {
+    patient_user_id: patientUserId,
+    staff_user_id: staffUserId,
+    team_role: staffRole.role,
+    is_primary: false,
+  };
 }
 
 /**
