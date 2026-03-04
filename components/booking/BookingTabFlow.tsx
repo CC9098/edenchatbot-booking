@@ -8,11 +8,14 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Clock3,
+  Info,
   Loader2,
   UserRound,
 } from 'lucide-react';
 import type { BookableDoctorSchedule } from '@/shared/bookable-schedule-data';
 import { type ClinicId, type DoctorId } from '@/shared/clinic-data';
+import type { TimeRange, WeeklySchedule } from '@/shared/schedule-config';
 
 type BookingStep = 'setup' | 'timeslot' | 'details' | 'success';
 type VisitType = 'first' | 'followup';
@@ -46,6 +49,7 @@ const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const SLOT_INTERVAL_MINUTES = 15;
 const MAX_BOOKING_WINDOW_DAYS = 90;
 const WEEKDAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
+const WEEKDAY_LABELS_ZH = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'] as const;
 
 const PICKUP_LABELS: Record<PickupType, string> = {
   none: '不需要 None',
@@ -176,6 +180,22 @@ function monthHasSelectableDate(monthKey: string, minDate: string, maxDate: stri
   const firstDate = isoDateFromMonthDay(monthKey, 1);
   const lastDate = isoDateFromMonthDay(monthKey, daysInMonth);
   return !(lastDate < minDate || firstDate > maxDate);
+}
+
+function formatTimeRanges(ranges: TimeRange[]): string {
+  return ranges.map((range) => `${range.start}-${range.end}`).join('，');
+}
+
+function formatScheduleLines(schedule: WeeklySchedule): string[] {
+  const lines: string[] = [];
+
+  for (let day = 0; day <= 6; day += 1) {
+    const ranges = schedule[day];
+    if (!ranges || ranges.length === 0) continue;
+    lines.push(`${WEEKDAY_LABELS_ZH[day]}：${formatTimeRanges(ranges)}`);
+  }
+
+  return lines;
 }
 
 export function BookingTabFlow({ doctors }: BookingTabFlowProps) {
@@ -686,6 +706,76 @@ export function BookingTabFlow({ doctors }: BookingTabFlowProps) {
               </select>
             </label>
           </div>
+
+          {selectedDoctor && (
+            <section className="rounded-[28px] border border-primary/15 bg-gradient-to-br from-primary-light/60 via-white to-primary-light/20 p-4 sm:p-5">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-full bg-primary/10 p-2 text-primary">
+                  <Clock3 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/70">
+                    Doctor Schedule
+                  </p>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-900">
+                    {selectedDoctor.doctorNameZh}
+                  </h2>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                    揀好醫師後可即時睇到固定應診時間，實際可預約日期會喺下一步顯示。
+                  </p>
+                </div>
+              </div>
+
+              {selectedDoctor.scheduleNote && (
+                <div className="mt-4 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>{selectedDoctor.scheduleNote}</p>
+                </div>
+              )}
+
+              <div className="mt-4 grid gap-3">
+                {selectedDoctor.clinics.map((clinic) => {
+                  const scheduleLines = formatScheduleLines(clinic.schedule);
+                  const isChosenClinic = clinic.clinicId === clinicId;
+
+                  return (
+                    <div
+                      key={clinic.clinicId}
+                      className={`rounded-2xl border px-4 py-4 transition ${
+                        isChosenClinic
+                          ? 'border-primary/40 bg-white shadow-[0_12px_30px_rgba(31,95,63,0.08)]'
+                          : 'border-white/80 bg-white/80'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-base font-semibold text-slate-900">
+                            {clinic.clinicNameZh}
+                            <span className="ml-2 text-sm font-medium text-slate-400">
+                              {clinic.clinicNameEn}
+                            </span>
+                          </p>
+                        </div>
+                        {isChosenClinic && (
+                          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                            已選診所
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-3 grid gap-2">
+                        {scheduleLines.map((line) => (
+                          <p key={`${clinic.clinicId}-${line}`} className="text-sm text-slate-600">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           <div className="space-y-3">
             <p className="text-sm font-semibold text-slate-700">診症類型</p>

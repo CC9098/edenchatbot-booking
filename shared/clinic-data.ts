@@ -16,6 +16,7 @@ export type DoctorProfile = {
   nameEn: string;
   bookingUrl?: string;
   bookingNote?: string;
+  scheduleNote?: string;
 };
 
 export type ClinicProfile = {
@@ -81,7 +82,14 @@ export const CLINICS: ClinicProfile[] = [
 export const DOCTORS: DoctorProfile[] = [
   { id: 'chan', nameZh: '陳家富醫師', nameEn: 'Dr. Chan', bookingUrl: 'https://edentcm.as.me/DrCHAN' },
   { id: 'lee', nameZh: '李芊霖醫師', nameEn: 'Dr. Lee', bookingUrl: 'https://edentcm.as.me/DrLEE' },
-  { id: 'hon', nameZh: '韓曉恩醫師', nameEn: 'Dr. Hon', bookingUrl: 'https://edentcm.as.me/DrHon' },
+  {
+    id: 'hon',
+    nameZh: '韓曉恩醫師',
+    nameEn: 'Dr. Hon',
+    bookingUrl: 'https://edentcm.as.me/DrHon',
+    scheduleNote:
+      '2026年3月1日至2026年3月9日如欲預約，請致電或 WhatsApp 聯絡診所；2026年3月10日至2026年4月30日韓醫師進修休診，會由張天慧醫師及梁仲威醫師駐診。',
+  },
   { id: 'chau', nameZh: '周德健醫師', nameEn: 'Dr. Chau', bookingUrl: 'https://edentcm.as.me/DrChau' },
   { id: 'cheung', nameZh: '張天慧醫師', nameEn: 'Dr. Cheung' },
   { id: 'leung', nameZh: '梁仲威醫師', nameEn: 'Dr. Leung' },

@@ -80,6 +80,7 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
         doctorId: doctor.id,
         doctorNameZh: doctor.nameZh,
         doctorNameEn: doctor.nameEn,
+        scheduleNote: doctor.scheduleNote,
         summary: '',
         clinics: [clinicSchedule],
       });

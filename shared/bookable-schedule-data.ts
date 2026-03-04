@@ -13,6 +13,7 @@ export type BookableDoctorSchedule = {
   doctorId: DoctorId;
   doctorNameZh: string;
   doctorNameEn: string;
+  scheduleNote?: string;
   summary: string;
   clinics: BookableClinicSchedule[];
 };
