@@ -3,9 +3,9 @@
 import { useEffect } from "react";
 import { App, type URLOpenListenerEvent } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 import { createBrowserClient } from "@/lib/supabase-browser";
 import { getMobileUrlScheme, sanitizeAuthNextPath } from "@/lib/auth-redirect";
-import { isNativeAppRuntime } from "@/lib/platform";
 
 function isNativeOAuthCallback(url: string) {
   const expectedPrefix = `${getMobileUrlScheme()}://auth/callback`;
@@ -14,7 +14,7 @@ function isNativeOAuthCallback(url: string) {
 
 export function NativeOAuthListener() {
   useEffect(() => {
-    if (!isNativeAppRuntime()) return;
+    if (!Capacitor.isNativePlatform()) return;
 
     const handler = async (event: URLOpenListenerEvent) => {
       if (!event.url || !isNativeOAuthCallback(event.url)) return;

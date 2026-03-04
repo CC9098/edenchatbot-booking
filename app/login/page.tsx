@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
+import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
 import { createBrowserClient } from "@/lib/supabase-browser";
 import {
@@ -10,7 +11,6 @@ import {
   getWebAuthCallbackUrl,
   sanitizeAuthNextPath,
 } from "@/lib/auth-redirect";
-import { isNativeAppRuntime } from "@/lib/platform";
 
 type EmailAuthMode = "signin" | "signup";
 
@@ -92,7 +92,7 @@ function LoginForm() {
     setLoading(true);
     const supabase = createBrowserClient();
 
-    if (isNativeAppRuntime()) {
+    if (Capacitor.isNativePlatform()) {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
