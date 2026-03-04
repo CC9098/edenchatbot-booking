@@ -3,18 +3,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { MessageCircle, RotateCcw, X } from 'lucide-react';
-import { CALENDAR_MAPPINGS, getScheduleForDay } from '@/shared/schedule-config';
 import {
-  CLINIC_BY_ID,
-  DOCTOR_BY_NAME_ZH,
   getClinicAddressLines,
   getClinicHoursLines,
   getClinicRouteLinks,
   getDoctorBookingLinkOrNote,
   getWhatsappContactLines,
-  isClinicId,
 } from '@/shared/clinic-data';
-import { getBookableDoctorNameZhList, getDoctorScheduleSummaryByNameZh } from '@/shared/clinic-schedule-data';
+import {
+  getScheduleForDayFromPublicSchedule,
+  type BookableDoctorSchedule,
+} from '@/shared/bookable-schedule-data';
 import { ChatMessages } from '@/components/chat/ChatMessages';
 import { ChatOptions } from '@/components/chat/ChatOptions';
 import { ChatInput } from '@/components/chat/ChatInput';
@@ -41,6 +40,7 @@ export function ChatWidget() {
   const [bookingMode, setBookingMode] = useState(false);
   const [booking, setBooking] = useState<BookingState>({ step: 'doctor' });
   const [, setIsLoading] = useState(false);
+  const [bookableDoctors, setBookableDoctors] = useState<BookableDoctorSchedule[]>([]);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const {
     messages,
@@ -63,6 +63,29 @@ export function ChatWidget() {
     const id = `widget_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     localStorage.setItem(storageKey, id);
     setWidgetSessionId(id);
+  }, []);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadBookableDoctors = async () => {
+      try {
+        const response = await fetch('/api/public/bookable-schedules');
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (isCancelled || !Array.isArray(data?.doctors)) return;
+        setBookableDoctors(data.doctors);
+      } catch (error) {
+        console.error('[ChatWidget] Failed to load bookable schedules:', error);
+      }
+    };
+
+    void loadBookableDoctors();
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   // 通知父窗口 chatbot 打开/关闭状态，让父窗口调整 iframe 大小
@@ -122,6 +145,14 @@ export function ChatWidget() {
     'lastName', 'firstName', 'phone', 'email',
     'idCard', 'dob', 'allergies', 'medications', 'symptoms'
   ].includes(booking.step));
+  const bookableDoctorNames = useMemo(
+    () => bookableDoctors.map((doctor) => doctor.doctorNameZh),
+    [bookableDoctors]
+  );
+  const bookableDoctorByName = useMemo(
+    () => new Map(bookableDoctors.map((doctor) => [doctor.doctorNameZh, doctor])),
+    [bookableDoctors]
+  );
 
   const linkify = (text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -234,11 +265,19 @@ export function ChatWidget() {
         break;
       }
       case 'booking': {
+        if (bookableDoctorNames.length === 0) {
+          const whatsappLines = getWhatsappContactLines().join('\n');
+          addBotMessage(
+            `目前未能同步最新醫師時間表，請稍後再試，或直接聯絡姑娘協助安排：\n${whatsappLines}`
+          );
+          setOptions([{ label: '返回主選單', value: 'main' }]);
+          break;
+        }
+
         addBotMessage('請問你想預約邊位醫師呢？😊');
         setBookingMode(true);
         setBooking({ step: 'doctor' });
-        const bookableDoctors = getBookableDoctorNameZhList();
-        const doctorOpts: Option[] = bookableDoctors.map((name) => ({
+        const doctorOpts: Option[] = bookableDoctorNames.map((name) => ({
           label: name,
           value: `doctor-${name}`,
         }));
@@ -309,7 +348,7 @@ export function ChatWidget() {
           // Non-booking doctor info (timetable mode)
           const name = option.value.replace('doctor-', '');
           const link = getDoctorBookingLinkOrNote(name) || 'https://edentcm.as.me/schedule.php';
-          const schedule = getDoctorScheduleSummaryByNameZh(name);
+          const schedule = bookableDoctorByName.get(name)?.summary;
           if (link.startsWith('http')) {
             let message = `無問題😊 呢個係${name}的應診時間：\n\n`;
             if (schedule) {
@@ -331,48 +370,49 @@ export function ChatWidget() {
   // ==================== BOOKING FLOW HANDLERS ====================
 
   const handleBookingDoctorSelect = (doctorNameZh: string) => {
-    const doctor = DOCTOR_BY_NAME_ZH[doctorNameZh];
+    const doctor = bookableDoctorByName.get(doctorNameZh);
     if (!doctor) {
       addBotMessage('抱歉，此醫師暫不支援線上預約。');
       setOptions([{ label: '返回主選單', value: 'main' }]);
       return;
     }
 
-    setBooking(prev => ({ ...prev, step: 'clinic', doctorId: doctor.id, doctorNameZh: doctor.nameZh, doctorName: doctor.nameEn }));
+    setBooking(prev => ({
+      ...prev,
+      step: 'clinic',
+      doctorId: doctor.doctorId,
+      doctorNameZh: doctor.doctorNameZh,
+      doctorName: doctor.doctorNameEn,
+    }));
 
-    // Find clinics where this doctor is active
-    const activeClinics = CALENDAR_MAPPINGS
-      .filter(m => m.doctorId === doctor.id && m.isActive && m.clinicId !== 'online')
-      .filter(m => {
-        // Check at least one day has a schedule
-        return Object.values(m.schedule).some(s => s !== null && s.length > 0);
-      })
-      .map(m => m.clinicId);
-
-    const uniqueClinics = [...new Set(activeClinics)].filter(isClinicId);
-
-    if (uniqueClinics.length === 0) {
+    if (doctor.clinics.length === 0) {
       addBotMessage(`抱歉，${doctorNameZh}目前暫無可預約的診所。`);
       setOptions([{ label: '返回主選單', value: 'main' }]);
       return;
     }
 
     addBotMessage(`好的！你要預約${doctorNameZh}，請選擇診所：`);
-    const clinicOpts: Option[] = uniqueClinics.map(cId => {
-      const clinic = CLINIC_BY_ID[cId];
-      return { label: clinic?.nameZh || cId, value: `booking_clinic-${cId}` as OptionKey };
-    });
+    const clinicOpts: Option[] = doctor.clinics.map((clinic) => ({
+      label: clinic.clinicNameZh,
+      value: `booking_clinic-${clinic.clinicId}` as OptionKey,
+    }));
     setOptions([...clinicOpts, { label: '⬅️ 上一步', value: 'booking_back' }, { label: '取消預約', value: 'booking_cancel' }]);
   };
 
   const handleBookingClinicSelect = (clinicId: string) => {
-    if (!isClinicId(clinicId)) return;
-    const clinic = CLINIC_BY_ID[clinicId];
+    const doctor = booking.doctorNameZh ? bookableDoctorByName.get(booking.doctorNameZh) : undefined;
+    const clinic = doctor?.clinics.find((entry) => entry.clinicId === clinicId);
     if (!clinic) return;
 
-    setBooking(prev => ({ ...prev, step: 'visitType', clinicId: clinic.id, clinicNameZh: clinic.nameZh, clinicName: clinic.nameEn }));
+    setBooking(prev => ({
+      ...prev,
+      step: 'visitType',
+      clinicId: clinic.clinicId,
+      clinicNameZh: clinic.clinicNameZh,
+      clinicName: clinic.clinicNameEn,
+    }));
 
-    addBotMessage(`好的！${clinic.nameZh}診所。請問你係首診定覆診呢？`);
+    addBotMessage(`好的！${clinic.clinicNameZh}診所。請問你係首診定覆診呢？`);
     setOptions([
       { label: '首診（第一次來）', value: 'booking_visit_first' },
       { label: '覆診（有來過）', value: 'booking_visit_followup' },
@@ -384,9 +424,9 @@ export function ChatWidget() {
   const handleBookingVisitTypeSelect = (isFirstVisit: boolean) => {
     setBooking(prev => ({ ...prev, step: 'date', isFirstVisit }));
 
-    // Get schedule for this doctor-clinic combo
-    const mapping = CALENDAR_MAPPINGS.find(m => m.doctorId === booking.doctorId && m.clinicId === booking.clinicId && m.isActive);
-    if (!mapping) {
+    const doctor = booking.doctorNameZh ? bookableDoctorByName.get(booking.doctorNameZh) : undefined;
+    const clinic = doctor?.clinics.find((entry) => entry.clinicId === booking.clinicId);
+    if (!clinic) {
       addBotMessage('抱歉，找不到此醫師在該診所的排班。');
       setOptions([{ label: '返回主選單', value: 'main' }]);
       return;
@@ -400,7 +440,7 @@ export function ChatWidget() {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
       const dayOfWeek = d.getDay();
-      const daySchedule = getScheduleForDay(mapping.schedule, dayOfWeek);
+      const daySchedule = getScheduleForDayFromPublicSchedule(clinic.schedule, dayOfWeek);
 
       if (daySchedule && daySchedule.length > 0) {
         const month = d.getMonth() + 1;
@@ -846,8 +886,7 @@ export function ChatWidget() {
       // Back to doctor selection
       addBotMessage('請問你想預約邊位醫師呢？😊');
       setBooking(prev => ({ ...prev, step: 'doctor' }));
-      const bookableDoctors = getBookableDoctorNameZhList();
-      const doctorOpts: Option[] = bookableDoctors.map((name) => ({
+      const doctorOpts: Option[] = bookableDoctorNames.map((name) => ({
         label: name, value: `doctor-${name}` as OptionKey,
       }));
       setOptions([...doctorOpts, { label: '返回主選單', value: 'main' }]);

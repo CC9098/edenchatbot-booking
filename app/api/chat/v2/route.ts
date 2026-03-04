@@ -1573,8 +1573,11 @@ ${FALLBACK_MODE_PROMPTS.B}
 - 必須直接提供完整可點擊 URL。
 - 禁止提供示意連結、臨時編造連結，或叫用戶自行搜尋作為主要答案。
 
-【醫師資訊】
+【醫師每週固定應診參考】
 ${doctorInfo}
+
+- 以上只供固定應診規律參考，唔等於實時空位，亦唔保證當日冇假期或臨時調更。
+- 只要用戶問某日／某個時段可唔可以約、今日仲有冇位、下星期幾點有位，必須調用 get_booking_options，唔可以單靠以上資料回答。
 
 【診所資訊】
 ${clinicInfo}
@@ -2512,8 +2515,10 @@ ${type === 'unknown' ? `\n${UNKNOWN_CONSTITUTION_GUARDRAIL}` : ''}
 【診所資訊】
 ${clinicInfo}
 
-【醫師資訊】
+【醫師每週固定應診參考】
 ${doctorInfo}
+
+- 以上只供固定應診規律參考，唔等於實時空位，亦唔保證當日冇假期或臨時調更。
 
 【WhatsApp 聯絡】
 ${whatsappInfo}
@@ -2636,7 +2641,7 @@ async function buildSystemPrompt(
   const clinicInfo = getPromptClinicInfoLines().map((line) => `- ${line}`).join('\n');
   const doctorInfo = (await getPromptDoctorInfoLinesServer()).map((line) => `- ${line}`).join('\n');
   const whatsappInfo = getWhatsappContactLines().map((line) => `- ${line}`).join('\n');
-  systemPrompt += `\n\n【診所資訊】\n${clinicInfo}\n\n【醫師資訊】\n${doctorInfo}\n\n【WhatsApp 聯絡】\n${whatsappInfo}`;
+  systemPrompt += `\n\n【診所資訊】\n${clinicInfo}\n\n【醫師每週固定應診參考】\n${doctorInfo}\n- 以上只供固定應診規律參考，唔等於實時空位，亦唔保證當日冇假期或臨時調更。\n\n【WhatsApp 聯絡】\n${whatsappInfo}`;
 
   return {
     systemPrompt,

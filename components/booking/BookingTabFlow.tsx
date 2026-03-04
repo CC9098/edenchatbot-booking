@@ -11,8 +11,8 @@ import {
   Loader2,
   UserRound,
 } from 'lucide-react';
-import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
-import { CLINICS, DOCTORS, type ClinicId, type DoctorId } from '@/shared/clinic-data';
+import type { BookableDoctorSchedule } from '@/shared/bookable-schedule-data';
+import { type ClinicId, type DoctorId } from '@/shared/clinic-data';
 
 type BookingStep = 'setup' | 'timeslot' | 'details' | 'success';
 type VisitType = 'first' | 'followup';
@@ -37,6 +37,10 @@ type BookingFormValues = {
 };
 
 type BookingFormErrors = Partial<Record<keyof BookingFormValues, string>>;
+
+type BookingTabFlowProps = {
+  doctors: BookableDoctorSchedule[];
+};
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const SLOT_INTERVAL_MINUTES = 15;
@@ -65,19 +69,6 @@ const INITIAL_FORM_VALUES: BookingFormValues = {
   symptoms: '',
   referralSource: '',
 };
-
-function hasBookableSchedule(mapping: (typeof CALENDAR_MAPPINGS)[number]): boolean {
-  return Object.values(mapping.schedule).some(
-    (ranges) => Array.isArray(ranges) && ranges.length > 0
-  );
-}
-
-const ACTIVE_BOOKABLE_MAPPINGS = CALENDAR_MAPPINGS.filter(
-  (mapping) => mapping.isActive && hasBookableSchedule(mapping)
-);
-const BOOKABLE_DOCTOR_IDS = new Set<DoctorId>(
-  ACTIVE_BOOKABLE_MAPPINGS.map((mapping) => mapping.doctorId)
-);
 
 function toIsoDateInHongKong(date: Date): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -187,7 +178,7 @@ function monthHasSelectableDate(monthKey: string, minDate: string, maxDate: stri
   return !(lastDate < minDate || firstDate > maxDate);
 }
 
-export function BookingTabFlow() {
+export function BookingTabFlow({ doctors }: BookingTabFlowProps) {
   const [step, setStep] = useState<BookingStep>('setup');
   const [visitType, setVisitType] = useState<VisitType>('first');
   const [doctorId, setDoctorId] = useState<DoctorId | ''>('');
@@ -214,31 +205,23 @@ export function BookingTabFlow() {
   const maxDate = getMaxDateIsoInHongKong(MAX_BOOKING_WINDOW_DAYS);
 
   const doctorOptions = useMemo(
-    () => DOCTORS.filter((doctor) => BOOKABLE_DOCTOR_IDS.has(doctor.id)),
-    []
+    () => doctors,
+    [doctors]
   );
 
   const clinicOptions = useMemo(() => {
     if (!doctorId) return [];
-
-    const clinicIds = new Set<ClinicId>();
-    for (const mapping of ACTIVE_BOOKABLE_MAPPINGS) {
-      if (mapping.doctorId === doctorId) {
-        clinicIds.add(mapping.clinicId);
-      }
-    }
-
-    return CLINICS.filter((clinic) => clinicIds.has(clinic.id));
-  }, [doctorId]);
+    return doctorOptions.find((doctor) => doctor.doctorId === doctorId)?.clinics ?? [];
+  }, [doctorId, doctorOptions]);
 
   const selectedDoctor = useMemo(
-    () => DOCTORS.find((doctor) => doctor.id === doctorId),
-    [doctorId]
+    () => doctorOptions.find((doctor) => doctor.doctorId === doctorId),
+    [doctorId, doctorOptions]
   );
 
   const selectedClinic = useMemo(
-    () => CLINICS.find((clinic) => clinic.id === clinicId),
-    [clinicId]
+    () => clinicOptions.find((clinic) => clinic.clinicId === clinicId),
+    [clinicId, clinicOptions]
   );
 
   const canContinueSetup = Boolean(doctorId && clinicId && visitType);
@@ -588,10 +571,10 @@ export function BookingTabFlow() {
     const payload = {
       doctorId,
       clinicId,
-      doctorName: selectedDoctor.nameEn,
-      doctorNameZh: selectedDoctor.nameZh,
-      clinicName: selectedClinic.nameEn,
-      clinicNameZh: selectedClinic.nameZh,
+      doctorName: selectedDoctor.doctorNameEn,
+      doctorNameZh: selectedDoctor.doctorNameZh,
+      clinicName: selectedClinic.clinicNameEn,
+      clinicNameZh: selectedClinic.clinicNameZh,
       date: selectedDate,
       time: selectedTime,
       durationMinutes: SLOT_INTERVAL_MINUTES,
@@ -679,8 +662,8 @@ export function BookingTabFlow() {
               >
                 <option value="">請選擇醫師</option>
                 {doctorOptions.map((doctor) => (
-                  <option key={doctor.id} value={doctor.id}>
-                    {doctor.nameZh} ({doctor.nameEn})
+                  <option key={doctor.doctorId} value={doctor.doctorId}>
+                    {doctor.doctorNameZh} ({doctor.doctorNameEn})
                   </option>
                 ))}
               </select>
@@ -696,8 +679,8 @@ export function BookingTabFlow() {
               >
                 <option value="">{doctorId ? '請選擇診所' : '請先選擇醫師'}</option>
                 {clinicOptions.map((clinic) => (
-                  <option key={clinic.id} value={clinic.id}>
-                    {clinic.nameZh} ({clinic.nameEn})
+                  <option key={clinic.clinicId} value={clinic.clinicId}>
+                    {clinic.clinicNameZh} ({clinic.clinicNameEn})
                   </option>
                 ))}
               </select>
@@ -758,7 +741,7 @@ export function BookingTabFlow() {
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
             <p className="font-semibold text-slate-900">
-              {selectedDoctor?.nameZh} @ {selectedClinic?.nameZh}
+              {selectedDoctor?.doctorNameZh} @ {selectedClinic?.clinicNameZh}
             </p>
             <p className="mt-1">{visitType === 'first' ? '首診 First Visit' : '覆診 Follow-up Visit'}</p>
           </div>
@@ -928,7 +911,7 @@ export function BookingTabFlow() {
 
           <div className="rounded-2xl border border-primary/15 bg-primary-light/40 p-4 text-sm text-slate-700">
             <p className="font-semibold text-slate-900">
-              {selectedDoctor?.nameZh} @ {selectedClinic?.nameZh}
+              {selectedDoctor?.doctorNameZh} @ {selectedClinic?.clinicNameZh}
             </p>
             <p className="mt-1">
               {formatDateForDisplay(selectedDate)} {selectedTime}
@@ -1166,10 +1149,10 @@ export function BookingTabFlow() {
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-sm text-slate-700">
             <p>
-              <strong>醫師：</strong> {selectedDoctor?.nameZh}
+              <strong>醫師：</strong> {selectedDoctor?.doctorNameZh}
             </p>
             <p>
-              <strong>診所：</strong> {selectedClinic?.nameZh}
+              <strong>診所：</strong> {selectedClinic?.clinicNameZh}
             </p>
             <p>
               <strong>時間：</strong> {formatDateForDisplay(selectedDate)} {selectedTime}
