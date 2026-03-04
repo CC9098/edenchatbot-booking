@@ -10,6 +10,7 @@ interface PatientItem {
   phone: string | null;
   constitution: string;
   nextFollowUpDate: string | null;
+  isSelf: boolean;
 }
 
 /* ---------- Constants ---------- */
@@ -322,7 +323,14 @@ export default function DoctorPatientsPage() {
                     className="cursor-pointer transition-colors hover:bg-primary/[0.03]"
                   >
                     <td className="px-4 py-3 font-medium text-gray-900">
-                      {p.displayName || "未設定姓名"}
+                      <div className="flex items-center gap-2">
+                        <span>{p.displayName || "未設定姓名"}</span>
+                        {p.isSelf ? (
+                          <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                            本人
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-gray-700">
                       {p.phone || "--"}
@@ -362,6 +370,9 @@ export default function DoctorPatientsPage() {
                   <p className="text-sm font-medium text-gray-900 truncate">
                     {p.displayName || "未設定姓名"}
                   </p>
+                  {p.isSelf ? (
+                    <p className="mt-1 text-xs font-medium text-primary">本人</p>
+                  ) : null}
                   <p className="mt-0.5 text-xs text-gray-600">
                     電話: {p.phone || "--"}
                   </p>

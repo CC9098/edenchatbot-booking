@@ -4,6 +4,7 @@ import { getCurrentUser, requireStaffRole, AuthError } from "@/lib/auth-helpers"
 import { createServiceClient } from "@/lib/supabase";
 import { normalizePhoneForSearch, normalizePhoneForStorage } from "@/lib/contact-utils";
 import { getWebAuthCallbackUrl } from "@/lib/auth-redirect";
+import { buildVisiblePatientIds, prioritizeSelfPatient } from "@/lib/doctor-patient-list";
 
 export const dynamic = "force-dynamic";
 const MAX_SEARCH_PATIENT_SCAN = 2000;
@@ -75,6 +76,7 @@ async function cleanupAuthUser(
 async function fetchAllVisiblePatientIds(
   supabase: ReturnType<typeof createServiceClient>,
   scanLimit: number,
+  currentStaffUserId?: string,
 ): Promise<string[]> {
   const [
     { data: activeStaffRows, error: activeStaffError },
@@ -120,30 +122,28 @@ async function fetchAllVisiblePatientIds(
     throw firstError;
   }
 
-  const staffIds = new Set(
-    (activeStaffRows || [])
-      .map((row) => row.user_id)
-      .filter((id): id is string => typeof id === "string" && id.length > 0),
-  );
-
-  const patientIds = new Set<string>();
-  const appendIds = (rows: Array<Record<string, unknown>> | null | undefined, key: string) => {
-    for (const row of rows || []) {
-      const value = row[key];
-      if (typeof value !== "string" || value.length === 0) continue;
-      if (staffIds.has(value)) continue;
-      patientIds.add(value);
-    }
-  };
-
-  appendIds(careTeamRows as Array<Record<string, unknown>> | null, "patient_user_id");
-  appendIds(careProfileRows as Array<Record<string, unknown>> | null, "patient_user_id");
-  appendIds(bookingIntakeRows as Array<Record<string, unknown>> | null, "user_id");
-  appendIds(symptomRows as Array<Record<string, unknown>> | null, "patient_user_id");
-  appendIds(followUpRows as Array<Record<string, unknown>> | null, "patient_user_id");
-  appendIds(instructionRows as Array<Record<string, unknown>> | null, "patient_user_id");
-
-  return Array.from(patientIds).sort();
+  return buildVisiblePatientIds({
+    activeStaffUserIds: (activeStaffRows || []).map((row) => row.user_id),
+    currentStaffUserId,
+    patientCareTeamIds: (careTeamRows as Array<Record<string, unknown>> | null)?.map(
+      (row) => row.patient_user_id as string | null | undefined,
+    ),
+    patientCareProfileIds: (careProfileRows as Array<Record<string, unknown>> | null)?.map(
+      (row) => row.patient_user_id as string | null | undefined,
+    ),
+    bookingUserIds: (bookingIntakeRows as Array<Record<string, unknown>> | null)?.map(
+      (row) => row.user_id as string | null | undefined,
+    ),
+    symptomPatientIds: (symptomRows as Array<Record<string, unknown>> | null)?.map(
+      (row) => row.patient_user_id as string | null | undefined,
+    ),
+    followUpPatientIds: (followUpRows as Array<Record<string, unknown>> | null)?.map(
+      (row) => row.patient_user_id as string | null | undefined,
+    ),
+    instructionPatientIds: (instructionRows as Array<Record<string, unknown>> | null)?.map(
+      (row) => row.patient_user_id as string | null | undefined,
+    ),
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -350,16 +350,20 @@ export async function GET(request: NextRequest) {
     const visiblePatientIds = await fetchAllVisiblePatientIds(
       supabase,
       isSearching ? MAX_SEARCH_PATIENT_SCAN : PATIENT_SOURCE_SCAN_LIMIT,
+      user.id,
     );
 
     if (visiblePatientIds.length === 0) {
       return NextResponse.json({ items: [], nextCursor: null });
     }
 
+    const prioritizedPatientIds =
+      !isSearching && !cursor ? prioritizeSelfPatient(visiblePatientIds, user.id) : visiblePatientIds;
+
     const cursorFilteredIds =
       !isSearching && cursor
         ? visiblePatientIds.filter((patientId) => patientId > cursor)
-        : visiblePatientIds;
+        : prioritizedPatientIds;
     const candidatePatientIds = isSearching
       ? cursorFilteredIds
       : cursorFilteredIds.slice(0, limit + 1);
@@ -466,6 +470,7 @@ export async function GET(request: NextRequest) {
       phone: profileMap.get(id)?.phone || bookingContactMap.get(id)?.phone || null,
       constitution: careMap.get(id)?.constitution || "unknown",
       nextFollowUpDate: followUpMap.get(id) || null,
+      isSelf: id === user.id,
     }));
 
     const nextCursor = hasMore && !isSearching ? patientIdsToInspect[patientIdsToInspect.length - 1] : null;
