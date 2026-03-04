@@ -5,84 +5,17 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { ClinicBrandLink } from "@/components/brand/ClinicBrandLink";
 import {
-  isMobileBrowserUserAgent,
   isNativeAppRuntime,
-  isNativeAppUserAgent,
+  shouldUsePatientMobileChrome,
 } from "@/lib/platform";
 import {
-  Sparkles,
-  CalendarCheck2,
-  Leaf,
-  UserRound,
-} from "lucide-react";
-
-const MOBILE_CHROME_MAX_WIDTH = 1024;
-
-type TabItem = {
-  id: "chat" | "booking" | "care" | "profile";
-  label: string;
-  href: string;
-  Icon: typeof Sparkles;
-};
-
-const TABS: TabItem[] = [
-  { id: "chat", label: "問問", href: "/chat", Icon: Sparkles },
-  { id: "booking", label: "預約", href: "/booking", Icon: CalendarCheck2 },
-  { id: "care", label: "養生", href: "/care", Icon: Leaf },
-  { id: "profile", label: "根源", href: "/chat/symptoms", Icon: UserRound },
-];
-
-function isPatientRoute(pathname: string): boolean {
-  return (
-    pathname.startsWith("/chat") ||
-    pathname.startsWith("/booking") ||
-    pathname.startsWith("/cancel") ||
-    pathname.startsWith("/reschedule") ||
-    pathname.startsWith("/articles") ||
-    pathname.startsWith("/courses") ||
-    pathname.startsWith("/care") ||
-    pathname.startsWith("/login")
-  );
-}
-
-function getActiveTab(pathname: string): TabItem["id"] {
-  if (pathname.startsWith("/chat/symptoms")) return "profile";
-  if (pathname.startsWith("/chat")) return "chat";
-  if (
-    pathname.startsWith("/booking") ||
-    pathname.startsWith("/cancel") ||
-    pathname.startsWith("/reschedule")
-  ) {
-    return "booking";
-  }
-  if (
-    pathname.startsWith("/care") ||
-    pathname.startsWith("/articles") ||
-    pathname.startsWith("/courses")
-  ) {
-    return "care";
-  }
-  return "profile";
-}
-
-function getTopbarTitle(pathname: string): string {
-  if (
-    pathname.startsWith("/booking") ||
-    pathname.startsWith("/cancel") ||
-    pathname.startsWith("/reschedule")
-  ) {
-    return "預約服務";
-  }
-  if (
-    pathname.startsWith("/care") ||
-    pathname.startsWith("/articles") ||
-    pathname.startsWith("/courses")
-  ) {
-    return "養生專區";
-  }
-  if (pathname.startsWith("/login")) return "會員登入";
-  return "醫天圓";
-}
+  PATIENT_TABS,
+  PatientDesktopTabs,
+  getActivePatientTab,
+  getPatientTopbarTitle,
+  isPatientRoute,
+  shouldShowPatientTabNavigation,
+} from "./patient-navigation";
 
 function ProfileCompletionPrompt({ enabled }: { enabled: boolean }) {
   const [open, setOpen] = useState(false);
@@ -215,9 +148,11 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [showMobileChrome, setShowMobileChrome] = useState(() => {
     if (typeof window === "undefined") return false;
-    const userAgent = window.navigator.userAgent;
-    const mobileBrowser = isMobileBrowserUserAgent(userAgent) && window.innerWidth <= MOBILE_CHROME_MAX_WIDTH;
-    return isNativeAppUserAgent(userAgent) || mobileBrowser;
+    return shouldUsePatientMobileChrome(window.navigator.userAgent, window.innerWidth);
+  });
+  const [isNativeShell, setIsNativeShell] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return isNativeAppRuntime();
   });
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 
@@ -229,9 +164,11 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
       // Native bridge availability can lag behind first render in WebView.
       const nativeRuntime = isNativeAppRuntime();
-      const mobileBrowserRuntime =
-        isMobileBrowserUserAgent(window.navigator.userAgent) &&
-        window.innerWidth <= MOBILE_CHROME_MAX_WIDTH;
+      const mobileBrowserRuntime = shouldUsePatientMobileChrome(
+        window.navigator.userAgent,
+        window.innerWidth,
+      );
+      setIsNativeShell(nativeRuntime);
       setShowMobileChrome(nativeRuntime || mobileBrowserRuntime);
     };
 
@@ -255,20 +192,34 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Show patient mobile chrome in native app and mobile browsers.
-  const patientRoute = showMobileChrome && isPatientRoute(pathname);
+  const patientPath = isPatientRoute(pathname);
+  const patientRoute = showMobileChrome && patientPath;
   const isChatRoute = patientRoute && pathname.startsWith("/chat");
+  const isChatPath = pathname.startsWith("/chat");
 
-  const activeTab = getActiveTab(pathname);
-  const topbarTitle = getTopbarTitle(pathname);
-  const shouldShowRouteTopbar = patientRoute && !isChatRoute;
-  const shouldShowTabbar = !isChatRoute || !keyboardOpen;
-  const shouldPromptProfileCompletion = isPatientRoute(pathname) && !pathname.startsWith("/login");
-  const routeTopbarInnerClassName =
-    "chat-fixed-topbar__inner !flex !min-h-[52px] !items-center !justify-between !gap-2.5 !rounded-[18px] !border !border-[rgba(92,118,95,0.14)] !bg-[#F5F7F2] !px-3 !shadow-[0_6px_16px_rgba(36,61,41,0.06)] max-[440px]:!min-h-[50px] max-[440px]:!gap-1.5 max-[440px]:!px-2.5";
-  const routeTopbarStartClassName = "chat-fixed-topbar__start flex min-w-0 flex-1 items-center gap-2";
+  const activeTab = getActivePatientTab(pathname);
+  const topbarTitle = getPatientTopbarTitle(pathname);
+  const shouldShowRouteTopbar = patientRoute && !isChatPath;
+  const shouldShowTabbar = !isChatPath || !keyboardOpen;
+  const shouldPromptProfileCompletion = patientPath && !pathname.startsWith("/login");
+  const shouldShowDesktopTabs = shouldShowPatientTabNavigation(pathname) && !isChatPath;
+  const routeTopbarInnerClassName = isNativeShell
+    ? "chat-fixed-topbar__inner !grid !grid-cols-[40px_minmax(0,1fr)_auto] !min-h-[52px] !items-center !gap-2 !rounded-[18px] !border !px-3 max-[440px]:!grid-cols-[38px_minmax(0,1fr)_auto] max-[440px]:!min-h-[50px] max-[440px]:!gap-1.5 max-[440px]:!px-2.5"
+    : "chat-fixed-topbar__inner !flex !min-h-[52px] !items-center !justify-between !gap-2.5 !rounded-[18px] !border !border-[rgba(92,118,95,0.14)] !bg-[#F5F7F2] !px-3 !shadow-[0_6px_16px_rgba(36,61,41,0.06)] max-[440px]:!min-h-[50px] max-[440px]:!gap-1.5 max-[440px]:!px-2.5";
+  const routeTopbarInnerStyle = isNativeShell
+    ? {
+        borderColor: "rgba(53, 104, 66, 0.95)",
+        background: "linear-gradient(180deg, #4b8158 0%, #3f784d 100%)",
+        boxShadow: "0 8px 18px rgba(35, 56, 39, 0.16)",
+      }
+    : undefined;
+  const routeTopbarStartClassName = isNativeShell
+    ? "chat-fixed-topbar__start flex min-w-0 flex-1 items-center justify-center"
+    : "chat-fixed-topbar__start flex min-w-0 flex-1 items-center gap-2";
   const routeTopbarActionsClassName = "chat-fixed-topbar__actions !flex !flex-none !items-center !justify-end !gap-0";
-  const routeTopbarSectionClassName =
-    "chat-fixed-topbar__action chat-fixed-topbar__action--section !min-h-10 !rounded-none !border-0 !bg-transparent !px-3 !text-[14px] !font-bold !text-[#365a3d] max-[440px]:!min-h-[38px] max-[440px]:!px-2.5 max-[440px]:!text-[13px]";
+  const routeTopbarSectionClassName = isNativeShell
+    ? "chat-fixed-topbar__action chat-fixed-topbar__action--section !min-h-10 !rounded-[10px] !border-0 !bg-transparent !px-3 !text-[13px] !font-semibold !text-[#f7fbf5] max-[440px]:!min-h-[38px] max-[440px]:!px-2.5 max-[440px]:!text-[12px]"
+    : "chat-fixed-topbar__action chat-fixed-topbar__action--section !min-h-10 !rounded-none !border-0 !bg-transparent !px-3 !text-[14px] !font-bold !text-[#365a3d] max-[440px]:!min-h-[38px] max-[440px]:!px-2.5 max-[440px]:!text-[13px]";
 
   // Avoid iOS keyboard + fixed tabbar collision on chat pages.
   useEffect(() => {
@@ -304,6 +255,24 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
     return (
       <>
         <ProfileCompletionPrompt enabled={shouldPromptProfileCompletion} />
+        {shouldShowDesktopTabs ? (
+          <div className="hidden min-[1025px]:block px-4 pb-5 pt-5 sm:px-6 lg:px-8">
+            <div className="mx-auto flex max-w-[760px] flex-col gap-4">
+              <div className="rounded-[28px] border border-[rgba(92,118,95,0.14)] bg-[rgba(245,247,242,0.92)] p-4 shadow-[0_12px_30px_rgba(36,61,41,0.07)] backdrop-blur">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <ClinicBrandLink href="/chat" subtitle="PATIENT PORTAL" />
+                  <div className="min-w-0 text-left sm:text-right">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#708070]">
+                      Eden Patient
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-[#365a3d]">{topbarTitle}</p>
+                  </div>
+                </div>
+              </div>
+              <PatientDesktopTabs pathname={pathname} />
+            </div>
+          </div>
+        ) : null}
         {children}
       </>
     );
@@ -314,9 +283,10 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
       <ProfileCompletionPrompt enabled={shouldPromptProfileCompletion} />
       {shouldShowRouteTopbar ? (
         <header className="chat-fixed-topbar chat-fixed-topbar--route" aria-label={`${topbarTitle} 頂部導覽`}>
-          <div className={routeTopbarInnerClassName}>
+          <div className={routeTopbarInnerClassName} style={routeTopbarInnerStyle}>
+            {isNativeShell ? <div className="chat-fixed-topbar__spacer !h-10 !w-10" aria-hidden="true" /> : null}
             <div className={routeTopbarStartClassName}>
-              <ClinicBrandLink href="/chat" />
+              <ClinicBrandLink href="/chat" variant={isNativeShell ? "native" : "default"} />
             </div>
             <div className={routeTopbarActionsClassName}>
               <span className={routeTopbarSectionClassName}>
@@ -332,7 +302,7 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
       {shouldShowTabbar ? (
         <nav className="patient-tabbar" aria-label="病人功能導覽">
           <div className="patient-tabbar__inner">
-            {TABS.map(({ id, label, href, Icon }) => {
+            {PATIENT_TABS.map(({ id, label, href, Icon }) => {
               const isActive = activeTab === id;
               return (
                 <Link
