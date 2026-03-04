@@ -263,6 +263,12 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   const shouldShowRouteTopbar = patientRoute && !isChatRoute;
   const shouldShowTabbar = !isChatRoute || !keyboardOpen;
   const shouldPromptProfileCompletion = isPatientRoute(pathname) && !pathname.startsWith("/login");
+  const routeTopbarInnerClassName =
+    "chat-fixed-topbar__inner !flex !min-h-[52px] !items-center !justify-between !gap-2.5 !rounded-[18px] !border !border-[rgba(92,118,95,0.14)] !bg-[#F5F7F2] !px-3 !shadow-[0_6px_16px_rgba(36,61,41,0.06)] max-[440px]:!min-h-[50px] max-[440px]:!gap-1.5 max-[440px]:!px-2.5";
+  const routeTopbarStartClassName = "chat-fixed-topbar__start flex min-w-0 flex-1 items-center gap-2";
+  const routeTopbarActionsClassName = "chat-fixed-topbar__actions !flex !flex-none !items-center !justify-end !gap-0";
+  const routeTopbarSectionClassName =
+    "chat-fixed-topbar__action chat-fixed-topbar__action--section !min-h-10 !rounded-none !border-0 !bg-transparent !px-3 !text-[14px] !font-bold !text-[#365a3d] max-[440px]:!min-h-[38px] max-[440px]:!px-2.5 max-[440px]:!text-[13px]";
 
   // Avoid iOS keyboard + fixed tabbar collision on chat pages.
   useEffect(() => {
@@ -308,11 +314,12 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
       <ProfileCompletionPrompt enabled={shouldPromptProfileCompletion} />
       {shouldShowRouteTopbar ? (
         <header className="chat-fixed-topbar chat-fixed-topbar--route" aria-label={`${topbarTitle} 頂部導覽`}>
-          <div className="chat-fixed-topbar__inner">
-            <div className="chat-fixed-topbar__spacer" aria-hidden="true" />
-            <ClinicBrandLink href="/chat" />
-            <div className="chat-fixed-topbar__actions">
-              <span className="chat-fixed-topbar__action chat-fixed-topbar__action--section">
+          <div className={routeTopbarInnerClassName}>
+            <div className={routeTopbarStartClassName}>
+              <ClinicBrandLink href="/chat" />
+            </div>
+            <div className={routeTopbarActionsClassName}>
+              <span className={routeTopbarSectionClassName}>
                 {topbarTitle}
               </span>
             </div>
