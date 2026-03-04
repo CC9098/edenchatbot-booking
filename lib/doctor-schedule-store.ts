@@ -22,6 +22,15 @@ interface MappingCache {
   mappings: CalendarMapping[];
 }
 
+type DoctorScheduleLoadSource = 'supabase' | 'static-fallback-empty' | 'static-fallback-error';
+
+interface DoctorScheduleLoadInfo {
+  detail: string | null;
+  loadedAt: number;
+  mappingCount: number;
+  source: DoctorScheduleLoadSource;
+}
+
 const DEFAULT_CACHE_TTL_SECONDS = 120;
 const MIN_CACHE_TTL_SECONDS = 5;
 const MAX_CACHE_TTL_SECONDS = 1800;
@@ -29,6 +38,12 @@ const TIME_TEXT_REGEX = /^\d{2}:\d{2}$/;
 
 let cache: MappingCache | null = null;
 let inFlightLoad: Promise<CalendarMapping[]> | null = null;
+let lastLoadInfo: DoctorScheduleLoadInfo = {
+  detail: null,
+  loadedAt: 0,
+  mappingCount: 0,
+  source: 'static-fallback-error',
+};
 
 function getCacheTtlMs(): number {
   const raw = Number(process.env.DOCTOR_SCHEDULE_CACHE_TTL_SECONDS ?? DEFAULT_CACHE_TTL_SECONDS);
@@ -179,19 +194,39 @@ async function loadMappingsWithFallback(): Promise<CalendarMapping[]> {
   try {
     const supabaseMappings = await fetchMappingsFromSupabase();
     if (supabaseMappings.length > 0) {
+      lastLoadInfo = {
+        detail: null,
+        loadedAt: Date.now(),
+        mappingCount: supabaseMappings.length,
+        source: 'supabase',
+      };
       return supabaseMappings;
     }
 
     console.warn(
       '[doctor-schedule-store] No active doctor_schedules in Supabase; using static schedule-config fallback.'
     );
-    return getStaticFallbackMappings();
+    const fallbackMappings = getStaticFallbackMappings();
+    lastLoadInfo = {
+      detail: 'No active doctor_schedules rows in Supabase',
+      loadedAt: Date.now(),
+      mappingCount: fallbackMappings.length,
+      source: 'static-fallback-empty',
+    };
+    return fallbackMappings;
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.warn(
       `[doctor-schedule-store] Failed to load doctor_schedules from Supabase; using static fallback. reason=${detail}`
     );
-    return getStaticFallbackMappings();
+    const fallbackMappings = getStaticFallbackMappings();
+    lastLoadInfo = {
+      detail,
+      loadedAt: Date.now(),
+      mappingCount: fallbackMappings.length,
+      source: 'static-fallback-error',
+    };
+    return fallbackMappings;
   }
 }
 
@@ -221,6 +256,10 @@ async function getCachedMappings(): Promise<CalendarMapping[]> {
 export function clearDoctorScheduleCache(): void {
   cache = null;
   inFlightLoad = null;
+}
+
+export function getDoctorScheduleLoadInfo(): DoctorScheduleLoadInfo {
+  return { ...lastLoadInfo };
 }
 
 export async function getActiveScheduleMappings(): Promise<CalendarMapping[]> {
