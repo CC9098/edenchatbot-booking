@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { ArrowRight, ArrowUpCircle, ChevronRight } from "lucide-react";
-import { getLocalDateKey, isBaseQuizComplete, type BaseQuizAnswers } from "@/lib/constitution-tendency";
+import { isBaseQuizComplete } from "@/lib/constitution-tendency";
 import { constitutionToTendencyKey, FORCE_NARRATIVE } from "@/lib/narrative-copy";
 
 type SymptomItem = {
@@ -65,12 +65,6 @@ type SymptomGroup = {
 type ConstitutionMeta = {
   label: string;
   badgeClass: string;
-  summary: string;
-};
-
-type JourneyAction = {
-  label: string;
-  hint: string;
 };
 
 type ElementKey = "water" | "wind" | "thunder";
@@ -79,56 +73,47 @@ const CONSTITUTION_META: Record<string, ConstitutionMeta> = {
   depleting: {
     label: "虛耗型",
     badgeClass: "bg-emerald-100 text-emerald-800",
-    summary: "重點是補氣養血、減少過度勞累，飲食以溫和、易消化為主。",
   },
   crossing: {
     label: "交錯型",
     badgeClass: "bg-blue-100 text-blue-800",
-    summary: "重點是疏導壓力、調節作息，飲食避免過度刺激與偏性太強。",
   },
   hoarding: {
     label: "屯積型",
     badgeClass: "bg-purple-100 text-purple-800",
-    summary: "重點是化濕健脾，飲食以清淡為主，減少濕重與黏滯食物。",
   },
   mixed: {
     label: "混合",
     badgeClass: "bg-orange-100 text-orange-800",
-    summary: "目前屬混合狀態，先跟隨醫師指示，逐步微調飲食與作息。",
   },
   unknown: {
     label: "未評估",
     badgeClass: "bg-gray-100 text-gray-700",
-    summary: "尚未建立完整體質評估，先採用清淡、規律、少刺激的基本原則。",
   },
 };
 
 const ELEMENT_META: Record<
   ElementKey,
   {
+    shortLabel: string;
     label: string;
     barClass: string;
-    badgeClass: string;
-    summary: string;
   }
 > = {
   water: {
-    label: "水勢",
+    shortLabel: "水",
+    label: "水",
     barClass: "bg-cyan-500",
-    badgeClass: "bg-cyan-100 text-cyan-800",
-    summary: "回養與修復訊號較明顯。",
   },
   wind: {
-    label: "風勢",
+    shortLabel: "風",
+    label: "風",
     barClass: "bg-emerald-500",
-    badgeClass: "bg-emerald-100 text-emerald-800",
-    summary: "節奏與流動訊號較明顯。",
   },
   thunder: {
-    label: "雷勢",
+    shortLabel: "雷",
+    label: "雷",
     barClass: "bg-amber-500",
-    badgeClass: "bg-amber-100 text-amber-800",
-    summary: "壓力與繃緊訊號較明顯。",
   },
 };
 
@@ -237,13 +222,6 @@ function formatDate(value: string | null): string {
   ).padStart(2, "0")}`;
 }
 
-function constitutionSourceLabel(source: CareContextResponse["constitutionSource"]): string {
-  if (source === "patient_care_profile") return "醫師評估";
-  if (source === "profiles") return "帳號體質檔案";
-  if (source === "chat_sessions") return "對話紀錄";
-  return "尚未同步";
-}
-
 function getSymptomLabel(symptom: SymptomItem): string {
   return symptom.category?.trim() || "未命名症狀";
 }
@@ -276,11 +254,6 @@ function groupSymptoms(symptoms: SymptomItem[]): SymptomGroup[] {
   return Array.from(groups.values());
 }
 
-function trimCopy(value: string, limit = 60): string {
-  if (value.length <= limit) return value;
-  return `${value.slice(0, limit).trim()}...`;
-}
-
 function getLeadingElement(stats: {
   waterScore: number;
   windScore: number;
@@ -297,38 +270,15 @@ function getLeadingElement(stats: {
   return leader.key;
 }
 
-function resolveJourneyAction(raw: string | null): JourneyAction {
-  const fallback = {
-    label: "開始體質問卷",
-    hint: "先做 3 題，建立你的身體基線。",
-  };
-
-  if (!raw) return fallback;
-
+function needsBaseQuizPrompt(raw: string | null): boolean {
+  if (!raw) return true;
   try {
     const parsed = JSON.parse(raw) as {
-      baseAnswers?: BaseQuizAnswers;
-      answeredDaily?: Record<string, { optionId: string }>;
+      baseAnswers?: unknown;
     };
-
-    if (!parsed.baseAnswers || !isBaseQuizComplete(parsed.baseAnswers)) {
-      return fallback;
-    }
-
-    const todayKey = getLocalDateKey();
-    if (!parsed.answeredDaily?.[todayKey]) {
-      return {
-        label: "回答今日題",
-        hint: "用 1 題更新今天狀態。",
-      };
-    }
-
-    return {
-      label: "查看今日旅程",
-      hint: "今日題已完成，可查看最新傾向。",
-    };
+    return !parsed.baseAnswers || !isBaseQuizComplete(parsed.baseAnswers);
   } catch {
-    return fallback;
+    return true;
   }
 }
 
@@ -341,10 +291,7 @@ export default function MySymptomsPage() {
   const [careError, setCareError] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [showSymptomDrawer, setShowSymptomDrawer] = useState(false);
-  const [journeyAction, setJourneyAction] = useState<JourneyAction>({
-    label: "開始體質問卷",
-    hint: "先做 3 題，建立你的身體基線。",
-  });
+  const [showBaseQuizPrompt, setShowBaseQuizPrompt] = useState(false);
   const [resolveTarget, setResolveTarget] = useState<SymptomItem | null>(null);
   const [resolveSaving, setResolveSaving] = useState(false);
   const [resolveError, setResolveError] = useState("");
@@ -410,7 +357,7 @@ export default function MySymptomsPage() {
     if (typeof window === "undefined") return;
     const tendencyStorageKey = `eden:tendency:v1:${careContext?.userId || "guest"}`;
     const storedRaw = window.localStorage.getItem(tendencyStorageKey);
-    setJourneyAction(resolveJourneyAction(storedRaw));
+    setShowBaseQuizPrompt(needsBaseQuizPrompt(storedRaw));
   }, [careContext?.userId]);
 
   const sortedSymptoms = useMemo(
@@ -549,12 +496,8 @@ export default function MySymptomsPage() {
   const constitutionMeta = CONSTITUTION_META[constitutionKey] || CONSTITUTION_META.unknown;
   const tendencyKey = constitutionToTendencyKey(constitutionKey);
   const accentBg = tendencyKey ? FORCE_NARRATIVE[tendencyKey].accentBg : "bg-primary-light/30";
-
-  const careSummaryCopy = useMemo(() => {
-    if (careLoading) return "整理體質資料中，先用最近症狀歸納今日重點。";
-    if (careError) return "體質資料暫未同步，先用症狀幫你整理今日狀態。";
-    return trimCopy(careContext?.constitutionNote?.trim() || constitutionMeta.summary);
-  }, [careContext?.constitutionNote, careError, careLoading, constitutionMeta.summary]);
+  const symptomActionLabel =
+    dashboardSymptomGroups.length > previewSymptoms.length ? `查看全部 (${dashboardSymptomGroups.length})` : "管理";
 
   function openResolveModal(symptom: SymptomItem) {
     setResolveTarget(symptom);
@@ -721,35 +664,23 @@ export default function MySymptomsPage() {
         <section className={`rounded-[28px] border border-primary/10 p-4 shadow-sm ${accentBg}`}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-xl font-semibold text-slate-900">身體狀態</h1>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <h2 className="text-sm font-semibold text-slate-900">
+              <p className="text-sm font-medium text-slate-600">身體狀態</p>
+              <div className="mt-2 flex items-end gap-3">
+                <span className="text-5xl font-semibold leading-none text-slate-900">
+                  {leadingElement ? ELEMENT_META[leadingElement].shortLabel : "—"}
+                </span>
+                <p className="pb-1 text-sm font-semibold text-slate-900">
                   {leadingElement ? `${ELEMENT_META[leadingElement].label}較明顯` : "等待更多記錄"}
-                </h2>
-                {leadingElement ? (
-                  <span
-                    className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${ELEMENT_META[leadingElement].badgeClass}`}
-                  >
-                    {ELEMENT_META[leadingElement].summary}
-                  </span>
-                ) : null}
+                </p>
               </div>
             </div>
-            <div className="flex flex-col items-end gap-2">
-              <Link
-                href="/chat"
-                className="inline-flex items-center rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
+            {!careLoading && !careError ? (
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${constitutionMeta.badgeClass}`}
               >
-                問 AI
-              </Link>
-              {!careLoading && !careError ? (
-                <span
-                  className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${constitutionMeta.badgeClass}`}
-                >
-                  {constitutionMeta.label}
-                </span>
-              ) : null}
-            </div>
+                {constitutionMeta.label}
+              </span>
+            ) : null}
           </div>
 
           <div className="mt-4 overflow-hidden rounded-full bg-slate-100">
@@ -764,35 +695,28 @@ export default function MySymptomsPage() {
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-medium text-slate-600">
             {elementBarSegments.map((segment) => (
-              <div key={segment.key} className="rounded-2xl border border-slate-200 bg-slate-50/90 px-2.5 py-2">
-                <div className="flex items-center justify-between gap-2 text-[11px]">
-                  <span className="font-semibold text-slate-700">{segment.label}</span>
-                  <span className="font-semibold text-slate-500">{segment.width}%</span>
-                </div>
-              </div>
+              <span key={segment.key} className="inline-flex items-center gap-1.5">
+                <span className={`h-2 w-2 rounded-full ${segment.barClass}`} />
+                <span>{segment.label}</span>
+                <span className="text-slate-500">{segment.width}%</span>
+              </span>
             ))}
           </div>
-
-          <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-slate-500">
-            <span className="truncate">{constitutionSourceLabel(careContext?.constitutionSource)}</span>
-            <span>未定 {stats.undeterminedCount}</span>
-          </div>
-          <p className="mt-2 text-xs leading-relaxed text-slate-600">{careSummaryCopy}</p>
         </section>
 
         <section className="rounded-[28px] border border-primary/10 bg-white/95 p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold text-slate-900">目前最值得跟進</h2>
+              <h2 className="text-base font-semibold text-slate-900">症狀</h2>
             </div>
             <button
               type="button"
               onClick={() => openSymptomDrawer()}
               className="inline-flex items-center rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
             >
-              管理
+              {symptomActionLabel}
             </button>
           </div>
 
@@ -814,7 +738,6 @@ export default function MySymptomsPage() {
           ) : previewSymptoms.length === 0 ? (
             <div className="mt-3 rounded-2xl border border-primary/10 bg-primary-light/20 px-3 py-4 text-sm text-slate-600">
               <p className="font-medium text-slate-900">暫時未有症狀紀錄</p>
-              <p className="mt-1 text-xs text-slate-500">你可以喺聊天時描述症狀，系統會自動幫你整理。</p>
             </div>
           ) : (
             <div className="mt-3 space-y-2">
@@ -849,40 +772,22 @@ export default function MySymptomsPage() {
                   </button>
                 );
               })}
-              {dashboardSymptomGroups.length > previewSymptoms.length ? (
-                <button
-                  type="button"
-                  onClick={() => openSymptomDrawer()}
-                  className="text-left text-[11px] font-medium text-slate-500 transition hover:text-primary"
-                >
-                  另有 {dashboardSymptomGroups.length - previewSymptoms.length} 項，按此查看全部症狀。
-                </button>
-              ) : null}
             </div>
           )}
         </section>
 
-        <section className="mt-auto grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => openSymptomDrawer()}
-            className="rounded-[24px] border border-primary/10 bg-white/95 px-4 py-4 text-left shadow-sm transition hover:border-primary/25 hover:bg-primary-light/20"
-          >
-            <p className="text-sm font-semibold text-slate-900">管理症狀</p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">查看完整記錄、修改內容或標記好轉。</p>
-          </button>
-
+        {showBaseQuizPrompt ? (
           <Link
             href="/chat/symptoms/tendency-quiz"
-            className="rounded-[24px] bg-primary px-4 py-4 text-left text-white shadow-sm transition hover:bg-primary-hover"
+            className="mt-auto rounded-[24px] border border-primary/10 bg-primary-light/35 px-4 py-4 text-left shadow-sm transition hover:border-primary/25 hover:bg-primary-light/55"
           >
-            <p className="inline-flex items-center gap-1 text-sm font-semibold">
-              {journeyAction.label}
-              <ArrowRight className="h-4 w-4" />
+            <p className="inline-flex items-center gap-1 text-sm font-semibold text-slate-900">
+              完成體質問卷
+              <ArrowRight className="h-4 w-4 text-primary" />
             </p>
-            <p className="mt-1 text-xs leading-relaxed text-white/80">{journeyAction.hint}</p>
+            <p className="mt-1 text-xs text-slate-500">先建立身體基線。</p>
           </Link>
-        </section>
+        ) : null}
       </div>
 
       {showSymptomDrawer ? (
@@ -891,8 +796,7 @@ export default function MySymptomsPage() {
             <div className="border-b border-gray-100 px-4 py-4 sm:px-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold text-slate-900">症狀明細</h2>
-                  <p className="mt-1 text-xs text-slate-500">點症狀可展開詳細、修改內容，或標記好轉。</p>
+                  <h2 className="text-base font-semibold text-slate-900">全部症狀</h2>
                 </div>
                 <button
                   type="button"
