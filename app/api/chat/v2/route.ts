@@ -554,7 +554,6 @@ const TASK_SUMMARY_KEYWORDS = ['總結', '总结', '摘要', '總結重點', 'su
 const TASK_JSON_KEYWORDS = ['json', '只輸出json', '只返回json', '只回傳json', 'only output json', 'return json only'];
 const TASK_BULLET_KEYWORDS = ['點列', '点列', '條列', 'bullet', 'bullets', '列出'];
 const B_SHORT_FOLLOWUP_KEYWORDS = ['下周', '下週', '下星期', 'tomorrow', 'next week', '聽日', '明日', '明天'];
-const B_SHORT_CONFIRMATION_KEYWORDS = ['係', '系', '好', '冇錯', '無錯', '啱', '啱呀', 'ok', 'okay', 'yes', '可以', '得'];
 const B_ASSISTANT_PROGRESS_KEYWORDS = ['醫師', '诊所', '診所', '時段', '时间', '日期', '預約', '预约'];
 const B_LOW_SIGNAL_ASSISTANT_PATTERNS = [
   '我已收到你嘅預約需求。請先確認你想預約邊位醫師同日期，我會用最少步驟幫你完成。',
@@ -1137,44 +1136,128 @@ function isBookingProgressAssistantMessage(text: string): boolean {
   return B_ASSISTANT_PROGRESS_KEYWORDS.some((kw) => normalized.includes(normalizeIntentText(kw)));
 }
 
-function isShortBookingTimeReply(text: string): boolean {
-  const compact = text
+function toHalfWidthDigits(value: string): string {
+  return value.replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xFEE0));
+}
+
+function toTwoDigits(value: number): string {
+  return value.toString().padStart(2, '0');
+}
+
+function normalizeBookingTimeCandidate(text: string): string | null {
+  const compact = toHalfWidthDigits(text)
     .trim()
     .toLowerCase()
     .replace(/\s+/g, '')
-    .replace(/：/g, ':')
+    .replace(/[：﹕]/g, ':')
     .replace(/[。！？，、,.!?]/g, '');
 
-  if (!compact || compact.length > 12) return false;
+  if (!compact) return null;
 
-  // 13:00 / 1300 / 900
-  if (/^(?:[01]?\d|2[0-3]):?[0-5]\d$/.test(compact)) return true;
-  // 1pm / 1:30pm
-  if (/^(?:[1-9]|1[0-2])(?::[0-5]\d)?(?:am|pm)$/.test(compact)) return true;
-  // 13點 / 13點30
-  if (/^(?:[01]?\d|2[0-3])點(?:[0-5]?\d)?$/.test(compact)) return true;
+  const fromHourMinute = (hour: number, minute: number): string | null => {
+    if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return `${toTwoDigits(hour)}:${toTwoDigits(minute)}`;
+  };
+
+  const h24 = compact.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (h24?.[1] && h24?.[2]) {
+    return fromHourMinute(Number.parseInt(h24[1], 10), Number.parseInt(h24[2], 10));
+  }
+
+  const hAmPm = compact.match(/^([1-9]|1[0-2])(?::([0-5]\d))?(am|pm)$/);
+  if (hAmPm?.[1] && hAmPm?.[3]) {
+    const hourRaw = Number.parseInt(hAmPm[1], 10);
+    const minuteRaw = hAmPm[2] ? Number.parseInt(hAmPm[2], 10) : 0;
+    const normalizedHour = hAmPm[3] === 'pm'
+      ? (hourRaw === 12 ? 12 : hourRaw + 12)
+      : (hourRaw === 12 ? 0 : hourRaw);
+    return fromHourMinute(normalizedHour, minuteRaw);
+  }
+
+  const hCjk = compact.match(/^([01]?\d|2[0-3])[點时時]([0-5]?\d)?$/);
+  if (hCjk?.[1]) {
+    const hourRaw = Number.parseInt(hCjk[1], 10);
+    const minuteRaw = hCjk[2] ? Number.parseInt(hCjk[2], 10) : 0;
+    return fromHourMinute(hourRaw, minuteRaw);
+  }
+
+  if (/^\d{3,4}$/.test(compact)) {
+    const hourRaw = Number.parseInt(compact.slice(0, -2), 10);
+    const minuteRaw = Number.parseInt(compact.slice(-2), 10);
+    return fromHourMinute(hourRaw, minuteRaw);
+  }
+
+  if (/^\d{1,2}$/.test(compact)) {
+    return fromHourMinute(Number.parseInt(compact, 10), 0);
+  }
+
+  return null;
+}
+
+function extractNormalizedBookingTimes(text: string): string[] {
+  const source = toHalfWidthDigits(text).toLowerCase().replace(/[：﹕]/g, ':');
+  const collected = new Set<string>();
+  const patterns = [
+    /\b(?:[01]?\d|2[0-3]):[0-5]\d\b/g,
+    /\b(?:[1-9]|1[0-2])(?::[0-5]\d)?(?:am|pm)\b/g,
+    /(?:[01]?\d|2[0-3])[點时時](?:[0-5]?\d)?/g,
+    /\b\d{3,4}\b/g,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) {
+      const token = match[0];
+      if (!token) continue;
+      const normalized = normalizeBookingTimeCandidate(token);
+      if (normalized) {
+        collected.add(normalized);
+      }
+    }
+  }
+
+  return Array.from(collected);
+}
+
+function isLikelySlotSelectionPrompt(text: string): boolean {
+  const normalized = normalizeIntentText(text);
+  if (!normalized) return false;
+  const hasSelectHint = ['時段', '時間', '邊個', '揀', '選'].some((kw) =>
+    normalized.includes(normalizeIntentText(kw))
+  );
+  return hasSelectHint || text.includes('?') || text.includes('？');
+}
+
+function isLikelySlotSelectionReply(previousAssistantText: string, latestUserText: string): boolean {
+  const normalizedCandidate = normalizeBookingTimeCandidate(latestUserText);
+  if (!normalizedCandidate) return false;
+
+  const priorSlots = extractNormalizedBookingTimes(previousAssistantText);
+  if (priorSlots.includes(normalizedCandidate)) return true;
+
+  if (priorSlots.length >= 2 && isLikelySlotSelectionPrompt(previousAssistantText)) {
+    return true;
+  }
 
   return false;
 }
 
 function isBModeShortFollowUpMessage(messages: ChatMessagePayload[], latestUserText: string): boolean {
   const normalized = normalizeIntentText(latestUserText);
-  if (!normalized || normalized.length > 14) return false;
+  if (!normalized || normalized.length > 20) return false;
+
+  const previousAssistant = findPreviousAssistantMessage(messages);
+  if (!previousAssistant) return false;
+  if (!isBookingProgressAssistantMessage(previousAssistant.content)) return false;
 
   const hasKeywordCue = B_SHORT_FOLLOWUP_KEYWORDS.some((kw) =>
     normalized.includes(normalizeIntentText(kw))
   );
-  const hasShortConfirmationCue =
-    isShortAffirmativeReply(latestUserText)
-    || B_SHORT_CONFIRMATION_KEYWORDS.some((kw) =>
-      normalized.includes(normalizeIntentText(kw))
-    );
-  const hasTimeCue = isShortBookingTimeReply(latestUserText);
-  if (!hasKeywordCue && !hasShortConfirmationCue && !hasTimeCue) return false;
+  const hasShortConfirmationCue = isShortAffirmativeReply(latestUserText)
+    && (previousAssistant.content.includes('?') || previousAssistant.content.includes('？'));
+  const hasSlotSelectionCue = isLikelySlotSelectionReply(previousAssistant.content, latestUserText);
 
-  const previousAssistant = findPreviousAssistantMessage(messages);
-  if (!previousAssistant) return false;
-  return isBookingProgressAssistantMessage(previousAssistant.content);
+  return hasKeywordCue || hasShortConfirmationCue || hasSlotSelectionCue;
 }
 
 function buildBShortFollowUpReply(latestUserText: string): string {
