@@ -44,7 +44,7 @@ type NextFollowUp = {
 
 type CareContextResponse = {
   constitution: string;
-  constitutionSource?: "patient_care_profile" | "profiles" | "chat_sessions" | "default";
+  constitutionSource?: "patient_care_profile" | "default";
   constitutionNote: string | null;
   activeInstructions: CareInstruction[];
   nextFollowUp: NextFollowUp | null;
@@ -96,10 +96,8 @@ function instructionMetaText(item: CareInstruction): string {
 }
 
 function constitutionSourceLabel(source: CareContextResponse["constitutionSource"]): string {
-  if (source === "patient_care_profile") return "來源：醫師評估";
-  if (source === "profiles") return "來源：帳號體質檔案";
-  if (source === "chat_sessions") return "來源：登入帳號對話紀錄";
-  return "來源：未有完整資料";
+  if (source === "patient_care_profile") return "來源：體質檔案";
+  return "來源：未有正式體質資料";
 }
 
 export default function CareAdvicePage() {

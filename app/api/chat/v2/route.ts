@@ -1394,7 +1394,7 @@ async function resolveModeWithRouter(
 async function resolveConstitution(userId: string): Promise<ConstitutionType> {
   const supabase = createServiceClient();
 
-  // Priority 1: patient_care_profile (doctor-assigned)
+  // Single source of truth: patient_care_profile.constitution
   const { data: careProfile } = await supabase
     .from('patient_care_profile')
     .select('constitution')
@@ -1403,17 +1403,6 @@ async function resolveConstitution(userId: string): Promise<ConstitutionType> {
 
   if (isConstitutionType(careProfile?.constitution)) {
     return careProfile.constitution;
-  }
-
-  // Priority 2: profiles.constitution_type (quiz result)
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('constitution_type')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (isConstitutionType(profile?.constitution_type)) {
-    return profile.constitution_type;
   }
 
   // Default

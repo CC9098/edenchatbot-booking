@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowRight, ArrowUpCircle, ChevronRight } from "lucide-react";
-import { blendTendencyScores, isBaseQuizComplete, normalizeToPercentages, type BaseQuizAnswers, type TendencyScore } from "@/lib/constitution-tendency";
+import { ArrowUpCircle, ChevronRight } from "lucide-react";
 import { constitutionToTendencyKey, FORCE_NARRATIVE } from "@/lib/narrative-copy";
 
 type SymptomItem = {
@@ -36,7 +35,7 @@ type SymptomApiResponse = {
 type CareContextResponse = {
   userId?: string;
   constitution: string;
-  constitutionSource?: "patient_care_profile" | "profiles" | "chat_sessions" | "default";
+  constitutionSource?: "patient_care_profile" | "default";
   constitutionNote: string | null;
   error?: string;
 };
@@ -76,12 +75,6 @@ type ConstitutionMeta = {
 };
 
 type ElementKey = "water" | "wind" | "thunder";
-
-type QuizStorageState = {
-  baseAnswers?: BaseQuizAnswers;
-  baseScore?: Partial<TendencyScore>;
-  liveScore?: Partial<TendencyScore>;
-};
 
 const CONSTITUTION_META: Record<string, ConstitutionMeta> = {
   depleting: {
@@ -284,65 +277,6 @@ function getLeadingElement(stats: {
   return leader.key;
 }
 
-function needsBaseQuizPrompt(raw: string | null): boolean {
-  if (!raw) return true;
-  try {
-    const parsed = JSON.parse(raw) as {
-      baseAnswers?: unknown;
-    };
-    return !parsed.baseAnswers || !isBaseQuizComplete(parsed.baseAnswers);
-  } catch {
-    return true;
-  }
-}
-
-function toCompleteScore(score?: Partial<TendencyScore> | null): TendencyScore {
-  return {
-    J: Number(score?.J || 0),
-    K: Number(score?.K || 0),
-    L: Number(score?.L || 0),
-  };
-}
-
-function getQuizElementSegments(raw: string | null): ElementSegment[] | null {
-  if (!raw) return null;
-
-  try {
-    const parsed = JSON.parse(raw) as QuizStorageState;
-    if (!parsed.baseAnswers || !isBaseQuizComplete(parsed.baseAnswers)) {
-      return null;
-    }
-
-    const percentages = normalizeToPercentages(blendTendencyScores(toCompleteScore(parsed.baseScore), toCompleteScore(parsed.liveScore)));
-
-    return [
-      {
-        key: "water",
-        label: ELEMENT_META.water.label,
-        value: percentages.K,
-        width: percentages.K,
-        barClass: ELEMENT_META.water.barClass,
-      },
-      {
-        key: "wind",
-        label: ELEMENT_META.wind.label,
-        value: percentages.J,
-        width: percentages.J,
-        barClass: ELEMENT_META.wind.barClass,
-      },
-      {
-        key: "thunder",
-        label: ELEMENT_META.thunder.label,
-        value: percentages.L,
-        width: percentages.L,
-        barClass: ELEMENT_META.thunder.barClass,
-      },
-    ];
-  } catch {
-    return null;
-  }
-}
-
 export default function MySymptomsPage() {
   const [symptoms, setSymptoms] = useState<SymptomItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -352,8 +286,6 @@ export default function MySymptomsPage() {
   const [careError, setCareError] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [showSymptomDrawer, setShowSymptomDrawer] = useState(false);
-  const [showBaseQuizPrompt, setShowBaseQuizPrompt] = useState(false);
-  const [quizElementSegments, setQuizElementSegments] = useState<ElementSegment[] | null>(null);
   const [resolveTarget, setResolveTarget] = useState<SymptomItem | null>(null);
   const [resolveSaving, setResolveSaving] = useState(false);
   const [resolveError, setResolveError] = useState("");
@@ -414,14 +346,6 @@ export default function MySymptomsPage() {
     void loadSymptoms();
     void loadCareContext();
   }, [loadSymptoms, loadCareContext]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const tendencyStorageKey = `eden:tendency:v1:${careContext?.userId || "guest"}`;
-    const storedRaw = window.localStorage.getItem(tendencyStorageKey);
-    setShowBaseQuizPrompt(needsBaseQuizPrompt(storedRaw));
-    setQuizElementSegments(getQuizElementSegments(storedRaw));
-  }, [careContext?.userId]);
 
   const sortedSymptoms = useMemo(
     () =>
@@ -551,7 +475,7 @@ export default function MySymptomsPage() {
   const accentBg = tendencyKey ? FORCE_NARRATIVE[tendencyKey].accentBg : "bg-primary-light/30";
   const hasSymptomRecords = stats.total > 0;
   const hasSymptomSignal = elementBarSegments.some((segment) => segment.value > 0);
-  const displayElementSegments = hasSymptomSignal ? elementBarSegments : quizElementSegments;
+  const displayElementSegments = hasSymptomSignal ? elementBarSegments : null;
   const displayLeadingElement = useMemo(
     () =>
       displayElementSegments
@@ -741,16 +665,6 @@ export default function MySymptomsPage() {
                     {ELEMENT_META[displayLeadingElement].label}較明顯
                   </p>
                 </div>
-              ) : showBaseQuizPrompt ? (
-                <div className="mt-3">
-                  <Link
-                    href="/chat/symptoms/tendency-quiz"
-                    className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-white/70 px-3 py-1.5 text-sm font-semibold text-primary transition hover:bg-white"
-                  >
-                    做體質問卷
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
               ) : (
                 <p className="mt-3 text-sm text-slate-600">未有足夠資料。</p>
               )}
@@ -861,18 +775,6 @@ export default function MySymptomsPage() {
           )}
         </section>
 
-        {showBaseQuizPrompt && hasSymptomRecords ? (
-          <Link
-            href="/chat/symptoms/tendency-quiz"
-            className="mt-auto rounded-[24px] border border-primary/10 bg-primary-light/35 px-4 py-4 text-left shadow-sm transition hover:border-primary/25 hover:bg-primary-light/55"
-          >
-            <p className="inline-flex items-center gap-1 text-sm font-semibold text-slate-900">
-              完成體質問卷
-              <ArrowRight className="h-4 w-4 text-primary" />
-            </p>
-            <p className="mt-1 text-xs text-slate-500">先建立身體基線。</p>
-          </Link>
-        ) : null}
       </div>
 
       {showSymptomDrawer ? (

@@ -32,49 +32,11 @@ export async function GET() {
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 
-    // Fallback source: profile-level constitution
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("constitution_type")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profileError) {
-      console.error("[GET /api/me/care-context] profile constitution error:", profileError.message);
-      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-    }
-
-    // Last fallback source: latest chat session type bound to this login user.
-    const { data: latestSession, error: latestSessionError } = await supabase
-      .from("chat_sessions")
-      .select("type")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (latestSessionError) {
-      console.error("[GET /api/me/care-context] latest session type error:", latestSessionError.message);
-      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-    }
-
-    // Keep consistency with chat/v2 resolution while adding legacy fallback to chat_sessions.type.
-    let resolvedConstitution: ConstitutionValue = "unknown";
-    let constitutionSource: "patient_care_profile" | "profiles" | "chat_sessions" | "default" = "default";
-
-    if (isConstitutionValue(careProfile?.constitution) && careProfile.constitution !== "unknown") {
-      resolvedConstitution = careProfile.constitution;
-      constitutionSource = "patient_care_profile";
-    } else if (isConstitutionValue(profile?.constitution_type)) {
-      resolvedConstitution = profile.constitution_type;
-      constitutionSource = "profiles";
-    } else if (isConstitutionValue(latestSession?.type)) {
-      resolvedConstitution = latestSession.type;
-      constitutionSource = "chat_sessions";
-    } else if (isConstitutionValue(careProfile?.constitution)) {
-      resolvedConstitution = careProfile.constitution;
-      constitutionSource = "patient_care_profile";
-    }
+    const resolvedConstitution: ConstitutionValue = isConstitutionValue(careProfile?.constitution)
+      ? careProfile.constitution
+      : "unknown";
+    const constitutionSource: "patient_care_profile" | "default" =
+      resolvedConstitution !== "unknown" ? "patient_care_profile" : "default";
 
     // Fetch active care instructions
     const { data: instructions, error: instrError } = await supabase

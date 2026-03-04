@@ -1,74 +1,60 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Wind, Droplet, Zap } from "lucide-react";
-import {
-  type TendencyKey,
-  blendTendencyScores,
-  createEmptyScore,
-  getLocalDateKey,
-  isBaseQuizComplete,
-  normalizeToPercentages,
-  rankTendency,
-} from "@/lib/constitution-tendency";
-import { FORCE_NARRATIVE } from "@/lib/narrative-copy";
+import { type TendencyKey } from "@/lib/constitution-tendency";
+import { constitutionToTendencyKey, FORCE_NARRATIVE } from "@/lib/narrative-copy";
 
 type TendencyWhisperProps = {
   userId?: string;
 };
 
+type CareContextResponse = {
+  constitution?: string | null;
+};
+
 /**
- * A single quiet line at the top of the chat room showing the user's
- * current primary force tendency.
- *
- * - If the user hasn't done the base quiz → renders nothing (no nagging).
- * - Otherwise shows one line like: 🌬 風勢偏高 · 留意回氣
- * - No interactivity, no expansion, just a gentle ambient presence.
+ * A single quiet line at the top of the chat room showing the
+ * authoritative constitution stored in Supabase.
  */
 export function TendencyWhisper({ userId }: TendencyWhisperProps) {
   const [primaryKey, setPrimaryKey] = useState<TendencyKey | null>(null);
 
-  const storageKey = useMemo(() => `eden:tendency:v1:${userId || "guest"}`, [userId]);
-
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    let cancelled = false;
 
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (!raw) return;
+    setPrimaryKey(null);
 
-      const parsed = JSON.parse(raw) as {
-        version?: number;
-        baseAnswers?: Record<string, string>;
-        baseScore?: Record<string, number>;
-        liveScore?: Record<string, number>;
+    if (!userId) {
+      return () => {
+        cancelled = true;
       };
-
-      if (parsed.version !== 1) return;
-      if (!isBaseQuizComplete(parsed.baseAnswers || {})) return;
-
-      const baseScore = {
-        J: Number(parsed.baseScore?.J || 0),
-        K: Number(parsed.baseScore?.K || 0),
-        L: Number(parsed.baseScore?.L || 0),
-      };
-      const liveScore = {
-        J: Number(parsed.liveScore?.J || 0),
-        K: Number(parsed.liveScore?.K || 0),
-        L: Number(parsed.liveScore?.L || 0),
-      };
-
-      const blended = blendTendencyScores(baseScore, liveScore);
-      const percentages = normalizeToPercentages(blended);
-      const ranked = rankTendency(percentages);
-
-      if (ranked[0]) {
-        setPrimaryKey(ranked[0]);
-      }
-    } catch {
-      // Silently ignore — this is ambient, not critical.
     }
-  }, [storageKey]);
+
+    async function loadCareContext() {
+      try {
+        const response = await fetch("/api/me/care-context", { cache: "no-store" });
+        if (!response.ok) return;
+
+        const payload = (await response.json()) as CareContextResponse;
+        const nextPrimaryKey = constitutionToTendencyKey(payload.constitution);
+
+        if (!cancelled) {
+          setPrimaryKey(nextPrimaryKey);
+        }
+      } catch {
+        if (!cancelled) {
+          setPrimaryKey(null);
+        }
+      }
+    }
+
+    void loadCareContext();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   if (!primaryKey) return null;
 
