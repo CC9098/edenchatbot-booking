@@ -2,6 +2,7 @@
 
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { ClinicBrandLink } from "@/components/brand/ClinicBrandLink";
 import { Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -55,9 +56,7 @@ function ChatLayoutFrame({ children }: { children: React.ReactNode }) {
           ) : (
             <div className="chat-fixed-topbar__spacer" />
           )}
-          <Link href="/chat" className="chat-fixed-topbar__brand">
-            Eden Care
-          </Link>
+          <ClinicBrandLink href="/chat" />
           <div className="chat-fixed-topbar__actions">
             <Link href={actionHref} className="chat-fixed-topbar__action">
               {actionLabel}

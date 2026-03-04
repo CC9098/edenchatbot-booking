@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { ClinicBrandLink } from "@/components/brand/ClinicBrandLink";
 import {
   isMobileBrowserUserAgent,
   isNativeAppRuntime,
@@ -80,7 +81,7 @@ function getTopbarTitle(pathname: string): string {
     return "養生專區";
   }
   if (pathname.startsWith("/login")) return "會員登入";
-  return "Eden Care";
+  return "醫天圓";
 }
 
 function ProfileCompletionPrompt({ enabled }: { enabled: boolean }) {
@@ -309,9 +310,7 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
         <header className="chat-fixed-topbar chat-fixed-topbar--route" aria-label={`${topbarTitle} 頂部導覽`}>
           <div className="chat-fixed-topbar__inner">
             <div className="chat-fixed-topbar__spacer" aria-hidden="true" />
-            <Link href="/chat" className="chat-fixed-topbar__brand">
-              Eden Care
-            </Link>
+            <ClinicBrandLink href="/chat" />
             <div className="chat-fixed-topbar__actions">
               <span className="chat-fixed-topbar__action chat-fixed-topbar__action--section">
                 {topbarTitle}
