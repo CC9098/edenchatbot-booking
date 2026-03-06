@@ -3,6 +3,7 @@ type NullableId = string | null | undefined;
 type VisiblePatientIdOptions = {
   activeStaffUserIds: NullableId[];
   currentStaffUserId?: NullableId;
+  profileIds?: NullableId[];
   patientCareTeamIds?: NullableId[];
   patientCareProfileIds?: NullableId[];
   bookingUserIds?: NullableId[];
@@ -31,6 +32,7 @@ function appendVisibleIds(
 export function buildVisiblePatientIds({
   activeStaffUserIds,
   currentStaffUserId,
+  profileIds,
   patientCareTeamIds,
   patientCareProfileIds,
   bookingUserIds,
@@ -44,6 +46,7 @@ export function buildVisiblePatientIds({
   const activeStaffIds = new Set(activeStaffUserIds.filter(isNonEmptyId));
   const patientIds = new Set<string>();
 
+  appendVisibleIds(patientIds, profileIds, activeStaffIds, normalizedCurrentStaffUserId);
   appendVisibleIds(patientIds, patientCareTeamIds, activeStaffIds, normalizedCurrentStaffUserId);
   appendVisibleIds(patientIds, patientCareProfileIds, activeStaffIds, normalizedCurrentStaffUserId);
   appendVisibleIds(patientIds, bookingUserIds, activeStaffIds, normalizedCurrentStaffUserId);

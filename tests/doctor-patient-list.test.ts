@@ -10,6 +10,7 @@ test("buildVisiblePatientIds keeps current staff visible while excluding other s
   const patientIds = buildVisiblePatientIds({
     activeStaffUserIds: ["staff-self", "staff-other"],
     currentStaffUserId: "staff-self",
+    profileIds: ["patient-profile", "staff-other"],
     patientCareTeamIds: ["patient-a", "staff-other"],
     patientCareProfileIds: ["patient-b"],
     bookingUserIds: ["staff-self"],
@@ -18,7 +19,13 @@ test("buildVisiblePatientIds keeps current staff visible while excluding other s
     instructionPatientIds: [],
   });
 
-  assert.deepEqual(patientIds, ["patient-a", "patient-b", "patient-c", "staff-self"]);
+  assert.deepEqual(patientIds, [
+    "patient-a",
+    "patient-b",
+    "patient-c",
+    "patient-profile",
+    "staff-self",
+  ]);
 });
 
 test("buildVisiblePatientIds adds current staff even without patient records", () => {
@@ -34,6 +41,22 @@ test("buildVisiblePatientIds adds current staff even without patient records", (
   });
 
   assert.deepEqual(patientIds, ["staff-self"]);
+});
+
+test("buildVisiblePatientIds includes non-staff profiles without care activity", () => {
+  const patientIds = buildVisiblePatientIds({
+    activeStaffUserIds: ["staff-self", "staff-other"],
+    currentStaffUserId: "staff-self",
+    profileIds: ["patient-a", "patient-b", "staff-other"],
+    patientCareTeamIds: [],
+    patientCareProfileIds: [],
+    bookingUserIds: [],
+    symptomPatientIds: [],
+    followUpPatientIds: [],
+    instructionPatientIds: [],
+  });
+
+  assert.deepEqual(patientIds, ["patient-a", "patient-b", "staff-self"]);
 });
 
 test("prioritizeSelfPatient moves self to the front without duplication", () => {

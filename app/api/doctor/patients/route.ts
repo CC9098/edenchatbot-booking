@@ -80,6 +80,7 @@ async function fetchAllVisiblePatientIds(
 ): Promise<string[]> {
   const [
     { data: activeStaffRows, error: activeStaffError },
+    { data: profileRows, error: profileError },
     { data: careTeamRows, error: careTeamError },
     { data: careProfileRows, error: careProfileError },
     { data: bookingIntakeRows, error: bookingIntakeError },
@@ -88,6 +89,7 @@ async function fetchAllVisiblePatientIds(
     { data: instructionRows, error: instructionError },
   ] = await Promise.all([
     supabase.from("staff_roles").select("user_id").eq("is_active", true).limit(scanLimit),
+    supabase.from("profiles").select("id").limit(scanLimit),
     supabase.from("patient_care_team").select("patient_user_id").limit(scanLimit),
     supabase.from("patient_care_profile").select("patient_user_id").limit(scanLimit),
     supabase
@@ -111,6 +113,7 @@ async function fetchAllVisiblePatientIds(
 
   const firstError =
     activeStaffError ||
+    profileError ||
     careTeamError ||
     careProfileError ||
     bookingIntakeError ||
@@ -125,6 +128,7 @@ async function fetchAllVisiblePatientIds(
   return buildVisiblePatientIds({
     activeStaffUserIds: (activeStaffRows || []).map((row) => row.user_id),
     currentStaffUserId,
+    profileIds: (profileRows || []).map((row) => row.id),
     patientCareTeamIds: (careTeamRows as Array<Record<string, unknown>> | null)?.map(
       (row) => row.patient_user_id as string | null | undefined,
     ),
