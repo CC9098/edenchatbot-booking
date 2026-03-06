@@ -19,6 +19,14 @@ import {
   isRetryableGeminiError,
   retryGeminiRequest,
 } from "@/lib/gemini-request";
+import {
+  DeepgramApiError,
+  getDoctorVoiceSttProvider,
+  getDeepgramErrorStatus,
+  isRetryableDeepgramError,
+  transcribeAudioWithDeepgram,
+  type DoctorVoiceSttProvider,
+} from "@/lib/deepgram-stt";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
@@ -105,6 +113,33 @@ function getRequestedMode(rawMode: string): VoiceNoteMode {
 
 function getModelName(): string {
   return process.env.GEMINI_DOCTOR_VOICE_MODEL || "gemini-flash-latest";
+}
+
+function buildDeepgramFailureResponse(operationLabel: string, error: unknown) {
+  const status = getDeepgramErrorStatus(error);
+
+  if (status === 429) {
+    return {
+      status: 429,
+      error: `${operationLabel}服務繁忙，請稍後再試。`,
+    };
+  }
+
+  if (isRetryableDeepgramError(error)) {
+    return {
+      status: 503,
+      error: `${operationLabel}服務暫時不穩定，請稍後再試。`,
+    };
+  }
+
+  if (error instanceof DeepgramApiError) {
+    return {
+      status: 502,
+      error: `${operationLabel}服務回應異常，請稍後再試。`,
+    };
+  }
+
+  return null;
 }
 
 function buildGeminiFailureResponse(operationLabel: string, error: unknown) {
@@ -233,9 +268,6 @@ export async function POST(request: Request) {
     await requireStaffRole(user.id);
 
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: "GEMINI_API_KEY is not configured" }, { status: 500 });
-    }
 
     const formData = await request.formData();
     const mode = getRequestedMode(sanitizeFormText(formData.get("mode"), 40));
@@ -250,10 +282,13 @@ export async function POST(request: Request) {
         ? patientContext
         : null;
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: getModelName() });
-
     if (mode === "extract-transcript") {
+      if (!apiKey) {
+        return NextResponse.json({ error: "GEMINI_API_KEY is not configured" }, { status: 500 });
+      }
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: getModelName() });
       const transcript = sanitizeFormText(formData.get("transcript"), MAX_TRANSCRIPT_CHARS);
       if (transcript.length < 3) {
         return NextResponse.json({ error: "transcript is required" }, { status: 400 });
@@ -269,6 +304,7 @@ export async function POST(request: Request) {
         recordText,
         mode,
         model: getModelName(),
+        analysisModel: getModelName(),
       });
     }
 
@@ -293,10 +329,64 @@ export async function POST(request: Request) {
     }
 
     const audioBuffer = Buffer.from(await audioInput.arrayBuffer());
-    const audioBase64 = audioBuffer.toString("base64");
     const mimeType = audioInput.type;
+    let audioBase64Cache: string | null = null;
+    const getAudioBase64 = () => {
+      if (!audioBase64Cache) {
+        audioBase64Cache = audioBuffer.toString("base64");
+      }
+      return audioBase64Cache;
+    };
+    const sttProvider = getDoctorVoiceSttProvider();
+    let usedSttProvider: DoctorVoiceSttProvider = sttProvider;
+    let transcriptionModel = getModelName();
+    let transcript = "";
 
-    const transcript = await transcribeAudio(model, mimeType, audioBase64);
+    if (sttProvider === "deepgram") {
+      const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
+      if (!deepgramApiKey) {
+        return NextResponse.json({ error: "DEEPGRAM_API_KEY is not configured" }, { status: 500 });
+      }
+
+      try {
+        const deepgramResult = await transcribeAudioWithDeepgram({
+          apiKey: deepgramApiKey,
+          audioBuffer,
+          mimeType,
+        });
+        transcript = deepgramResult.transcript;
+        transcriptionModel = deepgramResult.model;
+      } catch (deepgramError) {
+        if (!apiKey) {
+          const deepgramFailureResponse = buildDeepgramFailureResponse("語音逐字稿", deepgramError);
+          if (deepgramFailureResponse) {
+            console.error("[POST /api/doctor/voice-notes] deepgram error:", deepgramError);
+            return NextResponse.json(
+              { error: deepgramFailureResponse.error },
+              { status: deepgramFailureResponse.status }
+            );
+          }
+          throw deepgramError;
+        }
+
+        console.warn("[POST /api/doctor/voice-notes] Deepgram STT failed, falling back to Gemini:", deepgramError);
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const geminiModel = genAI.getGenerativeModel({ model: getModelName() });
+        transcript = await transcribeAudio(geminiModel, mimeType, getAudioBase64());
+        usedSttProvider = "gemini";
+        transcriptionModel = getModelName();
+      }
+    } else {
+      if (!apiKey) {
+        return NextResponse.json({ error: "GEMINI_API_KEY is not configured" }, { status: 500 });
+      }
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const geminiModel = genAI.getGenerativeModel({ model: getModelName() });
+      transcript = await transcribeAudio(geminiModel, mimeType, getAudioBase64());
+      transcriptionModel = getModelName();
+    }
+
     if (!transcript) {
       return NextResponse.json({ error: "轉錄結果為空，請重試" }, { status: 502 });
     }
@@ -306,10 +396,18 @@ export async function POST(request: Request) {
         patient: patientPayload,
         transcript,
         mode,
-        model: getModelName(),
+        model: transcriptionModel,
+        transcriptionProvider: usedSttProvider,
+        transcriptionModel,
       });
     }
 
+    if (!apiKey) {
+      return NextResponse.json({ error: "GEMINI_API_KEY is not configured" }, { status: 500 });
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: getModelName() });
     const extraction = await extractSymptoms(model, transcript, patientContext);
     const recordText = buildRecordText(extraction, patientContext);
 
@@ -320,10 +418,22 @@ export async function POST(request: Request) {
       recordText,
       mode,
       model: getModelName(),
+      transcriptionProvider: usedSttProvider,
+      transcriptionModel,
+      analysisModel: getModelName(),
     });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    const deepgramFailureResponse = buildDeepgramFailureResponse("語音逐字稿", error);
+    if (deepgramFailureResponse) {
+      console.error("[POST /api/doctor/voice-notes] deepgram error:", error);
+      return NextResponse.json(
+        { error: deepgramFailureResponse.error },
+        { status: deepgramFailureResponse.status }
+      );
     }
 
     const geminiFailureResponse = buildGeminiFailureResponse("語音病歷", error);
