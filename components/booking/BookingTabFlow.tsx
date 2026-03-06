@@ -13,6 +13,11 @@ import {
   Loader2,
   UserRound,
 } from 'lucide-react';
+import {
+  buildBookingContactPrefill,
+  normalizePhoneForSearch,
+  normalizePhoneForStorage,
+} from '@/lib/contact-utils';
 import type { BookableDoctorSchedule } from '@/shared/bookable-schedule-data';
 import { type ClinicId, type DoctorId } from '@/shared/clinic-data';
 import type { TimeRange, WeeklySchedule } from '@/shared/schedule-config';
@@ -43,6 +48,11 @@ type BookingFormErrors = Partial<Record<keyof BookingFormValues, string>>;
 
 type BookingTabFlowProps = {
   doctors: BookableDoctorSchedule[];
+  initialContact?: {
+    displayName?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
 };
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
@@ -73,6 +83,24 @@ const INITIAL_FORM_VALUES: BookingFormValues = {
   symptoms: '',
   referralSource: '',
 };
+
+function buildInitialFormValues(
+  initialContact?: BookingTabFlowProps['initialContact']
+): BookingFormValues {
+  if (!initialContact) {
+    return { ...INITIAL_FORM_VALUES };
+  }
+
+  const contactPrefill = buildBookingContactPrefill(initialContact);
+
+  return {
+    ...INITIAL_FORM_VALUES,
+    firstName: contactPrefill.firstName,
+    lastName: contactPrefill.lastName,
+    phone: contactPrefill.phone,
+    email: contactPrefill.email,
+  };
+}
 
 function toIsoDateInHongKong(date: Date): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -198,7 +226,7 @@ function formatScheduleLines(schedule: WeeklySchedule): string[] {
   return lines;
 }
 
-export function BookingTabFlow({ doctors }: BookingTabFlowProps) {
+export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps) {
   const [step, setStep] = useState<BookingStep>('setup');
   const [visitType, setVisitType] = useState<VisitType>('first');
   const [doctorId, setDoctorId] = useState<DoctorId | ''>('');
@@ -214,7 +242,9 @@ export function BookingTabFlow({ doctors }: BookingTabFlowProps) {
   const [bookableDatesLoading, setBookableDatesLoading] = useState(false);
   const [bookableDatesError, setBookableDatesError] = useState('');
 
-  const [formValues, setFormValues] = useState<BookingFormValues>(INITIAL_FORM_VALUES);
+  const [formValues, setFormValues] = useState<BookingFormValues>(() =>
+    buildInitialFormValues(initialContact)
+  );
   const [formErrors, setFormErrors] = useState<BookingFormErrors>({});
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -250,6 +280,9 @@ export function BookingTabFlow({ doctors }: BookingTabFlowProps) {
   const nextMonthKey = shiftMonthKey(calendarMonthKey, 1);
   const canGoToPreviousMonth = monthHasSelectableDate(previousMonthKey, minDate, maxDate);
   const canGoToNextMonth = monthHasSelectableDate(nextMonthKey, minDate, maxDate);
+  const hasAutofilledContact = Boolean(
+    initialContact?.displayName || initialContact?.email || initialContact?.phone
+  );
 
   const calendarMonthLabel = useMemo(
     () => formatMonthLabel(calendarMonthKey),
@@ -497,12 +530,12 @@ export function BookingTabFlow({ doctors }: BookingTabFlowProps) {
       nextErrors.lastName = '請輸入姓氏';
     }
 
-    const normalizedPhone = values.phone.replace(/\s+/g, '');
-    if (!/^[0-9]{8,}$/.test(normalizedPhone)) {
+    const normalizedPhone = normalizePhoneForSearch(values.phone);
+    if (normalizedPhone.length < 8) {
       nextErrors.phone = '請輸入有效電話（至少 8 位數字）';
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim().toLowerCase())) {
       nextErrors.email = '請輸入有效電郵地址';
     }
 
@@ -598,9 +631,9 @@ export function BookingTabFlow({ doctors }: BookingTabFlowProps) {
       date: selectedDate,
       time: selectedTime,
       durationMinutes: SLOT_INTERVAL_MINUTES,
-      patientName: `${formValues.lastName.trim()} ${formValues.firstName.trim()}`,
-      phone: formValues.phone.trim(),
-      email: formValues.email.trim(),
+      patientName: `${formValues.lastName.trim()} ${formValues.firstName.trim()}`.trim(),
+      phone: normalizePhoneForStorage(formValues.phone),
+      email: formValues.email.trim().toLowerCase(),
       notes: buildBookingNotes(formValues),
     };
 
@@ -1010,10 +1043,18 @@ export function BookingTabFlow({ doctors }: BookingTabFlowProps) {
           </div>
 
           <form className="space-y-5" onSubmit={handleSubmit}>
+            {hasAutofilledContact ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-800">
+                已從登入帳戶帶入可用聯絡資料，你可按需要修改。
+              </div>
+            ) : null}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="space-y-1.5">
                 <span className="text-sm font-semibold text-slate-700">名字 *</span>
                 <input
+                  type="text"
+                  autoComplete="given-name"
                   value={formValues.firstName}
                   onChange={(event) => updateFormField('firstName', event.target.value)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
@@ -1025,6 +1066,8 @@ export function BookingTabFlow({ doctors }: BookingTabFlowProps) {
               <label className="space-y-1.5">
                 <span className="text-sm font-semibold text-slate-700">姓氏 *</span>
                 <input
+                  type="text"
+                  autoComplete="family-name"
                   value={formValues.lastName}
                   onChange={(event) => updateFormField('lastName', event.target.value)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
@@ -1037,6 +1080,8 @@ export function BookingTabFlow({ doctors }: BookingTabFlowProps) {
             <label className="space-y-1.5">
               <span className="text-sm font-semibold text-slate-700">電話 *</span>
               <input
+                type="tel"
+                autoComplete="tel"
                 value={formValues.phone}
                 onChange={(event) => updateFormField('phone', event.target.value)}
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
@@ -1048,6 +1093,8 @@ export function BookingTabFlow({ doctors }: BookingTabFlowProps) {
             <label className="space-y-1.5">
               <span className="text-sm font-semibold text-slate-700">電郵 *</span>
               <input
+                type="email"
+                autoComplete="email"
                 value={formValues.email}
                 onChange={(event) => updateFormField('email', event.target.value)}
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"

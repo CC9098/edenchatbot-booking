@@ -9,6 +9,8 @@ import { bookingSchema } from '@/shared/types';
 import { CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
 import { isSlotAvailableUtc } from '@/lib/booking-helpers';
 import { getSafeErrorMessage } from '@/lib/error-sanitizer';
+import { getCurrentUser } from '@/lib/auth-helpers';
+import { syncPatientProfileContact } from '@/lib/profile-contact-sync';
 import {
                 markBookingIntakeCancelledByEvent,
                 markBookingIntakeRescheduledByEvent,
@@ -136,6 +138,7 @@ const rescheduleSchema = z.object({
 
 export async function POST(request: NextRequest) {
                 try {
+                                const user = await getCurrentUser().catch(() => null);
                                 const body = await request.json();
                                 const parsed = bookingSchema.safeParse(body);
                                 if (!parsed.success) {
@@ -218,6 +221,15 @@ export async function POST(request: NextRequest) {
                                 if (!calResult.success || !calResult.eventId) {
                                                 console.error('Calendar creation failed:', calResult.error);
                                                 return NextResponse.json({ error: 'Failed to create booking in calendar' }, { status: 500 });
+                                }
+
+                                const profileSync = await syncPatientProfileContact({
+                                                userId: user?.id,
+                                                displayName: bookingData.patientName,
+                                                phone: bookingData.phone,
+                                });
+                                if (!profileSync.success) {
+                                                console.warn(`booking profile sync warning: ${profileSync.error}`);
                                 }
 
                                 // Send Confirmation Email (Async - fire and forget)
