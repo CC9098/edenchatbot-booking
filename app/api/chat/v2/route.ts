@@ -797,6 +797,26 @@ function hasDoctorAndTimeHints(rawText: string, normalizedText: string): boolean
   return hasExplicitDate || hasTimeHint;
 }
 
+function hasBookingActionIntent(rawText: string, normalizedText: string): boolean {
+  const hasBookingVerb = [
+    '想約',
+    '想預約',
+    '約睇',
+    '約見',
+    'book me',
+  ].some((kw) => normalizedText.includes(normalizeIntentText(kw)));
+
+  if (!hasBookingVerb) return false;
+
+  const hasMedicalTarget =
+    containsNormalizedKeyword(normalizedText, BOOKING_DOCTOR_HINTS)
+    || normalizedText.includes(normalizeIntentText('睇症'))
+    || normalizedText.includes(normalizeIntentText('診所'))
+    || /dr\.?\s*[a-z]/i.test(rawText);
+
+  return hasMedicalTarget;
+}
+
 function shouldIncludeNonBBookingGuidance(latestUserText: string): boolean {
   const normalized = normalizeIntentText(latestUserText);
   if (!normalized) return false;
@@ -957,7 +977,8 @@ function hasRecentUserBookingIntent(messages: ChatMessagePayload[]): boolean {
 
   return recentUserMessages.some((msg) => {
     const normalized = normalizeIntentText(msg.content);
-    return containsNormalizedKeyword(normalized, BOOKING_KEYWORDS);
+    return containsNormalizedKeyword(normalized, BOOKING_KEYWORDS)
+      || hasBookingActionIntent(msg.content, normalized);
   });
 }
 
@@ -975,7 +996,8 @@ function resolveModeByRules(messages: ChatMessagePayload[]): ModeRuleResolution 
     latestLength: normalizedLatest.length,
     hasLatestBookingKeyword:
       containsNormalizedKeyword(normalizedLatest, BOOKING_KEYWORDS)
-      || hasDoctorAndTimeHints(latestMessage, normalizedLatest),
+      || hasDoctorAndTimeHints(latestMessage, normalizedLatest)
+      || hasBookingActionIntent(latestMessage, normalizedLatest),
     hasRecentBookingIntent,
     explicitCancel: containsNormalizedKeyword(normalizedLatest, CANCEL_KEYWORDS),
     hasLatestG2Keyword: containsNormalizedKeyword(normalizedLatest, G2_KEYWORDS),
