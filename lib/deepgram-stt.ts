@@ -23,6 +23,13 @@ interface DeepgramTranscriptionResult {
   requestId: string | null;
 }
 
+interface DeepgramGrantTokenResponse {
+  access_token?: string;
+  expires_in?: number | null;
+  err_code?: string;
+  err_msg?: string;
+}
+
 interface DeepgramAlternative {
   transcript?: string;
 }
@@ -83,6 +90,49 @@ export function buildDeepgramListenUrl(baseUrl = getDeepgramApiBaseUrl()): strin
   });
 
   return `${baseUrl}/v1/listen?${params.toString()}`;
+}
+
+export function buildDeepgramLiveListenWebSocketUrl({
+  sampleRate,
+  channels = 1,
+  baseUrl = getDeepgramApiBaseUrl(),
+  endpointingMs = 800,
+  utteranceEndMs = 1000,
+  interimResults = true,
+  smartFormat = true,
+  punctuate = true,
+  tag,
+}: {
+  sampleRate: number;
+  channels?: number;
+  baseUrl?: string;
+  endpointingMs?: number;
+  utteranceEndMs?: number;
+  interimResults?: boolean;
+  smartFormat?: boolean;
+  punctuate?: boolean;
+  tag?: string;
+}): string {
+  const url = new URL(baseUrl);
+  url.protocol = url.protocol === "http:" ? "ws:" : "wss:";
+  url.pathname = `${url.pathname.replace(/\/$/, "")}/v1/listen`;
+
+  url.searchParams.set("model", getDeepgramDoctorVoiceModel());
+  url.searchParams.set("language", getDeepgramDoctorVoiceLanguage());
+  url.searchParams.set("encoding", "linear16");
+  url.searchParams.set("sample_rate", String(Math.max(8_000, Math.round(sampleRate))));
+  url.searchParams.set("channels", String(Math.max(1, Math.round(channels))));
+  url.searchParams.set("interim_results", interimResults ? "true" : "false");
+  url.searchParams.set("endpointing", String(Math.max(0, Math.round(endpointingMs))));
+  url.searchParams.set("utterance_end_ms", String(Math.max(0, Math.round(utteranceEndMs))));
+  url.searchParams.set("smart_format", smartFormat ? "true" : "false");
+  url.searchParams.set("punctuate", punctuate ? "true" : "false");
+
+  if (tag) {
+    url.searchParams.set("tag", tag);
+  }
+
+  return url.toString();
 }
 
 export function getDeepgramErrorStatus(error: unknown): number | null {
@@ -216,6 +266,57 @@ export async function transcribeAudioWithDeepgram({
         model: getDeepgramDoctorVoiceModel(),
         language: getDeepgramDoctorVoiceLanguage(),
         requestId: payload.metadata?.request_id || null,
+      };
+    },
+  });
+}
+
+export async function grantDeepgramTemporaryToken({
+  apiKey,
+  ttlSeconds = 60,
+  fetchFn = fetch,
+  baseUrl = getDeepgramApiBaseUrl(),
+}: {
+  apiKey: string;
+  ttlSeconds?: number;
+  fetchFn?: typeof fetch;
+  baseUrl?: string;
+}): Promise<{
+  accessToken: string;
+  expiresIn: number | null;
+}> {
+  return retryDeepgramRequest({
+    operationLabel: "deepgram-temporary-token",
+    maxRetries: 1,
+    task: async () => {
+      const response = await fetchFn(`${baseUrl.replace(/\/$/, "")}/v1/auth/grant`, {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ttl_seconds: Math.min(3600, Math.max(1, Math.round(ttlSeconds))),
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as DeepgramGrantTokenResponse;
+      if (!response.ok) {
+        const errorMessage =
+          payload.err_msg ||
+          payload.err_code ||
+          `Deepgram token grant failed with status ${response.status}`;
+        throw new DeepgramApiError(errorMessage, response.status);
+      }
+
+      const accessToken = typeof payload.access_token === "string" ? payload.access_token.trim() : "";
+      if (!accessToken) {
+        throw new DeepgramApiError("Deepgram temporary token is empty", 502);
+      }
+
+      return {
+        accessToken,
+        expiresIn: typeof payload.expires_in === "number" ? payload.expires_in : null,
       };
     },
   });

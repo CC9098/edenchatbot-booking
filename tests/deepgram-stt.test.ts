@@ -2,8 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildDeepgramLiveListenWebSocketUrl,
   DeepgramApiError,
   extractDeepgramTranscript,
+  grantDeepgramTemporaryToken,
   getDeepgramErrorStatus,
   isRetryableDeepgramError,
   resolveDoctorVoiceSttProvider,
@@ -28,6 +30,21 @@ test("extractDeepgramTranscript joins first transcript from each channel", () =>
   });
 
   assert.equal(transcript, "第一段廣東話\n\n第二段廣東話");
+});
+
+test("buildDeepgramLiveListenWebSocketUrl switches to websockets and includes linear16 params", () => {
+  const listenUrl = buildDeepgramLiveListenWebSocketUrl({
+    sampleRate: 48_000,
+    baseUrl: "https://api.deepgram.com",
+    tag: "doctor-live",
+  });
+
+  const parsed = new URL(listenUrl);
+  assert.equal(parsed.protocol, "wss:");
+  assert.equal(parsed.pathname, "/v1/listen");
+  assert.equal(parsed.searchParams.get("encoding"), "linear16");
+  assert.equal(parsed.searchParams.get("sample_rate"), "48000");
+  assert.equal(parsed.searchParams.get("tag"), "doctor-live");
 });
 
 test("getDeepgramErrorStatus reads status from typed errors", () => {
@@ -76,4 +93,32 @@ test("retryDeepgramRequest stops on non-retryable errors", async () => {
   );
 
   assert.equal(attempts, 1);
+});
+
+test("grantDeepgramTemporaryToken returns access token payload", async () => {
+  const token = await grantDeepgramTemporaryToken({
+    apiKey: "secret",
+    ttlSeconds: 45,
+    baseUrl: "https://api.deepgram.com",
+    fetchFn: async (input, init) => {
+      assert.equal(input, "https://api.deepgram.com/v1/auth/grant");
+      assert.equal(init?.method, "POST");
+      assert.equal(init?.headers && (init.headers as Record<string, string>).Authorization, "Token secret");
+      assert.equal(init?.body, JSON.stringify({ ttl_seconds: 45 }));
+
+      return new Response(
+        JSON.stringify({
+          access_token: "temporary-token",
+          expires_in: 45,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    },
+  });
+
+  assert.equal(token.accessToken, "temporary-token");
+  assert.equal(token.expiresIn, 45);
 });
