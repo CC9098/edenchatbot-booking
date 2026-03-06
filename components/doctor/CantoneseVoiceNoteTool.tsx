@@ -6,6 +6,10 @@ import { useEffect, useRef, useState } from "react";
 const MAX_AUDIO_FILE_BYTES = 15 * 1024 * 1024;
 const CHUNK_TIMESLICE_MS = 30_000;
 const DRAFT_SUMMARY_INTERVAL_SECONDS = 5 * 60;
+const TRANSCRIBE_REQUEST_TIMEOUT_MS = 90_000;
+const ANALYZE_REQUEST_TIMEOUT_MS = 150_000;
+const MAX_VOICE_NOTE_REQUEST_RETRIES = 2;
+const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 type CopyTarget = "transcript" | "record";
 
@@ -55,6 +59,82 @@ interface VoiceNoteResponse {
 interface SaveToRecordResponse {
   symptom?: { id?: string };
   error?: string;
+}
+
+interface VoiceNoteRequestOptions {
+  buildFormData: () => FormData;
+  operationLabel: string;
+  timeoutMs: number;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+async function submitVoiceNoteRequest({
+  buildFormData,
+  operationLabel,
+  timeoutMs,
+}: VoiceNoteRequestOptions): Promise<VoiceNoteResponse> {
+  let lastRetryableError: Error | null = null;
+
+  for (let attempt = 0; attempt <= MAX_VOICE_NOTE_REQUEST_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutHandle = window.setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch("/api/doctor/voice-notes", {
+        method: "POST",
+        body: buildFormData(),
+        signal: controller.signal,
+      });
+      const data = (await response.json().catch(() => ({}))) as VoiceNoteResponse;
+
+      if (!response.ok) {
+        const requestError = new Error(data.error || `HTTP ${response.status}`);
+        if (RETRYABLE_STATUS_CODES.has(response.status)) {
+          lastRetryableError = requestError;
+          if (attempt < MAX_VOICE_NOTE_REQUEST_RETRIES) {
+            await sleep(600 * (attempt + 1));
+            continue;
+          }
+          break;
+        }
+
+        throw requestError;
+      }
+
+      return data;
+    } catch (requestError) {
+      if (isAbortError(requestError) || requestError instanceof TypeError) {
+        lastRetryableError =
+          requestError instanceof Error ? requestError : new Error(String(requestError));
+        if (attempt < MAX_VOICE_NOTE_REQUEST_RETRIES) {
+          await sleep(600 * (attempt + 1));
+          continue;
+        }
+        break;
+      }
+
+      throw requestError instanceof Error
+        ? requestError
+        : new Error(`${operationLabel}失敗，請重試。`);
+    } finally {
+      window.clearTimeout(timeoutHandle);
+    }
+  }
+
+  if (isAbortError(lastRetryableError)) {
+    throw new Error(`${operationLabel}逾時，請重試。`);
+  }
+
+  throw new Error(
+    `${operationLabel}失敗，已自動重試 ${MAX_VOICE_NOTE_REQUEST_RETRIES} 次仍未成功。`
+  );
 }
 
 export interface VoiceNotePatient {
@@ -206,41 +286,33 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     const extension = fileExtensionForMime(mimeType);
     const fileName = `doctor-note-chunk-${Date.now()}.${extension}`;
     const audioFile = new File([blob], fileName, { type: mimeType });
-    const formData = new FormData();
-    formData.append("mode", "transcribe-audio");
-    formData.append("audio", audioFile);
-    buildPatientFormData(formData, patient);
-
-    const response = await fetch("/api/doctor/voice-notes", {
-      method: "POST",
-      body: formData,
+    const data = await submitVoiceNoteRequest({
+      operationLabel: "分段轉錄",
+      timeoutMs: TRANSCRIBE_REQUEST_TIMEOUT_MS,
+      buildFormData: () => {
+        const formData = new FormData();
+        formData.append("mode", "transcribe-audio");
+        formData.append("audio", audioFile);
+        buildPatientFormData(formData, patient);
+        return formData;
+      },
     });
-    const data = (await response.json().catch(() => ({}))) as VoiceNoteResponse;
-
-    if (!response.ok) {
-      throw new Error(data.error || `HTTP ${response.status}`);
-    }
 
     return data.transcript || "";
   }
 
   async function analyzeTranscript(transcriptText: string, patient: VoiceNotePatient | null) {
-    const formData = new FormData();
-    formData.append("mode", "extract-transcript");
-    formData.append("transcript", transcriptText);
-    buildPatientFormData(formData, patient);
-
-    const response = await fetch("/api/doctor/voice-notes", {
-      method: "POST",
-      body: formData,
+    return submitVoiceNoteRequest({
+      operationLabel: "病歷整理",
+      timeoutMs: ANALYZE_REQUEST_TIMEOUT_MS,
+      buildFormData: () => {
+        const formData = new FormData();
+        formData.append("mode", "extract-transcript");
+        formData.append("transcript", transcriptText);
+        buildPatientFormData(formData, patient);
+        return formData;
+      },
     });
-    const data = (await response.json().catch(() => ({}))) as VoiceNoteResponse;
-
-    if (!response.ok) {
-      throw new Error(data.error || `HTTP ${response.status}`);
-    }
-
-    return data;
   }
 
   async function maybeGenerateDraftSummary(
@@ -494,7 +566,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
         <div>
           <h2 className="text-base font-semibold text-gray-900">語音病歷工具（廣東話）</h2>
           <p className="mt-1 text-sm text-gray-600">
-            已升級為長錄音模式：每 30 秒自動分段轉錄，並於每 5 分鐘更新一次暫時病歷摘要；停止錄音後，長逐字稿會分段整理再合併。
+            已升級為長錄音模式：每 30 秒自動分段轉錄，分段失敗會自動重試，並於每 5 分鐘更新一次暫時病歷摘要；停止錄音後，長逐字稿會分段整理再合併。
           </p>
           <p className="mt-1 text-xs text-gray-500">
             錄音綁定病人：{displayedPatient?.displayName || "未選擇（可直接錄音）"}
