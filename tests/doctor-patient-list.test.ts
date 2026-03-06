@@ -59,6 +59,28 @@ test("buildVisiblePatientIds includes non-staff profiles without care activity",
   assert.deepEqual(patientIds, ["patient-a", "patient-b", "staff-self"]);
 });
 
+test("buildVisiblePatientIds can include all active staff when requested", () => {
+  const patientIds = buildVisiblePatientIds({
+    activeStaffUserIds: ["staff-self", "staff-other", "staff-third"],
+    currentStaffUserId: "staff-self",
+    includeOtherStaff: true,
+    profileIds: ["patient-a", "staff-other"],
+    patientCareTeamIds: [],
+    patientCareProfileIds: [],
+    bookingUserIds: [],
+    symptomPatientIds: [],
+    followUpPatientIds: [],
+    instructionPatientIds: [],
+  });
+
+  assert.deepEqual(patientIds, [
+    "patient-a",
+    "staff-other",
+    "staff-self",
+    "staff-third",
+  ]);
+});
+
 test("prioritizeSelfPatient moves self to the front without duplication", () => {
   const prioritized = prioritizeSelfPatient(
     ["patient-a", "staff-self", "patient-b"],

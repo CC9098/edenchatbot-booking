@@ -77,6 +77,7 @@ async function fetchAllVisiblePatientIds(
   supabase: ReturnType<typeof createServiceClient>,
   scanLimit: number,
   currentStaffUserId?: string,
+  includeOtherStaff = false,
 ): Promise<string[]> {
   const [
     { data: activeStaffRows, error: activeStaffError },
@@ -128,6 +129,7 @@ async function fetchAllVisiblePatientIds(
   return buildVisiblePatientIds({
     activeStaffUserIds: (activeStaffRows || []).map((row) => row.user_id),
     currentStaffUserId,
+    includeOtherStaff,
     profileIds: (profileRows || []).map((row) => row.id),
     patientCareTeamIds: (careTeamRows as Array<Record<string, unknown>> | null)?.map(
       (row) => row.patient_user_id as string | null | undefined,
@@ -343,6 +345,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const q = (searchParams.get("q") || "").trim();
+    const includeStaff = ["1", "true", "yes", "all"].includes(
+      (searchParams.get("includeStaff") || "").trim().toLowerCase(),
+    );
     const queryText = q.toLowerCase();
     const queryDigits = normalizePhoneForSearch(q);
     const isSearching = q.length > 0;
@@ -355,6 +360,7 @@ export async function GET(request: NextRequest) {
       supabase,
       isSearching ? MAX_SEARCH_PATIENT_SCAN : PATIENT_SOURCE_SCAN_LIMIT,
       user.id,
+      includeStaff,
     );
 
     if (visiblePatientIds.length === 0) {
@@ -390,6 +396,19 @@ export async function GET(request: NextRequest) {
     }
 
     const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+    const { data: visibleStaffRoles, error: visibleStaffRolesError } = await supabase
+      .from("staff_roles")
+      .select("user_id, role")
+      .in("user_id", patientIdsToInspect)
+      .eq("is_active", true);
+
+    if (visibleStaffRolesError) {
+      console.error("[GET /api/doctor/patients] staff_roles query error:", visibleStaffRolesError.message);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+
+    const staffRoleMap = new Map((visibleStaffRoles || []).map((row) => [row.user_id, row.role]));
 
     // Pull latest intake contact snapshot for fallback display/search.
     const { data: bookingContacts, error: bookingContactsError } = await supabase
@@ -474,6 +493,8 @@ export async function GET(request: NextRequest) {
       phone: profileMap.get(id)?.phone || bookingContactMap.get(id)?.phone || null,
       constitution: careMap.get(id)?.constitution || "unknown",
       nextFollowUpDate: followUpMap.get(id) || null,
+      entryType: staffRoleMap.has(id) ? "staff" : "patient",
+      staffRole: staffRoleMap.get(id) || null,
       isSelf: id === user.id,
     }));
 

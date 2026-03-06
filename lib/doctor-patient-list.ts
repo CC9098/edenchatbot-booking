@@ -3,6 +3,7 @@ type NullableId = string | null | undefined;
 type VisiblePatientIdOptions = {
   activeStaffUserIds: NullableId[];
   currentStaffUserId?: NullableId;
+  includeOtherStaff?: boolean;
   profileIds?: NullableId[];
   patientCareTeamIds?: NullableId[];
   patientCareProfileIds?: NullableId[];
@@ -21,10 +22,11 @@ function appendVisibleIds(
   ids: NullableId[] | undefined,
   activeStaffIds: Set<string>,
   currentStaffUserId: string | null,
+  includeOtherStaff: boolean,
 ) {
   for (const id of ids || []) {
     if (!isNonEmptyId(id)) continue;
-    if (activeStaffIds.has(id) && id !== currentStaffUserId) continue;
+    if (!includeOtherStaff && activeStaffIds.has(id) && id !== currentStaffUserId) continue;
     target.add(id);
   }
 }
@@ -32,6 +34,7 @@ function appendVisibleIds(
 export function buildVisiblePatientIds({
   activeStaffUserIds,
   currentStaffUserId,
+  includeOtherStaff = false,
   profileIds,
   patientCareTeamIds,
   patientCareProfileIds,
@@ -46,15 +49,19 @@ export function buildVisiblePatientIds({
   const activeStaffIds = new Set(activeStaffUserIds.filter(isNonEmptyId));
   const patientIds = new Set<string>();
 
-  appendVisibleIds(patientIds, profileIds, activeStaffIds, normalizedCurrentStaffUserId);
-  appendVisibleIds(patientIds, patientCareTeamIds, activeStaffIds, normalizedCurrentStaffUserId);
-  appendVisibleIds(patientIds, patientCareProfileIds, activeStaffIds, normalizedCurrentStaffUserId);
-  appendVisibleIds(patientIds, bookingUserIds, activeStaffIds, normalizedCurrentStaffUserId);
-  appendVisibleIds(patientIds, symptomPatientIds, activeStaffIds, normalizedCurrentStaffUserId);
-  appendVisibleIds(patientIds, followUpPatientIds, activeStaffIds, normalizedCurrentStaffUserId);
-  appendVisibleIds(patientIds, instructionPatientIds, activeStaffIds, normalizedCurrentStaffUserId);
+  appendVisibleIds(patientIds, profileIds, activeStaffIds, normalizedCurrentStaffUserId, includeOtherStaff);
+  appendVisibleIds(patientIds, patientCareTeamIds, activeStaffIds, normalizedCurrentStaffUserId, includeOtherStaff);
+  appendVisibleIds(patientIds, patientCareProfileIds, activeStaffIds, normalizedCurrentStaffUserId, includeOtherStaff);
+  appendVisibleIds(patientIds, bookingUserIds, activeStaffIds, normalizedCurrentStaffUserId, includeOtherStaff);
+  appendVisibleIds(patientIds, symptomPatientIds, activeStaffIds, normalizedCurrentStaffUserId, includeOtherStaff);
+  appendVisibleIds(patientIds, followUpPatientIds, activeStaffIds, normalizedCurrentStaffUserId, includeOtherStaff);
+  appendVisibleIds(patientIds, instructionPatientIds, activeStaffIds, normalizedCurrentStaffUserId, includeOtherStaff);
 
-  if (normalizedCurrentStaffUserId && activeStaffIds.has(normalizedCurrentStaffUserId)) {
+  if (includeOtherStaff) {
+    for (const staffId of activeStaffIds) {
+      patientIds.add(staffId);
+    }
+  } else if (normalizedCurrentStaffUserId && activeStaffIds.has(normalizedCurrentStaffUserId)) {
     patientIds.add(normalizedCurrentStaffUserId);
   }
 

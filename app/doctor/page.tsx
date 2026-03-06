@@ -10,6 +10,8 @@ interface PatientItem {
   phone: string | null;
   constitution: string;
   nextFollowUpDate: string | null;
+  entryType: "patient" | "staff";
+  staffRole: string | null;
   isSelf: boolean;
 }
 
@@ -28,6 +30,12 @@ const CONSTITUTION_COLORS: Record<string, string> = {
   hoarding: "bg-purple-100 text-purple-800",
   mixed: "bg-orange-100 text-orange-800",
   unknown: "bg-gray-100 text-gray-600",
+};
+
+const STAFF_ROLE_LABELS: Record<string, string> = {
+  doctor: "醫師",
+  assistant: "姑娘",
+  admin: "管理員",
 };
 
 /* ---------- Component ---------- */
@@ -59,6 +67,7 @@ export default function DoctorPatientsPage() {
       const params = new URLSearchParams();
       if (q) params.set("q", q);
       params.set("limit", "50");
+      params.set("includeStaff", "true");
 
       const res = await fetch(`/api/doctor/patients?${params.toString()}`);
       if (!res.ok) {
@@ -136,14 +145,22 @@ export default function DoctorPatientsPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
 
+  function getIdentityLabel(item: PatientItem): string {
+    if (item.entryType === "staff") {
+      return STAFF_ROLE_LABELS[item.staffRole || ""] || "員工";
+    }
+
+    return "病人";
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">病人列表</h1>
+          <h1 className="text-xl font-bold text-gray-900">所有人名單</h1>
           <p className="mt-1 text-sm text-gray-500">
-            管理您的病人護理記錄{!loading && !error ? `（共 ${patients.length} 位）` : ""}
+            查看所有病人、醫師及姑娘{!loading && !error ? `（共 ${patients.length} 位）` : ""}
           </p>
         </div>
         <button
@@ -178,7 +195,7 @@ export default function DoctorPatientsPage() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="搜尋病人姓名或電話..."
+          placeholder="搜尋姓名或電話..."
           className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </div>
@@ -296,9 +313,9 @@ export default function DoctorPatientsPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
             </svg>
           </div>
-          <p className="text-sm font-medium text-gray-900">暫無病人記錄</p>
+          <p className="text-sm font-medium text-gray-900">暫無名單記錄</p>
           <p className="mt-1 text-xs text-gray-500">
-            {query ? "找不到符合的病人" : "目前沒有分配的病人"}
+            {query ? "找不到符合的人員或病人" : "目前沒有可顯示的人員或病人"}
           </p>
         </div>
       ) : (
@@ -310,17 +327,21 @@ export default function DoctorPatientsPage() {
                 <tr className="border-b border-gray-100 bg-gray-50/50">
                   <th className="px-4 py-3 text-left font-medium text-gray-500">姓名</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-500">電話</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-500">身份</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-500">體質分型</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-500">下次覆診</th>
                   <th className="px-4 py-3 text-right font-medium text-gray-500"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {patients.map((p) => (
+                {patients.map((p) => {
+                  const canOpenPatientRecord = p.entryType === "patient";
+
+                  return (
                   <tr
                     key={p.patientUserId}
-                    onClick={() => router.push(`/doctor/patients/${p.patientUserId}`)}
-                    className="cursor-pointer transition-colors hover:bg-primary/[0.03]"
+                    onClick={canOpenPatientRecord ? () => router.push(`/doctor/patients/${p.patientUserId}`) : undefined}
+                    className={canOpenPatientRecord ? "cursor-pointer transition-colors hover:bg-primary/[0.03]" : "transition-colors"}
                   >
                     <td className="px-4 py-3 font-medium text-gray-900">
                       <div className="flex items-center gap-2">
@@ -336,64 +357,101 @@ export default function DoctorPatientsPage() {
                       {p.phone || "--"}
                     </td>
                     <td className="px-4 py-3">
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        p.entryType === "staff"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-slate-100 text-slate-700"
+                      }`}>
+                        {getIdentityLabel(p)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          CONSTITUTION_COLORS[p.constitution] || CONSTITUTION_COLORS.unknown
+                          p.entryType === "patient"
+                            ? CONSTITUTION_COLORS[p.constitution] || CONSTITUTION_COLORS.unknown
+                            : "bg-gray-100 text-gray-500"
                         }`}
                       >
-                        {CONSTITUTION_LABELS[p.constitution] || "未評估"}
+                        {p.entryType === "patient" ? CONSTITUTION_LABELS[p.constitution] || "未評估" : "--"}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-600">
-                      {formatDate(p.nextFollowUpDate)}
+                      {p.entryType === "patient" ? formatDate(p.nextFollowUpDate) : "--"}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <svg className="ml-auto h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                      </svg>
+                      {canOpenPatientRecord ? (
+                        <svg className="ml-auto h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                      ) : (
+                        <span className="text-xs text-gray-400">名單顯示</span>
+                      )}
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
 
           {/* Mobile cards */}
           <div className="space-y-2 sm:hidden">
-            {patients.map((p) => (
+            {patients.map((p) => {
+              const canOpenPatientRecord = p.entryType === "patient";
+
+              return (
               <button
                 key={p.patientUserId}
+                type="button"
+                disabled={!canOpenPatientRecord}
                 onClick={() => router.push(`/doctor/patients/${p.patientUserId}`)}
-                className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3.5 text-left transition-colors hover:bg-gray-50"
+                className={`flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3.5 text-left transition-colors ${
+                  canOpenPatientRecord ? "hover:bg-gray-50" : "opacity-100"
+                }`}
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-gray-900 truncate">
                     {p.displayName || "未設定姓名"}
                   </p>
-                  {p.isSelf ? (
-                    <p className="mt-1 text-xs font-medium text-primary">本人</p>
-                  ) : null}
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                      p.entryType === "staff"
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-slate-100 text-slate-700"
+                    }`}>
+                      {getIdentityLabel(p)}
+                    </span>
+                    {p.isSelf ? (
+                      <span className="text-xs font-medium text-primary">本人</span>
+                    ) : null}
+                  </div>
                   <p className="mt-0.5 text-xs text-gray-600">
                     電話: {p.phone || "--"}
                   </p>
                   <div className="mt-1 flex items-center gap-2">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                        CONSTITUTION_COLORS[p.constitution] || CONSTITUTION_COLORS.unknown
+                        p.entryType === "patient"
+                          ? CONSTITUTION_COLORS[p.constitution] || CONSTITUTION_COLORS.unknown
+                          : "bg-gray-100 text-gray-500"
                       }`}
                     >
-                      {CONSTITUTION_LABELS[p.constitution] || "未評估"}
+                      {p.entryType === "patient" ? CONSTITUTION_LABELS[p.constitution] || "未評估" : "--"}
                     </span>
                     <span className="text-xs text-gray-500">
-                      覆診: {formatDate(p.nextFollowUpDate)}
+                      覆診: {p.entryType === "patient" ? formatDate(p.nextFollowUpDate) : "--"}
                     </span>
                   </div>
                 </div>
-                <svg className="ml-2 h-4 w-4 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                </svg>
+                {canOpenPatientRecord ? (
+                  <svg className="ml-2 h-4 w-4 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                ) : (
+                  <span className="ml-2 shrink-0 text-xs text-gray-400">名單顯示</span>
+                )}
               </button>
-            ))}
+            )})}
           </div>
         </>
       )}
