@@ -7,6 +7,7 @@ import {
   getDeepgramDoctorVoiceLanguage,
   getDeepgramDoctorVoiceModel,
   getDeepgramErrorStatus,
+  getDeepgramLiveApiKey,
   grantDeepgramTemporaryToken,
   isRetryableDeepgramError,
 } from "@/lib/deepgram-stt";
@@ -20,6 +21,21 @@ function buildDeepgramFailureResponse(error: unknown) {
     return {
       status: 429,
       error: "即時語音轉錄服務繁忙，請稍後再試。",
+    };
+  }
+
+  if (status === 401) {
+    return {
+      status: 401,
+      error: "Deepgram live key 無效，請檢查 DEEPGRAM_LIVE_API_KEY 或 DEEPGRAM_API_KEY。",
+    };
+  }
+
+  if (status === 403) {
+    return {
+      status: 403,
+      error:
+        "Deepgram live key 未獲 temporary token 權限。請改用具 Member 權限的 key，或另設 DEEPGRAM_LIVE_API_KEY。",
     };
   }
 
@@ -49,9 +65,12 @@ export async function POST() {
 
     await requireStaffRole(user.id);
 
-    const apiKey = process.env.DEEPGRAM_API_KEY;
+    const apiKey = getDeepgramLiveApiKey();
     if (!apiKey) {
-      return NextResponse.json({ error: "DEEPGRAM_API_KEY is not configured" }, { status: 500 });
+      return NextResponse.json(
+        { error: "DEEPGRAM_LIVE_API_KEY / DEEPGRAM_API_KEY is not configured" },
+        { status: 500 }
+      );
     }
 
     const token = await grantDeepgramTemporaryToken({

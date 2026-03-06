@@ -6,6 +6,7 @@ import {
   DeepgramApiError,
   extractDeepgramTranscript,
   grantDeepgramTemporaryToken,
+  getDeepgramLiveApiKey,
   getDeepgramErrorStatus,
   isRetryableDeepgramError,
   resolveDoctorVoiceSttProvider,
@@ -17,6 +18,32 @@ test("resolveDoctorVoiceSttProvider prefers explicit provider over auto-detectio
   assert.equal(resolveDoctorVoiceSttProvider("gemini", true), "gemini");
   assert.equal(resolveDoctorVoiceSttProvider(undefined, true), "deepgram");
   assert.equal(resolveDoctorVoiceSttProvider(undefined, false), "gemini");
+});
+
+test("getDeepgramLiveApiKey prefers live key over general key", () => {
+  const originalLiveKey = process.env.DEEPGRAM_LIVE_API_KEY;
+  const originalGeneralKey = process.env.DEEPGRAM_API_KEY;
+
+  try {
+    process.env.DEEPGRAM_LIVE_API_KEY = "live-key";
+    process.env.DEEPGRAM_API_KEY = "general-key";
+    assert.equal(getDeepgramLiveApiKey(), "live-key");
+
+    delete process.env.DEEPGRAM_LIVE_API_KEY;
+    assert.equal(getDeepgramLiveApiKey(), "general-key");
+  } finally {
+    if (originalLiveKey === undefined) {
+      delete process.env.DEEPGRAM_LIVE_API_KEY;
+    } else {
+      process.env.DEEPGRAM_LIVE_API_KEY = originalLiveKey;
+    }
+
+    if (originalGeneralKey === undefined) {
+      delete process.env.DEEPGRAM_API_KEY;
+    } else {
+      process.env.DEEPGRAM_API_KEY = originalGeneralKey;
+    }
+  }
 });
 
 test("extractDeepgramTranscript joins first transcript from each channel", () => {

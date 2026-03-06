@@ -82,6 +82,10 @@ export function getDeepgramApiBaseUrl(): string {
   return (process.env.DEEPGRAM_API_BASE_URL || "https://api.deepgram.com").replace(/\/$/, "");
 }
 
+export function getDeepgramLiveApiKey(): string {
+  return process.env.DEEPGRAM_LIVE_API_KEY || process.env.DEEPGRAM_API_KEY || "";
+}
+
 export function buildDeepgramListenUrl(baseUrl = getDeepgramApiBaseUrl()): string {
   const params = new URLSearchParams({
     model: getDeepgramDoctorVoiceModel(),

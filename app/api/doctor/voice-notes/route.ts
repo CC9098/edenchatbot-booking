@@ -125,6 +125,20 @@ function buildDeepgramFailureResponse(operationLabel: string, error: unknown) {
     };
   }
 
+  if (status === 401) {
+    return {
+      status: 401,
+      error: "Deepgram API key 無效，請檢查 DEEPGRAM_API_KEY。",
+    };
+  }
+
+  if (status === 403) {
+    return {
+      status: 403,
+      error: "Deepgram API key 權限不足，請檢查 key scope 或改用具備所需權限的 key。",
+    };
+  }
+
   if (isRetryableDeepgramError(error)) {
     return {
       status: 503,
