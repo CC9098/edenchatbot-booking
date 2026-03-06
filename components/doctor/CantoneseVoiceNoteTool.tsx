@@ -85,6 +85,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
   const failedChunkCountRef = useRef(0);
   const durationSecondsRef = useRef(0);
   const nextDraftDueSecondsRef = useRef(DRAFT_SUMMARY_INTERVAL_SECONDS);
+  const draftSummaryInFlightRef = useRef(false);
 
   const [isSupported, setIsSupported] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -155,6 +156,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     failedChunkCountRef.current = 0;
     durationSecondsRef.current = 0;
     nextDraftDueSecondsRef.current = DRAFT_SUMMARY_INTERVAL_SECONDS;
+    draftSummaryInFlightRef.current = false;
     setTranscribedChunkCount(0);
     setFailedChunkCount(0);
     setDraftSummaryMinuteMark(null);
@@ -250,15 +252,18 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     if (mediaRecorderRef.current?.state !== "recording") return;
     if (elapsedSeconds < nextDraftDueSecondsRef.current) return;
     if (combinedTranscript.trim().length < 20) return;
+    if (draftSummaryInFlightRef.current) return;
 
     const dueSeconds = nextDraftDueSecondsRef.current;
     nextDraftDueSecondsRef.current += DRAFT_SUMMARY_INTERVAL_SECONDS;
     const minuteMark = Math.floor(dueSeconds / 60);
+    draftSummaryInFlightRef.current = true;
     setProcessingStatus(`已錄音 ${minuteMark} 分鐘，正在更新暫時病歷摘要...`);
 
     try {
       const analysis = await analyzeTranscript(combinedTranscript, patient);
       if (sessionIdRef.current !== sessionId) return;
+      if (mediaRecorderRef.current?.state !== "recording") return;
       if (analysis.recordText) {
         setDraftRecordText(analysis.recordText);
         setDraftSummaryMinuteMark(minuteMark);
@@ -266,8 +271,13 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
       }
     } catch (draftError) {
       if (sessionIdRef.current !== sessionId) return;
+      if (mediaRecorderRef.current?.state !== "recording") return;
       setError(draftError instanceof Error ? draftError.message : "暫時病歷摘要更新失敗");
       setProcessingStatus("逐字稿仍會繼續更新，暫時摘要將於下一個時間點再試。");
+    } finally {
+      if (sessionIdRef.current === sessionId) {
+        draftSummaryInFlightRef.current = false;
+      }
     }
   }
 
@@ -301,7 +311,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
           durationSecondsRef.current,
           Math.floor((chunkNumber * CHUNK_TIMESLICE_MS) / 1000)
         );
-        await maybeGenerateDraftSummary(sessionId, combinedTranscript, elapsedSeconds, patientAtStart);
+        void maybeGenerateDraftSummary(sessionId, combinedTranscript, elapsedSeconds, patientAtStart);
       } catch (chunkError) {
         if (sessionIdRef.current !== sessionId) return;
         failedChunkCountRef.current += 1;
@@ -484,7 +494,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
         <div>
           <h2 className="text-base font-semibold text-gray-900">語音病歷工具（廣東話）</h2>
           <p className="mt-1 text-sm text-gray-600">
-            已升級為長錄音模式：每 30 秒自動分段轉錄，並於每 5 分鐘更新一次暫時病歷摘要。
+            已升級為長錄音模式：每 30 秒自動分段轉錄，並於每 5 分鐘更新一次暫時病歷摘要；停止錄音後，長逐字稿會分段整理再合併。
           </p>
           <p className="mt-1 text-xs text-gray-500">
             錄音綁定病人：{displayedPatient?.displayName || "未選擇（可直接錄音）"}

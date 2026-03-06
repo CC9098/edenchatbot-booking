@@ -2,11 +2,22 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
 import { AuthError, getCurrentUser, requireStaffRole } from "@/lib/auth-helpers";
+import {
+  buildPatientHeader,
+  buildRecordText,
+  mergeSymptomExtractions,
+  normalizeSymptomExtraction,
+  splitTranscriptIntoSegments,
+  type PatientContext,
+  type SymptomExtraction,
+} from "@/lib/doctor-voice-note";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 180;
 
 const MAX_AUDIO_FILE_BYTES = 15 * 1024 * 1024;
+const MAX_TRANSCRIPT_CHARS = 250_000;
+const EXTRACTION_SEGMENT_MAX_CHARS = 12_000;
 
 const TRANSCRIPTION_PROMPT = [
   "你是中醫門診的語音轉錄助手。",
@@ -38,22 +49,6 @@ const EXTRACTION_PROMPT = [
   "3) 請去除寒暄、與症狀無關內容。",
   "4) 只取症狀、病程、加重/緩解因素、否認症狀。",
 ].join("\n");
-
-interface SymptomExtraction {
-  chiefComplaint: string;
-  presentIllnessSummary: string;
-  associatedSymptoms: string[];
-  negativeSymptoms: string[];
-  durationAndCourse: string;
-  otherRecordableFindings: string[];
-  verificationItems: string[];
-}
-
-interface PatientContext {
-  patientUserId: string;
-  patientDisplayName: string;
-  patientPhone: string;
-}
 
 type VoiceNoteMode = "transcribe-audio" | "extract-transcript" | "transcribe-and-extract";
 
@@ -88,19 +83,6 @@ function parseJsonObject(rawText: string): Record<string, unknown> | null {
   return null;
 }
 
-function sanitizeText(value: unknown, maxLength = 800): string {
-  if (typeof value !== "string") return "";
-  return value.trim().slice(0, maxLength);
-}
-
-function sanitizeList(value: unknown, maxItems = 12, maxItemLength = 180): string[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => sanitizeText(item, maxItemLength))
-    .filter(Boolean)
-    .slice(0, maxItems);
-}
-
 function sanitizeFormText(value: FormDataEntryValue | null, maxLength: number): string {
   if (typeof value !== "string") return "";
   return value.trim().slice(0, maxLength);
@@ -110,68 +92,6 @@ function getRequestedMode(rawMode: string): VoiceNoteMode {
   if (rawMode === "transcribe-audio") return rawMode;
   if (rawMode === "extract-transcript") return rawMode;
   return "transcribe-and-extract";
-}
-
-function buildPatientHeader(patient: PatientContext): string[] {
-  const hasAnyPatientInfo = Boolean(
-    patient.patientUserId || patient.patientDisplayName || patient.patientPhone
-  );
-  if (!hasAnyPatientInfo) return [];
-
-  return [
-    `病人ID：${patient.patientUserId || "未提供"}`,
-    `病人姓名：${patient.patientDisplayName || "未提供"}`,
-    `病人電話：${patient.patientPhone || "未提供"}`,
-  ];
-}
-
-function normalizeExtraction(data: Record<string, unknown> | null): SymptomExtraction {
-  if (!data) {
-    return {
-      chiefComplaint: "",
-      presentIllnessSummary: "",
-      associatedSymptoms: [],
-      negativeSymptoms: [],
-      durationAndCourse: "",
-      otherRecordableFindings: [],
-      verificationItems: [],
-    };
-  }
-
-  return {
-    chiefComplaint: sanitizeText(data.chiefComplaint, 240),
-    presentIllnessSummary: sanitizeText(data.presentIllnessSummary, 1200),
-    associatedSymptoms: sanitizeList(data.associatedSymptoms),
-    negativeSymptoms: sanitizeList(data.negativeSymptoms),
-    durationAndCourse: sanitizeText(data.durationAndCourse, 500),
-    otherRecordableFindings: sanitizeList(data.otherRecordableFindings),
-    verificationItems: sanitizeList(data.verificationItems),
-  };
-}
-
-function formatList(items: string[]): string {
-  if (items.length === 0) return "未明確提及";
-  return items.map((item, index) => `${index + 1}. ${item}`).join("\n");
-}
-
-function buildRecordText(extraction: SymptomExtraction, patient: PatientContext): string {
-  const patientHeader = buildPatientHeader(patient);
-  return [
-    ...(patientHeader.length > 0 ? [...patientHeader, ""] : []),
-    `主訴：${extraction.chiefComplaint || "未明確提及"}`,
-    "",
-    `現病史摘要：${extraction.presentIllnessSummary || "未明確提及"}`,
-    "",
-    `伴隨症狀：\n${formatList(extraction.associatedSymptoms)}`,
-    "",
-    `否認症狀：\n${formatList(extraction.negativeSymptoms)}`,
-    "",
-    `病程/時長：${extraction.durationAndCourse || "未明確提及"}`,
-    "",
-    `其他可記錄觀察：\n${formatList(extraction.otherRecordableFindings)}`,
-    "",
-    `待醫師確認：\n${formatList(extraction.verificationItems)}`,
-  ].join("\n");
 }
 
 function getModelName(): string {
@@ -206,7 +126,7 @@ async function transcribeAudio(
   return result.response.text().trim();
 }
 
-async function extractSymptoms(
+async function extractSymptomsFromSegment(
   model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
   transcript: string,
   patient: PatientContext
@@ -234,7 +154,27 @@ async function extractSymptoms(
 
   const rawText = result.response.text();
   const parsed = parseJsonObject(rawText);
-  return normalizeExtraction(parsed);
+  return normalizeSymptomExtraction(parsed);
+}
+
+async function extractSymptoms(
+  model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
+  transcript: string,
+  patient: PatientContext
+): Promise<SymptomExtraction> {
+  const segments = splitTranscriptIntoSegments(transcript, EXTRACTION_SEGMENT_MAX_CHARS);
+
+  if (segments.length <= 1) {
+    return extractSymptomsFromSegment(model, transcript, patient);
+  }
+
+  const segmentExtractions: SymptomExtraction[] = [];
+  for (const segment of segments) {
+    const extraction = await extractSymptomsFromSegment(model, segment, patient);
+    segmentExtractions.push(extraction);
+  }
+
+  return mergeSymptomExtractions(segmentExtractions);
 }
 
 export async function POST(request: Request) {
@@ -268,7 +208,7 @@ export async function POST(request: Request) {
     const model = genAI.getGenerativeModel({ model: getModelName() });
 
     if (mode === "extract-transcript") {
-      const transcript = sanitizeFormText(formData.get("transcript"), 100_000);
+      const transcript = sanitizeFormText(formData.get("transcript"), MAX_TRANSCRIPT_CHARS);
       if (transcript.length < 3) {
         return NextResponse.json({ error: "transcript is required" }, { status: 400 });
       }
