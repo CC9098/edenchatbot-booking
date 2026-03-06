@@ -798,15 +798,17 @@ function hasDoctorAndTimeHints(rawText: string, normalizedText: string): boolean
 }
 
 function hasBookingActionIntent(rawText: string, normalizedText: string): boolean {
+  const hasGenericBookingCue = normalizedText.includes(normalizeIntentText('約'));
   const hasBookingVerb = [
     '想約',
     '想預約',
+    '約',
     '約睇',
     '約見',
     'book me',
   ].some((kw) => normalizedText.includes(normalizeIntentText(kw)));
 
-  if (!hasBookingVerb) return false;
+  if (!hasBookingVerb && !hasGenericBookingCue) return false;
 
   const hasMedicalTarget =
     containsNormalizedKeyword(normalizedText, BOOKING_DOCTOR_HINTS)
