@@ -1,4 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import {
+  GoogleGenerativeAI,
+  GoogleGenerativeAIError,
+} from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
 import { AuthError, getCurrentUser, requireStaffRole } from "@/lib/auth-helpers";
@@ -11,6 +14,11 @@ import {
   type PatientContext,
   type SymptomExtraction,
 } from "@/lib/doctor-voice-note";
+import {
+  getGeminiErrorStatus,
+  isRetryableGeminiError,
+  retryGeminiRequest,
+} from "@/lib/gemini-request";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
@@ -18,6 +26,7 @@ export const maxDuration = 180;
 const MAX_AUDIO_FILE_BYTES = 15 * 1024 * 1024;
 const MAX_TRANSCRIPT_CHARS = 250_000;
 const EXTRACTION_SEGMENT_MAX_CHARS = 12_000;
+const MAX_GEMINI_REQUEST_RETRIES = 2;
 
 const TRANSCRIPTION_PROMPT = [
   "你是中醫門診的語音轉錄助手。",
@@ -98,29 +107,61 @@ function getModelName(): string {
   return process.env.GEMINI_DOCTOR_VOICE_MODEL || "gemini-flash-latest";
 }
 
+function buildGeminiFailureResponse(operationLabel: string, error: unknown) {
+  const status = getGeminiErrorStatus(error);
+
+  if (status === 429) {
+    return {
+      status: 429,
+      error: `${operationLabel}服務繁忙，請稍後再試。`,
+    };
+  }
+
+  if (isRetryableGeminiError(error)) {
+    return {
+      status: 503,
+      error: `${operationLabel}服務暫時不穩定，請稍後再試。`,
+    };
+  }
+
+  if (error instanceof GoogleGenerativeAIError) {
+    return {
+      status: 502,
+      error: `${operationLabel}服務回應異常，請稍後再試。`,
+    };
+  }
+
+  return null;
+}
+
 async function transcribeAudio(
   model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
   mimeType: string,
   audioBase64: string
 ): Promise<string> {
-  const result = await model.generateContent({
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: TRANSCRIPTION_PROMPT },
+  const result = await retryGeminiRequest({
+    operationLabel: "voice-note-transcription",
+    maxRetries: MAX_GEMINI_REQUEST_RETRIES,
+    task: () =>
+      model.generateContent({
+        contents: [
           {
-            inlineData: {
-              mimeType,
-              data: audioBase64,
-            },
+            role: "user",
+            parts: [
+              { text: TRANSCRIPTION_PROMPT },
+              {
+                inlineData: {
+                  mimeType,
+                  data: audioBase64,
+                },
+              },
+            ],
           },
         ],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.1,
-    },
+        generationConfig: {
+          temperature: 0.1,
+        },
+      }),
   });
 
   return result.response.text().trim();
@@ -136,20 +177,25 @@ async function extractSymptomsFromSegment(
     patientHeader.length > 0
       ? `\n\n【病人資料】\n${patientHeader.join("\n")}\n【病人資料結束】`
       : "";
-  const result = await model.generateContent({
-    contents: [
-      {
-        role: "user",
-        parts: [
+  const result = await retryGeminiRequest({
+    operationLabel: "voice-note-extraction",
+    maxRetries: MAX_GEMINI_REQUEST_RETRIES,
+    task: () =>
+      model.generateContent({
+        contents: [
           {
-            text: `${EXTRACTION_PROMPT}${patientBlock}\n\n【逐字稿開始】\n${transcript}\n【逐字稿結束】`,
+            role: "user",
+            parts: [
+              {
+                text: `${EXTRACTION_PROMPT}${patientBlock}\n\n【逐字稿開始】\n${transcript}\n【逐字稿結束】`,
+              },
+            ],
           },
         ],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.1,
-    },
+        generationConfig: {
+          temperature: 0.1,
+        },
+      }),
   });
 
   const rawText = result.response.text();
@@ -278,6 +324,15 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    const geminiFailureResponse = buildGeminiFailureResponse("語音病歷", error);
+    if (geminiFailureResponse) {
+      console.error("[POST /api/doctor/voice-notes] gemini error:", error);
+      return NextResponse.json(
+        { error: geminiFailureResponse.error },
+        { status: geminiFailureResponse.status }
+      );
     }
 
     console.error("[POST /api/doctor/voice-notes] unexpected error:", error);
