@@ -31,7 +31,8 @@ export default function EmbedLayout({
           background: 'transparent',
           margin: 0,
           padding: 0,
-          overflow: 'hidden',
+          overflowX: 'hidden',
+          overflowY: 'auto',
           touchAction: 'manipulation',
           WebkitTouchCallout: 'none',
           WebkitUserSelect: 'none',
@@ -44,7 +45,6 @@ export default function EmbedLayout({
     </html>
   );
 }
-
 
 
 
