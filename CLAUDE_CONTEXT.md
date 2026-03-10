@@ -78,6 +78,16 @@ Use this file first when you need to decide:
 - `app/page.tsx`
 - `components/ChatWidget.tsx`
 
+### G) Timetable / staff schedule admin / WordPress embed
+- `app/doctor/timetable/page.tsx`
+- `app/api/doctor/timetable/route.ts`
+- `app/api/doctor/timetable/schedules/route.ts`
+- `app/api/doctor/timetable/holidays/route.ts`
+- `app/embed/timetable/page.tsx`
+- `app/api/public/bookable-schedules/route.ts`
+- `lib/doctor-schedule-store.ts`
+- `lib/public-timetable-data-server.ts`
+
 ## 5) Core Data Model (What matters most)
 
 ### Booking and scheduling
@@ -107,7 +117,27 @@ Reference migrations:
 - `supabase/migrations/20260216204500_content_unification_phase1.sql`
 - `supabase/migrations/20260217093000_add_booking_intake.sql`
 
-## 6) API Surface (Critical Routes)
+## 6) Live Data Lookup Rules
+
+### Timetable and closures
+- `doctor_schedules` and `holidays` are now read from Supabase via `createServiceClient()` in `lib/doctor-schedule-store.ts`.
+- If Supabase returns no active `doctor_schedules` rows or errors, the app falls back to `shared/schedule-config.ts`. Treat that file as fallback, not source of truth.
+- Staff can edit live timetable data at `/doctor/timetable`.
+- Public timetable rendering uses `/embed/timetable` and `GET /api/public/bookable-schedules`.
+- Actual slot availability still depends on timetable + `holidays` + Google Calendar busy slots in `POST /api/availability`.
+
+### External database access rule
+- If someone shares a Railway Postgres URL using `*.railway.internal`, that host is private to Railway and is usually not reachable from an external machine.
+- In that case, do not assume direct DB access. Ask for one of:
+  - a public/external Postgres connection string
+  - a Railway shell / SQL-console result
+  - Supabase dashboard / SQL Editor access
+
+### FRONTEND_URL rule
+- `FRONTEND_URL` is a public website URL, not a database URL.
+- Railway's yellow info/warning icon beside `FRONTEND_URL` is advisory about public-endpoint usage, not a fatal error by itself.
+
+## 7) API Surface (Critical Routes)
 
 - `POST /api/chat`
 - `POST /api/chat/v2`
@@ -118,7 +148,7 @@ Reference migrations:
 - `GET /api/courses`, `GET /api/courses/[slug]`
 - `GET|PUT /api/me/lesson-progress*`
 
-## 7) Minimum Verification Before Push
+## 8) Minimum Verification Before Push
 
 1. Type and lint
 - `npm run typecheck`
@@ -138,16 +168,17 @@ Reference migrations:
 - Published-only filtering still enforced.
 - Slug resolution still works for encoded slugs.
 
-## 8) Suggested Read Order for New AI Session
+## 9) Suggested Read Order for New AI Session
 
 1. `CLAUDE_CONTEXT.md` (this file)
-2. `docs/CROSS_AGENT_HANDOFF_PLAYBOOK.md`
-3. `docs/WEBSITE_ARCHITECTURE_MAP.md`
-4. `ARCHITECTURE.md`
-5. `README.md`
-6. target files for the current task
+2. `AI_DATA_LOOKUP.md`
+3. `docs/CROSS_AGENT_HANDOFF_PLAYBOOK.md`
+4. `docs/WEBSITE_ARCHITECTURE_MAP.md`
+5. `ARCHITECTURE.md`
+6. `README.md`
+7. target files for the current task
 
-## 9) Boundaries
+## 10) Boundaries
 
 - Work only inside `EdenChatbotBooking/` unless explicitly requested.
 - Do not touch legacy `EDENCHATBOT/`.
