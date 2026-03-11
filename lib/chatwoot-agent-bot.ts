@@ -257,10 +257,16 @@ export function mapConversationMessagesToLegacyChat(
     })
     .sort((left, right) => (left.created_at || 0) - (right.created_at || 0))
     .slice(-12)
-    .map((message) => ({
-      role: message.sender_type === 'contact' ? 'user' : 'assistant',
-      content: message.content!.trim(),
-    }));
+    .map((message) => {
+      const normalizedSenderType = typeof message.sender_type === 'string'
+        ? message.sender_type.toLowerCase()
+        : '';
+
+      return {
+        role: normalizedSenderType === 'contact' ? 'user' : 'assistant',
+        content: message.content!.trim(),
+      };
+    });
 }
 
 export function replaceLatestUserMessage(
