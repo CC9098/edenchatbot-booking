@@ -166,13 +166,14 @@ export function extractIncomingChatwootEvent(payload: unknown): ChatwootIncoming
     messageType === '0';
 
   const normalizedSenderType = typeof senderType === 'string' ? senderType.toLowerCase() : '';
+  const senderIsSupportedContact = !normalizedSenderType || normalizedSenderType === 'contact';
 
   if (
     event !== 'message_created' ||
     !isIncoming ||
     privateFlag === true ||
     !content ||
-    normalizedSenderType !== 'contact' ||
+    !senderIsSupportedContact ||
     !Number.isFinite(accountId) ||
     !Number.isFinite(conversationId) ||
     !Number.isFinite(messageId)
