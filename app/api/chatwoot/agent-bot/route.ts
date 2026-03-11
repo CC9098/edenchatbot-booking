@@ -77,9 +77,8 @@ export async function POST(request: NextRequest) {
           reply = CHATWOOT_GENERAL_INQUIRY_PROMPT;
         } else {
           const mappedMessages = mapConversationMessagesToLegacyChat(conversation.messages);
-          const aiMessages = selection?.remainder
-            ? replaceLatestUserMessage(mappedMessages, selection.remainder)
-            : mappedMessages;
+          const latestUserMessage = selection?.remainder || event.content;
+          const aiMessages = replaceLatestUserMessage(mappedMessages, latestUserMessage);
           const { reply: aiReply } = await generateLegacyChatResponse({
             messages: aiMessages,
           });

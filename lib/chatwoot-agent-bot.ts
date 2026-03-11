@@ -31,6 +31,7 @@ interface ChatwootMessage {
   id?: number;
   content?: string | null;
   created_at?: number;
+  message_type?: number | string | null;
   private?: boolean;
   sender_type?: string | null;
 }
@@ -247,7 +248,14 @@ export function mapConversationMessagesToLegacyChat(
   return (messages || [])
     .filter((message) => {
       const content = message.content?.trim();
+      const messageType = message.message_type;
+      const isActivity =
+        messageType === 2 ||
+        messageType === '2' ||
+        messageType === 'activity';
+
       if (!content || message.private) return false;
+      if (isActivity) return false;
       if (content === CHATWOOT_GENERAL_INQUIRY_PROMPT) return false;
       if (content === CHATWOOT_BOOKING_ACK) return false;
       if (content === CHATWOOT_HUMAN_ACK) return false;
