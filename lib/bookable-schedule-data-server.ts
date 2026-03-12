@@ -11,6 +11,7 @@ import type {
   BookableDoctorSchedule,
 } from '@/shared/bookable-schedule-data';
 import type { TimeRange, WeeklySchedule } from '@/shared/schedule-config';
+import { buildVirtualOnlineScheduleFromMappings } from '@/lib/virtual-online-booking';
 
 const DAY_LABELS_ZH = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
 
@@ -94,9 +95,21 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
     .map((doctor) => doctorMap.get(doctor.id))
     .filter((doctor): doctor is BookableDoctorSchedule => Boolean(doctor))
     .map((doctor) => {
-      const clinics = PHYSICAL_CLINIC_IDS
+      const clinics: BookableClinicSchedule[] = PHYSICAL_CLINIC_IDS
         .map((clinicId) => doctor.clinics.find((clinic) => clinic.clinicId === clinicId))
         .filter((clinic): clinic is BookableClinicSchedule => Boolean(clinic));
+      const onlineSchedule = buildVirtualOnlineScheduleFromMappings(mappings, doctor.doctorId);
+
+      if (onlineSchedule && hasAnySchedule(onlineSchedule)) {
+        const onlineClinic = CLINIC_BY_ID.online;
+        clinics.push({
+          clinicId: 'online',
+          clinicNameZh: onlineClinic.nameZh,
+          clinicNameEn: onlineClinic.nameEn,
+          schedule: cloneWeeklySchedule(onlineSchedule),
+          summary: formatWeeklySchedule(onlineSchedule),
+        });
+      }
 
       return {
         ...doctor,

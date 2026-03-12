@@ -12,6 +12,7 @@ import {
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { type Holiday } from "@/shared/schema";
 import { getSafeErrorMessage } from "@/lib/error-sanitizer";
+import { getVirtualOnlineAvailability } from "@/lib/virtual-online-booking";
 
 // ── Whitelist schema ────────────────────────────────────────────────
 // Only these fields are accepted; anything extra is stripped.
@@ -53,6 +54,44 @@ export async function POST(request: NextRequest) {
         { error: "Invalid date format. Use YYYY-MM-DD" },
         { status: 400 }
       );
+    }
+
+    if (clinicId === "online") {
+      try {
+        const availability = await getVirtualOnlineAvailability({
+          doctorId,
+          requestedDate,
+          durationMinutes,
+        });
+
+        if (!availability.mappingFound) {
+          return NextResponse.json(
+            { error: "Doctor not available at this clinic" },
+            { status: 404 }
+          );
+        }
+
+        if (availability.isClosed) {
+          return NextResponse.json({
+            isClosed: true,
+            isHoliday: availability.isHoliday,
+            slots: [],
+          });
+        }
+
+        return NextResponse.json({ success: true, slots: availability.slots });
+      } catch (calendarError) {
+        console.error(
+          `[chat/booking/availability] Calendar error: ${getSafeErrorMessage(calendarError)}`
+        );
+        return NextResponse.json(
+          {
+            error: "暫時未能讀取預約日曆，請稍後再試或聯絡診所。",
+            errorCode: "CALENDAR_UNAVAILABLE",
+          },
+          { status: 503 }
+        );
+      }
     }
 
     // Look up doctor-clinic mapping

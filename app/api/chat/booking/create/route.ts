@@ -13,6 +13,7 @@ import { getCurrentUser } from "@/lib/auth-helpers";
 import { createServiceClient } from "@/lib/supabase";
 import { getSafeErrorMessage } from "@/lib/error-sanitizer";
 import { syncPatientProfileContact } from "@/lib/profile-contact-sync";
+import { resolveOnlineSourceMappingForSlot } from "@/lib/virtual-online-booking";
 
 // ── Whitelist schema ────────────────────────────────────────────────
 const bridgeBookingSchema = z
@@ -56,17 +57,52 @@ export async function POST(request: NextRequest) {
     const bookingData = parsed.data;
 
     // Resolve calendar ID
-    const mapping = await getMappingWithFallback(
-      bookingData.doctorId,
-      bookingData.clinicId
-    );
-    if (!mapping || !mapping.isActive) {
+    let calendarId = "";
+    if (bookingData.clinicId === "online") {
+      const resolvedOnlineMapping = await resolveOnlineSourceMappingForSlot({
+        doctorId: bookingData.doctorId,
+        requestedDate: bookingData.date,
+        time: bookingData.time,
+        durationMinutes: bookingData.durationMinutes,
+      });
+
+      if (resolvedOnlineMapping.errorCode === "CALENDAR_UNAVAILABLE") {
+        return NextResponse.json(
+          {
+            error: "暫時未能讀取預約日曆，請稍後再試或聯絡診所。",
+            errorCode: "CALENDAR_UNAVAILABLE",
+          },
+          { status: 503 }
+        );
+      }
+
+      if (!resolvedOnlineMapping.mapping) {
+        return NextResponse.json(
+          {
+            error:
+              "This time slot has just been booked. Please pick another time.",
+          },
+          { status: 409 }
+        );
+      }
+
+      calendarId = resolvedOnlineMapping.mapping.calendarId;
+    } else {
+      const mapping = await getMappingWithFallback(
+        bookingData.doctorId,
+        bookingData.clinicId
+      );
+      if (mapping && mapping.isActive) {
+        calendarId = mapping.calendarId;
+      }
+    }
+
+    if (!calendarId) {
       return NextResponse.json(
         { error: "Doctor schedule not found" },
         { status: 404 }
       );
     }
-    const calendarId = mapping.calendarId;
 
     // Calculate start/end
     const startDate = fromZonedTime(

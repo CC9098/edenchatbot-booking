@@ -1,8 +1,8 @@
-import type { DoctorId, PhysicalClinicId } from '@/shared/clinic-data';
+import type { ClinicId, DoctorId } from '@/shared/clinic-data';
 import type { WeeklySchedule } from '@/shared/schedule-config';
 
 export type BookableClinicSchedule = {
-  clinicId: PhysicalClinicId;
+  clinicId: ClinicId;
   clinicNameZh: string;
   clinicNameEn: string;
   schedule: WeeklySchedule;

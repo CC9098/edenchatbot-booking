@@ -2,11 +2,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
-import { createBooking, getFreeBusy, getEvent, deleteEvent, updateEvent } from '@/lib/google-calendar';
+import { createBooking, getFreeBusy, getEvent, deleteEvent, moveEventToCalendar, updateEvent } from '@/lib/google-calendar';
 import { sendBookingCancellationEmail, sendBookingConfirmationEmail } from '@/lib/gmail';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { bookingSchema } from '@/shared/types';
-import { CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
+import { CLINIC_ID_BY_NAME_ZH, DOCTOR_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
 import { isSlotAvailableUtc } from '@/lib/booking-helpers';
 import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import { getCurrentUser } from '@/lib/auth-helpers';
@@ -15,6 +15,7 @@ import {
                 markBookingIntakeCancelledByEvent,
                 markBookingIntakeRescheduledByEvent,
 } from '@/lib/booking-intake-storage';
+import { resolveOnlineSourceMappingForSlot } from '@/lib/virtual-online-booking';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
@@ -71,6 +72,24 @@ function extractBookingEmailMetadata(event: any) {
                                 clinicName,
                                 clinicNameZh,
                                 clinicAddress,
+                };
+}
+
+function extractBookingIdentity(event: any) {
+                const metadata = extractBookingEmailMetadata(event);
+                if (!metadata) {
+                                return null;
+                }
+
+                const doctorId = DOCTOR_ID_BY_NAME_ZH[metadata.doctorNameZh];
+                const clinicId = CLINIC_ID_BY_NAME_ZH[metadata.clinicNameZh];
+                if (!doctorId || !clinicId) {
+                                return null;
+                }
+
+                return {
+                                doctorId,
+                                clinicId,
                 };
 }
 
@@ -134,6 +153,8 @@ const rescheduleSchema = z.object({
                 date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
                 time: z.string().regex(/^\d{2}:\d{2}$/),
                 durationMinutes: z.number().int().positive().default(15),
+                doctorId: z.string().optional(),
+                clinicId: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -155,10 +176,37 @@ export async function POST(request: NextRequest) {
                                 // For now, let's inline a quick lookup or just rely on static config if DB fails
                                 // Use robust helper that handles DB errors
                                 let calendarId = "";
-                                // Use robust helper that handles DB errors
-                                const mapping = await getMappingWithFallback(bookingData.doctorId, bookingData.clinicId);
-                                if (mapping && mapping.isActive) {
-                                                calendarId = mapping.calendarId;
+                                if (bookingData.clinicId === 'online') {
+                                                const resolvedOnlineMapping = await resolveOnlineSourceMappingForSlot({
+                                                                doctorId: bookingData.doctorId,
+                                                                requestedDate: bookingData.date,
+                                                                time: bookingData.time,
+                                                                durationMinutes: bookingData.durationMinutes,
+                                                });
+
+                                                if (resolvedOnlineMapping.errorCode === 'CALENDAR_UNAVAILABLE') {
+                                                                return NextResponse.json(
+                                                                                {
+                                                                                                error: '暫時未能讀取預約日曆，請稍後再試或聯絡診所。',
+                                                                                                errorCode: 'CALENDAR_UNAVAILABLE',
+                                                                                },
+                                                                                { status: 503 }
+                                                                );
+                                                }
+
+                                                if (!resolvedOnlineMapping.mapping) {
+                                                                return NextResponse.json(
+                                                                                { error: 'This time slot has just been booked. Please pick another time.' },
+                                                                                { status: 409 }
+                                                                );
+                                                }
+
+                                                calendarId = resolvedOnlineMapping.mapping.calendarId;
+                                } else {
+                                                const mapping = await getMappingWithFallback(bookingData.doctorId, bookingData.clinicId);
+                                                if (mapping && mapping.isActive) {
+                                                                calendarId = mapping.calendarId;
+                                                }
                                 }
 
                                 if (!calendarId) {
@@ -340,7 +388,7 @@ export async function PATCH(request: NextRequest) {
                                                                 { status: 400 }
                                                 );
                                 }
-                                const { eventId, calendarId, date, time, durationMinutes } = parsed.data;
+                                const { eventId, calendarId, date, time, durationMinutes, doctorId, clinicId } = parsed.data;
 
                                 let existingEvent: any = null;
                                 const existingEventResult = await getEvent(calendarId, eventId);
@@ -360,10 +408,64 @@ export async function PATCH(request: NextRequest) {
 
                                 const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
 
-                                const result = await updateEvent(calendarId, eventId, {
-                                                startTime: startDate,
-                                                endTime: endDate,
-                                });
+                                const existingIdentity = existingEvent ? extractBookingIdentity(existingEvent) : null;
+                                const effectiveDoctorId = doctorId || existingIdentity?.doctorId;
+                                const effectiveClinicId = clinicId || existingIdentity?.clinicId;
+
+                                let nextEventId = eventId;
+                                let nextCalendarId = calendarId;
+                                let result:
+                                                | { success: true; eventId?: string }
+                                                | { success: false; error?: string };
+
+                                if (effectiveDoctorId && effectiveClinicId === 'online') {
+                                                const resolvedOnlineMapping = await resolveOnlineSourceMappingForSlot({
+                                                                doctorId: effectiveDoctorId,
+                                                                requestedDate: date,
+                                                                time,
+                                                                durationMinutes,
+                                                                preferredCalendarId: calendarId,
+                                                });
+
+                                                if (resolvedOnlineMapping.errorCode === 'CALENDAR_UNAVAILABLE') {
+                                                                return NextResponse.json(
+                                                                                {
+                                                                                                error: '暫時未能讀取預約日曆，請稍後再試或聯絡診所。',
+                                                                                                errorCode: 'CALENDAR_UNAVAILABLE',
+                                                                                },
+                                                                                { status: 503 }
+                                                                );
+                                                }
+
+                                                if (!resolvedOnlineMapping.mapping) {
+                                                                return NextResponse.json(
+                                                                                { error: 'This time slot has just been booked. Please pick another time.' },
+                                                                                { status: 409 }
+                                                                );
+                                                }
+
+                                                const targetCalendarId = resolvedOnlineMapping.mapping.calendarId;
+                                                if (targetCalendarId === calendarId) {
+                                                                result = await updateEvent(calendarId, eventId, {
+                                                                                startTime: startDate,
+                                                                                endTime: endDate,
+                                                                });
+                                                } else {
+                                                                result = await moveEventToCalendar(calendarId, targetCalendarId, eventId, {
+                                                                                startTime: startDate,
+                                                                                endTime: endDate,
+                                                                });
+                                                                if (result.success) {
+                                                                                nextEventId = result.eventId || eventId;
+                                                                                nextCalendarId = targetCalendarId;
+                                                                }
+                                                }
+                                } else {
+                                                result = await updateEvent(calendarId, eventId, {
+                                                                startTime: startDate,
+                                                                endTime: endDate,
+                                                });
+                                }
 
                                 if (!result.success) {
                                                 return NextResponse.json({ error: result.error || 'Failed to reschedule booking' }, { status: 500 });
@@ -375,6 +477,8 @@ export async function PATCH(request: NextRequest) {
                                                 appointmentDate: date,
                                                 appointmentTime: time,
                                                 durationMinutes,
+                                                nextGoogleEventId: nextEventId !== eventId ? nextEventId : undefined,
+                                                nextCalendarId: nextCalendarId !== calendarId ? nextCalendarId : undefined,
                                 });
                                 if (!intakeRescheduleSync.success) {
                                                 console.warn(`booking_intake reschedule sync warning: ${intakeRescheduleSync.error}`);
@@ -382,7 +486,13 @@ export async function PATCH(request: NextRequest) {
 
                                 // Best effort: send updated confirmation email after reschedule succeeds.
                                 if (existingEvent) {
-                                                const payload = buildRescheduleEmailPayload(existingEvent, date, time, eventId, calendarId);
+                                                const payload = buildRescheduleEmailPayload(
+                                                                existingEvent,
+                                                                date,
+                                                                time,
+                                                                nextEventId,
+                                                                nextCalendarId
+                                                );
                                                 if (payload) {
                                                                 try {
                                                                                 await sendBookingConfirmationEmail(payload);
@@ -396,7 +506,11 @@ export async function PATCH(request: NextRequest) {
                                                 console.warn('Skip reschedule email: original event lookup failed before update.');
                                 }
 
-                                return NextResponse.json({ success: true });
+                                return NextResponse.json({
+                                                success: true,
+                                                bookingId: nextEventId,
+                                                calendarId: nextCalendarId,
+                                });
 
                 } catch (error) {
                                 console.error(`Reschedule API Error: ${formatUnknownError(error)}`);

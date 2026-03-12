@@ -12,6 +12,7 @@ import {
                 isSlotBlockedByHolidaysUtc,
 } from '@/lib/booking-helpers';
 import { type Holiday } from '@/shared/schema';
+import { getVirtualOnlineAvailability } from '@/lib/virtual-online-booking';
 
 
 
@@ -31,6 +32,39 @@ export async function POST(request: NextRequest) {
                                 const requestedDate = date.slice(0, 10);
                                 if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
                                                 return NextResponse.json({ error: 'Invalid date format. Use YYYY-MM-DD' }, { status: 400 });
+                                }
+
+                                if (clinicId === 'online') {
+                                                try {
+                                                                const availability = await getVirtualOnlineAvailability({
+                                                                                doctorId,
+                                                                                requestedDate,
+                                                                                durationMinutes,
+                                                                });
+
+                                                                if (!availability.mappingFound) {
+                                                                                return NextResponse.json({ error: 'Doctor not available at this clinic' }, { status: 404 });
+                                                                }
+
+                                                                if (availability.isClosed) {
+                                                                                return NextResponse.json({
+                                                                                                isClosed: true,
+                                                                                                isHoliday: availability.isHoliday,
+                                                                                                slots: [],
+                                                                                });
+                                                                }
+
+                                                                return NextResponse.json({ success: true, slots: availability.slots });
+                                                } catch (calError: any) {
+                                                                console.error(`Calendar error: ${getSafeErrorMessage(calError)}`);
+                                                                return NextResponse.json(
+                                                                                {
+                                                                                                error: '暫時未能讀取預約日曆，請稍後再試或聯絡診所。',
+                                                                                                errorCode: 'CALENDAR_UNAVAILABLE',
+                                                                                },
+                                                                                { status: 503 }
+                                                                );
+                                                }
                                 }
 
                                 const mapping = await getMappingWithFallback(doctorId, clinicId);

@@ -21,6 +21,10 @@ import { DAY_NAMES, FORM_FLOW, MAIN_MENU, PRIMARY, TEXT_INPUT_STEPS } from '@/co
 import { useChatState } from '@/components/chat/hooks/useChatState';
 import { type BookingState, type BookingStep, type ConsultationFormData, type Option, type OptionKey } from '@/components/chat/types';
 
+function formatClinicLabel(clinicNameZh?: string) {
+  return clinicNameZh === '網上' ? '網上應診' : `${clinicNameZh || '診所'}診所`;
+}
+
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [widgetSessionId, setWidgetSessionId] = useState('');
@@ -412,7 +416,7 @@ export function ChatWidget() {
       clinicName: clinic.clinicNameEn,
     }));
 
-    addBotMessage(`好的！${clinic.clinicNameZh}診所。請問你係首診定覆診呢？`);
+    addBotMessage(`好的！${formatClinicLabel(clinic.clinicNameZh)}。請問你係首診定覆診呢？`);
     setOptions([
       { label: '首診（第一次來）', value: 'booking_visit_first' },
       { label: '覆診（有來過）', value: 'booking_visit_followup' },
@@ -455,7 +459,7 @@ export function ChatWidget() {
     }
 
     if (dateOptions.length === 0) {
-      addBotMessage(`抱歉，${booking.doctorNameZh}在${booking.clinicNameZh}未來兩星期內暫無可預約日子。`);
+      addBotMessage(`抱歉，${booking.doctorNameZh}在${formatClinicLabel(booking.clinicNameZh)}未來兩星期內暫無可預約日子。`);
       setOptions([{ label: '返回主選單', value: 'main' }]);
       return;
     }

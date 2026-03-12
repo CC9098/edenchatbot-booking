@@ -228,6 +228,78 @@ export async function updateEvent(
   }
 }
 
+export async function moveEventToCalendar(
+  sourceCalendarId: string,
+  targetCalendarId: string,
+  eventId: string,
+  details: {
+    startTime: Date;
+    endTime: Date;
+    privateMetadata?: Record<string, string>;
+  }
+): Promise<{ success: boolean; eventId?: string; error?: string }> {
+  try {
+    const calendar = await getUncachableGoogleCalendarClient();
+    const existingEvent = await calendar.events.get({
+      calendarId: sourceCalendarId,
+      eventId,
+    });
+
+    const existingPrivate = existingEvent.data.extendedProperties?.private || {};
+    const mergedPrivate = {
+      ...existingPrivate,
+      ...(details.privateMetadata || {}),
+    };
+
+    const insertResponse = await calendar.events.insert({
+      calendarId: targetCalendarId,
+      requestBody: {
+        summary: existingEvent.data.summary || '',
+        description: existingEvent.data.description || '',
+        colorId: existingEvent.data.colorId || undefined,
+        start: {
+          dateTime: details.startTime.toISOString(),
+          timeZone: 'Asia/Hong_Kong',
+        },
+        end: {
+          dateTime: details.endTime.toISOString(),
+          timeZone: 'Asia/Hong_Kong',
+        },
+        extendedProperties:
+          Object.keys(mergedPrivate).length > 0
+            ? {
+                private: mergedPrivate,
+              }
+            : undefined,
+      },
+    });
+
+    const nextEventId = insertResponse.data.id;
+    if (!nextEventId) {
+      return {
+        success: false,
+        error: 'Failed to create replacement event',
+      };
+    }
+
+    await calendar.events.delete({
+      calendarId: sourceCalendarId,
+      eventId,
+    });
+
+    return {
+      success: true,
+      eventId: nextEventId,
+    };
+  } catch (error: any) {
+    console.error(`Failed to move calendar event: ${getSafeErrorMessage(error)}`);
+    return {
+      success: false,
+      error: error.message || 'Failed to move event',
+    };
+  }
+}
+
 export async function listEventsInRange(
   calendarId: string,
   timeMin: Date,

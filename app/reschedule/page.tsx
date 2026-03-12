@@ -147,6 +147,7 @@ function RescheduleBookingContent() {
                 };
 
                 const handleRescheduleConfirm = async () => {
+                                if (!doctor || !clinic) return;
                                 setSubmitting(true);
                                 try {
                                                 const res = await fetch('/api/booking', {
@@ -155,6 +156,8 @@ function RescheduleBookingContent() {
                                                                 body: JSON.stringify({
                                                                                 eventId,
                                                                                 calendarId,
+                                                                                doctorId: doctor.id,
+                                                                                clinicId: clinic.id,
                                                                                 date: selectedDate,
                                                                                 time: selectedTime,
                                                                                 durationMinutes: 15

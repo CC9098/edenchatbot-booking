@@ -100,9 +100,13 @@ function buildClinicGoogleMapHtml(clinicNameZh: string): string {
 }
 
 function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
-  const clinicInfoHtml = getClinicInfoHtmlSections();
-  const clinicWhatsappLinksHtml = buildClinicWhatsappLinksHtml();
-  const clinicGoogleMapHtml = buildClinicGoogleMapHtml(data.clinicNameZh);
+  const isOnlineConsultation = data.clinicNameZh === '網上';
+  const clinicInfoHtml = isOnlineConsultation
+    ? `<p>💻 <strong>網上應診 Online Consultation</strong><br>
+請於預約時間前保持電話暢通，我們會按安排透過 Zoom / WhatsApp Video 與你聯絡。</p>`
+    : getClinicInfoHtmlSections();
+  const clinicWhatsappLinksHtml = isOnlineConsultation ? '' : buildClinicWhatsappLinksHtml();
+  const clinicGoogleMapHtml = isOnlineConsultation ? '' : buildClinicGoogleMapHtml(data.clinicNameZh);
   const googleCalendarStart = data.date.replace(/-/g, '') + 'T' + data.time.replace(':', '') + '00';
   const [h, m] = data.time.split(':').map(Number);
   const endMinutes = h * 60 + m + 15;
@@ -196,8 +200,12 @@ function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
         ${clinicInfoHtml}
         ${clinicGoogleMapHtml}
         
-        <p>🔗 附上診所路綫圖，方便你參考：<br>
-        <a href="https://www.edenclinic.hk/eden/關於我們/診所地址及聯絡方法/" style="color:#5c8d4d;">https://www.edenclinic.hk/eden/關於我們/診所地址及聯絡方法/</a></p>
+        ${
+          isOnlineConsultation
+            ? '<p>如需協助安排網上應診連結或流程，歡迎透過 WhatsApp 聯絡我們。</p>'
+            : `<p>🔗 附上診所路綫圖，方便你參考：<br>
+        <a href="https://www.edenclinic.hk/eden/關於我們/診所地址及聯絡方法/" style="color:#5c8d4d;">https://www.edenclinic.hk/eden/關於我們/診所地址及聯絡方法/</a></p>`
+        }
       </div>
       
       <hr class="divider">

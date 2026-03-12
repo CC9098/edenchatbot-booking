@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { fromZonedTime } from "date-fns-tz";
-import { updateEvent } from "@/lib/google-calendar";
+import { moveEventToCalendar, updateEvent } from "@/lib/google-calendar";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { markBookingIntakeRescheduledByEvent } from "@/lib/booking-intake-storage";
 import { getSafeErrorMessage } from "@/lib/error-sanitizer";
+import { resolveOnlineSourceMappingForSlot } from "@/lib/virtual-online-booking";
 
 // ── Whitelist schema ────────────────────────────────────────────────
 const bridgeRescheduleSchema = z
@@ -14,6 +15,8 @@ const bridgeRescheduleSchema = z
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     time: z.string().regex(/^\d{2}:\d{2}$/),
     durationMinutes: z.number().int().positive().default(15),
+    doctorId: z.string().optional(),
+    clinicId: z.string().optional(),
   })
   .strict();
 
@@ -37,7 +40,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { eventId, calendarId, date, time, durationMinutes } = parsed.data;
+    const { eventId, calendarId, date, time, durationMinutes, doctorId, clinicId } = parsed.data;
 
     // Calculate start/end
     const startDate = fromZonedTime(
@@ -52,10 +55,63 @@ export async function POST(request: NextRequest) {
     }
     const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
 
-    const result = await updateEvent(calendarId, eventId, {
-      startTime: startDate,
-      endTime: endDate,
-    });
+    let nextEventId = eventId;
+    let nextCalendarId = calendarId;
+    let result:
+      | { success: true; eventId?: string }
+      | { success: false; error?: string };
+
+    if (doctorId && clinicId === "online") {
+      const resolvedOnlineMapping = await resolveOnlineSourceMappingForSlot({
+        doctorId,
+        requestedDate: date,
+        time,
+        durationMinutes,
+        preferredCalendarId: calendarId,
+      });
+
+      if (resolvedOnlineMapping.errorCode === "CALENDAR_UNAVAILABLE") {
+        return NextResponse.json(
+          {
+            error: "暫時未能讀取預約日曆，請稍後再試或聯絡診所。",
+            errorCode: "CALENDAR_UNAVAILABLE",
+          },
+          { status: 503 }
+        );
+      }
+
+      if (!resolvedOnlineMapping.mapping) {
+        return NextResponse.json(
+          {
+            error:
+              "This time slot has just been booked. Please pick another time.",
+          },
+          { status: 409 }
+        );
+      }
+
+      const targetCalendarId = resolvedOnlineMapping.mapping.calendarId;
+      if (targetCalendarId === calendarId) {
+        result = await updateEvent(calendarId, eventId, {
+          startTime: startDate,
+          endTime: endDate,
+        });
+      } else {
+        result = await moveEventToCalendar(calendarId, targetCalendarId, eventId, {
+          startTime: startDate,
+          endTime: endDate,
+        });
+        if (result.success) {
+          nextEventId = result.eventId || eventId;
+          nextCalendarId = targetCalendarId;
+        }
+      }
+    } else {
+      result = await updateEvent(calendarId, eventId, {
+        startTime: startDate,
+        endTime: endDate,
+      });
+    }
 
     if (!result.success) {
       return NextResponse.json(
@@ -70,6 +126,8 @@ export async function POST(request: NextRequest) {
       appointmentDate: date,
       appointmentTime: time,
       durationMinutes,
+      nextGoogleEventId: nextEventId !== eventId ? nextEventId : undefined,
+      nextCalendarId: nextCalendarId !== calendarId ? nextCalendarId : undefined,
     });
     if (!intakeRescheduleSync.success) {
       console.warn(
@@ -77,7 +135,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      bookingId: nextEventId,
+      calendarId: nextCalendarId,
+    });
   } catch (error: unknown) {
     console.error(
       `[chat/booking/reschedule] Error: ${getSafeErrorMessage(error)}`
