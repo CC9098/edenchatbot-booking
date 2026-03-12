@@ -8,6 +8,7 @@ import {
 } from '@/lib/booking-helpers';
 import { getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
 import { getFreeBusy } from '@/lib/google-calendar';
+import type { Holiday } from '@/shared/schema';
 import {
   PHYSICAL_CLINIC_IDS,
   type DoctorId,
@@ -145,11 +146,16 @@ async function getAvailableSlotsForPhysicalMapping(params: {
     };
   }
 
-  const applicableHolidays = await getApplicableHolidaysForDate(
-    requestedDate,
-    mapping.doctorId,
-    mapping.clinicId
-  );
+  let applicableHolidays: Holiday[] = [];
+  try {
+    applicableHolidays = await getApplicableHolidaysForDate(
+      requestedDate,
+      mapping.doctorId,
+      mapping.clinicId
+    );
+  } catch {
+    applicableHolidays = [];
+  }
   const isAllDayHoliday = applicableHolidays.some((holiday) => !holiday.startTime || !holiday.endTime);
   if (isAllDayHoliday) {
     return {
@@ -242,11 +248,16 @@ async function isMappingBookableForExactSlot(params: {
     return 'not_available';
   }
 
-  const applicableHolidays = await getApplicableHolidaysForDate(
-    requestedDate,
-    mapping.doctorId,
-    mapping.clinicId
-  );
+  let applicableHolidays: Holiday[] = [];
+  try {
+    applicableHolidays = await getApplicableHolidaysForDate(
+      requestedDate,
+      mapping.doctorId,
+      mapping.clinicId
+    );
+  } catch {
+    applicableHolidays = [];
+  }
   if (isSlotBlockedByHolidaysUtc(slotStart, slotEnd, applicableHolidays)) {
     return 'not_available';
   }
