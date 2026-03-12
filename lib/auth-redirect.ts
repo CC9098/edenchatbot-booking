@@ -2,6 +2,14 @@ const DEFAULT_PUBLIC_WEB_URL = "https://edenchatbot-booking.vercel.app";
 const DEFAULT_MOBILE_SCHEME = "com.cc9098.edenchatbotbooking";
 const DEFAULT_AUTH_NEXT = "/chat";
 
+type GoogleOAuthOptions = {
+  redirectTo: string;
+  queryParams: {
+    prompt: "select_account";
+  };
+  skipBrowserRedirect?: true;
+};
+
 function normalizeBaseUrl(value?: string | null): string | null {
   if (!value) return null;
   const trimmed = value.trim();
@@ -48,4 +56,28 @@ export function getNativeAuthCallbackUrl(next = DEFAULT_AUTH_NEXT) {
   const url = new URL(`${getMobileUrlScheme()}://auth/callback`);
   url.searchParams.set("next", sanitizeAuthNextPath(next));
   return url.toString();
+}
+
+export function buildGoogleOAuthOptions(
+  next = DEFAULT_AUTH_NEXT,
+  isNative = false,
+): GoogleOAuthOptions {
+  const safeNext = sanitizeAuthNextPath(next);
+
+  if (isNative) {
+    return {
+      redirectTo: getNativeAuthCallbackUrl(safeNext),
+      skipBrowserRedirect: true,
+      queryParams: {
+        prompt: "select_account",
+      },
+    };
+  }
+
+  return {
+    redirectTo: getWebAuthCallbackUrl(safeNext),
+    queryParams: {
+      prompt: "select_account",
+    },
+  };
 }

@@ -7,7 +7,7 @@ import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
 import { createBrowserClient } from "@/lib/supabase-browser";
 import {
-  getNativeAuthCallbackUrl,
+  buildGoogleOAuthOptions,
   getWebAuthCallbackUrl,
   sanitizeAuthNextPath,
 } from "@/lib/auth-redirect";
@@ -95,13 +95,7 @@ function LoginForm() {
     if (Capacitor.isNativePlatform()) {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: {
-          redirectTo: getNativeAuthCallbackUrl(nextPath),
-          skipBrowserRedirect: true,
-          queryParams: {
-            prompt: "select_account",
-          },
-        },
+        options: buildGoogleOAuthOptions(nextPath, true),
       });
 
       if (error || !data?.url) {
@@ -123,9 +117,7 @@ function LoginForm() {
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: getWebAuthCallbackUrl(nextPath),
-      },
+      options: buildGoogleOAuthOptions(nextPath),
     });
 
     if (error) {
