@@ -323,6 +323,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
 
   const [isSupported, setIsSupported] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -330,6 +331,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
   const [transcript, setTranscript] = useState("");
   const [draftRecordText, setDraftRecordText] = useState("");
   const [recordText, setRecordText] = useState("");
+  const [isEditingRecordText, setIsEditingRecordText] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [savingToPatientRecord, setSavingToPatientRecord] = useState(false);
   const [saveRecordStatus, setSaveRecordStatus] = useState<string | null>(null);
@@ -375,6 +377,17 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     timerRef.current = null;
   }
 
+  function startDurationTimer() {
+    clearTimer();
+    timerRef.current = window.setInterval(() => {
+      setDurationSeconds((current) => {
+        const next = current + 1;
+        durationSecondsRef.current = next;
+        return next;
+      });
+    }, 1000);
+  }
+
   function clearKeepAliveTimer() {
     if (!keepAliveTimerRef.current) return;
     clearInterval(keepAliveTimerRef.current);
@@ -416,6 +429,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     finalizeResolverRef.current = null;
     stoppingRef.current = false;
     liveProviderLabelRef.current = "Deepgram";
+    setIsPaused(false);
     setFinalizedSegmentCount(0);
     setDraftSummaryMinuteMark(null);
     setProcessingStatus(null);
@@ -426,6 +440,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     setTranscript("");
     setDraftRecordText("");
     setRecordText("");
+    setIsEditingRecordText(false);
     setCopyStatus(null);
     setSaveRecordStatus(null);
     setSaveRecordError(null);
@@ -655,7 +670,8 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
     if (stoppingRef.current) return;
 
     const activeSessionId = sessionIdRef.current;
-    const hasActiveRecorder = mediaRecorderRef.current?.state === "recording";
+    const recorderState = mediaRecorderRef.current?.state;
+    const hasActiveRecorder = recorderState === "recording" || recorderState === "paused";
     const hasOpenSocket =
       deepgramSocketRef.current?.readyState === WebSocket.OPEN ||
       deepgramSocketRef.current?.readyState === WebSocket.CONNECTING;
@@ -664,6 +680,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
 
     stoppingRef.current = true;
     setIsRecording(false);
+    setIsPaused(false);
     setIsProcessing(true);
     setProcessingStatus(
       options?.skipAnalysis
@@ -737,6 +754,7 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
       setDraftSummaryMinuteMark(null);
       setTranscript(analysis.transcript || combinedTranscript);
       setRecordText(analysis.recordText || "");
+      setIsEditingRecordText(!analysis.recordText);
 
       if (!analysis.recordText) {
         setError("已取得逐字稿，但未能整理摘要，請重試。");
@@ -744,7 +762,9 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
         setError(null);
       }
 
-      setProcessingStatus("最終病歷摘要已完成");
+      setProcessingStatus(
+        analysis.recordText ? "最終病歷摘要已完成" : "AI 未整理出摘要，可直接在下方手動補充。"
+      );
     } catch (finalError) {
       if (sessionIdRef.current !== activeSessionId) return;
       setError(finalError instanceof Error ? finalError.message : "語音分析失敗");
@@ -924,17 +944,12 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
       startKeepAlive();
       setIsProcessing(false);
       setIsRecording(true);
+      setIsPaused(false);
       setProcessingStatus(
         `即時語音轉錄已開始，系統會持續串流至 ${liveProviderLabelRef.current}，並於每 5 分鐘更新一次暫時摘要。`
       );
 
-      timerRef.current = window.setInterval(() => {
-        setDurationSeconds((current) => {
-          const next = current + 1;
-          durationSecondsRef.current = next;
-          return next;
-        });
-      }, 1000);
+      startDurationTimer();
     } catch (startError) {
       resolveFinalizeWait();
       stopAudioPipeline();
@@ -949,9 +964,77 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
       mediaRecorderRef.current = null;
       stopStream();
       setIsRecording(false);
+      setIsPaused(false);
       setIsProcessing(false);
       setProcessingStatus(null);
       setError(normalizeSocketErrorMessage(startError));
+    }
+  }
+
+  async function pauseRecording() {
+    const recorder = mediaRecorderRef.current;
+    const audioContext = audioContextRef.current;
+
+    if (
+      !recorder ||
+      !audioContext ||
+      recorder.state !== "recording" ||
+      isProcessing ||
+      stoppingRef.current
+    ) {
+      return;
+    }
+
+    try {
+      recorder.pause();
+      if (audioContext.state === "running") {
+        await audioContext.suspend();
+      }
+      clearTimer();
+      setIsPaused(true);
+      setError(null);
+      setProcessingStatus("錄音已暫停；逐字稿與計時已暫停，按「繼續錄音」即可恢復。");
+    } catch {
+      if (mediaRecorderRef.current?.state === "paused" || audioContextRef.current?.state === "suspended") {
+        clearTimer();
+        setIsPaused(true);
+      }
+      setError("未能暫停錄音，請重試。");
+    }
+  }
+
+  async function resumeRecording() {
+    const recorder = mediaRecorderRef.current;
+    const audioContext = audioContextRef.current;
+
+    if (
+      !recorder ||
+      !audioContext ||
+      recorder.state !== "paused" ||
+      isProcessing ||
+      stoppingRef.current
+    ) {
+      return;
+    }
+
+    try {
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+      recorder.resume();
+      startDurationTimer();
+      setIsPaused(false);
+      setError(null);
+      setProcessingStatus(`錄音已繼續，系統會持續串流至 ${liveProviderLabelRef.current}。`);
+    } catch {
+      if (
+        mediaRecorderRef.current?.state === "recording" &&
+        audioContextRef.current?.state === "running"
+      ) {
+        startDurationTimer();
+        setIsPaused(false);
+      }
+      setError("未能繼續錄音，請重試。");
     }
   }
 
@@ -1004,6 +1087,8 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
   }
 
   const displayedPatient = isRecording || isProcessing ? recordingPatientRef.current : selectedPatient;
+  const canRenderFinalRecordPanel = Boolean(recordText) || (!isRecording && !isProcessing && Boolean(transcript));
+  const hasRecordText = recordText.trim().length > 0;
 
   return (
     <section className="rounded-xl border border-primary/20 bg-white p-4 shadow-sm sm:p-5">
@@ -1018,15 +1103,25 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
             {displayedPatient?.phone ? `（${displayedPatient.phone}）` : ""}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {isRecording ? (
-            <button
-              type="button"
-              onClick={stopRecording}
-              className="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
-            >
-              停止錄音
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => void (isPaused ? resumeRecording() : pauseRecording())}
+                disabled={isProcessing}
+                className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isPaused ? "繼續錄音" : "暫停錄音"}
+              </button>
+              <button
+                type="button"
+                onClick={stopRecording}
+                className="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
+              >
+                停止錄音
+              </button>
+            </>
           ) : (
             <button
               type="button"
@@ -1042,9 +1137,13 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
 
       <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
         {isRecording ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-red-700">
-            <span className="h-2 w-2 rounded-full bg-red-600" />
-            錄音中 {formatDuration(durationSeconds)}
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 ${
+              isPaused ? "bg-amber-50 text-amber-800" : "bg-red-50 text-red-700"
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${isPaused ? "bg-amber-500" : "bg-red-600"}`} />
+            {isPaused ? `已暫停 ${formatDuration(durationSeconds)}` : `錄音中 ${formatDuration(durationSeconds)}`}
           </span>
         ) : (
           <span className="rounded-full bg-gray-100 px-2.5 py-1 text-gray-600">未錄音</span>
@@ -1130,27 +1229,43 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
         </div>
       ) : null}
 
-      {recordText ? (
+      {canRenderFinalRecordPanel ? (
         <div className="mt-4 space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-semibold text-gray-900">最終病歷摘要</h3>
-              <p className="text-xs text-gray-600">停止錄音後整段整理，可直接貼入病歷系統。</p>
+              <p className="text-xs text-gray-600">
+                {hasRecordText
+                  ? "停止錄音後整段整理，可直接貼入病歷系統。"
+                  : "如 AI 未整理出摘要，可直接手打修改後再複製或寫入。"}
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => void copyText(recordText, "record")}
-                className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100"
+                disabled={!hasRecordText}
+                className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 複製摘要
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditingRecordText((current) => !current)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  isEditingRecordText
+                    ? "border border-primary/30 bg-primary/[0.08] text-primary hover:bg-primary/[0.12]"
+                    : "border border-cyan-200 bg-cyan-50 text-cyan-900 hover:bg-cyan-100"
+                }`}
+              >
+                {isEditingRecordText ? "完成修改" : hasRecordText ? "手動修改" : "手打摘要"}
               </button>
               {selectedPatient ? (
                 <>
                   <button
                     type="button"
                     onClick={() => void saveToPatientRecord()}
-                    disabled={savingToPatientRecord}
+                    disabled={savingToPatientRecord || !hasRecordText}
                     className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {savingToPatientRecord ? "寫入中..." : "寫入病人記錄"}
@@ -1166,7 +1281,26 @@ export function CantoneseVoiceNoteTool({ selectedPatient }: CantoneseVoiceNoteTo
               ) : null}
             </div>
           </div>
-          <pre className="whitespace-pre-wrap text-sm leading-6 text-gray-800">{recordText}</pre>
+          {isEditingRecordText ? (
+            <textarea
+              value={recordText}
+              onChange={(event) => setRecordText(event.target.value)}
+              rows={12}
+              placeholder="可直接手打或修正 AI 摘要，之後複製摘要或寫入病人記錄都會用此版本。"
+              className="w-full rounded-md border border-cyan-200 bg-white p-3 text-sm leading-6 text-gray-800 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          ) : hasRecordText ? (
+            <pre className="whitespace-pre-wrap text-sm leading-6 text-gray-800">{recordText}</pre>
+          ) : (
+            <div className="rounded-md border border-dashed border-gray-300 bg-white px-3 py-4 text-sm text-gray-500">
+              尚未有摘要，按右上角「手打摘要」即可直接輸入。
+            </div>
+          )}
+          {isEditingRecordText ? (
+            <p className="text-xs text-cyan-900">
+              手動修改後，複製摘要及寫入病人記錄都會使用目前文字版本。
+            </p>
+          ) : null}
           {!selectedPatient ? (
             <p className="text-xs text-amber-700">
               目前未勾選病人；你可先複製使用。若想一鍵寫入，先在上方選取病人。
