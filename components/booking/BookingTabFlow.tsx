@@ -58,14 +58,42 @@ type BookingTabFlowProps = {
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const SLOT_INTERVAL_MINUTES = 15;
 const MAX_BOOKING_WINDOW_DAYS = 90;
-const WEEKDAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
+const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const;
 const WEEKDAY_LABELS_ZH = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'] as const;
 
 const PICKUP_LABELS: Record<PickupType, string> = {
-  none: '不需要 None',
-  lalamove: 'Lalamove',
-  sfexpress: '順豐 SF Express',
-  clinic_pickup: '診所自取 Clinic Pickup',
+  none: '不需要',
+  lalamove: '即日配送（Lalamove）',
+  sfexpress: '順豐速運',
+  clinic_pickup: '診所自取',
+};
+
+const VISIT_TYPE_LABELS: Record<VisitType, string> = {
+  first: '首診',
+  followup: '覆診',
+};
+
+const RECEIPT_LABELS: Record<ReceiptType, string> = {
+  no: '不需要',
+  yes_insurance: '需要，用作保險索償',
+  yes_not_insurance: '需要，非保險用途',
+};
+
+const GENDER_LABELS: Record<Exclude<GenderType, ''>, string> = {
+  male: '男',
+  female: '女',
+  other: '其他',
+};
+
+const REFERRAL_SOURCE_LABELS: Record<string, string> = {
+  google: 'Google 搜尋',
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+  youtube: 'YouTube',
+  friend: '朋友介紹',
+  doctor: '醫師介紹',
+  walk_in: '路過',
+  other: '其他',
 };
 
 const INITIAL_FORM_VALUES: BookingFormValues = {
@@ -196,7 +224,7 @@ function formatMonthLabel(monthKey: string): string {
   if (!parsed) return monthKey;
 
   const date = new Date(Date.UTC(parsed.year, parsed.month - 1, 1));
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat('zh-HK', {
     timeZone: HONG_KONG_TIMEZONE,
     year: 'numeric',
     month: 'long',
@@ -576,21 +604,21 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
     if (visitType === 'first') {
       return [
         '[首診]',
-        `ID: ${values.idCard.trim() || 'N/A'}`,
-        `DOB: ${values.dateOfBirth.trim() || 'N/A'}`,
-        `Gender: ${values.gender || 'N/A'}`,
-        `Allergies: ${values.allergies.trim() || 'None'}`,
-        `Medications: ${values.medications.trim() || 'None'}`,
-        `Symptoms: ${values.symptoms.trim() || 'N/A'}`,
-        `Referral: ${values.referralSource.trim() || 'N/A'}`,
-        `Receipt: ${values.needReceipt}`,
+        `身份證號碼: ${values.idCard.trim() || '未提供'}`,
+        `出生日期: ${values.dateOfBirth.trim() || '未提供'}`,
+        `性別: ${values.gender ? GENDER_LABELS[values.gender] : '未提供'}`,
+        `過敏史: ${values.allergies.trim() || '沒有'}`,
+        `正服用藥物／保健品: ${values.medications.trim() || '沒有'}`,
+        `主要症狀: ${values.symptoms.trim() || '未提供'}`,
+        `得知來源: ${REFERRAL_SOURCE_LABELS[values.referralSource.trim()] || '未提供'}`,
+        `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
         `取藥方法: ${PICKUP_LABELS[values.medicationPickup]}`,
       ].join(' | ');
     }
 
     return [
       '[覆診]',
-      `Receipt: ${values.needReceipt}`,
+      `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
       `取藥方法: ${PICKUP_LABELS[values.medicationPickup]}`,
     ].join(' | ');
   }
@@ -747,8 +775,8 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
                   <Clock3 className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/70">
-                    Doctor Schedule
+                  <p className="text-xs font-semibold tracking-[0.24em] text-primary/70">
+                    醫師應診時間
                   </p>
                   <h2 className="mt-1 text-lg font-semibold text-slate-900">
                     {selectedDoctor.doctorNameZh}
@@ -822,7 +850,7 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
                     : 'border-slate-200 bg-white text-slate-700 hover:border-primary/40'
                 }`}
               >
-                <p className="font-semibold">首診 First Visit</p>
+                <p className="font-semibold">{VISIT_TYPE_LABELS.first}</p>
                 <p className="mt-1 text-xs text-slate-500">第一次到診所就診</p>
               </button>
 
@@ -835,7 +863,7 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
                     : 'border-slate-200 bg-white text-slate-700 hover:border-primary/40'
                 }`}
               >
-                <p className="font-semibold">覆診 Follow-up</p>
+                <p className="font-semibold">{VISIT_TYPE_LABELS.followup}</p>
                 <p className="mt-1 text-xs text-slate-500">曾經到診所就診</p>
               </button>
             </div>
@@ -866,7 +894,7 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
             <p className="font-semibold text-slate-900">
               {selectedDoctor?.doctorNameZh} @ {selectedClinic?.clinicNameZh}
             </p>
-            <p className="mt-1">{visitType === 'first' ? '首診 First Visit' : '覆診 Follow-up Visit'}</p>
+            <p className="mt-1">{VISIT_TYPE_LABELS[visitType]}</p>
           </div>
 
           <div className="space-y-3">
@@ -1039,7 +1067,7 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
             <p className="mt-1">
               {formatDateForDisplay(selectedDate)} {selectedTime}
             </p>
-            <p className="mt-1">{visitType === 'first' ? '首診 First Visit' : '覆診 Follow-up Visit'}</p>
+            <p className="mt-1">{VISIT_TYPE_LABELS[visitType]}</p>
           </div>
 
           <form className="space-y-5" onSubmit={handleSubmit}>
@@ -1058,7 +1086,7 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
                   value={formValues.firstName}
                   onChange={(event) => updateFormField('firstName', event.target.value)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                  placeholder="Tai Man"
+                  placeholder="例如：大文"
                 />
                 {formErrors.firstName ? <p className="text-xs text-red-600">{formErrors.firstName}</p> : null}
               </label>
@@ -1071,7 +1099,7 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
                   value={formValues.lastName}
                   onChange={(event) => updateFormField('lastName', event.target.value)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                  placeholder="Chan"
+                  placeholder="例如：陳"
                 />
                 {formErrors.lastName ? <p className="text-xs text-red-600">{formErrors.lastName}</p> : null}
               </label>
@@ -1085,7 +1113,7 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
                 value={formValues.phone}
                 onChange={(event) => updateFormField('phone', event.target.value)}
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                placeholder="98765432"
+                placeholder="例如：98765432"
               />
               {formErrors.phone ? <p className="text-xs text-red-600">{formErrors.phone}</p> : null}
             </label>
@@ -1098,7 +1126,7 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
                 value={formValues.email}
                 onChange={(event) => updateFormField('email', event.target.value)}
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                placeholder="email@example.com"
+                placeholder="例如：name@example.com"
               />
               {formErrors.email ? <p className="text-xs text-red-600">{formErrors.email}</p> : null}
             </label>
@@ -1111,9 +1139,9 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
                   onChange={(event) => updateFormField('needReceipt', event.target.value as ReceiptType)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
                 >
-                  <option value="no">不用 No</option>
-                  <option value="yes_insurance">是，保險索償 Yes for insurance</option>
-                  <option value="yes_not_insurance">是，但非保險 Yes not for insurance</option>
+                  <option value="no">不需要</option>
+                  <option value="yes_insurance">需要，用作保險索償</option>
+                  <option value="yes_not_insurance">需要，非保險用途</option>
                 </select>
               </label>
 
@@ -1126,10 +1154,10 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
                   }
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
                 >
-                  <option value="none">不需要 None</option>
-                  <option value="lalamove">Lalamove</option>
-                  <option value="sfexpress">順豐 SF Express</option>
-                  <option value="clinic_pickup">診所自取 Clinic Pickup</option>
+                  <option value="none">不需要</option>
+                  <option value="lalamove">即日配送（Lalamove）</option>
+                  <option value="sfexpress">順豐速運</option>
+                  <option value="clinic_pickup">診所自取</option>
                 </select>
               </label>
             </div>
@@ -1173,9 +1201,9 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
                   >
                     <option value="">請選擇</option>
-                    <option value="male">男 Male</option>
-                    <option value="female">女 Female</option>
-                    <option value="other">其他 Other</option>
+                    <option value="male">男</option>
+                    <option value="female">女</option>
+                    <option value="other">其他</option>
                   </select>
                   {formErrors.gender ? <p className="text-xs text-red-600">{formErrors.gender}</p> : null}
                 </label>
