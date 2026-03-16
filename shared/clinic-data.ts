@@ -25,6 +25,7 @@ export type ClinicProfile = {
   nameEn: string;
   address: string;
   phones: string[];
+  contactPhone?: string;
   whatsappUrl?: string;
   hoursText: string;
   googleMapUrl?: string;
@@ -42,6 +43,7 @@ export const CLINICS: ClinicProfile[] = [
     nameEn: 'Central',
     address: '中環皇后大道中70號卡佛大廈23樓2310室',
     phones: ['3575 9733', '6733 3234'],
+    contactPhone: '6733 3234',
     whatsappUrl: 'https://wa.me/85267333234',
     hoursText: '週一至五 11:00-14:00, 15:30-19:30；週六日及公眾假期休息',
     googleMapUrl: buildGoogleMapSearchUrl('中環皇后大道中70號卡佛大廈23樓2310室'),
@@ -53,6 +55,7 @@ export const CLINICS: ClinicProfile[] = [
     nameEn: 'Jordan',
     address: '九龍佐敦寶靈街6號佐敦中心7樓全層',
     phones: ['3105 0733', '6733 3801'],
+    contactPhone: '6733 3801',
     whatsappUrl: 'https://wa.me/85267333801',
     hoursText: '週一至五 11:00-14:00, 15:30-19:30；週六 11:00-14:00, 15:30-18:30；週日及公眾假期休息',
     googleMapUrl: buildGoogleMapSearchUrl('九龍佐敦寶靈街6號佐敦中心7樓全層'),
@@ -63,7 +66,8 @@ export const CLINICS: ClinicProfile[] = [
     nameZh: '荃灣',
     nameEn: 'Tsuen Wan',
     address: '荃灣富麗花園商場A座地下20號舖',
-    phones: ['2698 5422', '6097 7363'],
+    phones: ['6097 7363'],
+    contactPhone: '6097 7363',
     whatsappUrl: 'https://wa.me/85260977363',
     hoursText: '週一、二、四至日 10:30-14:00，15:30-19:00；週三及公眾假期休息',
     googleMapUrl: buildGoogleMapSearchUrl('荃灣富麗花園商場A座地下20號舖'),
@@ -172,10 +176,11 @@ export function getWhatsappContactLines(): string[] {
 export function getPromptClinicInfoLines(): string[] {
   return PHYSICAL_CLINIC_IDS.map((clinicId) => {
     const clinic = CLINIC_BY_ID[clinicId];
-    const phones = clinic.phones.join(', ');
+    const contactPhone = clinic.contactPhone || clinic.phones[0] || '';
+    const phoneInfo = contactPhone ? ` | 聯絡電話：${contactPhone}` : '';
     const whatsappInfo = clinic.whatsappUrl ? ` | WhatsApp：${clinic.whatsappUrl}` : '';
     const mapInfo = clinic.googleMapUrl ? ` | Google地圖：${clinic.googleMapUrl}` : '';
-    return `${clinic.nameZh}診所：地址：${clinic.address} | 電話：${phones}${whatsappInfo} | ${clinic.hoursText}${mapInfo}`;
+    return `${clinic.nameZh}診所：地址：${clinic.address}${phoneInfo}${whatsappInfo} | ${clinic.hoursText}${mapInfo}`;
   });
 }
 
