@@ -1,13 +1,38 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { LegacyChatMessage } from '@/lib/legacy-chat-response';
+import { DEFAULT_WIDGET_CHATBOT_SETTINGS } from '@/lib/widget-chatbot-settings';
+import {
+  getClinicAddressLines,
+  getClinicHoursLines,
+  getClinicRouteLinks,
+} from '@/shared/clinic-data';
 
 export const CHATWOOT_MAIN_MENU_MESSAGE = `你好，呢度係醫天圓中醫診所。請問有咩可以幫到你？
 1. 一般查詢
 2. 預約
 3. 想搵姑娘`;
 
+const widgetSettings = DEFAULT_WIDGET_CHATBOT_SETTINGS;
+const clinicRouteLinkLines = getClinicRouteLinks()
+  .map(({ label, href }) => `${label}: ${href}`)
+  .join('\n');
+
+export const CHATWOOT_GENERAL_MENU_MESSAGE = `${widgetSettings.flows.clinic.prompt}
+1. 收費
+2. 診所資訊
+3. 醫師時間表
+4. 其他問題
+5. 返回主選單`;
+
+export const CHATWOOT_CLINIC_MENU_MESSAGE = `${widgetSettings.flows.clinic.prompt}
+1. ${widgetSettings.flows.clinic.hoursButtonLabel}
+2. ${widgetSettings.flows.clinic.addressesButtonLabel}
+3. ${widgetSettings.flows.clinic.backButtonLabel}`;
+
 export const CHATWOOT_GENERAL_INQUIRY_PROMPT =
   '可以呀，請直接講你想問嘅內容，我會盡快幫你。';
+
+export const CHATWOOT_FEES_MESSAGE = widgetSettings.flows.fees.reply;
 
 export const CHATWOOT_BOOKING_ACK =
   '收到，你想查預約。我先記低，你可以等姑娘跟進。';
@@ -15,10 +40,16 @@ export const CHATWOOT_BOOKING_ACK =
 export const CHATWOOT_HUMAN_ACK =
   '好，我幫你轉交姑娘跟進，請稍等。';
 
+export const CHATWOOT_TIMETABLE_MESSAGE = widgetSettings.flows.timetable.reply;
+
+export const CHATWOOT_CLINIC_HOURS_MESSAGE = `${getClinicHoursLines().join('\n')}\n\n${widgetSettings.flows.clinic.hoursClosingText}`;
+
+export const CHATWOOT_CLINIC_ADDRESSES_MESSAGE = `${widgetSettings.flows.clinic.addressesPrompt}\n\n${getClinicAddressLines().join('\n\n')}${clinicRouteLinkLines ? `\n\n${clinicRouteLinkLines}` : ''}`;
+
 export const CHATWOOT_FLOW_STATE_ATTRIBUTE = 'eden_flow_state';
 export const CHATWOOT_LAST_INCOMING_MESSAGE_ID_ATTRIBUTE = 'eden_last_incoming_message_id';
 
-export type ChatwootFlowState = 'menu' | 'general_ai' | 'booking' | 'human';
+export type ChatwootFlowState = 'menu' | 'general_menu' | 'clinic_menu' | 'general_ai' | 'booking' | 'human';
 
 export interface ChatwootIncomingEvent {
   accountId: number;
@@ -42,7 +73,9 @@ interface ChatwootConversationDetails {
   messages?: ChatwootMessage[];
 }
 
-type MenuSelectionKind = 'general_ai' | 'booking' | 'human';
+type MenuSelectionKind = 'general' | 'booking' | 'human';
+type GeneralSelectionKind = 'fees' | 'clinic' | 'timetable' | 'other' | 'main';
+type ClinicSelectionKind = 'hours' | 'addresses' | 'main';
 
 export class ChatwootClient {
   constructor(
@@ -195,7 +228,13 @@ export function getFlowState(customAttributes: Record<string, unknown> | null | 
     ? customAttributes[CHATWOOT_FLOW_STATE_ATTRIBUTE]
     : '';
 
-  if (value === 'general_ai' || value === 'booking' || value === 'human') {
+  if (
+    value === 'general_menu' ||
+    value === 'clinic_menu' ||
+    value === 'general_ai' ||
+    value === 'booking' ||
+    value === 'human'
+  ) {
     return value;
   }
 
@@ -221,15 +260,12 @@ export function mergeFlowAttributes(
   };
 }
 
-export function resolveMenuSelection(content: string): { kind: MenuSelectionKind; remainder: string } | null {
+function resolveSelection<K extends string>(
+  content: string,
+  patterns: Array<{ kind: K; pattern: RegExp }>
+): { kind: K; remainder: string } | null {
   const trimmed = content.trim();
   if (!trimmed) return null;
-
-  const patterns: Array<{ kind: MenuSelectionKind; pattern: RegExp }> = [
-    { kind: 'general_ai', pattern: /^(?:1(?:[.)、\s-]|$)|一般查詢(?:[:：\s-]|$)|一般查询(?:[:：\s-]|$))/u },
-    { kind: 'booking', pattern: /^(?:2(?:[.)、\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u },
-    { kind: 'human', pattern: /^(?:3(?:[.)、\s-]|$)|想搵姑娘(?:[:：\s-]|$)|姑娘(?:[:：\s-]|$)|真人(?:[:：\s-]|$))/u },
-  ];
 
   for (const { kind, pattern } of patterns) {
     const match = trimmed.match(pattern);
@@ -240,6 +276,52 @@ export function resolveMenuSelection(content: string): { kind: MenuSelectionKind
   }
 
   return null;
+}
+
+export function resolveMenuSelection(
+  content: string,
+  options?: { allowNumeric?: boolean }
+): { kind: MenuSelectionKind; remainder: string } | null {
+  const allowNumeric = options?.allowNumeric ?? true;
+
+  return resolveSelection(content, [
+    {
+      kind: 'general',
+      pattern: allowNumeric
+        ? /^(?:1(?:[.)、\s-]|$)|一般查詢(?:[:：\s-]|$)|一般查询(?:[:：\s-]|$))/u
+        : /^(?:一般查詢(?:[:：\s-]|$)|一般查询(?:[:：\s-]|$))/u,
+    },
+    {
+      kind: 'booking',
+      pattern: allowNumeric
+        ? /^(?:2(?:[.)、\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u
+        : /^(?:預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u,
+    },
+    {
+      kind: 'human',
+      pattern: allowNumeric
+        ? /^(?:3(?:[.)、\s-]|$)|想搵姑娘(?:[:：\s-]|$)|姑娘(?:[:：\s-]|$)|真人(?:[:：\s-]|$))/u
+        : /^(?:想搵姑娘(?:[:：\s-]|$)|姑娘(?:[:：\s-]|$)|真人(?:[:：\s-]|$))/u,
+    },
+  ]);
+}
+
+export function resolveGeneralMenuSelection(content: string): { kind: GeneralSelectionKind; remainder: string } | null {
+  return resolveSelection(content, [
+    { kind: 'fees', pattern: /^(?:1(?:[.)、\s-]|$)|收費(?:[:：\s-]|$)|收费(?:[:：\s-]|$))/u },
+    { kind: 'clinic', pattern: /^(?:2(?:[.)、\s-]|$)|診所資訊(?:[:：\s-]|$)|诊所资讯(?:[:：\s-]|$))/u },
+    { kind: 'timetable', pattern: /^(?:3(?:[.)、\s-]|$)|醫師時間表(?:[:：\s-]|$)|医师时间表(?:[:：\s-]|$))/u },
+    { kind: 'other', pattern: /^(?:4(?:[.)、\s-]|$)|其他問題(?:[:：\s-]|$)|其他问题(?:[:：\s-]|$))/u },
+    { kind: 'main', pattern: /^(?:5(?:[.)、\s-]|$)|返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/u },
+  ]);
+}
+
+export function resolveClinicMenuSelection(content: string): { kind: ClinicSelectionKind; remainder: string } | null {
+  return resolveSelection(content, [
+    { kind: 'hours', pattern: /^(?:1(?:[.)、\s-]|$)|營業時間(?:[:：\s-]|$)|营业时间(?:[:：\s-]|$))/u },
+    { kind: 'addresses', pattern: /^(?:2(?:[.)、\s-]|$)|地址(?:[:：\s-]|$)|路線圖(?:[:：\s-]|$)|路线图(?:[:：\s-]|$))/u },
+    { kind: 'main', pattern: /^(?:3(?:[.)、\s-]|$)|返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/u },
+  ]);
 }
 
 export function mapConversationMessagesToLegacyChat(
@@ -257,10 +339,16 @@ export function mapConversationMessagesToLegacyChat(
       if (!content || message.private) return false;
       if (isActivity) return false;
       if (content === CHATWOOT_GENERAL_INQUIRY_PROMPT) return false;
+      if (content === CHATWOOT_GENERAL_MENU_MESSAGE) return false;
+      if (content === CHATWOOT_CLINIC_MENU_MESSAGE) return false;
+      if (content === CHATWOOT_FEES_MESSAGE) return false;
       if (content === CHATWOOT_BOOKING_ACK) return false;
       if (content === CHATWOOT_HUMAN_ACK) return false;
+      if (content === CHATWOOT_TIMETABLE_MESSAGE) return false;
+      if (content === CHATWOOT_CLINIC_HOURS_MESSAGE) return false;
+      if (content === CHATWOOT_CLINIC_ADDRESSES_MESSAGE) return false;
       if (content === CHATWOOT_MAIN_MENU_MESSAGE) return false;
-      if (isPureGeneralInquirySelection(content)) return false;
+      if (isPureSelection(content)) return false;
       return true;
     })
     .sort((left, right) => (left.created_at || 0) - (right.created_at || 0))
@@ -300,7 +388,13 @@ export function replaceLatestUserMessage(
   return nextMessages;
 }
 
-function isPureGeneralInquirySelection(content: string): boolean {
-  const selection = resolveMenuSelection(content);
-  return selection?.kind === 'general_ai' && !selection.remainder;
+function isPureSelection(content: string): boolean {
+  const rootSelection = resolveMenuSelection(content);
+  if (rootSelection && !rootSelection.remainder) return true;
+
+  const generalSelection = resolveGeneralMenuSelection(content);
+  if (generalSelection && !generalSelection.remainder) return true;
+
+  const clinicSelection = resolveClinicMenuSelection(content);
+  return Boolean(clinicSelection && !clinicSelection.remainder);
 }

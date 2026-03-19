@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   CHATWOOT_BOOKING_ACK,
+  CHATWOOT_CLINIC_ADDRESSES_MESSAGE,
+  CHATWOOT_CLINIC_HOURS_MESSAGE,
+  CHATWOOT_CLINIC_MENU_MESSAGE,
+  CHATWOOT_FEES_MESSAGE,
+  CHATWOOT_GENERAL_MENU_MESSAGE,
   CHATWOOT_GENERAL_INQUIRY_PROMPT,
   CHATWOOT_HUMAN_ACK,
   CHATWOOT_MAIN_MENU_MESSAGE,
+  CHATWOOT_TIMETABLE_MESSAGE,
   createChatwootClientFromEnv,
   extractIncomingChatwootEvent,
   getFlowState,
@@ -11,6 +17,8 @@ import {
   mapConversationMessagesToLegacyChat,
   mergeFlowAttributes,
   replaceLatestUserMessage,
+  resolveClinicMenuSelection,
+  resolveGeneralMenuSelection,
   resolveMenuSelection,
   verifyChatwootSignature,
 } from '@/lib/chatwoot-agent-bot';
@@ -55,35 +63,68 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, ignored: 'duplicate_message' });
     }
 
-    const selection = resolveMenuSelection(event.content);
-    let nextState = getFlowState(currentAttributes);
+    const currentState = getFlowState(currentAttributes);
+    const rootSelection = resolveMenuSelection(event.content, {
+      allowNumeric: currentState === 'menu',
+    });
+    let nextState = currentState;
     let reply: string | null = null;
 
-    if (selection?.kind === 'human') {
+    if (rootSelection?.kind === 'human') {
       nextState = 'human';
       reply = CHATWOOT_HUMAN_ACK;
-    } else if (selection?.kind === 'booking') {
+    } else if (rootSelection?.kind === 'booking') {
       nextState = 'booking';
       reply = CHATWOOT_BOOKING_ACK;
-    } else {
-      const shouldStartGeneralAi = selection?.kind === 'general_ai';
+    } else if (rootSelection?.kind === 'general') {
+      nextState = 'general_menu';
+      reply = CHATWOOT_GENERAL_MENU_MESSAGE;
+    } else if (currentState === 'general_menu') {
+      const generalSelection = resolveGeneralMenuSelection(event.content);
 
-      if (shouldStartGeneralAi) {
+      if (generalSelection?.kind === 'fees') {
+        nextState = 'general_menu';
+        reply = CHATWOOT_FEES_MESSAGE;
+      } else if (generalSelection?.kind === 'clinic') {
+        nextState = 'clinic_menu';
+        reply = CHATWOOT_CLINIC_MENU_MESSAGE;
+      } else if (generalSelection?.kind === 'timetable') {
+        nextState = 'general_menu';
+        reply = CHATWOOT_TIMETABLE_MESSAGE;
+      } else if (generalSelection?.kind === 'other') {
         nextState = 'general_ai';
+        reply = CHATWOOT_GENERAL_INQUIRY_PROMPT;
+      } else if (generalSelection?.kind === 'main') {
+        nextState = 'menu';
+        reply = CHATWOOT_MAIN_MENU_MESSAGE;
+      } else {
+        nextState = 'general_menu';
+        reply = CHATWOOT_GENERAL_MENU_MESSAGE;
       }
+    } else if (currentState === 'clinic_menu') {
+      const clinicSelection = resolveClinicMenuSelection(event.content);
 
+      if (clinicSelection?.kind === 'hours') {
+        nextState = 'clinic_menu';
+        reply = CHATWOOT_CLINIC_HOURS_MESSAGE;
+      } else if (clinicSelection?.kind === 'addresses') {
+        nextState = 'clinic_menu';
+        reply = CHATWOOT_CLINIC_ADDRESSES_MESSAGE;
+      } else if (clinicSelection?.kind === 'main') {
+        nextState = 'menu';
+        reply = CHATWOOT_MAIN_MENU_MESSAGE;
+      } else {
+        nextState = 'clinic_menu';
+        reply = CHATWOOT_CLINIC_MENU_MESSAGE;
+      }
+    } else {
       if (nextState === 'general_ai') {
-        if (selection?.kind === 'general_ai' && !selection.remainder) {
-          reply = CHATWOOT_GENERAL_INQUIRY_PROMPT;
-        } else {
-          const mappedMessages = mapConversationMessagesToLegacyChat(conversation.messages);
-          const latestUserMessage = selection?.remainder || event.content;
-          const aiMessages = replaceLatestUserMessage(mappedMessages, latestUserMessage);
-          const { reply: aiReply } = await generateLegacyChatResponse({
-            messages: aiMessages,
-          });
-          reply = aiReply;
-        }
+        const mappedMessages = mapConversationMessagesToLegacyChat(conversation.messages);
+        const aiMessages = replaceLatestUserMessage(mappedMessages, event.content);
+        const { reply: aiReply } = await generateLegacyChatResponse({
+          messages: aiMessages,
+        });
+        reply = aiReply;
       } else if (nextState === 'booking' || nextState === 'human') {
         reply = null;
       } else {
