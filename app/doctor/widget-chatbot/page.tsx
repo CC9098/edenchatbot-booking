@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  CheckCircle2,
   Eye,
+  LoaderCircle,
   MessageCircleMore,
   RefreshCcw,
   Save,
@@ -267,7 +269,9 @@ export default function DoctorWidgetChatbotPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved">("idle");
   const [selectedNodeId, setSelectedNodeId] = useState<WidgetChatbotNodeId>("welcome");
+  const statusBannerRef = useRef<HTMLDivElement | null>(null);
 
   async function loadSettings() {
     setLoading(true);
@@ -312,16 +316,36 @@ export default function DoctorWidgetChatbotPage() {
     [settings, draft]
   );
 
+  useEffect(() => {
+    if (saveStatus !== "saved") return;
+
+    const timer = window.setTimeout(() => {
+      setSaveStatus("idle");
+    }, 2200);
+
+    return () => window.clearTimeout(timer);
+  }, [saveStatus]);
+
+  const saveButtonLabel = saving
+    ? "儲存中..."
+    : saveStatus === "saved" && !hasUnsavedChanges
+      ? "已儲存"
+      : hasUnsavedChanges
+        ? "儲存 widget 設定"
+        : "未有改動";
+
   function resetDraft() {
     setDraft(cloneSettings(settings));
     setNotice("已還原到最近一次儲存版本。");
     setError(null);
+    setSaveStatus("idle");
   }
 
   async function saveSettings() {
     setSaving(true);
     setError(null);
     setNotice(null);
+    setSaveStatus("idle");
 
     try {
       const response = await fetch("/api/doctor/widget-chatbot/settings", {
@@ -346,8 +370,15 @@ export default function DoctorWidgetChatbotPage() {
       setUpdatedAt(payload.updatedAt ?? null);
       setRole(payload.role ?? role);
       setNotice("客服 widget 設定已更新，前台 widget 重新打開後就會讀取新內容。");
+      setSaveStatus("saved");
+      window.setTimeout(() => {
+        statusBannerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 80);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "儲存失敗");
+      window.setTimeout(() => {
+        statusBannerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 80);
     } finally {
       setSaving(false);
     }
@@ -1079,10 +1110,18 @@ export default function DoctorWidgetChatbotPage() {
       </header>
 
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div
+          ref={statusBannerRef}
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {error}
+        </div>
       ) : null}
       {notice ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div
+          ref={statusBannerRef}
+          className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+        >
           {notice}
         </div>
       ) : null}
@@ -1092,7 +1131,26 @@ export default function DoctorWidgetChatbotPage() {
           <Waypoints className="h-4 w-4 text-cyan-600" />
           <span>Flow-first 編輯：先揀節點，再改節點內文字。</span>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <span
+            className={`text-sm font-medium ${
+              saving
+                ? "text-cyan-700"
+                : saveStatus === "saved" && !hasUnsavedChanges
+                  ? "text-emerald-700"
+                  : hasUnsavedChanges
+                    ? "text-amber-700"
+                    : "text-slate-500"
+            }`}
+          >
+            {saving
+              ? "正在儲存設定..."
+              : saveStatus === "saved" && !hasUnsavedChanges
+                ? "所有改動已儲存"
+                : hasUnsavedChanges
+                  ? "有未儲存改動"
+                  : "未有新改動"}
+          </span>
           <button
             type="button"
             onClick={resetDraft}
@@ -1106,13 +1164,42 @@ export default function DoctorWidgetChatbotPage() {
             type="button"
             onClick={() => void saveSettings()}
             disabled={!hasUnsavedChanges || saving}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+            className={`inline-flex min-w-[170px] items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white transition disabled:cursor-not-allowed ${
+              saving
+                ? "bg-cyan-700"
+                : saveStatus === "saved" && !hasUnsavedChanges
+                  ? "bg-emerald-600"
+                  : hasUnsavedChanges
+                    ? "bg-primary hover:bg-primary-hover"
+                    : "bg-slate-300 disabled:opacity-100"
+            }`}
           >
-            <Save size={16} />
-            {saving ? "儲存中..." : "儲存 widget 設定"}
+            {saving ? (
+              <LoaderCircle size={16} className="animate-spin" />
+            ) : saveStatus === "saved" && !hasUnsavedChanges ? (
+              <CheckCircle2 size={16} />
+            ) : (
+              <Save size={16} />
+            )}
+            {saveButtonLabel}
           </button>
         </div>
       </div>
+
+      {(saving || (saveStatus === "saved" && !hasUnsavedChanges)) ? (
+        <div className="pointer-events-none fixed bottom-6 right-6 z-50">
+          <div
+            className={`rounded-2xl px-4 py-3 text-sm font-medium text-white shadow-2xl ${
+              saving ? "bg-cyan-700" : "bg-emerald-600"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {saving ? <LoaderCircle size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+              <span>{saving ? "儲存中..." : "已儲存"}</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 shadow-sm">
