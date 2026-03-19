@@ -21,6 +21,7 @@ import {
   buildWidgetMainMenuOptions,
   DEFAULT_WIDGET_CHATBOT_SETTINGS,
   getWidgetChatbotMenuLabelByTarget,
+  normalizeWidgetChatbotSettings,
   WIDGET_CHATBOT_FLOW_NODES,
   WIDGET_CHATBOT_MENU_TARGET_OPTIONS,
   type WidgetChatbotFlowNode,
@@ -342,6 +343,9 @@ export default function DoctorWidgetChatbotPage() {
   }
 
   async function saveSettings() {
+    const expectedSettings = normalizeWidgetChatbotSettings(cloneSettings(draft));
+    const expectedSerialized = JSON.stringify(expectedSettings);
+
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -364,12 +368,33 @@ export default function DoctorWidgetChatbotPage() {
         throw new Error(payload.error || `HTTP ${response.status}`);
       }
 
-      const nextSettings = cloneSettings(payload.settings);
-      setSettings(nextSettings);
-      setDraft(cloneSettings(nextSettings));
-      setUpdatedAt(payload.updatedAt ?? null);
-      setRole(payload.role ?? role);
-      setNotice("客服 widget 設定已更新，前台 widget 重新打開後就會讀取新內容。");
+      const persistedSettings = cloneSettings(payload.settings);
+      if (JSON.stringify(persistedSettings) !== expectedSerialized) {
+        throw new Error("資料庫回寫內容同你剛剛送出的修改不一致，請重新整理後再試。");
+      }
+
+      const verifyResponse = await fetch("/api/doctor/widget-chatbot/settings", {
+        method: "GET",
+        cache: "no-store",
+      });
+      const verifyPayload = (await verifyResponse.json().catch(() => ({}))) as Partial<WidgetChatbotSettingsPayload> & {
+        error?: string;
+      };
+
+      if (!verifyResponse.ok || !verifyPayload.settings) {
+        throw new Error(verifyPayload.error || "儲存後重新讀取驗證失敗");
+      }
+
+      const verifiedSettings = cloneSettings(verifyPayload.settings);
+      if (JSON.stringify(verifiedSettings) !== expectedSerialized) {
+        throw new Error("已寫入後端，但重新讀取驗證時發現內容不一致，請重新整理檢查。");
+      }
+
+      setSettings(verifiedSettings);
+      setDraft(cloneSettings(verifiedSettings));
+      setUpdatedAt(verifyPayload.updatedAt ?? payload.updatedAt ?? null);
+      setRole(verifyPayload.role ?? payload.role ?? role);
+      setNotice("已成功寫入資料庫，並重新讀回確認修改一致。");
       setSaveStatus("saved");
       window.setTimeout(() => {
         statusBannerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
