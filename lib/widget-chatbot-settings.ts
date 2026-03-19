@@ -23,6 +23,7 @@ export type WidgetChatbotNodeId =
 
 export interface WidgetChatbotMenuItem {
   id: WidgetChatbotMenuId;
+  target: WidgetChatbotMenuId;
   label: string;
   visible: boolean;
 }
@@ -122,6 +123,11 @@ const DEFAULT_MENU_LABELS: Record<WidgetChatbotMenuId, string> = {
   consult: "諮詢醫師",
 };
 
+export const WIDGET_CHATBOT_MENU_TARGET_OPTIONS = MENU_ORDER.map((id) => ({
+  value: id,
+  label: DEFAULT_MENU_LABELS[id],
+}));
+
 export const DEFAULT_WIDGET_CHATBOT_SETTINGS: WidgetChatbotSettings = {
   header: {
     title: "醫天圓小助手",
@@ -138,6 +144,7 @@ export const DEFAULT_WIDGET_CHATBOT_SETTINGS: WidgetChatbotSettings = {
   menu: {
     items: MENU_ORDER.map((id) => ({
       id,
+      target: id,
       label: DEFAULT_MENU_LABELS[id],
       visible: true,
     })),
@@ -210,9 +217,9 @@ export const WIDGET_CHATBOT_FLOW_NODES: WidgetChatbotFlowNode[] = [
     id: "mainMenu",
     title: "主選單",
     trigger: "開場白之後，或者任何流程按「返回主選單」之後。",
-    description: "列出 6 個主選項；姑娘可改顯示名稱、排序、顯示/隱藏。",
+    description: "列出主選項；姑娘可改顯示名稱、排序、顯示/隱藏，同埋每個 button 對應去邊條 flow。",
     nextSteps: ["收費", "診所資訊", "預約", "醫師時間表", "其他問題", "諮詢醫師"],
-    editScope: "可改 button 名稱、排序、顯示/隱藏；button 去向暫時固定。",
+    editScope: "可改 button 名稱、排序、顯示/隱藏，以及 button 去向。",
   },
   {
     id: "fees",
@@ -307,10 +314,12 @@ function normalizeMenuItems(value: unknown): WidgetChatbotMenuItem[] {
 
     const candidate = item as Record<string, unknown>;
     if (!isMenuId(candidate.id)) continue;
+    const target = isMenuId(candidate.target) ? candidate.target : candidate.id;
 
     byId.set(candidate.id, {
       id: candidate.id,
-      label: toNonEmptyString(candidate.label, DEFAULT_MENU_LABELS[candidate.id]),
+      target,
+      label: toNonEmptyString(candidate.label, DEFAULT_MENU_LABELS[target]),
       visible: candidate.visible !== false,
     });
   }
@@ -319,6 +328,7 @@ function normalizeMenuItems(value: unknown): WidgetChatbotMenuItem[] {
     return (
       byId.get(id) ?? {
         id,
+        target: id,
         label: DEFAULT_MENU_LABELS[id],
         visible: true,
       }
@@ -531,8 +541,15 @@ export function buildWidgetMainMenuOptions(settings: WidgetChatbotSettings): Opt
     .filter((item) => item.visible)
     .map((item) => ({
       label: item.label,
-      value: item.id,
+      value: item.target,
     }));
+}
+
+export function getWidgetChatbotMenuLabelByTarget(
+  settings: WidgetChatbotSettings,
+  target: WidgetChatbotMenuId
+): string {
+  return settings.menu.items.find((item) => item.target === target)?.label ?? DEFAULT_MENU_LABELS[target];
 }
 
 export function buildWidgetGreetingMessage(

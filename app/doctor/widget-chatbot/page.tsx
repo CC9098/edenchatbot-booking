@@ -18,7 +18,9 @@ import {
   buildWidgetGreetingMessage,
   buildWidgetMainMenuOptions,
   DEFAULT_WIDGET_CHATBOT_SETTINGS,
+  getWidgetChatbotMenuLabelByTarget,
   WIDGET_CHATBOT_FLOW_NODES,
+  WIDGET_CHATBOT_MENU_TARGET_OPTIONS,
   type WidgetChatbotFlowNode,
   type WidgetChatbotMenuId,
   type WidgetChatbotNodeId,
@@ -83,12 +85,12 @@ function buildPreview(settings: WidgetChatbotSettings, node: WidgetChatbotFlowNo
       return {
         bubbles: [{ role: "assistant", text: "主選單目前會顯示以下按鈕：" }],
         buttons: mainMenuButtons,
-        helper: "button 的去向固定，但姑娘可改名稱、排序、顯示/隱藏。",
+        helper: "每個 button 的顯示名稱、排序、顯示/隱藏，以及實際去向都可以在這裡設定。",
       };
     case "fees":
       return {
         bubbles: [
-          { role: "user", text: settings.menu.items.find((item) => item.id === "fees")?.label || "收費" },
+          { role: "user", text: getWidgetChatbotMenuLabelByTarget(settings, "fees") },
           { role: "assistant", text: settings.flows.fees.reply },
         ],
         buttons: [settings.flows.fees.endButtonLabel, settings.flows.fees.mainButtonLabel],
@@ -97,7 +99,7 @@ function buildPreview(settings: WidgetChatbotSettings, node: WidgetChatbotFlowNo
     case "clinic":
       return {
         bubbles: [
-          { role: "user", text: settings.menu.items.find((item) => item.id === "clinic")?.label || "診所資訊" },
+          { role: "user", text: getWidgetChatbotMenuLabelByTarget(settings, "clinic") },
           { role: "assistant", text: settings.flows.clinic.prompt },
         ],
         buttons: [
@@ -110,7 +112,7 @@ function buildPreview(settings: WidgetChatbotSettings, node: WidgetChatbotFlowNo
     case "clinicHours":
       return {
         bubbles: [
-          { role: "user", text: settings.menu.items.find((item) => item.id === "clinic")?.label || "診所資訊" },
+          { role: "user", text: getWidgetChatbotMenuLabelByTarget(settings, "clinic") },
           { role: "assistant", text: settings.flows.clinic.prompt },
           { role: "user", text: settings.flows.clinic.hoursButtonLabel },
           {
@@ -124,7 +126,7 @@ function buildPreview(settings: WidgetChatbotSettings, node: WidgetChatbotFlowNo
     case "clinicAddresses":
       return {
         bubbles: [
-          { role: "user", text: settings.menu.items.find((item) => item.id === "clinic")?.label || "診所資訊" },
+          { role: "user", text: getWidgetChatbotMenuLabelByTarget(settings, "clinic") },
           { role: "assistant", text: settings.flows.clinic.prompt },
           { role: "user", text: settings.flows.clinic.addressesButtonLabel },
           {
@@ -138,7 +140,7 @@ function buildPreview(settings: WidgetChatbotSettings, node: WidgetChatbotFlowNo
     case "booking":
       return {
         bubbles: [
-          { role: "user", text: settings.menu.items.find((item) => item.id === "booking")?.label || "預約" },
+          { role: "user", text: getWidgetChatbotMenuLabelByTarget(settings, "booking") },
           { role: "assistant", text: settings.flows.booking.prompt },
         ],
         buttons: ["[系統動態醫師清單]", settings.flows.common.returnMainButtonLabel],
@@ -147,7 +149,7 @@ function buildPreview(settings: WidgetChatbotSettings, node: WidgetChatbotFlowNo
     case "timetable":
       return {
         bubbles: [
-          { role: "user", text: settings.menu.items.find((item) => item.id === "timetable")?.label || "醫師時間表" },
+          { role: "user", text: getWidgetChatbotMenuLabelByTarget(settings, "timetable") },
           { role: "assistant", text: settings.flows.timetable.reply },
         ],
         buttons: [settings.flows.common.returnMainButtonLabel],
@@ -156,7 +158,7 @@ function buildPreview(settings: WidgetChatbotSettings, node: WidgetChatbotFlowNo
     case "other":
       return {
         bubbles: [
-          { role: "user", text: settings.menu.items.find((item) => item.id === "other")?.label || "其他問題" },
+          { role: "user", text: getWidgetChatbotMenuLabelByTarget(settings, "other") },
           {
             role: "assistant",
             text: `${settings.flows.other.prompt}\n6097 7363\nhttps://wa.me/85260977363`,
@@ -169,7 +171,7 @@ function buildPreview(settings: WidgetChatbotSettings, node: WidgetChatbotFlowNo
     case "consult":
       return {
         bubbles: [
-          { role: "user", text: settings.menu.items.find((item) => item.id === "consult")?.label || "諮詢醫師" },
+          { role: "user", text: getWidgetChatbotMenuLabelByTarget(settings, "consult") },
           { role: "assistant", text: consultFlow[0]?.prompt || "" },
           { role: "system", text: `之後會依次再問：${consultFlow.slice(1).map((item) => item.prompt).join(" / ")}` },
         ],
@@ -482,7 +484,7 @@ export default function DoctorWidgetChatbotPage() {
         return (
           <div className="space-y-4">
             <div className="rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm leading-6 text-cyan-900">
-              主選單只管「顯示點樣」；每個 button 會去邊個流程，目前仍然係固定，避免姑娘改壞 flow。
+              主選單而家會一齊設定「顯示點樣」同「按落去去邊條 flow」，所以 label 同實際對話邏輯會同步。
             </div>
             <div className="space-y-3">
               {draft.menu.items.map((item, index) => (
@@ -492,8 +494,10 @@ export default function DoctorWidgetChatbotPage() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">{item.id}</p>
-                      <p className="text-xs text-slate-500">第 {index + 1} 位顯示</p>
+                      <p className="text-sm font-semibold text-slate-900">主選單 Button {index + 1}</p>
+                      <p className="text-xs text-slate-500">
+                        按下後會去：{WIDGET_CHATBOT_MENU_TARGET_OPTIONS.find((option) => option.value === item.target)?.label || item.target}
+                      </p>
                     </div>
                     <button
                       type="button"
@@ -506,14 +510,49 @@ export default function DoctorWidgetChatbotPage() {
                   </div>
 
                   <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                    <input
-                      value={item.label}
-                      onChange={(event) =>
-                        updateMenuItem(item.id, (current) => ({ ...current, label: event.target.value }))
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-                    />
-                    <div className="flex items-center gap-2">
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <SectionLabel title="Button 顯示文字" />
+                        <input
+                          value={item.label}
+                          onChange={(event) =>
+                            updateMenuItem(item.id, (current) => ({ ...current, label: event.target.value }))
+                          }
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <SectionLabel title="Button 去向" hint="按下這個主選單 button 之後，widget 會進入哪條流程。" />
+                        <select
+                          value={item.target}
+                          onChange={(event) =>
+                            updateMenuItem(item.id, (current) => {
+                              const nextTarget = event.target.value as WidgetChatbotMenuId;
+                              const currentDefaultLabel =
+                                WIDGET_CHATBOT_MENU_TARGET_OPTIONS.find((option) => option.value === current.target)?.label
+                                || current.target;
+                              const shouldResetLabel =
+                                current.label.trim() === "" || current.label === currentDefaultLabel;
+                              const defaultLabel = WIDGET_CHATBOT_MENU_TARGET_OPTIONS.find((option) => option.value === nextTarget)?.label || nextTarget;
+
+                              return {
+                                ...current,
+                                target: nextTarget,
+                                label: shouldResetLabel ? defaultLabel : current.label,
+                              };
+                            })
+                          }
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                        >
+                          {WIDGET_CHATBOT_MENU_TARGET_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 self-start">
                       <button
                         type="button"
                         onClick={() => moveMenuItem(item.id, "up")}

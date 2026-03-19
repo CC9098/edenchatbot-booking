@@ -1,0 +1,68 @@
+<!-- Eden Chatbot WordPress embed -->
+<!-- Use this once only. Remove any old Railway /embed snippet before pasting. -->
+
+<style>
+  #eden-chatbot-wrapper {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    z-index: 999999;
+    width: 200px;
+    height: 200px;
+    overflow: visible;
+    pointer-events: auto;
+    transition: width 0.3s ease, height 0.3s ease;
+  }
+
+  #eden-chatbot-wrapper iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    pointer-events: auto;
+  }
+
+  #eden-chatbot-wrapper.open {
+    width: 420px;
+    height: 700px;
+  }
+
+  @media (max-width: 480px) {
+    #eden-chatbot-wrapper.open {
+      width: 100%;
+      height: 100%;
+    }
+  }
+</style>
+
+<script>
+  (() => {
+    if (window.__edenChatbotEmbedMounted) return;
+    window.__edenChatbotEmbedMounted = true;
+
+    const wrappers = document.querySelectorAll("#eden-chatbot-wrapper");
+    wrappers.forEach((node, index) => {
+      if (index > 0) node.remove();
+    });
+
+    let wrapper = wrappers[0];
+    if (!wrapper) {
+      wrapper = document.createElement("div");
+      wrapper.id = "eden-chatbot-wrapper";
+      document.body.appendChild(wrapper);
+    }
+
+    wrapper.innerHTML = `
+      <iframe
+        id="eden-chatbot-iframe"
+        src="https://edenchatbot-booking.vercel.app/embed?v=20260319"
+        allow="clipboard-write"
+      ></iframe>
+    `;
+
+    window.addEventListener("message", (event) => {
+      if (event.data?.type !== "chatbot-state") return;
+      wrapper.classList.toggle("open", Boolean(event.data.open));
+    });
+  })();
+</script>
