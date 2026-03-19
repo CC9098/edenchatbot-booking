@@ -17,9 +17,16 @@ import {
 import { ChatMessages } from '@/components/chat/ChatMessages';
 import { ChatOptions } from '@/components/chat/ChatOptions';
 import { ChatInput } from '@/components/chat/ChatInput';
-import { DAY_NAMES, FORM_FLOW, MAIN_MENU, PRIMARY, TEXT_INPUT_STEPS } from '@/components/chat/constants';
+import { DAY_NAMES, PRIMARY, TEXT_INPUT_STEPS } from '@/components/chat/constants';
 import { useChatState } from '@/components/chat/hooks/useChatState';
 import { type BookingState, type BookingStep, type ConsultationFormData, type Option, type OptionKey } from '@/components/chat/types';
+import {
+  buildConsultationFormFlow,
+  buildWidgetGreetingMessage,
+  buildWidgetMainMenuOptions,
+  DEFAULT_WIDGET_CHATBOT_SETTINGS,
+  type WidgetChatbotSettings,
+} from '@/lib/widget-chatbot-settings';
 
 function formatClinicLabel(clinicNameZh?: string) {
   return clinicNameZh === '網上' ? '網上應診' : `${clinicNameZh || '診所'}診所`;
@@ -29,7 +36,8 @@ export function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [widgetSessionId, setWidgetSessionId] = useState('');
   const [iosKeyboardOffset, setIosKeyboardOffset] = useState(0);
-  const [options, setOptions] = useState<Option[]>(MAIN_MENU);
+  const [widgetSettings, setWidgetSettings] = useState<WidgetChatbotSettings>(DEFAULT_WIDGET_CHATBOT_SETTINGS);
+  const [options, setOptions] = useState<Option[]>(() => buildWidgetMainMenuOptions(DEFAULT_WIDGET_CHATBOT_SETTINGS));
   const [aiMode, setAiMode] = useState(false);
   const [formMode, setFormMode] = useState(false);
   const [formStep, setFormStep] = useState(0);
@@ -92,6 +100,31 @@ export function ChatWidget() {
     };
   }, []);
 
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadWidgetSettings = async () => {
+      try {
+        const response = await fetch('/api/public/widget-chatbot-settings', {
+          cache: 'no-store',
+        });
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (isCancelled || !data?.settings) return;
+        setWidgetSettings(data.settings);
+      } catch (error) {
+        console.error('[ChatWidget] Failed to load widget chatbot settings:', error);
+      }
+    };
+
+    void loadWidgetSettings();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
   // 通知父窗口 chatbot 打开/关闭状态，让父窗口调整 iframe 大小
   useEffect(() => {
     if (window.parent !== window) {
@@ -101,10 +134,9 @@ export function ChatWidget() {
 
   useEffect(() => {
     if (open && messages.length === 0) {
-      const whatsappLines = getWhatsappContactLines().join('\n');
-      addBotMessage(`你好，我係醫天圓小助手，請問有咩幫到你😊\n會為你提供即時資訊和更多幫助。如有需要直接Whatsapp聯繫，請與我們姑娘真人聯絡。\n\n真人聯絡通道：\n${whatsappLines}`);
+      addBotMessage(buildWidgetGreetingMessage(widgetSettings, getWhatsappContactLines()));
     }
-  }, [open, messages.length, addBotMessage]);
+  }, [open, messages.length, addBotMessage, widgetSettings]);
 
   useEffect(() => {
     // 使用 setTimeout 确保 DOM 更新完成后再滚动
@@ -149,6 +181,24 @@ export function ChatWidget() {
     'lastName', 'firstName', 'phone', 'email',
     'idCard', 'dob', 'allergies', 'medications', 'symptoms'
   ].includes(booking.step));
+  const consultationFlow = useMemo(
+    () => buildConsultationFormFlow(widgetSettings),
+    [widgetSettings]
+  );
+  const returnMainOption = useMemo<Option>(
+    () => ({
+      label: widgetSettings.flows.common.returnMainButtonLabel,
+      value: 'main',
+    }),
+    [widgetSettings]
+  );
+  const bookingBackCancelOptions = useMemo<Option[]>(
+    () => ([
+      { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' },
+      { label: widgetSettings.flows.common.bookingCancelButtonLabel, value: 'booking_cancel' },
+    ]),
+    [widgetSettings]
+  );
   const bookableDoctorNames = useMemo(
     () => bookableDoctors.map((doctor) => doctor.doctorNameZh),
     [bookableDoctors]
@@ -157,6 +207,12 @@ export function ChatWidget() {
     () => new Map(bookableDoctors.map((doctor) => [doctor.doctorNameZh, doctor])),
     [bookableDoctors]
   );
+
+  useEffect(() => {
+    if (messages.length === 0 && !aiMode && !formMode && !bookingMode) {
+      setOptions(buildWidgetMainMenuOptions(widgetSettings));
+    }
+  }, [messages.length, aiMode, formMode, bookingMode, widgetSettings]);
 
   const linkify = (text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -180,7 +236,7 @@ export function ChatWidget() {
   };
 
   const resetToMain = () => {
-    setOptions(MAIN_MENU);
+    setOptions(buildWidgetMainMenuOptions(widgetSettings));
     setAiMode(false);
     setFormMode(false);
     setBookingMode(false);
@@ -193,7 +249,7 @@ export function ChatWidget() {
   };
 
   const handleAIResponse = async (text: string) => {
-    addBotMessage('Connecting to AI... 正在為你連接Gemini，稍後回覆。');
+    addBotMessage(widgetSettings.flows.other.aiLoadingText);
 
     try {
       const response = await fetch('/api/chat', {
@@ -212,14 +268,14 @@ export function ChatWidget() {
       const data = await response.json();
 
       // 移除 loading 訊息並添加 AI 回應
-      replaceBotLoadingMessage('Connecting to AI... 正在為你連接Gemini，稍後回覆。', data.response);
+      replaceBotLoadingMessage(widgetSettings.flows.other.aiLoadingText, data.response);
     } catch (error) {
       console.error('AI Error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const whatsappLines = getWhatsappContactLines().join('\n');
       replaceBotLoadingMessage(
-        'Connecting to AI... 正在為你連接Gemini，稍後回覆。',
-        `抱歉，AI 服務暫時無法使用。\n\n錯誤訊息：${errorMessage}\n\n請直接聯絡我們姑娘：\n${whatsappLines}`,
+        widgetSettings.flows.other.aiLoadingText,
+        `${widgetSettings.flows.other.aiErrorLead}\n\n錯誤訊息：${errorMessage}\n\n請直接聯絡我們姑娘：\n${whatsappLines}`,
       );
     }
   };
@@ -233,39 +289,37 @@ export function ChatWidget() {
 
     switch (option.value) {
       case 'fees': {
-        addBotMessage(
-          '**醫天圓基本收費詳情**\n診金：$100 / 次\n基本藥費：$80 起 / 劑 (按藥量調整收費，每次最少3天)\n針灸：$300 – 500 / 次\n正骨手法：$350 – 700 / 次\n拔罐：$350 / 次\n\n👴 合資格長者可使用醫療券。\n📄 可提供處方及收據以辦理保險索償。'
-        );
+        addBotMessage(widgetSettings.flows.fees.reply);
         setOptions([
-          { label: '無問題了', value: 'end' },
-          { label: '還有問題 (返回主選單)', value: 'main' },
+          { label: widgetSettings.flows.fees.endButtonLabel, value: 'end' },
+          { label: widgetSettings.flows.fees.mainButtonLabel, value: 'main' },
         ]);
         break;
       }
       case 'clinic': {
-        addBotMessage('請問你想查詢邊方面？');
+        addBotMessage(widgetSettings.flows.clinic.prompt);
         setOptions([
-          { label: '營業時間', value: 'hours' },
-          { label: '地址', value: 'addresses' },
-          { label: '返回主選單', value: 'main' },
+          { label: widgetSettings.flows.clinic.hoursButtonLabel, value: 'hours' },
+          { label: widgetSettings.flows.clinic.addressesButtonLabel, value: 'addresses' },
+          { label: widgetSettings.flows.clinic.backButtonLabel, value: 'main' },
         ]);
         break;
       }
       case 'hours': {
         const hoursText = getClinicHoursLines().join('\n');
         addBotMessage(
-          `${hoursText}\n\n⚠️ **重要提示**：以上時間僅供參考，具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。\n\n🔗 詳情請參考： https://www.edenclinic.hk/timetable/\n🔗 立即預約及查看最新時間表： https://edentcm.as.me/schedule.php`
+          `${hoursText}\n\n${widgetSettings.flows.clinic.hoursClosingText}`
         );
-        setOptions([{ label: '返回主選單', value: 'main' }]);
+        setOptions([returnMainOption]);
         break;
       }
       case 'addresses': {
         const addressText = getClinicAddressLines().join('\n\n');
         addBotMessage(
-          `請問你想查詢邊間診所呢？\n\n${addressText}`,
+          `${widgetSettings.flows.clinic.addressesPrompt}\n\n${addressText}`,
           getClinicRouteLinks()
         );
-        setOptions([{ label: '返回主選單', value: 'main' }]);
+        setOptions([returnMainOption]);
         break;
       }
       case 'booking': {
@@ -274,33 +328,31 @@ export function ChatWidget() {
           addBotMessage(
             `目前未能同步最新醫師時間表，請稍後再試，或直接聯絡姑娘協助安排：\n${whatsappLines}`
           );
-          setOptions([{ label: '返回主選單', value: 'main' }]);
+          setOptions([returnMainOption]);
           break;
         }
 
-        addBotMessage('請問你想預約邊位醫師呢？😊');
+        addBotMessage(widgetSettings.flows.booking.prompt);
         setBookingMode(true);
         setBooking({ step: 'doctor' });
         const doctorOpts: Option[] = bookableDoctorNames.map((name) => ({
           label: name,
           value: `doctor-${name}`,
         }));
-        setOptions([...doctorOpts, { label: '返回主選單', value: 'main' }]);
+        setOptions([...doctorOpts, returnMainOption]);
         break;
       }
 
       case 'timetable': {
-        addBotMessage(
-          '以下係幾位醫師的時間表參考。\n\n⚠️ **重要提示**：具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。\n\n🔗 立即預約及查看最新時間表：https://edentcm.as.me/schedule.php\n🔗 查看診所時間表網頁：https://www.edenclinic.hk/timetable/'
-        );
-        setOptions([{ label: '返回主選單', value: 'main' }]);
+        addBotMessage(widgetSettings.flows.timetable.reply);
+        setOptions([returnMainOption]);
         break;
       }
       case 'other': {
         const whatsappLines = getWhatsappContactLines().join('\n');
         setAiMode(true);
         addBotMessage(
-          `請問你有無咩問題，我會儘量以我所知為你解答。😊\n如有需要，請與我們姑娘真人聯絡：\n${whatsappLines}`
+          `${widgetSettings.flows.other.prompt}\n${whatsappLines}`
         );
         setOptions([]);
         break;
@@ -310,12 +362,12 @@ export function ChatWidget() {
         break;
       }
       case 'main': {
-        addBotMessage('返回主選單，仲有咩可以幫到你？');
+        addBotMessage(widgetSettings.flows.common.returnToMainText);
         resetToMain();
         break;
       }
       case 'end': {
-        addBotMessage('好的，希望能幫到你！祝你身體健康，生活愉快！🌿');
+        addBotMessage(widgetSettings.flows.common.endText);
         resetToMain();
         break;
       }
@@ -365,7 +417,7 @@ export function ChatWidget() {
           } else {
             addBotMessage(link);
           }
-          setOptions([{ label: '返回主選單', value: 'main' }]);
+          setOptions([returnMainOption]);
         }
       }
     }
@@ -377,7 +429,7 @@ export function ChatWidget() {
     const doctor = bookableDoctorByName.get(doctorNameZh);
     if (!doctor) {
       addBotMessage('抱歉，此醫師暫不支援線上預約。');
-      setOptions([{ label: '返回主選單', value: 'main' }]);
+      setOptions([returnMainOption]);
       return;
     }
 
@@ -391,7 +443,7 @@ export function ChatWidget() {
 
     if (doctor.clinics.length === 0) {
       addBotMessage(`抱歉，${doctorNameZh}目前暫無可預約的診所。`);
-      setOptions([{ label: '返回主選單', value: 'main' }]);
+      setOptions([returnMainOption]);
       return;
     }
 
@@ -400,7 +452,7 @@ export function ChatWidget() {
       label: clinic.clinicNameZh,
       value: `booking_clinic-${clinic.clinicId}` as OptionKey,
     }));
-    setOptions([...clinicOpts, { label: '⬅️ 上一步', value: 'booking_back' }, { label: '取消預約', value: 'booking_cancel' }]);
+    setOptions([...clinicOpts, ...bookingBackCancelOptions]);
   };
 
   const handleBookingClinicSelect = (clinicId: string) => {
@@ -420,8 +472,7 @@ export function ChatWidget() {
     setOptions([
       { label: '首診（第一次來）', value: 'booking_visit_first' },
       { label: '覆診（有來過）', value: 'booking_visit_followup' },
-      { label: '⬅️ 上一步', value: 'booking_back' },
-      { label: '取消預約', value: 'booking_cancel' },
+      ...bookingBackCancelOptions,
     ]);
   };
 
@@ -432,7 +483,7 @@ export function ChatWidget() {
     const clinic = doctor?.clinics.find((entry) => entry.clinicId === booking.clinicId);
     if (!clinic) {
       addBotMessage('抱歉，找不到此醫師在該診所的排班。');
-      setOptions([{ label: '返回主選單', value: 'main' }]);
+      setOptions([returnMainOption]);
       return;
     }
 
@@ -460,12 +511,12 @@ export function ChatWidget() {
 
     if (dateOptions.length === 0) {
       addBotMessage(`抱歉，${booking.doctorNameZh}在${formatClinicLabel(booking.clinicNameZh)}未來兩星期內暫無可預約日子。`);
-      setOptions([{ label: '返回主選單', value: 'main' }]);
+      setOptions([returnMainOption]);
       return;
     }
 
     addBotMessage(`${isFirstVisit ? '首診' : '覆診'}，請選擇日期：`);
-    setOptions([...dateOptions, { label: '⬅️ 上一步', value: 'booking_back' }, { label: '取消預約', value: 'booking_cancel' }]);
+    setOptions([...dateOptions, ...bookingBackCancelOptions]);
   };
 
   const handleBookingDateSelect = async (dateStr: string) => {
@@ -512,19 +563,19 @@ export function ChatWidget() {
         label: slot,
         value: `booking_time-${slot}` as OptionKey,
       }));
-      setOptions([...timeOpts, { label: '⬅️ 上一步', value: 'booking_back' }, { label: '取消預約', value: 'booking_cancel' }]);
+      setOptions([...timeOpts, ...bookingBackCancelOptions]);
     } catch (error) {
       setIsLoading(false);
       removeMessageByExactText('正在查詢可預約時段... ⏳');
       addBotMessage('抱歉，查詢時段時發生錯誤，請稍後再試。');
-      setOptions([{ label: '返回主選單', value: 'main' }]);
+      setOptions([returnMainOption]);
     }
   };
 
   const handleBookingTimeSelect = (time: string) => {
     setBooking(prev => ({ ...prev, step: 'lastName', time }));
     addBotMessage(`好的，你選擇了 ${time}。\n\n請輸入你的姓氏（Last Name）：`);
-    setOptions([{ label: '⬅️ 上一步', value: 'booking_back' }, { label: '取消預約', value: 'booking_cancel' }]);
+    setOptions(bookingBackCancelOptions);
   };
 
 
@@ -668,11 +719,11 @@ export function ChatWidget() {
     setOptions([]);
     setFormStep(0);
     setInput('');
-    addBotMessage(FORM_FLOW[0].prompt);
+    addBotMessage(consultationFlow[0].prompt);
   };
 
   const validateInput = () => {
-    const step = FORM_FLOW[formStep];
+    const step = consultationFlow[formStep];
     if (step.key === 'email') {
       const emailOk = /^[\w-.]+@([\w-]+\.)+[\w-]{2,}$/i.test(input.trim());
       if (!emailOk) return '請輸入有效的電郵地址';
@@ -687,7 +738,7 @@ export function ChatWidget() {
   const submitConsultationForm = async (payload: ConsultationFormData) => {
     setIsLoading(true);
     setOptions([]);
-    addBotMessage('正在提交諮詢資料... ⏳');
+    addBotMessage(widgetSettings.flows.consultation.submittingText);
 
     try {
       const response = await fetch('/api/consultation', {
@@ -697,20 +748,20 @@ export function ChatWidget() {
       });
 
       const data = await response.json();
-      removeMessageByExactText('正在提交諮詢資料... ⏳');
+      removeMessageByExactText(widgetSettings.flows.consultation.submittingText);
       setIsLoading(false);
 
       if (!response.ok || !data.success) {
         throw new Error(data.error || '提交失敗');
       }
 
-      addBotMessage('資料已提交，我們會盡快以電話或電郵聯絡你。');
+      addBotMessage(widgetSettings.flows.consultation.successText);
       resetToMain();
     } catch (error) {
-      removeMessageByExactText('正在提交諮詢資料... ⏳');
+      removeMessageByExactText(widgetSettings.flows.consultation.submittingText);
       setIsLoading(false);
-      addBotMessage('抱歉，提交諮詢時發生錯誤。請稍後再試，或直接 WhatsApp 聯絡診所姑娘。');
-      setOptions([{ label: '返回主選單', value: 'main' }]);
+      addBotMessage(widgetSettings.flows.consultation.errorText);
+      setOptions([returnMainOption]);
       setFormMode(false);
     }
   };
@@ -723,7 +774,7 @@ export function ChatWidget() {
       return;
     }
 
-    const step = FORM_FLOW[formStep];
+    const step = consultationFlow[formStep];
     const value = input.trim();
     const nextFormData = {
       ...consultationFormData,
@@ -734,19 +785,14 @@ export function ChatWidget() {
     addMessage('user', value);
     const nextStep = formStep + 1;
     setInput('');
-    if (nextStep < FORM_FLOW.length) {
+    if (nextStep < consultationFlow.length) {
       setFormStep(nextStep);
-      addBotMessage(FORM_FLOW[nextStep].prompt);
+      addBotMessage(consultationFlow[nextStep].prompt);
     } else {
       setFormMode(false);
       await submitConsultationForm(nextFormData);
     }
   };
-
-  const BACK_CANCEL_OPTS: Option[] = [
-    { label: '⬅️ 上一步', value: 'booking_back' },
-    { label: '取消預約', value: 'booking_cancel' },
-  ];
 
   // Handle booking text input steps
   const handleBookingInput = () => {
@@ -760,21 +806,21 @@ export function ChatWidget() {
       setBooking(prev => ({ ...prev, step: 'firstName', lastName: trimmed }));
       setInput('');
       addBotMessage('請輸入你的名字（First Name）：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (booking.step === 'firstName') {
       if (trimmed.length < 1) { setFormError('請輸入名字'); return; }
       addMessage('user', trimmed);
       setBooking(prev => ({ ...prev, step: 'phone', firstName: trimmed }));
       setInput('');
       addBotMessage('請輸入你的電話號碼（8位數字）：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (booking.step === 'phone') {
       if (!/^[0-9+\-\s]{8,}$/.test(trimmed)) { setFormError('電話格式唔正確，請輸入至少8位數字'); return; }
       addMessage('user', trimmed);
       setBooking(prev => ({ ...prev, step: 'email', phone: trimmed }));
       setInput('');
       addBotMessage('請輸入電郵地址：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (booking.step === 'email') {
       if (!/^[\w-.]+@([\w-]+\.)+[\w-]{2,}$/i.test(trimmed)) { setFormError('請輸入有效的電郵地址'); return; }
       addMessage('user', trimmed);
@@ -785,8 +831,7 @@ export function ChatWidget() {
         { label: '不用', value: 'booking_receipt-no' },
         { label: '是，保險索償', value: 'booking_receipt-yes_insurance' },
         { label: '是，但非保險', value: 'booking_receipt-yes_not_insurance' },
-        { label: '⬅️ 上一步', value: 'booking_back' },
-        { label: '取消預約', value: 'booking_cancel' },
+        ...bookingBackCancelOptions,
       ]);
     } else if (booking.step === 'idCard') {
       if (trimmed.length < 5) { setFormError('身份證號碼至少5個字'); return; }
@@ -794,7 +839,7 @@ export function ChatWidget() {
       setBooking(prev => ({ ...prev, step: 'dob', idCard: trimmed }));
       setInput('');
       addBotMessage('請輸入出生日期（例如：1990/01/15）：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (booking.step === 'dob') {
       if (!trimmed) { setFormError('請輸入出生日期'); return; }
       addMessage('user', trimmed);
@@ -805,21 +850,20 @@ export function ChatWidget() {
         { label: '男 Male', value: 'booking_gender-male' },
         { label: '女 Female', value: 'booking_gender-female' },
         { label: '其他 Other', value: 'booking_gender-other' },
-        { label: '⬅️ 上一步', value: 'booking_back' },
-        { label: '取消預約', value: 'booking_cancel' },
+        ...bookingBackCancelOptions,
       ]);
     } else if (booking.step === 'allergies') {
       addMessage('user', trimmed);
       setBooking(prev => ({ ...prev, step: 'medications', allergies: trimmed }));
       setInput('');
       addBotMessage('請列出你正服用的藥物或保健品（如沒有請填「沒有」）：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (booking.step === 'medications') {
       addMessage('user', trimmed);
       setBooking(prev => ({ ...prev, step: 'symptoms', medications: trimmed }));
       setInput('');
       addBotMessage('請簡述你主要希望處理的病症/體質狀況：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (booking.step === 'symptoms') {
       addMessage('user', trimmed);
       setBooking(prev => ({ ...prev, step: 'referralSource', symptoms: trimmed }));
@@ -834,8 +878,7 @@ export function ChatWidget() {
         { label: '醫師介紹', value: 'booking_referral-doctor' },
         { label: '路過', value: 'booking_referral-walk_in' },
         { label: '其他', value: 'booking_referral-other' },
-        { label: '⬅️ 上一步', value: 'booking_back' },
-        { label: '取消預約', value: 'booking_cancel' },
+        ...bookingBackCancelOptions,
       ]);
     }
   };
@@ -849,8 +892,7 @@ export function ChatWidget() {
       { label: 'Lalamove', value: 'booking_pickup-lalamove' },
       { label: '順豐 SF Express', value: 'booking_pickup-sfexpress' },
       { label: '診所自取', value: 'booking_pickup-clinic_pickup' },
-      { label: '⬅️ 上一步', value: 'booking_back' },
-      { label: '取消預約', value: 'booking_cancel' },
+      ...bookingBackCancelOptions,
     ]);
   };
 
@@ -860,7 +902,7 @@ export function ChatWidget() {
     if (booking.isFirstVisit) {
       setBooking(prev => ({ ...prev, step: 'idCard' }));
       addBotMessage('因為你係首診，需要填寫以下資料。\n\n請輸入身份證號碼（例如：A123456(7)）：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else {
       setBooking(prev => ({ ...prev, step: 'confirm' }));
       showBookingSummary();
@@ -871,7 +913,7 @@ export function ChatWidget() {
   const handleBookingGenderSelect = (value: string) => {
     setBooking(prev => ({ ...prev, step: 'allergies', gender: value }));
     addBotMessage('請填寫你的藥物及食物敏感史（如沒有請填「沒有」）：');
-    setOptions(BACK_CANCEL_OPTS);
+    setOptions(bookingBackCancelOptions);
   };
 
   // Handle referral source selection
@@ -888,12 +930,12 @@ export function ChatWidget() {
 
     if (s === 'clinic') {
       // Back to doctor selection
-      addBotMessage('請問你想預約邊位醫師呢？😊');
+      addBotMessage(widgetSettings.flows.booking.prompt);
       setBooking(prev => ({ ...prev, step: 'doctor' }));
       const doctorOpts: Option[] = bookableDoctorNames.map((name) => ({
         label: name, value: `doctor-${name}` as OptionKey,
       }));
-      setOptions([...doctorOpts, { label: '返回主選單', value: 'main' }]);
+      setOptions([...doctorOpts, returnMainOption]);
     } else if (s === 'visitType') {
       handleBookingDoctorSelect(booking.doctorNameZh!);
     } else if (s === 'date') {
@@ -905,19 +947,19 @@ export function ChatWidget() {
     } else if (s === 'firstName') {
       setBooking(prev => ({ ...prev, step: 'lastName' }));
       addBotMessage('請輸入你的姓氏（Last Name）：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (s === 'phone') {
       setBooking(prev => ({ ...prev, step: 'firstName' }));
       addBotMessage('請輸入你的名字（First Name）：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (s === 'email') {
       setBooking(prev => ({ ...prev, step: 'phone' }));
       addBotMessage('請輸入你的電話號碼（8位數字）：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (s === 'receipt') {
       setBooking(prev => ({ ...prev, step: 'email' }));
       addBotMessage('請輸入電郵地址：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (s === 'medicationPickup') {
       setBooking(prev => ({ ...prev, step: 'receipt' }));
       addBotMessage('請問你是否需要收據作保險索償呢？');
@@ -925,8 +967,7 @@ export function ChatWidget() {
         { label: '不用', value: 'booking_receipt-no' },
         { label: '是，保險索償', value: 'booking_receipt-yes_insurance' },
         { label: '是，但非保險', value: 'booking_receipt-yes_not_insurance' },
-        { label: '⬅️ 上一步', value: 'booking_back' },
-        { label: '取消預約', value: 'booking_cancel' },
+        ...bookingBackCancelOptions,
       ]);
     } else if (s === 'idCard') {
       setBooking(prev => ({ ...prev, step: 'medicationPickup' }));
@@ -936,17 +977,16 @@ export function ChatWidget() {
         { label: 'Lalamove', value: 'booking_pickup-lalamove' },
         { label: '順豐 SF Express', value: 'booking_pickup-sfexpress' },
         { label: '診所自取', value: 'booking_pickup-clinic_pickup' },
-        { label: '⬅️ 上一步', value: 'booking_back' },
-        { label: '取消預約', value: 'booking_cancel' },
+        ...bookingBackCancelOptions,
       ]);
     } else if (s === 'dob') {
       setBooking(prev => ({ ...prev, step: 'idCard' }));
       addBotMessage('請輸入身份證號碼（例如：A123456(7)）：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (s === 'gender') {
       setBooking(prev => ({ ...prev, step: 'dob' }));
       addBotMessage('請輸入出生日期（例如：1990/01/15）：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (s === 'allergies') {
       setBooking(prev => ({ ...prev, step: 'gender' }));
       addBotMessage('請選擇性別：');
@@ -954,21 +994,20 @@ export function ChatWidget() {
         { label: '男 Male', value: 'booking_gender-male' },
         { label: '女 Female', value: 'booking_gender-female' },
         { label: '其他 Other', value: 'booking_gender-other' },
-        { label: '⬅️ 上一步', value: 'booking_back' },
-        { label: '取消預約', value: 'booking_cancel' },
+        ...bookingBackCancelOptions,
       ]);
     } else if (s === 'medications') {
       setBooking(prev => ({ ...prev, step: 'allergies' }));
       addBotMessage('請填寫你的藥物及食物敏感史（如沒有請填「沒有」）：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (s === 'symptoms') {
       setBooking(prev => ({ ...prev, step: 'medications' }));
       addBotMessage('請列出你正服用的藥物或保健品（如沒有請填「沒有」）：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (s === 'referralSource') {
       setBooking(prev => ({ ...prev, step: 'symptoms' }));
       addBotMessage('請簡述你主要希望處理的病症/體質狀況：');
-      setOptions(BACK_CANCEL_OPTS);
+      setOptions(bookingBackCancelOptions);
     } else if (s === 'confirm') {
       if (booking.isFirstVisit) {
         setBooking(prev => ({ ...prev, step: 'referralSource' }));
@@ -982,8 +1021,7 @@ export function ChatWidget() {
           { label: '醫師介紹', value: 'booking_referral-doctor' },
           { label: '路過', value: 'booking_referral-walk_in' },
           { label: '其他', value: 'booking_referral-other' },
-          { label: '⬅️ 上一步', value: 'booking_back' },
-          { label: '取消預約', value: 'booking_cancel' },
+          ...bookingBackCancelOptions,
         ]);
       } else {
         setBooking(prev => ({ ...prev, step: 'medicationPickup' }));
@@ -993,8 +1031,7 @@ export function ChatWidget() {
           { label: 'Lalamove', value: 'booking_pickup-lalamove' },
           { label: '順豐 SF Express', value: 'booking_pickup-sfexpress' },
           { label: '診所自取', value: 'booking_pickup-clinic_pickup' },
-          { label: '⬅️ 上一步', value: 'booking_back' },
-          { label: '取消預約', value: 'booking_cancel' },
+          ...bookingBackCancelOptions,
         ]);
       }
     }
@@ -1030,10 +1067,10 @@ export function ChatWidget() {
       symptoms: '請簡述你的症狀',
     };
     if (bookingMode) return placeholders[booking.step] || '';
-    if (formMode) return FORM_FLOW[formStep]?.placeholder ?? '請輸入';
+    if (formMode) return consultationFlow[formStep]?.placeholder ?? '請輸入';
     if (aiMode) return '輸入你的問題...（Enter 或 Send）';
     return '';
-  }, [aiMode, formMode, formStep, bookingMode, booking.step]);
+  }, [aiMode, formMode, formStep, bookingMode, booking.step, consultationFlow]);
 
   return (
     <div
@@ -1065,8 +1102,8 @@ export function ChatWidget() {
                 >
                   <div className="flex items-center gap-3 text-white">
                     <div className="flex flex-col leading-tight">
-                      <span className="text-lg font-semibold">醫天圓小助手</span>
-                      <span className="text-xs font-semibold text-white/90">EDEN TCM CLINIC</span>
+                      <span className="text-lg font-semibold">{widgetSettings.header.title}</span>
+                      <span className="text-xs font-semibold text-white/90">{widgetSettings.header.subtitle}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 text-white">
@@ -1101,11 +1138,11 @@ export function ChatWidget() {
                         WebkitUserSelect: 'none',
                         userSelect: 'none'
                       }}
-                      aria-label="重新開始"
+                      aria-label={widgetSettings.header.restartButtonLabel}
                       type="button"
                     >
                       <RotateCcw size={14} />
-                      <span>重新開始</span>
+                      <span>{widgetSettings.header.restartButtonLabel}</span>
                     </button>
                     <button
                       onClick={(e) => {
@@ -1239,7 +1276,7 @@ export function ChatWidget() {
         <div className="relative text-left pointer-events-none">
           <div className="text-[11px] text-white/70 tracking-wide">醫天圓中醫</div>
           <div className="text-[15px] font-semibold tracking-tight">
-            {open ? '收起對話' : '立即諮詢'}
+            {open ? widgetSettings.header.launcherOpenLabel : widgetSettings.header.launcherClosedLabel}
           </div>
         </div>
 

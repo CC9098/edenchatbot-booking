@@ -12,6 +12,7 @@ function DoctorHeader() {
   const pathname = usePathname();
   const isPatientsActive = pathname === "/doctor" || pathname.startsWith("/doctor/patients/");
   const isChatbotActive = pathname.startsWith("/doctor/chatbot");
+  const isWidgetChatbotActive = pathname.startsWith("/doctor/widget-chatbot");
   const isRecordActive = pathname.startsWith("/doctor/record");
   const isArticleContentActive = pathname.startsWith("/doctor/content/articles");
   const isCardContentActive = pathname.startsWith("/doctor/content/cards");
@@ -62,7 +63,17 @@ function DoctorHeader() {
                   : "text-gray-600 hover:text-primary hover:bg-primary/5"
               }`}
             >
-              Chatbot
+              養生 Chatbot
+            </Link>
+            <Link
+              href="/doctor/widget-chatbot"
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                isWidgetChatbotActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-gray-600 hover:text-primary hover:bg-primary/5"
+              }`}
+            >
+              客服 Widget
             </Link>
             <Link
               href="/doctor/record"

@@ -223,15 +223,15 @@ export default function DoctorChatbotSettingsPage() {
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
-            Chatbot Console
+            Wellness Chatbot Console
           </span>
           <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
             目前角色：{roleLabel}
           </span>
         </div>
-        <h1 className="text-xl font-bold text-slate-900">Chatbot 對話控制台</h1>
+        <h1 className="text-xl font-bold text-slate-900">養生 Chatbot 對話控制台</h1>
         <p className="max-w-3xl text-sm leading-6 text-slate-600">
-          俾姑娘直接調整三種體質 chatbot 的說話方式、回覆深度同額外指示。儲存之後，
+          呢頁係 G1 / G2 / G3 養生 chatbot 用，俾姑娘直接調整三種體質 chatbot 的說話方式、回覆深度同額外指示。儲存之後，
           <span className="mx-1 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">
             /api/chat/v2
           </span>
