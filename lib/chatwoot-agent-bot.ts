@@ -7,7 +7,13 @@ import {
   getClinicRouteLinks,
 } from '@/shared/clinic-data';
 
-export const CHATWOOT_MAIN_MENU_MESSAGE = `你好，呢度係醫天圓中醫診所。請問有咩可以幫到你？
+export const CHATWOOT_MAIN_MENU_PROMPT = '你好，呢度係醫天圓中醫診所。請問有咩可以幫到你？';
+export const CHATWOOT_MAIN_MENU_ITEMS = [
+  { title: '一般查詢', value: 'general' },
+  { title: '預約', value: 'booking' },
+  { title: '想搵姑娘', value: 'human' },
+] as const;
+export const CHATWOOT_MAIN_MENU_MESSAGE = `${CHATWOOT_MAIN_MENU_PROMPT}
 1. 一般查詢
 2. 預約
 3. 想搵姑娘`;
@@ -17,14 +23,28 @@ const clinicRouteLinkLines = getClinicRouteLinks()
   .map(({ label, href }) => `${label}: ${href}`)
   .join('\n');
 
-export const CHATWOOT_GENERAL_MENU_MESSAGE = `${widgetSettings.flows.clinic.prompt}
+export const CHATWOOT_GENERAL_MENU_PROMPT = widgetSettings.flows.clinic.prompt;
+export const CHATWOOT_GENERAL_MENU_ITEMS = [
+  { title: '收費', value: 'fees' },
+  { title: '診所資訊', value: 'clinic' },
+  { title: '醫師時間表', value: 'timetable' },
+  { title: '其他問題', value: 'other' },
+  { title: '返回主選單', value: 'main' },
+] as const;
+export const CHATWOOT_GENERAL_MENU_MESSAGE = `${CHATWOOT_GENERAL_MENU_PROMPT}
 1. 收費
 2. 診所資訊
 3. 醫師時間表
 4. 其他問題
 5. 返回主選單`;
 
-export const CHATWOOT_CLINIC_MENU_MESSAGE = `${widgetSettings.flows.clinic.prompt}
+export const CHATWOOT_CLINIC_MENU_PROMPT = widgetSettings.flows.clinic.prompt;
+export const CHATWOOT_CLINIC_MENU_ITEMS = [
+  { title: widgetSettings.flows.clinic.hoursButtonLabel, value: 'hours' },
+  { title: widgetSettings.flows.clinic.addressesButtonLabel, value: 'addresses' },
+  { title: widgetSettings.flows.clinic.backButtonLabel, value: 'main' },
+] as const;
+export const CHATWOOT_CLINIC_MENU_MESSAGE = `${CHATWOOT_CLINIC_MENU_PROMPT}
 1. ${widgetSettings.flows.clinic.hoursButtonLabel}
 2. ${widgetSettings.flows.clinic.addressesButtonLabel}
 3. ${widgetSettings.flows.clinic.backButtonLabel}`;
@@ -73,6 +93,17 @@ interface ChatwootConversationDetails {
   messages?: ChatwootMessage[];
 }
 
+export interface ChatwootSelectItem {
+  title: string;
+  value: string;
+}
+
+export interface ChatwootOutgoingMessagePayload {
+  content: string;
+  contentType?: 'text' | 'input_select';
+  items?: ChatwootSelectItem[];
+}
+
 type MenuSelectionKind = 'general' | 'booking' | 'human';
 type GeneralSelectionKind = 'fees' | 'clinic' | 'timetable' | 'other' | 'main';
 type ClinicSelectionKind = 'hours' | 'addresses' | 'main';
@@ -113,16 +144,36 @@ export class ChatwootClient {
     );
   }
 
-  createMessage(accountId: number, conversationId: number, content: string) {
+  createMessage(
+    accountId: number,
+    conversationId: number,
+    payload: string | ChatwootOutgoingMessagePayload,
+  ) {
+    const messagePayload = typeof payload === 'string'
+      ? {
+          content: payload,
+          message_type: 'outgoing',
+          private: false,
+        }
+      : {
+          content: payload.content,
+          message_type: 'outgoing',
+          private: false,
+          ...(payload.contentType ? { content_type: payload.contentType } : {}),
+          ...(payload.items?.length
+            ? {
+                content_attributes: {
+                  items: payload.items,
+                },
+              }
+            : {}),
+        };
+
     return this.request(
       `/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`,
       {
         method: 'POST',
-        body: JSON.stringify({
-          content,
-          message_type: 'outgoing',
-          private: false,
-        }),
+        body: JSON.stringify(messagePayload),
       },
     );
   }
@@ -339,7 +390,9 @@ export function mapConversationMessagesToLegacyChat(
       if (!content || message.private) return false;
       if (isActivity) return false;
       if (content === CHATWOOT_GENERAL_INQUIRY_PROMPT) return false;
+      if (content === CHATWOOT_GENERAL_MENU_PROMPT) return false;
       if (content === CHATWOOT_GENERAL_MENU_MESSAGE) return false;
+      if (content === CHATWOOT_CLINIC_MENU_PROMPT) return false;
       if (content === CHATWOOT_CLINIC_MENU_MESSAGE) return false;
       if (content === CHATWOOT_FEES_MESSAGE) return false;
       if (content === CHATWOOT_BOOKING_ACK) return false;
@@ -347,6 +400,7 @@ export function mapConversationMessagesToLegacyChat(
       if (content === CHATWOOT_TIMETABLE_MESSAGE) return false;
       if (content === CHATWOOT_CLINIC_HOURS_MESSAGE) return false;
       if (content === CHATWOOT_CLINIC_ADDRESSES_MESSAGE) return false;
+      if (content === CHATWOOT_MAIN_MENU_PROMPT) return false;
       if (content === CHATWOOT_MAIN_MENU_MESSAGE) return false;
       if (isPureSelection(content)) return false;
       return true;

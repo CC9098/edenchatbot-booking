@@ -3,13 +3,17 @@ import {
   CHATWOOT_BOOKING_ACK,
   CHATWOOT_CLINIC_ADDRESSES_MESSAGE,
   CHATWOOT_CLINIC_HOURS_MESSAGE,
-  CHATWOOT_CLINIC_MENU_MESSAGE,
+  CHATWOOT_CLINIC_MENU_ITEMS,
+  CHATWOOT_CLINIC_MENU_PROMPT,
   CHATWOOT_FEES_MESSAGE,
-  CHATWOOT_GENERAL_MENU_MESSAGE,
+  CHATWOOT_GENERAL_MENU_ITEMS,
+  CHATWOOT_GENERAL_MENU_PROMPT,
   CHATWOOT_GENERAL_INQUIRY_PROMPT,
   CHATWOOT_HUMAN_ACK,
-  CHATWOOT_MAIN_MENU_MESSAGE,
+  CHATWOOT_MAIN_MENU_ITEMS,
+  CHATWOOT_MAIN_MENU_PROMPT,
   CHATWOOT_TIMETABLE_MESSAGE,
+  type ChatwootOutgoingMessagePayload,
   createChatwootClientFromEnv,
   extractIncomingChatwootEvent,
   getFlowState,
@@ -25,6 +29,24 @@ import {
 import { generateLegacyChatResponse } from '@/lib/legacy-chat-response';
 
 export const runtime = 'nodejs';
+
+const MAIN_MENU_REPLY: ChatwootOutgoingMessagePayload = {
+  content: CHATWOOT_MAIN_MENU_PROMPT,
+  contentType: 'input_select',
+  items: [...CHATWOOT_MAIN_MENU_ITEMS],
+};
+
+const GENERAL_MENU_REPLY: ChatwootOutgoingMessagePayload = {
+  content: CHATWOOT_GENERAL_MENU_PROMPT,
+  contentType: 'input_select',
+  items: [...CHATWOOT_GENERAL_MENU_ITEMS],
+};
+
+const CLINIC_MENU_REPLY: ChatwootOutgoingMessagePayload = {
+  content: CHATWOOT_CLINIC_MENU_PROMPT,
+  contentType: 'input_select',
+  items: [...CHATWOOT_CLINIC_MENU_ITEMS],
+};
 
 function getOptionalWebhookSecret(): string | null {
   const secret = (process.env.CHATWOOT_WEBHOOK_SECRET || '').trim();
@@ -68,7 +90,7 @@ export async function POST(request: NextRequest) {
       allowNumeric: currentState === 'menu',
     });
     let nextState = currentState;
-    let reply: string | null = null;
+    let reply: string | ChatwootOutgoingMessagePayload | null = null;
 
     if (rootSelection?.kind === 'human') {
       nextState = 'human';
@@ -78,7 +100,7 @@ export async function POST(request: NextRequest) {
       reply = CHATWOOT_BOOKING_ACK;
     } else if (rootSelection?.kind === 'general') {
       nextState = 'general_menu';
-      reply = CHATWOOT_GENERAL_MENU_MESSAGE;
+      reply = GENERAL_MENU_REPLY;
     } else if (currentState === 'general_menu') {
       const generalSelection = resolveGeneralMenuSelection(event.content);
 
@@ -87,7 +109,7 @@ export async function POST(request: NextRequest) {
         reply = CHATWOOT_FEES_MESSAGE;
       } else if (generalSelection?.kind === 'clinic') {
         nextState = 'clinic_menu';
-        reply = CHATWOOT_CLINIC_MENU_MESSAGE;
+        reply = CLINIC_MENU_REPLY;
       } else if (generalSelection?.kind === 'timetable') {
         nextState = 'general_menu';
         reply = CHATWOOT_TIMETABLE_MESSAGE;
@@ -96,10 +118,10 @@ export async function POST(request: NextRequest) {
         reply = CHATWOOT_GENERAL_INQUIRY_PROMPT;
       } else if (generalSelection?.kind === 'main') {
         nextState = 'menu';
-        reply = CHATWOOT_MAIN_MENU_MESSAGE;
+        reply = MAIN_MENU_REPLY;
       } else {
         nextState = 'general_menu';
-        reply = CHATWOOT_GENERAL_MENU_MESSAGE;
+        reply = GENERAL_MENU_REPLY;
       }
     } else if (currentState === 'clinic_menu') {
       const clinicSelection = resolveClinicMenuSelection(event.content);
@@ -112,10 +134,10 @@ export async function POST(request: NextRequest) {
         reply = CHATWOOT_CLINIC_ADDRESSES_MESSAGE;
       } else if (clinicSelection?.kind === 'main') {
         nextState = 'menu';
-        reply = CHATWOOT_MAIN_MENU_MESSAGE;
+        reply = MAIN_MENU_REPLY;
       } else {
         nextState = 'clinic_menu';
-        reply = CHATWOOT_CLINIC_MENU_MESSAGE;
+        reply = CLINIC_MENU_REPLY;
       }
     } else {
       if (nextState === 'general_ai') {
@@ -129,7 +151,7 @@ export async function POST(request: NextRequest) {
         reply = null;
       } else {
         nextState = 'menu';
-        reply = CHATWOOT_MAIN_MENU_MESSAGE;
+        reply = MAIN_MENU_REPLY;
       }
     }
 
