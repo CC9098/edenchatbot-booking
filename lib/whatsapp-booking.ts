@@ -88,11 +88,11 @@ export function buildWhatsappTemplateBodyParams(
   input: BookingWhatsappConfirmationInput,
 ): Record<string, string> {
   return {
-    '1': input.patientName,
-    '2': input.doctorNameZh,
-    '3': input.clinicNameZh,
-    '4': `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
-    '5': VISIT_TYPE_LABELS[input.visitType],
-    '6': input.bookingId,
+    patient_name: input.patientName,
+    doctor_name: input.doctorNameZh,
+    clinic_name: input.clinicNameZh,
+    appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
+    visit_type: VISIT_TYPE_LABELS[input.visitType],
+    booking_id: input.bookingId,
   };
 }
