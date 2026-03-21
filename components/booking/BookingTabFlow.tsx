@@ -23,6 +23,7 @@ import { type ClinicId, type DoctorId } from '@/shared/clinic-data';
 import type { TimeRange, WeeklySchedule } from '@/shared/schedule-config';
 
 type BookingStep = 'setup' | 'timeslot' | 'details' | 'success';
+type FlowVariant = 'booking' | 'whatsapp';
 type VisitType = 'first' | 'followup';
 type ReceiptType = 'no' | 'yes_insurance' | 'yes_not_insurance';
 type PickupType = 'none' | 'lalamove' | 'sfexpress' | 'clinic_pickup';
@@ -59,6 +60,7 @@ type BookingTabFlowProps = {
     visitType?: VisitType;
   };
   embedMode?: boolean;
+  flowVariant?: FlowVariant;
 };
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
@@ -265,7 +267,9 @@ export function BookingTabFlow({
   initialContact,
   initialSelection,
   embedMode = false,
+  flowVariant = 'booking',
 }: BookingTabFlowProps) {
+  const isWhatsappFlow = flowVariant === 'whatsapp';
   const [step, setStep] = useState<BookingStep>('setup');
   const [visitType, setVisitType] = useState<VisitType>(initialSelection?.visitType ?? 'first');
   const [doctorId, setDoctorId] = useState<DoctorId | ''>(initialSelection?.doctorId ?? '');
@@ -289,6 +293,10 @@ export function BookingTabFlow({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [bookingId, setBookingId] = useState('');
+  const [whatsappUrl, setWhatsappUrl] = useState('');
+  const [whatsappLabel, setWhatsappLabel] = useState('');
+  const [intakeSaved, setIntakeSaved] = useState(true);
+  const [whatsappRedirectAttempted, setWhatsappRedirectAttempted] = useState(false);
 
   const minDate = getTodayIsoInHongKong();
   const maxDate = getMaxDateIsoInHongKong(MAX_BOOKING_WINDOW_DAYS);
@@ -312,6 +320,23 @@ export function BookingTabFlow({
     () => clinicOptions.find((clinic) => clinic.clinicId === clinicId),
     [clinicId, clinicOptions]
   );
+  const pageTitle = isWhatsappFlow ? 'WhatsApp 預約' : '預約服務';
+  const pageSubtitle = isWhatsappFlow
+    ? '先選好醫師、時段同資料，再由姑娘透過 WhatsApp 跟進確認。'
+    : '「每一次預約，都是照顧自己的開始。」';
+  const submitButtonLabel = isWhatsappFlow ? '前往 WhatsApp 確認' : '確認預約';
+  const submitLoadingLabel = isWhatsappFlow ? '正在準備 WhatsApp...' : '預約處理中...';
+  const detailNotice = isWhatsappFlow
+    ? '提交後會自動開啟 WhatsApp 並預填預約資料；最終預約以姑娘確認為準。'
+    : '成功預約後會收到確認電郵通知；更改或取消可使用電郵內連結。';
+  const successTitle = isWhatsappFlow ? '已準備 WhatsApp 訊息' : '預約成功';
+  const successDescription = isWhatsappFlow
+    ? `系統已整理好預約資料，將會開啟 WhatsApp 交由${whatsappLabel || '姑娘'}跟進。`
+    : '確認電郵將發送到你提供的信箱。';
+  const successQuote = isWhatsappFlow
+    ? '「一步一步，安心安排。」'
+    : '「每一次回來，身體都記得。」';
+  const referenceLabel = isWhatsappFlow ? '查詢編號' : '預約編號';
 
   const canContinueSetup = Boolean(doctorId && clinicId && visitType);
   const canContinueTimeslot = Boolean(selectedDate && selectedTime);
@@ -459,6 +484,17 @@ export function BookingTabFlow({
     };
   }, [calendarMonthKey, clinicId, doctorId, maxDate, minDate, step]);
 
+  useEffect(() => {
+    if (!isWhatsappFlow || step !== 'success' || !whatsappUrl || whatsappRedirectAttempted) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setWhatsappRedirectAttempted(true);
+      window.location.href = whatsappUrl;
+    }, 900);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isWhatsappFlow, step, whatsappRedirectAttempted, whatsappUrl]);
+
   function resetSlotState() {
     setSelectedDate('');
     setSelectedTime('');
@@ -475,6 +511,10 @@ export function BookingTabFlow({
     setSubmitError('');
     setIsSubmitting(false);
     setBookingId('');
+    setWhatsappUrl('');
+    setWhatsappLabel('');
+    setIntakeSaved(true);
+    setWhatsappRedirectAttempted(false);
   }
 
   function handleDoctorChange(nextDoctorId: string) {
@@ -698,14 +738,30 @@ export function BookingTabFlow({
       email: formValues.email.trim().toLowerCase(),
       notes: buildBookingNotes(formValues),
     };
+    const submitEndpoint = isWhatsappFlow ? '/api/booking-whatsapp' : '/api/booking';
+    const requestBody = isWhatsappFlow
+      ? {
+          ...payload,
+          visitType,
+          needReceipt: formValues.needReceipt,
+          medicationPickup: formValues.medicationPickup,
+          idCard: formValues.idCard.trim(),
+          dateOfBirth: formValues.dateOfBirth.trim(),
+          gender: formValues.gender || undefined,
+          allergies: formValues.allergies.trim(),
+          medications: formValues.medications.trim(),
+          symptoms: formValues.symptoms.trim(),
+          referralSource: formValues.referralSource.trim(),
+        }
+      : payload;
 
     try {
-      const response = await fetch('/api/booking', {
+      const response = await fetch(submitEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
@@ -715,10 +771,19 @@ export function BookingTabFlow({
         return;
       }
 
-      setBookingId(data.bookingId || '');
+      if (isWhatsappFlow) {
+        setBookingId(data.intakeId || '');
+        setWhatsappUrl(data.whatsappUrl || '');
+        setWhatsappLabel(data.whatsappLabel || '');
+        setIntakeSaved(data.intakeSaved !== false);
+      } else {
+        setBookingId(data.bookingId || '');
+      }
       setStep('success');
     } catch {
-      setSubmitError('預約時發生錯誤，請稍後再試。');
+      setSubmitError(
+        isWhatsappFlow ? '未能準備 WhatsApp 訊息，請稍後再試。' : '預約時發生錯誤，請稍後再試。'
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -732,9 +797,9 @@ export function BookingTabFlow({
   }
 
   if (doctorOptions.length === 0) {
-    return (
-      <div className="patient-card p-6 sm:p-8">
-        <h1 className="text-2xl font-semibold text-primary">預約服務</h1>
+      return (
+        <div className="patient-card p-6 sm:p-8">
+        <h1 className="text-2xl font-semibold text-primary">{pageTitle}</h1>
         <p className="mt-3 text-sm text-slate-600">
           目前未有可用的醫師時段，請稍後再試或於聊天頁聯絡我們。
         </p>
@@ -753,12 +818,12 @@ export function BookingTabFlow({
   return (
     <div className={`patient-card mx-auto p-6 sm:p-8 ${embedMode ? 'max-w-4xl' : 'max-w-2xl'}`}>
       <div className="mb-8 space-y-3">
-        <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-primary sm:text-[30px]">預約服務</h1>
+        <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-primary sm:text-[30px]">{pageTitle}</h1>
         <p
           className="text-sm leading-relaxed text-slate-400"
           style={{ fontFamily: "var(--font-serif)" }}
         >
-          「每一次預約，都是照顧自己的開始。」
+          {pageSubtitle}
         </p>
       </div>
 
@@ -1304,7 +1369,7 @@ export function BookingTabFlow({
             ) : null}
 
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 sm:text-sm">
-              成功預約後會收到確認電郵通知；更改或取消可使用電郵內連結。
+              {detailNotice}
             </div>
 
             {submitError ? (
@@ -1321,10 +1386,10 @@ export function BookingTabFlow({
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  預約處理中...
+                  {submitLoadingLabel}
                 </>
               ) : (
-                '確認預約'
+                submitButtonLabel
               )}
             </button>
           </form>
@@ -1338,13 +1403,21 @@ export function BookingTabFlow({
           </div>
 
           <div className="space-y-3">
-            <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-slate-800">預約成功</h2>
-            <p className="text-sm text-slate-500">確認電郵將發送到你提供的信箱。</p>
+            <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-slate-800">{successTitle}</h2>
+            <p className="text-sm text-slate-500">{successDescription}</p>
+            {isWhatsappFlow ? (
+              <p className="text-xs text-slate-400">如未自動開啟 WhatsApp，可使用下方按鈕繼續。</p>
+            ) : null}
+            {isWhatsappFlow && !intakeSaved ? (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                已準備 WhatsApp 訊息，但系統未能同步保存查詢紀錄。
+              </p>
+            ) : null}
             <p
               className="mt-4 text-[14px] leading-[1.8] text-slate-400"
               style={{ fontFamily: "var(--font-serif)" }}
             >
-              「每一次回來，身體都記得。」
+              {successQuote}
             </p>
           </div>
 
@@ -1360,12 +1433,20 @@ export function BookingTabFlow({
             </p>
             {bookingId ? (
               <p>
-                <strong>預約編號：</strong> {bookingId}
+                <strong>{referenceLabel}：</strong> {bookingId}
               </p>
             ) : null}
           </div>
 
-          <div className={`grid gap-3 ${embedMode ? '' : 'sm:grid-cols-2'}`}>
+          <div className={`grid gap-3 ${embedMode ? '' : isWhatsappFlow && whatsappUrl ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+            {isWhatsappFlow && whatsappUrl ? (
+              <a
+                href={whatsappUrl}
+                className="inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
+              >
+                打開 WhatsApp
+              </a>
+            ) : null}
             <button
               type="button"
               onClick={startAnotherBooking}
@@ -1377,7 +1458,11 @@ export function BookingTabFlow({
             {!embedMode ? (
               <Link
                 href="/chat"
-                className="inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
+                className={`inline-flex items-center justify-center rounded-[18px] px-4 py-3 text-sm font-semibold transition ${
+                  isWhatsappFlow && whatsappUrl
+                    ? 'border border-primary/20 bg-white text-primary hover:bg-primary-light'
+                    : 'bg-primary text-white hover:bg-primary-hover'
+                }`}
               >
                 返回聊天頁
               </Link>
