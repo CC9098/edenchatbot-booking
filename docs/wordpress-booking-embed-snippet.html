@@ -4,19 +4,21 @@
 <style>
   #eden-booking-embed {
     width: 100%;
-    min-height: 1400px;
+    min-height: 1600px;
     border: 0;
     background: transparent;
     display: block;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
   }
 </style>
 
 <iframe
   id="eden-booking-embed"
-  src="https://edenchatbot-booking.vercel.app/embed/booking?source=wordpress&v=20260321"
+  src="https://edenchatbot-booking.vercel.app/embed/booking?source=wordpress&v=20260321b"
   title="Eden 即時預約"
   loading="lazy"
-  scrolling="no"
+  scrolling="yes"
 ></iframe>
 
 <script>
@@ -24,8 +26,8 @@
     const iframe = document.getElementById("eden-booking-embed");
     if (!iframe) return;
 
-    const DEFAULT_HEIGHT = 1400;
-    const MIN_HEIGHT = 1100;
+    const DEFAULT_HEIGHT = window.innerWidth < 768 ? 1900 : 1600;
+    const MIN_HEIGHT = window.innerWidth < 768 ? 1500 : 1200;
 
     const applyHeight = (height) => {
       const nextHeight = Number.isFinite(height) ? Math.max(height, MIN_HEIGHT) : DEFAULT_HEIGHT;
