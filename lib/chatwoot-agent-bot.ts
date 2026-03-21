@@ -7,16 +7,16 @@ import {
   getClinicRouteLinks,
 } from '@/shared/clinic-data';
 
-export const CHATWOOT_MAIN_MENU_PROMPT = '你好，呢度係醫天圓中醫診所。請問有咩可以幫到你？';
+export const CHATWOOT_MAIN_MENU_PROMPT = '你好，我們是醫天圓中醫診所，請問有什麼可以幫到你？';
 export const CHATWOOT_MAIN_MENU_ITEMS = [
   { title: '一般查詢', value: 'general' },
   { title: '預約', value: 'booking' },
-  { title: '想搵姑娘', value: 'human' },
+  { title: '想直接與姑娘對話', value: 'human' },
 ] as const;
 export const CHATWOOT_MAIN_MENU_MESSAGE = `${CHATWOOT_MAIN_MENU_PROMPT}
 1. 一般查詢
 2. 預約
-3. 想搵姑娘`;
+3. 想直接與姑娘對話`;
 
 const widgetSettings = DEFAULT_WIDGET_CHATBOT_SETTINGS;
 const clinicRouteLinkLines = getClinicRouteLinks()
@@ -351,8 +351,8 @@ export function resolveMenuSelection(
     {
       kind: 'human',
       pattern: allowNumeric
-        ? /^(?:3(?:[.)、\s-]|$)|想搵姑娘(?:[:：\s-]|$)|姑娘(?:[:：\s-]|$)|真人(?:[:：\s-]|$))/u
-        : /^(?:想搵姑娘(?:[:：\s-]|$)|姑娘(?:[:：\s-]|$)|真人(?:[:：\s-]|$))/u,
+        ? /^(?:3(?:[.)、\s-]|$)|想直接與姑娘對話(?:[:：\s-]|$)|想直接与姑娘对话(?:[:：\s-]|$)|想搵姑娘(?:[:：\s-]|$)|姑娘(?:[:：\s-]|$)|真人(?:[:：\s-]|$))/u
+        : /^(?:想直接與姑娘對話(?:[:：\s-]|$)|想直接与姑娘对话(?:[:：\s-]|$)|想搵姑娘(?:[:：\s-]|$)|姑娘(?:[:：\s-]|$)|真人(?:[:：\s-]|$))/u,
     },
   ]);
 }
