@@ -1,7 +1,11 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { LegacyChatMessage } from '@/lib/legacy-chat-response';
+import { getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
+import { buildPublicUrl } from '@/lib/public-url';
+import { createServiceClient } from '@/lib/supabase';
 import { DEFAULT_WIDGET_CHATBOT_SETTINGS } from '@/lib/widget-chatbot-settings';
 import {
+  DOCTORS,
   getClinicAddressLines,
   getClinicHoursLines,
   getClinicRouteLinks,
@@ -107,6 +111,13 @@ export interface ChatwootOutgoingMessagePayload {
 type MenuSelectionKind = 'general' | 'booking' | 'human';
 type GeneralSelectionKind = 'fees' | 'clinic' | 'timetable' | 'other' | 'main';
 type ClinicSelectionKind = 'hours' | 'addresses' | 'main';
+
+interface ChatwootDoctorDirectoryRow {
+  id: string;
+  name: string;
+  name_zh: string;
+  is_active: boolean | null;
+}
 
 export class ChatwootClient {
   constructor(
@@ -309,6 +320,115 @@ export function mergeFlowAttributes(
     [CHATWOOT_FLOW_STATE_ATTRIBUTE]: nextState,
     [CHATWOOT_LAST_INCOMING_MESSAGE_ID_ATTRIBUTE]: String(messageId),
   };
+}
+
+function hasAnySchedule(schedule: Record<string | number, unknown>): boolean {
+  return Object.values(schedule).some((ranges) => Array.isArray(ranges) && ranges.length > 0);
+}
+
+function buildWhatsappDoctorBookingUrl(doctorId: string): string {
+  const params = new URLSearchParams({ doctor: doctorId });
+  return buildPublicUrl(`/booking-whatsapp?${params.toString()}`);
+}
+
+async function loadActiveDoctorDirectoryRows(
+  doctorIds: string[],
+): Promise<ChatwootDoctorDirectoryRow[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from('doctors')
+    .select('id, name, name_zh, is_active')
+    .eq('is_active', true)
+    .in('id', doctorIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return Array.isArray(data) ? (data as ChatwootDoctorDirectoryRow[]) : [];
+}
+
+async function getChatwootBookableDoctors(): Promise<Array<{ id: string; nameZh: string; nameEn: string }>> {
+  const mappings = await getActiveScheduleMappings();
+  const bookableDoctorIds = Array.from(
+    new Set(
+      mappings
+        .filter((mapping) => mapping.clinicId !== 'online' && hasAnySchedule(mapping.schedule))
+        .map((mapping) => mapping.doctorId)
+    )
+  );
+
+  if (bookableDoctorIds.length === 0) {
+    return [];
+  }
+
+  const fallbackDoctorMap = new Map<string, { id: string; nameZh: string; nameEn: string }>(
+    DOCTORS.map((doctor) => [
+      doctor.id,
+      { id: doctor.id, nameZh: doctor.nameZh, nameEn: doctor.nameEn },
+    ])
+  );
+  const doctorOrder = new Map<string, number>(DOCTORS.map((doctor, index) => [doctor.id, index]));
+
+  try {
+    const rows = await loadActiveDoctorDirectoryRows(bookableDoctorIds);
+    const rowMap = new Map<string, { id: string; nameZh: string; nameEn: string }>(
+      rows.map((row) => [
+        row.id,
+        {
+          id: row.id,
+          nameZh: row.name_zh?.trim() || fallbackDoctorMap.get(row.id)?.nameZh || row.id,
+          nameEn: row.name?.trim() || fallbackDoctorMap.get(row.id)?.nameEn || row.id,
+        },
+      ])
+    );
+
+    return bookableDoctorIds
+      .map((doctorId) => rowMap.get(doctorId) || fallbackDoctorMap.get(doctorId))
+      .filter((doctor): doctor is { id: string; nameZh: string; nameEn: string } => Boolean(doctor))
+      .sort((left, right) => {
+        const leftOrder = doctorOrder.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+        const rightOrder = doctorOrder.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+        if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+        return left.nameZh.localeCompare(right.nameZh, 'zh-Hant');
+      });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    console.warn(`[chatwoot-agent-bot] Failed to load doctors from Supabase, using fallback. reason=${detail}`);
+
+    return bookableDoctorIds
+      .map((doctorId) => fallbackDoctorMap.get(doctorId))
+      .filter((doctor): doctor is { id: string; nameZh: string; nameEn: string } => Boolean(doctor));
+  }
+}
+
+export async function buildChatwootBookingDoctorReply(): Promise<string> {
+  const doctors = await getChatwootBookableDoctors();
+  const genericBookingUrl = buildPublicUrl('/booking-whatsapp');
+
+  if (doctors.length === 0) {
+    return [
+      '收到，你想預約。',
+      '請直接用以下 WhatsApp 預約頁揀醫師、診所同時段：',
+      genericBookingUrl,
+      '',
+      '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
+    ].join('\n');
+  }
+
+  const doctorLines = doctors.flatMap((doctor, index) => [
+    `${index + 1}. ${doctor.nameZh} (${doctor.nameEn})`,
+    buildWhatsappDoctorBookingUrl(doctor.id),
+    '',
+  ]);
+
+  return [
+    '請問你想預約邊位醫師？以下每位醫師都有自己嘅專屬 WhatsApp 預約頁，直接按對應連結就可以進入：',
+    '',
+    ...doctorLines.slice(0, -1),
+    '',
+    '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
+  ].join('\n');
 }
 
 function resolveSelection<K extends string>(

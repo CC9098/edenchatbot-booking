@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  CHATWOOT_BOOKING_ACK,
   CHATWOOT_CLINIC_ADDRESSES_MESSAGE,
   CHATWOOT_CLINIC_HOURS_MESSAGE,
   CHATWOOT_CLINIC_MENU_ITEMS,
@@ -13,6 +12,7 @@ import {
   CHATWOOT_MAIN_MENU_ITEMS,
   CHATWOOT_MAIN_MENU_PROMPT,
   CHATWOOT_TIMETABLE_MESSAGE,
+  buildChatwootBookingDoctorReply,
   type ChatwootOutgoingMessagePayload,
   createChatwootClientFromEnv,
   extractIncomingChatwootEvent,
@@ -109,8 +109,8 @@ export async function POST(request: NextRequest) {
       nextState = 'human';
       reply = CHATWOOT_HUMAN_ACK;
     } else if (rootSelection?.kind === 'booking') {
-      nextState = 'booking';
-      reply = CHATWOOT_BOOKING_ACK;
+      nextState = 'menu';
+      reply = await buildChatwootBookingDoctorReply();
     } else if (rootSelection?.kind === 'general') {
       nextState = 'general_menu';
       reply = GENERAL_MENU_REPLY;
