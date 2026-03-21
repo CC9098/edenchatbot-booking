@@ -149,8 +149,8 @@ export async function POST(request: NextRequest) {
         nextState = 'menu';
         reply = MAIN_MENU_REPLY;
       } else {
-        nextState = 'clinic_menu';
-        reply = CLINIC_MENU_REPLY;
+        nextState = 'general_ai';
+        reply = await generateGeneralAiReply(conversation.messages, event.content);
       }
     } else {
       if (nextState === 'general_ai') {
