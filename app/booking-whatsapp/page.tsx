@@ -9,8 +9,8 @@ import { createServiceClient } from "@/lib/supabase";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "WhatsApp 預約 | 醫天圓",
-  description: "先選擇醫師與時段，再透過 WhatsApp 交由姑娘確認。",
+  title: "預約服務 | 醫天圓",
+  description: "成功預約後，診所會透過 WhatsApp 發送確認訊息。",
 };
 
 async function getInitialBookingContact() {
