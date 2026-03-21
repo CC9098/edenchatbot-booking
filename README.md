@@ -25,6 +25,11 @@ Booking system backend and frontend for Eden TCM Clinic (醫天圓).
 | `BASE_URL` | **Domain of your deployed app**. e.g. `https://your-project.vercel.app` |
 | `CHATWOOT_BASE_URL` | Chatwoot base URL for Agent Bot callbacks. e.g. `https://chat.example.com` |
 | `CHATWOOT_API_ACCESS_TOKEN` | Chatwoot API access token used to send bot replies and update conversation attributes |
+| `CHATWOOT_ACCOUNT_ID` | Optional. Chatwoot account ID for outbound WhatsApp confirmations. If omitted, the app will try to infer it from `/api/v1/profile` |
+| `CHATWOOT_WHATSAPP_INBOX_ID` | Optional. WhatsApp inbox ID to use for booking confirmations. Required if your Chatwoot account has multiple WhatsApp inboxes that cannot be auto-matched by clinic number |
+| `CHATWOOT_WHATSAPP_TEMPLATE_NAME` | Approved WhatsApp template name used for new outbound booking confirmations |
+| `CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE` | Optional. WhatsApp template language, defaults to `zh_HK` |
+| `CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY` | Optional. WhatsApp template category, defaults to `UTILITY` |
 | `CHATWOOT_WEBHOOK_SECRET` | Optional but recommended. Validates the Agent Bot webhook signature |
 
 ### URL Resolution Logic

@@ -358,10 +358,8 @@ export function BookingTabFlow({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [bookingId, setBookingId] = useState('');
-  const [whatsappUrl, setWhatsappUrl] = useState('');
-  const [whatsappLabel, setWhatsappLabel] = useState('');
-  const [intakeSaved, setIntakeSaved] = useState(true);
-  const [whatsappRedirectAttempted, setWhatsappRedirectAttempted] = useState(false);
+  const [whatsappSent, setWhatsappSent] = useState<boolean | null>(null);
+  const [whatsappNotice, setWhatsappNotice] = useState('');
 
   const minDate = getTodayIsoInHongKong();
   const maxDate = getMaxDateIsoInHongKong(MAX_BOOKING_WINDOW_DAYS);
@@ -385,23 +383,23 @@ export function BookingTabFlow({
     () => clinicOptions.find((clinic) => clinic.clinicId === clinicId),
     [clinicId, clinicOptions]
   );
-  const pageTitle = isWhatsappFlow ? 'WhatsApp 預約' : '預約服務';
+  const pageTitle = '預約服務';
   const pageSubtitle = isWhatsappFlow
-    ? '先選好醫師、時段同資料，再由姑娘透過 WhatsApp 跟進確認。'
+    ? '成功預約後，診所會透過 WhatsApp 發送確認訊息到你提供的電話。'
     : '「每一次預約，都是照顧自己的開始。」';
-  const submitButtonLabel = isWhatsappFlow ? '前往 WhatsApp 確認' : '確認預約';
-  const submitLoadingLabel = isWhatsappFlow ? '正在準備 WhatsApp...' : '預約處理中...';
+  const submitButtonLabel = '確認預約';
+  const submitLoadingLabel = '預約處理中...';
   const detailNotice = isWhatsappFlow
-    ? '提交後會自動開啟 WhatsApp 並預填預約資料；最終預約以姑娘確認為準。'
+    ? '成功預約後會透過 WhatsApp 發送確認訊息到你提供的電話。'
     : '成功預約後會收到確認電郵通知；更改或取消可使用電郵內連結。';
-  const successTitle = isWhatsappFlow ? '已準備 WhatsApp 訊息' : '預約成功';
+  const successTitle = '預約成功';
   const successDescription = isWhatsappFlow
-    ? `系統已整理好預約資料，將會開啟 WhatsApp 交由${whatsappLabel || '姑娘'}跟進。`
+    ? whatsappSent
+      ? '確認訊息已透過 WhatsApp 發送到你提供的電話。'
+      : '診所會透過 WhatsApp 跟進你的預約確認。'
     : '確認電郵將發送到你提供的信箱。';
-  const successQuote = isWhatsappFlow
-    ? '「一步一步，安心安排。」'
-    : '「每一次回來，身體都記得。」';
-  const referenceLabel = isWhatsappFlow ? '查詢編號' : '預約編號';
+  const successQuote = '「每一次回來，身體都記得。」';
+  const referenceLabel = '預約編號';
 
   const canContinueSetup = Boolean(doctorId && clinicId && visitType);
   const canContinueTimeslot = Boolean(selectedDate && selectedTime);
@@ -549,17 +547,6 @@ export function BookingTabFlow({
     };
   }, [calendarMonthKey, clinicId, doctorId, maxDate, minDate, step]);
 
-  useEffect(() => {
-    if (!isWhatsappFlow || step !== 'success' || !whatsappUrl || whatsappRedirectAttempted) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setWhatsappRedirectAttempted(true);
-      window.location.href = whatsappUrl;
-    }, 900);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [isWhatsappFlow, step, whatsappRedirectAttempted, whatsappUrl]);
-
   function resetSlotState() {
     setSelectedDate('');
     setSelectedTime('');
@@ -576,10 +563,8 @@ export function BookingTabFlow({
     setSubmitError('');
     setIsSubmitting(false);
     setBookingId('');
-    setWhatsappUrl('');
-    setWhatsappLabel('');
-    setIntakeSaved(true);
-    setWhatsappRedirectAttempted(false);
+    setWhatsappSent(null);
+    setWhatsappNotice('');
   }
 
   function handleDoctorChange(nextDoctorId: string) {
@@ -837,18 +822,15 @@ export function BookingTabFlow({
       }
 
       if (isWhatsappFlow) {
-        setBookingId(data.intakeId || '');
-        setWhatsappUrl(data.whatsappUrl || '');
-        setWhatsappLabel(data.whatsappLabel || '');
-        setIntakeSaved(data.intakeSaved !== false);
+        setBookingId(data.bookingId || '');
+        setWhatsappSent(data.whatsappSent === true);
+        setWhatsappNotice(typeof data.whatsappError === 'string' ? data.whatsappError : '');
       } else {
         setBookingId(data.bookingId || '');
       }
       setStep('success');
     } catch {
-      setSubmitError(
-        isWhatsappFlow ? '未能準備 WhatsApp 訊息，請稍後再試。' : '預約時發生錯誤，請稍後再試。'
-      );
+      setSubmitError('預約時發生錯誤，請稍後再試。');
     } finally {
       setIsSubmitting(false);
     }
@@ -1484,13 +1466,13 @@ export function BookingTabFlow({
           <div className="space-y-3">
             <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-slate-800">{successTitle}</h2>
             <p className="text-sm text-slate-500">{successDescription}</p>
-            {isWhatsappFlow ? (
-              <p className="text-xs text-slate-400">如未自動開啟 WhatsApp，可使用下方按鈕繼續。</p>
-            ) : null}
-            {isWhatsappFlow && !intakeSaved ? (
+            {isWhatsappFlow && whatsappSent === false ? (
               <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                已準備 WhatsApp 訊息，但系統未能同步保存查詢紀錄。
+                已完成預約，但 WhatsApp 確認訊息暫時未能自動發送。診所會另行跟進。
               </p>
+            ) : null}
+            {isWhatsappFlow && whatsappSent === false && whatsappNotice ? (
+              <p className="text-xs text-slate-400">{whatsappNotice}</p>
             ) : null}
             <p
               className="mt-4 text-[14px] leading-[1.8] text-slate-400"
@@ -1510,15 +1492,7 @@ export function BookingTabFlow({
             ]}
           />
 
-          <div className={`grid gap-3 ${embedMode ? '' : isWhatsappFlow && whatsappUrl ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-            {isWhatsappFlow && whatsappUrl ? (
-              <a
-                href={whatsappUrl}
-                className="inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
-              >
-                打開 WhatsApp
-              </a>
-            ) : null}
+          <div className={`grid gap-3 ${embedMode ? '' : 'sm:grid-cols-2'}`}>
             <button
               type="button"
               onClick={startAnotherBooking}
@@ -1530,11 +1504,7 @@ export function BookingTabFlow({
             {!embedMode ? (
               <Link
                 href="/chat"
-                className={`inline-flex items-center justify-center rounded-[18px] px-4 py-3 text-sm font-semibold transition ${
-                  isWhatsappFlow && whatsappUrl
-                    ? 'border border-primary/20 bg-white text-primary hover:bg-primary-light'
-                    : 'bg-primary text-white hover:bg-primary-hover'
-                }`}
+                className="inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
               >
                 返回聊天頁
               </Link>
