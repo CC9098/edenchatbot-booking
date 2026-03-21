@@ -62,8 +62,17 @@ export function EmbedAutoHeightReporter({
       attributes: true,
     });
 
+    const images = Array.from(document.images);
+    images.forEach((image) => {
+      image.addEventListener('load', requestPostHeight);
+      image.addEventListener('error', requestPostHeight);
+    });
+
     window.addEventListener('load', requestPostHeight);
     window.addEventListener('resize', requestPostHeight);
+    window.addEventListener('pageshow', requestPostHeight);
+    window.addEventListener('transitionend', requestPostHeight);
+    window.addEventListener('animationend', requestPostHeight);
     window.visualViewport?.addEventListener('resize', requestPostHeight);
     window.visualViewport?.addEventListener('scroll', requestPostHeight);
     document.fonts?.ready.then(requestPostHeight).catch(() => {});
@@ -76,8 +85,15 @@ export function EmbedAutoHeightReporter({
       window.clearInterval(intervalId);
       resizeObserver.disconnect();
       mutationObserver.disconnect();
+      images.forEach((image) => {
+        image.removeEventListener('load', requestPostHeight);
+        image.removeEventListener('error', requestPostHeight);
+      });
       window.removeEventListener('load', requestPostHeight);
       window.removeEventListener('resize', requestPostHeight);
+      window.removeEventListener('pageshow', requestPostHeight);
+      window.removeEventListener('transitionend', requestPostHeight);
+      window.removeEventListener('animationend', requestPostHeight);
       window.visualViewport?.removeEventListener('resize', requestPostHeight);
       window.visualViewport?.removeEventListener('scroll', requestPostHeight);
     };

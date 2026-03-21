@@ -82,6 +82,7 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
         doctorNameZh: doctor.nameZh,
         doctorNameEn: doctor.nameEn,
         avatarSrc: doctor.avatarSrc,
+        avatarObjectPosition: doctor.avatarObjectPosition,
         scheduleNote: doctor.scheduleNote,
         summary: '',
         clinics: [clinicSchedule],

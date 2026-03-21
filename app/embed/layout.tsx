@@ -24,27 +24,36 @@ export default function EmbedLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-Hant" style={{ background: 'transparent', touchAction: 'manipulation' }}>
+    <html lang="zh-Hant" style={{ background: 'transparent', touchAction: 'pan-y pinch-zoom' }}>
       <body
-        className={`${sans.variable} ${mono.variable} antialiased`}
+        className={`embed-shell ${sans.variable} ${mono.variable} antialiased`}
         style={{ 
           background: 'transparent',
           margin: 0,
           padding: 0,
           overflowX: 'hidden',
           overflowY: 'auto',
-          touchAction: 'manipulation',
-          WebkitTouchCallout: 'none',
-          WebkitUserSelect: 'none',
-          userSelect: 'none',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y pinch-zoom',
           pointerEvents: 'auto'
         }}
       >
+        <style>{`
+          .embed-shell,
+          .embed-shell * {
+            touch-action: pan-y pinch-zoom;
+          }
+
+          .embed-shell input,
+          .embed-shell textarea,
+          .embed-shell select {
+            -webkit-user-select: text;
+            user-select: text;
+          }
+        `}</style>
         {children}
       </body>
     </html>
   );
 }
-
-
 

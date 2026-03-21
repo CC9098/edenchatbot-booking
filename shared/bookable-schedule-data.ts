@@ -14,6 +14,7 @@ export type BookableDoctorSchedule = {
   doctorNameZh: string;
   doctorNameEn: string;
   avatarSrc?: string;
+  avatarObjectPosition?: string;
   scheduleNote?: string;
   summary: string;
   clinics: BookableClinicSchedule[];

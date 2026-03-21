@@ -270,7 +270,7 @@ function DoctorAvatar({
   doctor,
   size = 'sm',
 }: {
-  doctor?: Pick<BookableDoctorSchedule, 'doctorNameZh' | 'avatarSrc'>;
+  doctor?: Pick<BookableDoctorSchedule, 'doctorNameZh' | 'avatarSrc' | 'avatarObjectPosition'>;
   size?: 'sm' | 'lg';
 }) {
   const isLarge = size === 'lg';
@@ -287,6 +287,7 @@ function DoctorAvatar({
           fill
           sizes={isLarge ? '112px' : '56px'}
           className="object-cover"
+          style={{ objectPosition: doctor.avatarObjectPosition || 'center' }}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,#eaf8ed_0%,#cfe8d6_100%)] text-lg font-semibold text-[#2b5d38]">
@@ -303,7 +304,7 @@ function DoctorBookingSummary({
   eyebrow,
   details,
 }: {
-  doctor?: Pick<BookableDoctorSchedule, 'doctorNameZh' | 'avatarSrc'>;
+  doctor?: Pick<BookableDoctorSchedule, 'doctorNameZh' | 'avatarSrc' | 'avatarObjectPosition'>;
   clinicNameZh?: string;
   eyebrow: string;
   details: string[];
