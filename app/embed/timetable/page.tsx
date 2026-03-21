@@ -234,31 +234,45 @@ function ClinicCard({ card }: { card: TimetableClinicCard }) {
                             {entries.map((entry) => {
                               const doctorName = splitDoctorName(entry.shortNameZh);
                               const isException = rowTimeLabel && entry.timeLabel !== rowTimeLabel;
+                              const doctorTone = getDoctorTone(entry.doctorId);
+                              const doctorLabel = `${entry.shortNameZh}${card.clinicNameZh}預約`;
 
                               return (
-                                <div
+                                <a
                                   key={`${card.clinicId}-${row.id}-${column.day}-${entry.doctorId}-${entry.timeLabel}`}
-                                  className="min-w-[62px] text-center"
+                                  href={entry.bookingUrl || buildBookingUrl({ doctorId: entry.doctorId, clinicId: card.clinicId })}
+                                  target="_top"
+                                  rel="noreferrer"
+                                  aria-label={doctorLabel}
+                                  title={doctorLabel}
+                                  className="group flex min-h-[112px] min-w-[86px] cursor-pointer flex-col items-center justify-center rounded-[20px] px-3 py-3 text-center transition duration-200 hover:-translate-y-0.5 hover:bg-white/65 hover:shadow-[0_14px_30px_-24px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                                 >
                                   <div
                                     className="text-5xl font-black leading-none"
-                                    style={{ color: getDoctorTone(entry.doctorId) }}
+                                    style={{ color: doctorTone }}
                                   >
                                     {doctorName.surname}
                                   </div>
                                   <div
                                     className="mt-1 text-[2rem] font-bold leading-none tracking-[0.04em]"
-                                    style={{ color: getDoctorTone(entry.doctorId) }}
+                                    style={{ color: doctorTone }}
                                   >
                                     {doctorName.given}
                                     {isException ? '*' : ''}
                                   </div>
+                                  <span
+                                    className="mt-2 inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] transition group-hover:bg-white"
+                                    style={{ borderColor: `${doctorTone}33`, color: doctorTone }}
+                                  >
+                                    預約
+                                    <ExternalLink className="h-3 w-3" />
+                                  </span>
                                   {isException ? (
                                     <div className="mt-2 text-[11px] font-semibold tracking-[0.08em] text-slate-500">
                                       {entry.timeLabel}
                                     </div>
                                   ) : null}
-                                </div>
+                                </a>
                               );
                             })}
                           </div>
@@ -274,6 +288,7 @@ function ClinicCard({ card }: { card: TimetableClinicCard }) {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-end gap-x-5 gap-y-2 px-1 text-sm font-semibold tracking-[0.04em] text-slate-600">
+        <span>點醫師名可直接進入預約。</span>
         {hasException ? <span>* 個別時段略有不同，請以右下細字為準。</span> : null}
         <span>#公眾假期照休息</span>
       </div>

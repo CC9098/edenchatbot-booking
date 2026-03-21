@@ -18,6 +18,7 @@ type TimetableDoctorEntry = {
   doctorNameZh: string;
   shortNameZh: string;
   timeLabel: string;
+  bookingUrl?: string;
 };
 
 type TimetableSessionRow = {
@@ -261,6 +262,7 @@ export async function getPublicTimetableData(): Promise<PublicTimetableData> {
           doctorNameZh: doctor.nameZh,
           shortNameZh: shortDoctorName(doctor.nameZh),
           timeLabel: `${range.start}-${range.end}`,
+          bookingUrl: doctor.bookingUrl,
         });
       }
     }
