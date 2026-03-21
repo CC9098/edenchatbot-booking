@@ -48,6 +48,19 @@ const CLINIC_MENU_REPLY: ChatwootOutgoingMessagePayload = {
   items: [...CHATWOOT_CLINIC_MENU_ITEMS],
 };
 
+async function generateGeneralAiReply(
+  messages: Parameters<typeof mapConversationMessagesToLegacyChat>[0],
+  userMessage: string,
+) {
+  const mappedMessages = mapConversationMessagesToLegacyChat(messages);
+  const aiMessages = replaceLatestUserMessage(mappedMessages, userMessage);
+  const { reply } = await generateLegacyChatResponse({
+    messages: aiMessages,
+  });
+
+  return reply;
+}
+
 function getOptionalWebhookSecret(): string | null {
   const secret = (process.env.CHATWOOT_WEBHOOK_SECRET || '').trim();
   return secret || null;
@@ -120,8 +133,8 @@ export async function POST(request: NextRequest) {
         nextState = 'menu';
         reply = MAIN_MENU_REPLY;
       } else {
-        nextState = 'general_menu';
-        reply = GENERAL_MENU_REPLY;
+        nextState = 'general_ai';
+        reply = await generateGeneralAiReply(conversation.messages, event.content);
       }
     } else if (currentState === 'clinic_menu') {
       const clinicSelection = resolveClinicMenuSelection(event.content);
@@ -141,12 +154,7 @@ export async function POST(request: NextRequest) {
       }
     } else {
       if (nextState === 'general_ai') {
-        const mappedMessages = mapConversationMessagesToLegacyChat(conversation.messages);
-        const aiMessages = replaceLatestUserMessage(mappedMessages, event.content);
-        const { reply: aiReply } = await generateLegacyChatResponse({
-          messages: aiMessages,
-        });
-        reply = aiReply;
+        reply = await generateGeneralAiReply(conversation.messages, event.content);
       } else if (nextState === 'booking' || nextState === 'human') {
         reply = null;
       } else {
