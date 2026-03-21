@@ -20,6 +20,14 @@ interface ChatwootInbox {
   provider?: string | null;
   medium?: string | null;
   phone_number?: string | null;
+  message_templates?: ChatwootMessageTemplate[] | null;
+}
+
+interface ChatwootMessageTemplate {
+  name?: string | null;
+  language?: string | null;
+  status?: string | null;
+  category?: string | null;
 }
 
 interface ChatwootContactInbox {
@@ -297,17 +305,21 @@ async function resolveWhatsappInboxId(
   accountId: number,
   configuredInboxId: number | null,
   clinicWhatsappPhone?: string | null,
-): Promise<number> {
-  if (configuredInboxId) {
-    return configuredInboxId;
-  }
-
+): Promise<ChatwootInbox> {
   const inboxResponse = await client.listInboxes(accountId);
   const whatsappInboxes = (inboxResponse.payload || []).filter((inbox) => {
     return inbox.channel_type === 'Channel::Whatsapp'
       || inbox.medium === 'whatsapp'
       || inbox.provider === 'whatsapp_cloud';
   });
+
+  if (configuredInboxId) {
+    const matchedConfiguredInbox = whatsappInboxes.find((inbox) => inbox.id === configuredInboxId);
+    if (!matchedConfiguredInbox) {
+      throw new Error(`Configured Chatwoot WhatsApp inbox ${configuredInboxId} not found`);
+    }
+    return matchedConfiguredInbox;
+  }
 
   if (whatsappInboxes.length === 0) {
     throw new Error('No Chatwoot WhatsApp inbox found');
@@ -320,12 +332,12 @@ async function resolveWhatsappInboxId(
     });
 
     if (matchedInbox?.id) {
-      return matchedInbox.id;
+      return matchedInbox;
     }
   }
 
   if (whatsappInboxes.length === 1 && whatsappInboxes[0]?.id) {
-    return whatsappInboxes[0].id;
+    return whatsappInboxes[0];
   }
 
   throw new Error('Multiple Chatwoot WhatsApp inboxes found; set CHATWOOT_WHATSAPP_INBOX_ID');
@@ -396,7 +408,7 @@ async function ensureWhatsappContact(
   };
 }
 
-function getTemplateConfigs(): TemplateConfig[] {
+function getTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
   const configuredName = (process.env.CHATWOOT_WHATSAPP_TEMPLATE_NAME || '').trim();
   const configuredLanguage = (process.env.CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE || '').trim();
   const category = (process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY || 'UTILITY').trim();
@@ -404,8 +416,34 @@ function getTemplateConfigs(): TemplateConfig[] {
   const templateNames = Array.from(
     new Set([configuredName, 'booking_confirm'].filter(Boolean)),
   );
+
+  const syncedTemplates = (inbox.message_templates || []).filter((template) => {
+    if (!template.name || !template.language) return false;
+    if (!templateNames.includes(template.name)) return false;
+    return String(template.status || '').toLowerCase() === 'approved';
+  });
+
+  const preferredSyncedTemplates = syncedTemplates
+    .filter((template) => {
+      if (!configuredLanguage) return true;
+      return template.language === configuredLanguage;
+    })
+    .sort((left, right) => {
+      if (left.language === configuredLanguage) return -1;
+      if (right.language === configuredLanguage) return 1;
+      return 0;
+    });
+
+  if (preferredSyncedTemplates.length > 0) {
+    return preferredSyncedTemplates.map((template) => ({
+      name: template.name || configuredName || 'booking_confirm',
+      category: (template.category || category).trim(),
+      language: (template.language || configuredLanguage || 'en').trim(),
+    }));
+  }
+
   const languages = Array.from(
-    new Set([configuredLanguage, 'zh_HK', 'en_US', 'en'].filter(Boolean)),
+    new Set([configuredLanguage, 'en_US', 'en', 'zh_HK'].filter(Boolean)),
   );
 
   return templateNames.flatMap((name) =>
@@ -475,12 +513,16 @@ export async function sendBookingConfirmationWhatsapp(
       client,
       parseOptionalInteger(process.env.CHATWOOT_ACCOUNT_ID),
     );
-    const inboxId = await resolveWhatsappInboxId(
+    const inbox = await resolveWhatsappInboxId(
       client,
       accountId,
       parseOptionalInteger(process.env.CHATWOOT_WHATSAPP_INBOX_ID),
       input.clinicWhatsappPhone,
     );
+    const inboxId = inbox.id;
+    if (!inboxId) {
+      throw new Error('Resolved Chatwoot WhatsApp inbox is missing an id');
+    }
     const contact = await ensureWhatsappContact(
       client,
       accountId,
@@ -492,7 +534,7 @@ export async function sendBookingConfirmationWhatsapp(
 
     const conversationsResponse = await client.getContactConversations(accountId, contact.contactId);
     const existingConversation = findExistingConversation(conversationsResponse.payload || [], inboxId);
-    const templateConfigs = getTemplateConfigs();
+    const templateConfigs = getTemplateConfigs(inbox);
     const canUseTemplate = templateConfigs.length > 0;
 
     let conversationId = existingConversation?.id;
