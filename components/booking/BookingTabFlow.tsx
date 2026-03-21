@@ -395,9 +395,7 @@ export function BookingTabFlow({
     : '成功預約後會收到確認電郵通知；更改或取消可使用電郵內連結。';
   const successTitle = '預約成功';
   const successDescription = isWhatsappFlow
-    ? whatsappSent
-      ? '確認訊息已透過 WhatsApp 發送到你提供的電話。'
-      : '診所會透過 WhatsApp 跟進你的預約確認。'
+    ? '預約已建立，診所會透過 WhatsApp 跟進並發送確認訊息到你提供的電話。'
     : '確認電郵將發送到你提供的信箱。';
   const successQuote = '「每一次回來，身體都記得。」';
   const referenceLabel = '預約編號';

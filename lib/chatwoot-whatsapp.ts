@@ -143,6 +143,13 @@ class ChatwootWhatsappClient {
     );
   }
 
+  syncInboxTemplates(accountId: number, inboxId: number) {
+    return this.request<{ message?: string; error?: string }>(
+      `/api/v1/accounts/${accountId}/inboxes/${inboxId}/sync_templates`,
+      { method: 'POST' },
+    );
+  }
+
   searchContacts(accountId: number, query: string) {
     const searchParams = new URLSearchParams({ q: query });
 
@@ -343,6 +350,25 @@ async function resolveWhatsappInboxId(
   throw new Error('Multiple Chatwoot WhatsApp inboxes found; set CHATWOOT_WHATSAPP_INBOX_ID');
 }
 
+async function refreshInboxTemplates(
+  client: ChatwootWhatsappClient,
+  accountId: number,
+  inbox: ChatwootInbox,
+): Promise<ChatwootInbox> {
+  if (!inbox.id) {
+    return inbox;
+  }
+
+  try {
+    await client.syncInboxTemplates(accountId, inbox.id);
+    const inboxResponse = await client.listInboxes(accountId);
+    const refreshedInbox = (inboxResponse.payload || []).find((candidate) => candidate.id === inbox.id);
+    return refreshedInbox || inbox;
+  } catch {
+    return inbox;
+  }
+}
+
 async function ensureWhatsappContact(
   client: ChatwootWhatsappClient,
   accountId: number,
@@ -513,12 +539,13 @@ export async function sendBookingConfirmationWhatsapp(
       client,
       parseOptionalInteger(process.env.CHATWOOT_ACCOUNT_ID),
     );
-    const inbox = await resolveWhatsappInboxId(
+    const initialInbox = await resolveWhatsappInboxId(
       client,
       accountId,
       parseOptionalInteger(process.env.CHATWOOT_WHATSAPP_INBOX_ID),
       input.clinicWhatsappPhone,
     );
+    const inbox = await refreshInboxTemplates(client, accountId, initialInbox);
     const inboxId = inbox.id;
     if (!inboxId) {
       throw new Error('Resolved Chatwoot WhatsApp inbox is missing an id');
