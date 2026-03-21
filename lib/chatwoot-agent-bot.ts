@@ -27,23 +27,16 @@ export const CHATWOOT_GENERAL_MENU_PROMPT = widgetSettings.flows.clinic.prompt;
 export const CHATWOOT_GENERAL_MENU_ITEMS = [
   { title: '收費', value: 'fees' },
   { title: '診所資訊', value: 'clinic' },
-  { title: '更多選項', value: 'more' },
-] as const;
-export const CHATWOOT_GENERAL_MENU_MESSAGE = `${CHATWOOT_GENERAL_MENU_PROMPT}
-1. 收費
-2. 診所資訊
-3. 更多選項`;
-
-export const CHATWOOT_GENERAL_MORE_MENU_PROMPT = '請再揀你想查詢嘅項目：';
-export const CHATWOOT_GENERAL_MORE_MENU_ITEMS = [
   { title: '醫師時間表', value: 'timetable' },
   { title: '其他問題', value: 'other' },
   { title: '返回主選單', value: 'main' },
 ] as const;
-export const CHATWOOT_GENERAL_MORE_MENU_MESSAGE = `${CHATWOOT_GENERAL_MORE_MENU_PROMPT}
-1. 醫師時間表
-2. 其他問題
-3. 返回主選單`;
+export const CHATWOOT_GENERAL_MENU_MESSAGE = `${CHATWOOT_GENERAL_MENU_PROMPT}
+1. 收費
+2. 診所資訊
+3. 醫師時間表
+4. 其他問題
+5. 返回主選單`;
 
 export const CHATWOOT_CLINIC_MENU_PROMPT = widgetSettings.flows.clinic.prompt;
 export const CHATWOOT_CLINIC_MENU_ITEMS = [
@@ -76,14 +69,7 @@ export const CHATWOOT_CLINIC_ADDRESSES_MESSAGE = `${widgetSettings.flows.clinic.
 export const CHATWOOT_FLOW_STATE_ATTRIBUTE = 'eden_flow_state';
 export const CHATWOOT_LAST_INCOMING_MESSAGE_ID_ATTRIBUTE = 'eden_last_incoming_message_id';
 
-export type ChatwootFlowState =
-  | 'menu'
-  | 'general_menu'
-  | 'general_menu_more'
-  | 'clinic_menu'
-  | 'general_ai'
-  | 'booking'
-  | 'human';
+export type ChatwootFlowState = 'menu' | 'general_menu' | 'clinic_menu' | 'general_ai' | 'booking' | 'human';
 
 export interface ChatwootIncomingEvent {
   accountId: number;
@@ -119,8 +105,7 @@ export interface ChatwootOutgoingMessagePayload {
 }
 
 type MenuSelectionKind = 'general' | 'booking' | 'human';
-type GeneralSelectionKind = 'fees' | 'clinic' | 'more';
-type GeneralMoreSelectionKind = 'timetable' | 'other' | 'main';
+type GeneralSelectionKind = 'fees' | 'clinic' | 'timetable' | 'other' | 'main';
 type ClinicSelectionKind = 'hours' | 'addresses' | 'main';
 
 export class ChatwootClient {
@@ -296,7 +281,6 @@ export function getFlowState(customAttributes: Record<string, unknown> | null | 
 
   if (
     value === 'general_menu' ||
-    value === 'general_menu_more' ||
     value === 'clinic_menu' ||
     value === 'general_ai' ||
     value === 'booking' ||
@@ -393,37 +377,21 @@ export function resolveGeneralMenuSelection(
         : /^(?:診所資訊(?:[:：\s-]|$)|诊所资讯(?:[:：\s-]|$))/u,
     },
     {
-      kind: 'more',
-      pattern: allowNumeric
-        ? /^(?:3(?:[.)、\s-]|$)|更多選項(?:[:：\s-]|$)|更多选项(?:[:：\s-]|$))/u
-        : /^(?:更多選項(?:[:：\s-]|$)|更多选项(?:[:：\s-]|$))/u,
-    },
-  ]);
-}
-
-export function resolveGeneralMoreMenuSelection(
-  content: string,
-  options?: { allowNumeric?: boolean },
-): { kind: GeneralMoreSelectionKind; remainder: string } | null {
-  const allowNumeric = options?.allowNumeric ?? true;
-
-  return resolveSelection(content, [
-    {
       kind: 'timetable',
       pattern: allowNumeric
-        ? /^(?:1(?:[.)、\s-]|$)|醫師時間表(?:[:：\s-]|$)|医师时间表(?:[:：\s-]|$))/u
+        ? /^(?:3(?:[.)、\s-]|$)|醫師時間表(?:[:：\s-]|$)|医师时间表(?:[:：\s-]|$))/u
         : /^(?:醫師時間表(?:[:：\s-]|$)|医师时间表(?:[:：\s-]|$))/u,
     },
     {
       kind: 'other',
       pattern: allowNumeric
-        ? /^(?:2(?:[.)、\s-]|$)|其他問題(?:[:：\s-]|$)|其他问题(?:[:：\s-]|$))/u
+        ? /^(?:4(?:[.)、\s-]|$)|其他問題(?:[:：\s-]|$)|其他问题(?:[:：\s-]|$))/u
         : /^(?:其他問題(?:[:：\s-]|$)|其他问题(?:[:：\s-]|$))/u,
     },
     {
       kind: 'main',
       pattern: allowNumeric
-        ? /^(?:3(?:[.)、\s-]|$)|返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/u
+        ? /^(?:5(?:[.)、\s-]|$)|返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/u
         : /^(?:返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/u,
     },
   ]);
@@ -454,8 +422,6 @@ export function mapConversationMessagesToLegacyChat(
       if (content === CHATWOOT_GENERAL_INQUIRY_PROMPT) return false;
       if (content === CHATWOOT_GENERAL_MENU_PROMPT) return false;
       if (content === CHATWOOT_GENERAL_MENU_MESSAGE) return false;
-      if (content === CHATWOOT_GENERAL_MORE_MENU_PROMPT) return false;
-      if (content === CHATWOOT_GENERAL_MORE_MENU_MESSAGE) return false;
       if (content === CHATWOOT_CLINIC_MENU_PROMPT) return false;
       if (content === CHATWOOT_CLINIC_MENU_MESSAGE) return false;
       if (content === CHATWOOT_FEES_MESSAGE) return false;

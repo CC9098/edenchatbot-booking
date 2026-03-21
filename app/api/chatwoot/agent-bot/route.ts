@@ -6,8 +6,6 @@ import {
   CHATWOOT_CLINIC_MENU_ITEMS,
   CHATWOOT_CLINIC_MENU_PROMPT,
   CHATWOOT_FEES_MESSAGE,
-  CHATWOOT_GENERAL_MORE_MENU_ITEMS,
-  CHATWOOT_GENERAL_MORE_MENU_PROMPT,
   CHATWOOT_GENERAL_MENU_ITEMS,
   CHATWOOT_GENERAL_MENU_PROMPT,
   CHATWOOT_GENERAL_INQUIRY_PROMPT,
@@ -24,7 +22,6 @@ import {
   mergeFlowAttributes,
   replaceLatestUserMessage,
   resolveClinicMenuSelection,
-  resolveGeneralMoreMenuSelection,
   resolveGeneralMenuSelection,
   resolveMenuSelection,
   verifyChatwootSignature,
@@ -43,12 +40,6 @@ const GENERAL_MENU_REPLY: ChatwootOutgoingMessagePayload = {
   content: CHATWOOT_GENERAL_MENU_PROMPT,
   contentType: 'input_select',
   items: [...CHATWOOT_GENERAL_MENU_ITEMS],
-};
-
-const GENERAL_MORE_MENU_REPLY: ChatwootOutgoingMessagePayload = {
-  content: CHATWOOT_GENERAL_MORE_MENU_PROMPT,
-  contentType: 'input_select',
-  items: [...CHATWOOT_GENERAL_MORE_MENU_ITEMS],
 };
 
 const CLINIC_MENU_REPLY: ChatwootOutgoingMessagePayload = {
@@ -112,9 +103,6 @@ export async function POST(request: NextRequest) {
       reply = GENERAL_MENU_REPLY;
     } else if (currentState === 'general_menu') {
       const generalSelection = resolveGeneralMenuSelection(event.content);
-      const moreSelectionByText = generalSelection
-        ? null
-        : resolveGeneralMoreMenuSelection(event.content, { allowNumeric: false });
 
       if (generalSelection?.kind === 'fees') {
         nextState = 'general_menu';
@@ -122,49 +110,18 @@ export async function POST(request: NextRequest) {
       } else if (generalSelection?.kind === 'clinic') {
         nextState = 'clinic_menu';
         reply = CLINIC_MENU_REPLY;
-      } else if (generalSelection?.kind === 'more') {
-        nextState = 'general_menu_more';
-        reply = GENERAL_MORE_MENU_REPLY;
-      } else if (moreSelectionByText?.kind === 'timetable') {
-        nextState = 'general_menu_more';
+      } else if (generalSelection?.kind === 'timetable') {
+        nextState = 'general_menu';
         reply = CHATWOOT_TIMETABLE_MESSAGE;
-      } else if (moreSelectionByText?.kind === 'other') {
+      } else if (generalSelection?.kind === 'other') {
         nextState = 'general_ai';
         reply = CHATWOOT_GENERAL_INQUIRY_PROMPT;
-      } else if (moreSelectionByText?.kind === 'main') {
+      } else if (generalSelection?.kind === 'main') {
         nextState = 'menu';
         reply = MAIN_MENU_REPLY;
       } else {
         nextState = 'general_menu';
         reply = GENERAL_MENU_REPLY;
-      }
-    } else if (currentState === 'general_menu_more') {
-      const generalMoreSelection = resolveGeneralMoreMenuSelection(event.content);
-      const generalSelectionByText = generalMoreSelection
-        ? null
-        : resolveGeneralMenuSelection(event.content, { allowNumeric: false });
-
-      if (generalMoreSelection?.kind === 'timetable') {
-        nextState = 'general_menu_more';
-        reply = CHATWOOT_TIMETABLE_MESSAGE;
-      } else if (generalMoreSelection?.kind === 'other') {
-        nextState = 'general_ai';
-        reply = CHATWOOT_GENERAL_INQUIRY_PROMPT;
-      } else if (generalMoreSelection?.kind === 'main') {
-        nextState = 'menu';
-        reply = MAIN_MENU_REPLY;
-      } else if (generalSelectionByText?.kind === 'fees') {
-        nextState = 'general_menu';
-        reply = CHATWOOT_FEES_MESSAGE;
-      } else if (generalSelectionByText?.kind === 'clinic') {
-        nextState = 'clinic_menu';
-        reply = CLINIC_MENU_REPLY;
-      } else if (generalSelectionByText?.kind === 'more') {
-        nextState = 'general_menu_more';
-        reply = GENERAL_MORE_MENU_REPLY;
-      } else {
-        nextState = 'general_menu_more';
-        reply = GENERAL_MORE_MENU_REPLY;
       }
     } else if (currentState === 'clinic_menu') {
       const clinicSelection = resolveClinicMenuSelection(event.content);
