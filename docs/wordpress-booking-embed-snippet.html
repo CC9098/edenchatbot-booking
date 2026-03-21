@@ -1,0 +1,42 @@
+<!-- Eden Booking WordPress embed -->
+<!-- Paste into a Custom HTML block or vc_raw_html. Remove any old Acuity iframe first. -->
+
+<style>
+  #eden-booking-embed {
+    width: 100%;
+    min-height: 1400px;
+    border: 0;
+    background: transparent;
+    display: block;
+  }
+</style>
+
+<iframe
+  id="eden-booking-embed"
+  src="https://edenchatbot-booking.vercel.app/embed/booking?source=wordpress&v=20260321"
+  title="Eden 即時預約"
+  loading="lazy"
+  scrolling="no"
+></iframe>
+
+<script>
+  (() => {
+    const iframe = document.getElementById("eden-booking-embed");
+    if (!iframe) return;
+
+    const DEFAULT_HEIGHT = 1400;
+    const MIN_HEIGHT = 1100;
+
+    const applyHeight = (height) => {
+      const nextHeight = Number.isFinite(height) ? Math.max(height, MIN_HEIGHT) : DEFAULT_HEIGHT;
+      iframe.style.height = `${nextHeight}px`;
+    };
+
+    applyHeight(DEFAULT_HEIGHT);
+
+    window.addEventListener("message", (event) => {
+      if (event.data?.type !== "embed-booking-height") return;
+      applyHeight(Number(event.data.height));
+    });
+  })();
+</script>

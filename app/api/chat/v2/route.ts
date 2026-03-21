@@ -24,6 +24,7 @@ import {
   type LogSymptomRequest,
 } from '@/lib/symptom-conversation-helpers';
 import { buildContentReferenceContext } from '@/lib/content-service';
+import { buildBookingUrl } from '@/lib/public-url';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1811,7 +1812,7 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
 4. 用戶要求取消/改期已有預約時，優先引導：
    - 先去預約確認電郵內，撳「取消預約 CANCEL」或「改期 RESCHEDULE」連結
    - 如果搵唔到電郵、連結失效，或者需要人工協助，先提供對應診所 WhatsApp
-   - 唔好提供「預約網站 https://edentcm.as.me/schedule.php」作為取消/改期指引
+   - 唔好提供「預約網站 ${buildBookingUrl()}」作為取消/改期指引
 5. 收集資料：
    - **姓名、電話：一定要問**
    - **首診/覆診：一定要問**（visitType = first 或 followup）
@@ -1945,7 +1946,7 @@ ${clinicInfo}
 ${whatsappInfo}
 
 【預約連結使用規則】
-- 新預約、查可用時段、一般預約入口：可提供 https://edentcm.as.me/schedule.php
+- 新預約、查可用時段、一般預約入口：可提供 ${buildBookingUrl()}
 - 取消/改期：唔好提供以上連結；應先引導用戶去預約確認電郵內嘅取消/改期連結，之後先提供 WhatsApp 作後備
 
 ${careContext}
@@ -2853,7 +2854,7 @@ async function buildFallbackPrompt(
   const showBookingGuidance = shouldIncludeNonBBookingGuidance(latestUserText);
   const nonBGuidanceSection = showBookingGuidance
     ? `如果問題涉及預約、詳細收費、或需要真人協助，請引導用戶：
-- 預約：https://edentcm.as.me/schedule.php
+- 預約：${buildBookingUrl()}
 - 時間表網頁：https://www.edenclinic.hk/timetable/
 
 重要提示：具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。`

@@ -20,6 +20,7 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { DAY_NAMES, PRIMARY, TEXT_INPUT_STEPS } from '@/components/chat/constants';
 import { useChatState } from '@/components/chat/hooks/useChatState';
 import { type BookingState, type BookingStep, type ConsultationFormData, type Option, type OptionKey } from '@/components/chat/types';
+import { buildBookingUrl } from '@/lib/public-url';
 import {
   buildConsultationFormFlow,
   buildWidgetGreetingMessage,
@@ -403,7 +404,7 @@ export function ChatWidget() {
         } else if (option.value.startsWith('doctor-')) {
           // Non-booking doctor info (timetable mode)
           const name = option.value.replace('doctor-', '');
-          const link = getDoctorBookingLinkOrNote(name) || 'https://edentcm.as.me/schedule.php';
+          const link = getDoctorBookingLinkOrNote(name) || buildBookingUrl();
           const schedule = bookableDoctorByName.get(name)?.summary;
           if (link.startsWith('http')) {
             let message = `無問題😊 呢個係${name}的應診時間：\n\n`;

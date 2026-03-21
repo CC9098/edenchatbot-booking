@@ -1,4 +1,5 @@
 import type { Option } from "@/components/chat/types";
+import { buildBookingUrl } from "@/lib/public-url";
 
 export type WidgetChatbotMenuId =
   | "fees"
@@ -96,6 +97,8 @@ export interface WidgetChatbotSettings {
   };
 }
 
+const BOOKING_URL = buildBookingUrl();
+
 export interface WidgetChatbotFlowNode {
   id: WidgetChatbotNodeId;
   title: string;
@@ -162,7 +165,7 @@ export const DEFAULT_WIDGET_CHATBOT_SETTINGS: WidgetChatbotSettings = {
       addressesButtonLabel: "地址",
       backButtonLabel: "返回主選單",
       hoursClosingText:
-        "⚠️ **重要提示**：以上時間僅供參考，具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。\n\n🔗 詳情請參考： https://www.edenclinic.hk/timetable/\n🔗 立即預約及查看最新時間表： https://edentcm.as.me/schedule.php",
+        `⚠️ **重要提示**：以上時間僅供參考，具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。\n\n🔗 詳情請參考： https://www.edenclinic.hk/timetable/\n🔗 立即預約及查看最新時間表： ${BOOKING_URL}`,
       addressesPrompt: "請問你想查詢邊間診所呢？",
     },
     booking: {
@@ -170,7 +173,7 @@ export const DEFAULT_WIDGET_CHATBOT_SETTINGS: WidgetChatbotSettings = {
     },
     timetable: {
       reply:
-        "以下係幾位醫師的時間表參考。\n\n⚠️ **重要提示**：具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。\n\n🔗 立即預約及查看最新時間表：https://edentcm.as.me/schedule.php\n🔗 查看診所時間表網頁：https://www.edenclinic.hk/timetable/",
+        `以下係幾位醫師的時間表參考。\n\n⚠️ **重要提示**：具體開放時間及休假安排（包括特殊假期）會經常更新，請以網上預約平台為準。\n\n🔗 立即預約及查看最新時間表：${BOOKING_URL}\n🔗 查看診所時間表網頁：https://www.edenclinic.hk/timetable/`,
     },
     other: {
       prompt: "請問你有無咩問題，我會儘量以我所知為你解答。😊\n如有需要，請與我們姑娘真人聯絡：",

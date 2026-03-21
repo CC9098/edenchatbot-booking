@@ -2,7 +2,11 @@
 
 import { useEffect } from 'react';
 
-export function EmbedAutoHeightReporter() {
+export function EmbedAutoHeightReporter({
+  messageType = 'embed-timetable-height',
+}: {
+  messageType?: string;
+}) {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
@@ -16,7 +20,7 @@ export function EmbedAutoHeightReporter() {
 
       window.parent?.postMessage(
         {
-          type: 'embed-timetable-height',
+          type: messageType,
           height,
         },
         '*'
@@ -33,7 +37,7 @@ export function EmbedAutoHeightReporter() {
       window.removeEventListener('load', postHeight);
       window.removeEventListener('resize', postHeight);
     };
-  }, []);
+  }, [messageType]);
 
   return null;
 }

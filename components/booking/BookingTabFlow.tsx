@@ -53,6 +53,12 @@ type BookingTabFlowProps = {
     email?: string | null;
     phone?: string | null;
   } | null;
+  initialSelection?: {
+    doctorId?: DoctorId;
+    clinicId?: ClinicId;
+    visitType?: VisitType;
+  };
+  embedMode?: boolean;
 };
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
@@ -254,11 +260,16 @@ function formatScheduleLines(schedule: WeeklySchedule): string[] {
   return lines;
 }
 
-export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps) {
+export function BookingTabFlow({
+  doctors,
+  initialContact,
+  initialSelection,
+  embedMode = false,
+}: BookingTabFlowProps) {
   const [step, setStep] = useState<BookingStep>('setup');
-  const [visitType, setVisitType] = useState<VisitType>('first');
-  const [doctorId, setDoctorId] = useState<DoctorId | ''>('');
-  const [clinicId, setClinicId] = useState<ClinicId | ''>('');
+  const [visitType, setVisitType] = useState<VisitType>(initialSelection?.visitType ?? 'first');
+  const [doctorId, setDoctorId] = useState<DoctorId | ''>(initialSelection?.doctorId ?? '');
+  const [clinicId, setClinicId] = useState<ClinicId | ''>(initialSelection?.clinicId ?? '');
 
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
@@ -311,6 +322,29 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
   const hasAutofilledContact = Boolean(
     initialContact?.displayName || initialContact?.email || initialContact?.phone
   );
+
+  useEffect(() => {
+    if (!doctorId) {
+      if (clinicId) {
+        setClinicId('');
+      }
+      return;
+    }
+
+    const doctorExists = doctorOptions.some((doctor) => doctor.doctorId === doctorId);
+    if (!doctorExists) {
+      setDoctorId('');
+      setClinicId('');
+      return;
+    }
+
+    if (!clinicId) return;
+
+    const clinicExists = clinicOptions.some((clinic) => clinic.clinicId === clinicId);
+    if (!clinicExists) {
+      setClinicId('');
+    }
+  }, [clinicId, clinicOptions, doctorId, doctorOptions]);
 
   const calendarMonthLabel = useMemo(
     () => formatMonthLabel(calendarMonthKey),
@@ -704,18 +738,20 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
         <p className="mt-3 text-sm text-slate-600">
           目前未有可用的醫師時段，請稍後再試或於聊天頁聯絡我們。
         </p>
-        <Link
-          href="/chat"
-          className="mt-6 inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
-        >
-          返回聊天頁
-        </Link>
+        {!embedMode ? (
+          <Link
+            href="/chat"
+            className="mt-6 inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
+          >
+            返回聊天頁
+          </Link>
+        ) : null}
       </div>
     );
   }
 
   return (
-    <div className="patient-card mx-auto max-w-2xl p-6 sm:p-8">
+    <div className={`patient-card mx-auto p-6 sm:p-8 ${embedMode ? 'max-w-4xl' : 'max-w-2xl'}`}>
       <div className="mb-8 space-y-3">
         <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-primary sm:text-[30px]">預約服務</h1>
         <p
@@ -1329,7 +1365,7 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
             ) : null}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className={`grid gap-3 ${embedMode ? '' : 'sm:grid-cols-2'}`}>
             <button
               type="button"
               onClick={startAnotherBooking}
@@ -1338,12 +1374,14 @@ export function BookingTabFlow({ doctors, initialContact }: BookingTabFlowProps)
               再預約一個時段
             </button>
 
-            <Link
-              href="/chat"
-              className="inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
-            >
-              返回聊天頁
-            </Link>
+            {!embedMode ? (
+              <Link
+                href="/chat"
+                className="inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
+              >
+                返回聊天頁
+              </Link>
+            ) : null}
           </div>
         </div>
       )}

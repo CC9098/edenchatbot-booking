@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { BookingTabFlow } from "@/components/booking/BookingTabFlow";
+import { parseBookingInitialSelection } from "@/lib/booking-search-params";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getPublicBookableScheduleData } from "@/lib/bookable-schedule-data-server";
 import { createServiceClient } from "@/lib/supabase";
@@ -52,15 +53,24 @@ async function getInitialBookingContact() {
   }
 }
 
-export default async function BookingPage() {
+export default async function BookingPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const [doctors, initialContact] = await Promise.all([
     getPublicBookableScheduleData(),
     getInitialBookingContact(),
   ]);
+  const initialSelection = parseBookingInitialSelection(searchParams);
 
   return (
     <main className="patient-pane text-slate-800">
-      <BookingTabFlow doctors={doctors} initialContact={initialContact} />
+      <BookingTabFlow
+        doctors={doctors}
+        initialContact={initialContact}
+        initialSelection={initialSelection}
+      />
     </main>
   );
 }

@@ -1,6 +1,7 @@
 import { CalendarClock, Clock3, ExternalLink } from 'lucide-react';
 
 import { EmbedAutoHeightReporter } from '@/components/embed/EmbedAutoHeightReporter';
+import { buildBookingUrl } from '@/lib/public-url';
 import { getPublicTimetableData, type TimetableClinicCard } from '@/lib/public-timetable-data-server';
 import { PHYSICAL_CLINIC_IDS, type PhysicalClinicId } from '@/shared/clinic-data';
 
@@ -343,7 +344,7 @@ export default async function TimetableEmbedPage({
 
             <div className="mt-5 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600">
               <a
-                href="https://edentcm.as.me/schedule.php"
+                href={buildBookingUrl()}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"

@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getPromptClinicInfoLines, getWhatsappContactLines } from '@/shared/clinic-data';
 import { getPromptDoctorInfoLinesServer } from '@/lib/clinic-schedule-data-server';
+import { buildBookingUrl } from '@/lib/public-url';
 import { gatherUserContext, buildIntelligentPrompt, getDaysUntilFollowUp } from '@/lib/user-context';
 
 export interface LegacyChatMessage {
@@ -70,7 +71,7 @@ ${doctorInfo}
 診金 $100/次，基本藥費 $80 起/劑，針灸 $300-500/次，正骨手法 $350-700/次，拔罐 $350/次
 
 【預約與聯絡】
-- 網上預約：https://edentcm.as.me/schedule.php
+- 網上預約：${buildBookingUrl()}
 - 時間表網頁：https://www.edenclinic.hk/timetable/
 - 回覆診所聯絡資料時，只可使用以上最新聯絡電話與 WhatsApp 連結；荃灣診所必須使用 6097 7363 / https://wa.me/85260977363。
 ${whatsappInfo}
