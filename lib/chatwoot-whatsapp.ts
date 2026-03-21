@@ -89,6 +89,12 @@ type ResolvedContact = {
   sourceId: string;
 };
 
+type TemplateConfig = {
+  name: string;
+  category: string;
+  language: string;
+};
+
 class ChatwootWhatsappClient {
   constructor(
     private readonly baseUrl: string,
@@ -390,12 +396,63 @@ async function ensureWhatsappContact(
   };
 }
 
-function getTemplateConfig() {
-  return {
-    name: (process.env.CHATWOOT_WHATSAPP_TEMPLATE_NAME || '').trim(),
-    language: (process.env.CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE || 'zh_HK').trim(),
-    category: (process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY || 'UTILITY').trim(),
-  };
+function getTemplateConfigs(): TemplateConfig[] {
+  const configuredName = (process.env.CHATWOOT_WHATSAPP_TEMPLATE_NAME || '').trim();
+  const configuredLanguage = (process.env.CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE || '').trim();
+  const category = (process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY || 'UTILITY').trim();
+
+  const templateNames = Array.from(
+    new Set([configuredName, 'booking_confirm'].filter(Boolean)),
+  );
+  const languages = Array.from(
+    new Set([configuredLanguage, 'zh_HK', 'en_US', 'en'].filter(Boolean)),
+  );
+
+  return templateNames.flatMap((name) =>
+    languages.map((language) => ({
+      name,
+      category,
+      language,
+    })),
+  );
+}
+
+async function sendMessageWithTemplateFallback(
+  client: ChatwootWhatsappClient,
+  accountId: number,
+  conversationId: number,
+  content: string,
+  templateConfigs: TemplateConfig[],
+  bodyParams: Record<string, string>,
+) {
+  let lastError: unknown = null;
+
+  for (const templateConfig of templateConfigs) {
+    try {
+      await client.createMessage(accountId, conversationId, {
+        content,
+        template_params: {
+          name: templateConfig.name,
+          category: templateConfig.category,
+          language: templateConfig.language,
+          processed_params: {
+            body: bodyParams,
+          },
+        },
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  await client.createMessage(accountId, conversationId, {
+    content,
+  });
 }
 
 export async function sendBookingConfirmationWhatsapp(
@@ -435,15 +492,11 @@ export async function sendBookingConfirmationWhatsapp(
 
     const conversationsResponse = await client.getContactConversations(accountId, contact.contactId);
     const existingConversation = findExistingConversation(conversationsResponse.payload || [], inboxId);
-    const templateConfig = getTemplateConfig();
-    const canUseTemplate = Boolean(templateConfig.name);
+    const templateConfigs = getTemplateConfigs();
+    const canUseTemplate = templateConfigs.length > 0;
 
     let conversationId = existingConversation?.id;
     if (!conversationId) {
-      if (!canUseTemplate) {
-        throw new Error('CHATWOOT_WHATSAPP_TEMPLATE_NAME is required for new outbound WhatsApp confirmations');
-      }
-
       const conversation = await client.createConversation(accountId, {
         inbox_id: inboxId,
         contact_id: contact.contactId,
@@ -463,21 +516,22 @@ export async function sendBookingConfirmationWhatsapp(
     }
 
     const content = buildWhatsappConfirmationText(input);
-    await client.createMessage(accountId, conversationId, {
-      content,
-      ...(canUseTemplate
-        ? {
-            template_params: {
-              name: templateConfig.name,
-              category: templateConfig.category,
-              language: templateConfig.language,
-              processed_params: {
-                body: buildWhatsappTemplateBodyParams(input),
-              },
-            },
-          }
-        : {}),
-    });
+    const bodyParams = buildWhatsappTemplateBodyParams(input);
+
+    if (canUseTemplate) {
+      await sendMessageWithTemplateFallback(
+        client,
+        accountId,
+        conversationId,
+        content,
+        templateConfigs,
+        bodyParams,
+      );
+    } else {
+      await client.createMessage(accountId, conversationId, {
+        content,
+      });
+    }
 
     return {
       success: true,
