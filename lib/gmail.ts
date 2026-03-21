@@ -60,7 +60,7 @@ interface ReminderEmailData {
 const CLINIC_WHATSAPP_CONTACTS = [
   { label: '佐敦診所', phoneDisplay: '+852 6733 3801', phoneDigits: '85267333801' },
   { label: '中環診所', phoneDisplay: '+852 6733 3234', phoneDigits: '85267333234' },
-  { label: '荃灣診所', phoneDisplay: '+852 6097 7363', phoneDigits: '85260977363' },
+  { label: '荃灣診所', phoneDisplay: '+852 5189 9065', phoneDigits: '85251899065' },
 ] as const;
 
 const CLINIC_GOOGLE_MAP_BY_NAME_ZH: Record<string, string> = {

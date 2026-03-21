@@ -73,7 +73,7 @@ ${doctorInfo}
 【預約與聯絡】
 - 網上預約：${buildBookingUrl()}
 - 時間表網頁：https://www.edenclinic.hk/timetable/
-- 回覆診所聯絡資料時，只可使用以上最新聯絡電話與 WhatsApp 連結；荃灣診所必須使用 6097 7363 / https://wa.me/85260977363。
+- 回覆診所聯絡資料時，只可使用以上最新聯絡電話與 WhatsApp 連結；荃灣診所必須使用 5189 9065 / https://wa.me/85251899065。
 ${whatsappInfo}
 
 【地址與地圖回覆規則】
