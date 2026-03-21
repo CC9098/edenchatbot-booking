@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { buildBookingUrl } from '@/lib/public-url';
 import { createServiceClient } from '@/lib/supabase';
 import { getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
 import {
@@ -262,7 +263,7 @@ export async function getPublicTimetableData(): Promise<PublicTimetableData> {
           doctorNameZh: doctor.nameZh,
           shortNameZh: shortDoctorName(doctor.nameZh),
           timeLabel: `${range.start}-${range.end}`,
-          bookingUrl: doctor.bookingUrl,
+          bookingUrl: buildBookingUrl({ doctorId: doctor.id, clinicId }),
         });
       }
     }
