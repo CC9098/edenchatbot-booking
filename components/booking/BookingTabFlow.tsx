@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -8,7 +9,6 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock3,
   Info,
   Loader2,
   UserRound,
@@ -260,6 +260,71 @@ function formatScheduleLines(schedule: WeeklySchedule): string[] {
   }
 
   return lines;
+}
+
+function getDoctorAvatarFallback(nameZh?: string): string {
+  return nameZh?.trim().slice(0, 1) || '醫';
+}
+
+function DoctorAvatar({
+  doctor,
+  size = 'sm',
+}: {
+  doctor?: Pick<BookableDoctorSchedule, 'doctorNameZh' | 'avatarSrc'>;
+  size?: 'sm' | 'lg';
+}) {
+  const isLarge = size === 'lg';
+  const frameClassName = isLarge ? 'h-24 w-24 sm:h-28 sm:w-28' : 'h-14 w-14';
+
+  return (
+    <div
+      className={`relative shrink-0 overflow-hidden rounded-full border-4 border-[#71a97a] bg-[#edf7ef] shadow-[0_18px_40px_-28px_rgba(31,74,44,0.55)] ${frameClassName}`}
+    >
+      {doctor?.avatarSrc ? (
+        <Image
+          src={doctor.avatarSrc}
+          alt={`${doctor.doctorNameZh}頭像`}
+          fill
+          sizes={isLarge ? '112px' : '56px'}
+          className="object-cover"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,#eaf8ed_0%,#cfe8d6_100%)] text-lg font-semibold text-[#2b5d38]">
+          {getDoctorAvatarFallback(doctor?.doctorNameZh)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DoctorBookingSummary({
+  doctor,
+  clinicNameZh,
+  eyebrow,
+  details,
+}: {
+  doctor?: Pick<BookableDoctorSchedule, 'doctorNameZh' | 'avatarSrc'>;
+  clinicNameZh?: string;
+  eyebrow: string;
+  details: string[];
+}) {
+  return (
+    <div className="rounded-[24px] border border-[#d5e4d8] bg-[linear-gradient(135deg,#f8fcf8_0%,#eef8f0_55%,#ffffff_100%)] p-4 text-left shadow-[0_16px_36px_-30px_rgba(31,74,44,0.45)]">
+      <div className="flex items-center gap-3">
+        <DoctorAvatar doctor={doctor} size="sm" />
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold tracking-[0.24em] text-[#5d8c67]">{eyebrow}</p>
+          <p className="mt-1 truncate text-base font-semibold text-[#254430]">{doctor?.doctorNameZh || '已選醫師'}</p>
+          <p className="truncate text-xs text-slate-500">{clinicNameZh || '請選擇診所'}</p>
+        </div>
+      </div>
+      <div className="mt-3 space-y-1 text-sm text-slate-600">
+        {details.map((detail) => (
+          <p key={detail}>{detail}</p>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function BookingTabFlow({
@@ -870,20 +935,34 @@ export function BookingTabFlow({
           </div>
 
           {selectedDoctor && (
-            <section className="rounded-[28px] border border-primary/15 bg-gradient-to-br from-primary-light/60 via-white to-primary-light/20 p-4 sm:p-5">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 rounded-full bg-primary/10 p-2 text-primary">
-                  <Clock3 className="h-4 w-4" />
+            <section className="rounded-[30px] border border-[#cfe1d3] bg-[linear-gradient(135deg,#f8fcf8_0%,#edf7f0_52%,#ffffff_100%)] p-4 shadow-[0_22px_56px_-42px_rgba(31,74,44,0.42)] sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <DoctorAvatar doctor={selectedDoctor} size="lg" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold tracking-[0.28em] text-[#5d8c67]">
+                      醫師應診時間
+                    </p>
+                    <h2 className="mt-2 text-[1.35rem] font-semibold text-[#234230] sm:text-[1.5rem]">
+                      {selectedDoctor.doctorNameZh}
+                    </h2>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                      揀好醫師後可即時睇到固定應診時間，實際可預約日期會喺下一步顯示。
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold tracking-[0.24em] text-primary/70">
-                    醫師應診時間
+
+                <div className="rounded-[22px] border border-[#d5e7d8] bg-white/85 px-4 py-3 text-sm shadow-[0_12px_30px_-26px_rgba(31,74,44,0.4)] sm:max-w-[240px]">
+                  <p className="text-[11px] font-semibold tracking-[0.24em] text-[#5d8c67]">
+                    醫師卡片
                   </p>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">
+                  <p className="mt-1 font-semibold text-[#254430]">
                     {selectedDoctor.doctorNameZh}
-                  </h2>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-600">
-                    揀好醫師後可即時睇到固定應診時間，實際可預約日期會喺下一步顯示。
+                  </p>
+                  <p className="mt-1 text-slate-500">
+                    {selectedClinic
+                      ? `${selectedClinic.clinicNameZh} 已預選，可直接去下一步揀日期。`
+                      : '請再選擇診所，之後即可查看固定應診時間。'}
                   </p>
                 </div>
               </div>
@@ -991,12 +1070,12 @@ export function BookingTabFlow({
             <ArrowLeft className="h-4 w-4" /> 返回上一頁
           </button>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-            <p className="font-semibold text-slate-900">
-              {selectedDoctor?.doctorNameZh} @ {selectedClinic?.clinicNameZh}
-            </p>
-            <p className="mt-1">{VISIT_TYPE_LABELS[visitType]}</p>
-          </div>
+          <DoctorBookingSummary
+            doctor={selectedDoctor}
+            clinicNameZh={selectedClinic?.clinicNameZh}
+            eyebrow="已選醫師"
+            details={[VISIT_TYPE_LABELS[visitType], '揀好日期後即可查看可預約時段。']}
+          />
 
           <div className="space-y-3">
             <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -1161,15 +1240,15 @@ export function BookingTabFlow({
             <ArrowLeft className="h-4 w-4" /> 返回選擇時段
           </button>
 
-          <div className="rounded-2xl border border-primary/15 bg-primary-light/40 p-4 text-sm text-slate-700">
-            <p className="font-semibold text-slate-900">
-              {selectedDoctor?.doctorNameZh} @ {selectedClinic?.clinicNameZh}
-            </p>
-            <p className="mt-1">
-              {formatDateForDisplay(selectedDate)} {selectedTime}
-            </p>
-            <p className="mt-1">{VISIT_TYPE_LABELS[visitType]}</p>
-          </div>
+          <DoctorBookingSummary
+            doctor={selectedDoctor}
+            clinicNameZh={selectedClinic?.clinicNameZh}
+            eyebrow="預約摘要"
+            details={[
+              `${formatDateForDisplay(selectedDate)} ${selectedTime}`,
+              VISIT_TYPE_LABELS[visitType],
+            ]}
+          />
 
           <form className="space-y-5" onSubmit={handleSubmit}>
             {hasAutofilledContact ? (
@@ -1421,22 +1500,15 @@ export function BookingTabFlow({
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-sm text-slate-700">
-            <p>
-              <strong>醫師：</strong> {selectedDoctor?.doctorNameZh}
-            </p>
-            <p>
-              <strong>診所：</strong> {selectedClinic?.clinicNameZh}
-            </p>
-            <p>
-              <strong>時間：</strong> {formatDateForDisplay(selectedDate)} {selectedTime}
-            </p>
-            {bookingId ? (
-              <p>
-                <strong>{referenceLabel}：</strong> {bookingId}
-              </p>
-            ) : null}
-          </div>
+          <DoctorBookingSummary
+            doctor={selectedDoctor}
+            clinicNameZh={selectedClinic?.clinicNameZh}
+            eyebrow="完成摘要"
+            details={[
+              `${formatDateForDisplay(selectedDate)} ${selectedTime}`,
+              bookingId ? `${referenceLabel}：${bookingId}` : '確認資料已準備完成',
+            ]}
+          />
 
           <div className={`grid gap-3 ${embedMode ? '' : isWhatsappFlow && whatsappUrl ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
             {isWhatsappFlow && whatsappUrl ? (

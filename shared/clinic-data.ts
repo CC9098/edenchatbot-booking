@@ -16,6 +16,7 @@ export type DoctorProfile = {
   id: DoctorId;
   nameZh: string;
   nameEn: string;
+  avatarSrc?: string;
   bookingUrl?: string;
   bookingNote?: string;
   scheduleNote?: string;
@@ -86,19 +87,50 @@ export const CLINICS: ClinicProfile[] = [
 ];
 
 export const DOCTORS: DoctorProfile[] = [
-  { id: 'chan', nameZh: '陳家富醫師', nameEn: 'Dr. Chan', bookingUrl: buildBookingUrl({ doctorId: 'chan' }) },
-  { id: 'lee', nameZh: '李芊霖醫師', nameEn: 'Dr. Lee', bookingUrl: buildBookingUrl({ doctorId: 'lee' }) },
+  {
+    id: 'chan',
+    nameZh: '陳家富醫師',
+    nameEn: 'Dr. Chan',
+    avatarSrc: '/doctor-avatars/chan.jpg',
+    bookingUrl: buildBookingUrl({ doctorId: 'chan' }),
+  },
+  {
+    id: 'lee',
+    nameZh: '李芊霖醫師',
+    nameEn: 'Dr. Lee',
+    avatarSrc: '/doctor-avatars/lee.jpg',
+    bookingUrl: buildBookingUrl({ doctorId: 'lee' }),
+  },
   {
     id: 'hon',
     nameZh: '韓曉恩醫師',
     nameEn: 'Dr. Hon',
+    avatarSrc: '/doctor-avatars/hon.jpg',
     bookingUrl: buildBookingUrl({ doctorId: 'hon' }),
     scheduleNote:
       '2026年3月1日至2026年3月9日如欲預約，請致電或 WhatsApp 聯絡診所；2026年3月10日至2026年4月30日韓醫師進修休診，會由張天慧醫師及梁仲威醫師駐診。',
   },
-  { id: 'chau', nameZh: '周德健醫師', nameEn: 'Dr. Chau', bookingUrl: buildBookingUrl({ doctorId: 'chau' }) },
-  { id: 'cheung', nameZh: '張天慧醫師', nameEn: 'Dr. Cheung', bookingUrl: buildBookingUrl({ doctorId: 'cheung' }) },
-  { id: 'leung', nameZh: '梁仲威醫師', nameEn: 'Dr. Leung', bookingUrl: buildBookingUrl({ doctorId: 'leung' }) },
+  {
+    id: 'chau',
+    nameZh: '周德健醫師',
+    nameEn: 'Dr. Chau',
+    avatarSrc: '/doctor-avatars/chau.jpg',
+    bookingUrl: buildBookingUrl({ doctorId: 'chau' }),
+  },
+  {
+    id: 'cheung',
+    nameZh: '張天慧醫師',
+    nameEn: 'Dr. Cheung',
+    avatarSrc: '/doctor-avatars/cheung.jpg',
+    bookingUrl: buildBookingUrl({ doctorId: 'cheung' }),
+  },
+  {
+    id: 'leung',
+    nameZh: '梁仲威醫師',
+    nameEn: 'Dr. Leung',
+    avatarSrc: '/doctor-avatars/leung.jpg',
+    bookingUrl: buildBookingUrl({ doctorId: 'leung' }),
+  },
 ];
 
 export const DOCTOR_BY_ID: Record<DoctorId, DoctorProfile> = Object.fromEntries(

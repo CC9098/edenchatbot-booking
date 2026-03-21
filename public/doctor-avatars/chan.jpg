@@ -1,0 +1,1380 @@
+<!DOCTYPE html><html class="no-touch" lang="zh-TW" xmlns="http://www.w3.org/1999/xhtml"><head><meta name="facebook-domain-verification" content="9zkuu5n1bheem33qsr817ngdkwkt38" /><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="profile" href="https://gmpg.org/xfn/11"><link rel="pingback" href="https://www.edenclinic.hk/xmlrpc.php"><title>找不到符合條件的頁面 &#8211; 醫天圓中醫診所</title><link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin/><link rel="preconnect" href="https://fonts.googleapis.com"/><style type="text/css">@font-face {
+ font-family: 'Noto Sans';
+ font-style: italic;
+ font-weight: 400;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/notosans/v42/o-0kIpQlx3QUlC5A4PNr4C5OaxRsfNNlKbCePevHtVtX57DGjDU1QDce6Vc.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Noto Sans';
+ font-style: italic;
+ font-weight: 700;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/notosans/v42/o-0kIpQlx3QUlC5A4PNr4C5OaxRsfNNlKbCePevHtVtX57DGjDU1QNAZ6Vc.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Noto Sans';
+ font-style: normal;
+ font-weight: 400;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/notosans/v42/o-0mIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjcz6L1SoM-jCpoiyD9A99d.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Noto Sans';
+ font-style: normal;
+ font-weight: 700;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/notosans/v42/o-0mIpQlx3QUlC5A4PNB6Ryti20_6n1iPHjcz6L1SoM-jCpoiyAaBN9d.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Noto Sans HK';
+ font-style: normal;
+ font-weight: 100;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/notosanshk/v34/nKKF-GM_FYFRJvXzVXaAPe97P1KHynJFP716qHB_-oU.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Noto Sans HK';
+ font-style: normal;
+ font-weight: 300;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/notosanshk/v34/nKKF-GM_FYFRJvXzVXaAPe97P1KHynJFP716qC5--oU.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Noto Sans HK';
+ font-style: normal;
+ font-weight: 400;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/notosanshk/v34/nKKF-GM_FYFRJvXzVXaAPe97P1KHynJFP716qHB--oU.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Noto Sans HK';
+ font-style: normal;
+ font-weight: 500;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/notosanshk/v34/nKKF-GM_FYFRJvXzVXaAPe97P1KHynJFP716qEJ--oU.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Noto Sans HK';
+ font-style: normal;
+ font-weight: 700;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/notosanshk/v34/nKKF-GM_FYFRJvXzVXaAPe97P1KHynJFP716qJd5-oU.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Noto Sans HK';
+ font-style: normal;
+ font-weight: 900;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/notosanshk/v34/nKKF-GM_FYFRJvXzVXaAPe97P1KHynJFP716qNl5-oU.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Oswald';
+ font-style: normal;
+ font-weight: 300;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/oswald/v57/TK3_WkUHHAIjg75cFRf3bXL8LICs169vgUE.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Oswald';
+ font-style: normal;
+ font-weight: 400;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/oswald/v57/TK3_WkUHHAIjg75cFRf3bXL8LICs1_FvgUE.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Oswald';
+ font-style: normal;
+ font-weight: 700;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/oswald/v57/TK3_WkUHHAIjg75cFRf3bXL8LICs1xZogUE.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Playfair Display';
+ font-style: italic;
+ font-weight: 400;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/playfairdisplay/v40/nuFRD-vYSZviVYUb_rj3ij__anPXDTnCjmHKM4nYO7KN_qiTbtY.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Playfair Display';
+ font-style: italic;
+ font-weight: 700;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/playfairdisplay/v40/nuFRD-vYSZviVYUb_rj3ij__anPXDTnCjmHKM4nYO7KN_k-UbtY.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Playfair Display';
+ font-style: italic;
+ font-weight: 900;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/playfairdisplay/v40/nuFRD-vYSZviVYUb_rj3ij__anPXDTnCjmHKM4nYO7KN_gGUbtY.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Playfair Display';
+ font-style: normal;
+ font-weight: 400;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/playfairdisplay/v40/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKdFvUDQ.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Playfair Display';
+ font-style: normal;
+ font-weight: 700;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/playfairdisplay/v40/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKeiukDQ.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Playfair Display';
+ font-style: normal;
+ font-weight: 900;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/playfairdisplay/v40/nuFvD-vYSZviVYUb_rj3ij__anPXJzDwcbmjWBN2PKfsukDQ.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Poppins';
+ font-style: normal;
+ font-weight: 300;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDz8V1s.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Poppins';
+ font-style: normal;
+ font-weight: 400;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/poppins/v24/pxiEyp8kv8JHgFVrFJA.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Poppins';
+ font-style: normal;
+ font-weight: 500;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLGT9V1s.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Poppins';
+ font-style: normal;
+ font-weight: 600;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLEj6V1s.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Poppins';
+ font-style: normal;
+ font-weight: 700;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLCz7V1s.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Roboto';
+ font-style: italic;
+ font-weight: 100;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/roboto/v50/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLoHRiA8.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Roboto';
+ font-style: italic;
+ font-weight: 300;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/roboto/v50/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLt_QiA8.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Roboto';
+ font-style: italic;
+ font-weight: 400;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/roboto/v50/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLoHQiA8.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Roboto';
+ font-style: italic;
+ font-weight: 500;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/roboto/v50/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLrPQiA8.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Roboto';
+ font-style: italic;
+ font-weight: 700;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/roboto/v50/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLmbXiA8.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Roboto';
+ font-style: italic;
+ font-weight: 900;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/roboto/v50/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLijXiA8.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Roboto';
+ font-style: normal;
+ font-weight: 100;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/roboto/v50/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWubEbGmT.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Roboto';
+ font-style: normal;
+ font-weight: 300;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/roboto/v50/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuaabWmT.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Roboto';
+ font-style: normal;
+ font-weight: 400;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/roboto/v50/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWubEbWmT.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Roboto';
+ font-style: normal;
+ font-weight: 500;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/roboto/v50/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWub2bWmT.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Roboto';
+ font-style: normal;
+ font-weight: 700;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/roboto/v50/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuYjammT.ttf) format('truetype');
+}
+@font-face {
+ font-family: 'Roboto';
+ font-style: normal;
+ font-weight: 900;
+ font-stretch: normal;
+ font-display: swap;
+ src: url(https://fonts.gstatic.com/s/roboto/v50/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuZtammT.ttf) format('truetype');
+} </style><link rel="stylesheet" id="siteground-optimizer-combined-css-f168f7b5badcdb794716341b37f5ce38" href="https://www.edenclinic.hk/wp-content/uploads/siteground-optimizer-assets/siteground-optimizer-combined-css-f168f7b5badcdb794716341b37f5ce38.css" media="all" /><meta name='robots' content='max-image-preview:large, noindex, follow' /> <script type="application/ld+json"> {
+ "@context": "https://schema.org",
+ "@graph": [
+ {
+ "@type": "WebSite",
+ "@id": "https://www.edenclinic.hk/#website",
+ "url": "https://www.edenclinic.hk/",
+ "name": "醫天圓中醫診所",
+ "alternateName": "Eden TCM Clinic",
+ "inLanguage": "zh-HK",
+ "publisher": {
+ "@id": "https://www.edenclinic.hk/#organization"
+ },
+ "potentialAction": {
+ "@type": "SearchAction",
+ "target": {
+ "@type": "EntryPoint",
+ "urlTemplate": "https://www.edenclinic.hk/?s={search_term_string}"
+ },
+ "query-input": "required name=search_term_string"
+ }
+ },
+ {
+ "@type": [
+ "MedicalOrganization",
+ "LocalBusiness"
+ ],
+ "@id": "https://www.edenclinic.hk/#organization",
+ "name": "醫天圓中醫診所",
+ "alternateName": "Eden TCM Clinic",
+ "url": "https://www.edenclinic.hk",
+ "logo": {
+ "@type": "ImageObject",
+ "url": "https://www.edenclinic.hk/wp-content/uploads/2016/09/logo.png",
+ "width": 800,
+ "height": 200
+ },
+ "image": "https://www.edenclinic.hk/wp-content/uploads/2016/09/logo.png",
+ "description": "醫天圓中醫診所創立於香港，擁有十三年深厚診療經驗。我們的專業團隊由六位註冊中醫師組成，均畢業於香港大學及香港中文大學中醫學院，並具備英國曼徹斯特都會大學營養學碩士學歷與腫瘤、婦科等專科高級文憑。診所累積逾十萬人次以上診症量經驗，在中環、佐敦、荃灣三個便利的地鐵站點為市民服務。我們特別重視現代醫學與傳統中醫理念的結合，深入聆聽病人需要，主張將生活養生與治療緊密連結，為病人提供全面的健康方案。秉持「專注、聆聽、連結、歸正」的服務理念。",
+ "priceRange": "$$",
+ "foundingDate": "2012",
+ "numberOfEmployees": {
+ "@type": "QuantitativeValue",
+ "value": 6
+ },
+ "address": {
+ "@type": "PostalAddress",
+ "streetAddress": "皇后大道中70號卡佛大廈23樓2310室",
+ "addressLocality": "中環",
+ "addressRegion": "香港",
+ "addressCountry": "HK"
+ },
+ "areaServed": {
+ "@type": "City",
+ "name": "Hong Kong"
+ },
+ "sameAs": [
+ "https://facebook.com/edenclinic",
+ "https://instagram.com/eden.tcm.clinic"
+ ],
+ "contactPoint": {
+ "@type": "ContactPoint",
+ "telephone": "+852-3575-9733",
+ "email": "info@edenclinic.hk",
+ "contactType": "customer service",
+ "areaServed": "HK",
+ "availableLanguage": [
+ "zh-HK",
+ "zh-TW",
+ "en"
+ ]
+ },
+ "aggregateRating": {
+ "@type": "AggregateRating",
+ "ratingValue": "4.9",
+ "bestRating": "5",
+ "ratingCount": "53"
+ },
+ "review": [
+ {
+ "@type": "Review",
+ "reviewRating": {
+ "@type": "Rating",
+ "ratingValue": "5"
+ },
+ "author": {
+ "@type": "Person",
+ "name": "Yik Hei Wong"
+ },
+ "reviewBody": "非常感謝陳家富醫生。主要是因為失眠和想調理身體準備懷孕，所以轉向中醫。之前試過無數中醫都沒效果，但陳醫生的治療真的有效。",
+ "datePublished": "2023"
+ },
+ {
+ "@type": "Review",
+ "reviewRating": {
+ "@type": "Rating",
+ "ratingValue": "5"
+ },
+ "author": {
+ "@type": "Person",
+ "name": "Connie wong"
+ },
+ "reviewBody": "跟隨張醫生多年。無論是調理身體、備孕、懷孕還是產後，張醫生都全心全意治療，非常感激。診所的女孩們也非常用心，服務一流。",
+ "datePublished": "2020"
+ },
+ {
+ "@type": "Review",
+ "reviewRating": {
+ "@type": "Rating",
+ "ratingValue": "5"
+ },
+ "author": {
+ "@type": "Person",
+ "name": "Poon Poon"
+ },
+ "reviewBody": "我長期患濕疹並對西藥過敏。有一次嚴重發作，偶然發現這個地方。看了幾年中醫後，情況已穩定。",
+ "datePublished": "2023"
+ },
+ {
+ "@type": "Review",
+ "reviewRating": {
+ "@type": "Rating",
+ "ratingValue": "5"
+ },
+ "author": {
+ "@type": "Person",
+ "name": "張天德"
+ },
+ "reviewBody": "去過醫天圓後，你就會意識到看中醫可以多麼舒適。環境很好，有書可讀，還有筆讓你畫畫。最重要的是，醫生一流，特別是我女兒的濕疹，很快就好了。",
+ "datePublished": "2020"
+ },
+ {
+ "@type": "Review",
+ "reviewRating": {
+ "@type": "Rating",
+ "ratingValue": "5"
+ },
+ "author": {
+ "@type": "Person",
+ "name": "Timmy Cheung"
+ },
+ "reviewBody": "長期腰痛。在醫天圓針灸後，背部疼痛大大緩解。現在久坐也不感到疼痛。",
+ "datePublished": "2018"
+ },
+ {
+ "@type": "Review",
+ "reviewRating": {
+ "@type": "Rating",
+ "ratingValue": "5"
+ },
+ "author": {
+ "@type": "Person",
+ "name": "Chris"
+ },
+ "reviewBody": "梁仲威醫生治好了我的背痛。環境安靜。診所的女孩們友善有禮。絕對值得推薦。",
+ "datePublished": "2024"
+ },
+ {
+ "@type": "Review",
+ "reviewRating": {
+ "@type": "Rating",
+ "ratingValue": "5"
+ },
+ "author": {
+ "@type": "Person",
+ "name": "Pingyung Li"
+ },
+ "reviewBody": "這次去醫園看周德健醫生，試圖解決腳冷的問題。網上預約非常方便。到診後，周醫生先把脈，非常仔細。",
+ "datePublished": "2024"
+ },
+ {
+ "@type": "Review",
+ "reviewRating": {
+ "@type": "Rating",
+ "ratingValue": "5"
+ },
+ "author": {
+ "@type": "Person",
+ "name": "Agnes Kai"
+ },
+ "reviewBody": "陳醫生對病人非常有耐心和體貼。經過陳醫生幾個月的治療，我的肺和胃都有顯著改善，痰也大大改善了。",
+ "datePublished": "2020"
+ }
+ ],
+ "sponsor": [
+ {
+ "@type": "Organization",
+ "name": "信和集團",
+ "sameAs": "https://www.sino.com/"
+ },
+ {
+ "@type": "Organization",
+ "name": "星展銀行",
+ "sameAs": "https://www.dbs.com.hk/"
+ },
+ {
+ "@type": "Organization",
+ "name": "英國保誠",
+ "sameAs": "https://www.prudential.com.hk/"
+ },
+ {
+ "@type": "Organization",
+ "name": "嘉里物流"
+ },
+ {
+ "@type": "Organization",
+ "name": "香港科技園公司",
+ "sameAs": "https://www.hkstp.org/"
+ },
+ {
+ "@type": "Organization",
+ "name": "東華三院",
+ "sameAs": "https://www.tungwah.org.hk/"
+ },
+ {
+ "@type": "Organization",
+ "name": "保良局",
+ "sameAs": "https://www.poleungkuk.org.hk/"
+ }
+ ],
+ "location": [
+ {
+ "@id": "https://www.edenclinic.hk/#central"
+ },
+ {
+ "@id": "https://www.edenclinic.hk/#jordan"
+ },
+ {
+ "@id": "https://www.edenclinic.hk/#tsuenwan"
+ }
+ ],
+ "employee": [
+ {
+ "@id": "https://www.edenclinic.hk/#dr-chan-ka-fu"
+ },
+ {
+ "@id": "https://www.edenclinic.hk/#dr-lee-chin-lam"
+ },
+ {
+ "@id": "https://www.edenclinic.hk/#dr-hon-hiu-yan"
+ },
+ {
+ "@id": "https://www.edenclinic.hk/#dr-chau-tak-kin"
+ },
+ {
+ "@id": "https://www.edenclinic.hk/#dr-cheung-tin-wai"
+ },
+ {
+ "@id": "https://www.edenclinic.hk/#dr-leung-chung-wai"
+ }
+ ],
+ "medicalSpecialty": [
+ "Traditional Chinese Medicine",
+ "Acupuncture",
+ "Chinese Herbal Medicine",
+ "Orthopedics",
+ "Gynecology",
+ "Internal Medicine"
+ ]
+ },
+ {
+ "@type": [
+ "MedicalClinic",
+ "LocalBusiness"
+ ],
+ "@id": "https://www.edenclinic.hk/#central",
+ "name": "醫天圓中醫診所 - 中環店",
+ "alternateName": "Eden TCM Clinic - Central",
+ "url": "https://www.edenclinic.hk",
+ "image": "https://www.edenclinic.hk/wp-content/uploads/2016/09/logo.png",
+ "telephone": "+852-3575-9733",
+ "email": "info@edenclinic.hk",
+ "address": {
+ "@type": "PostalAddress",
+ "streetAddress": "皇后大道中70號卡佛大廈23樓2310室",
+ "addressLocality": "中環",
+ "addressRegion": "香港島",
+ "addressCountry": "HK"
+ },
+ "geo": {
+ "@type": "GeoCoordinates",
+ "latitude": "22.2826315",
+ "longitude": "114.1555936"
+ },
+ "openingHoursSpecification": [
+ {
+ "@type": "OpeningHoursSpecification",
+ "dayOfWeek": [
+ "Monday",
+ "Tuesday",
+ "Wednesday",
+ "Thursday",
+ "Friday"
+ ],
+ "opens": "11:00",
+ "closes": "14:00"
+ },
+ {
+ "@type": "OpeningHoursSpecification",
+ "dayOfWeek": [
+ "Monday",
+ "Tuesday",
+ "Wednesday",
+ "Thursday",
+ "Friday"
+ ],
+ "opens": "15:30",
+ "closes": "19:30"
+ }
+ ],
+ "hasMap": "https://goo.gl/maps/2YF5At4LXHw",
+ "priceRange": "$$",
+ "currenciesAccepted": "HKD",
+ "paymentAccepted": "Cash, Credit Card, Medical Voucher, Health Insurance",
+ "aggregateRating": {
+ "@type": "AggregateRating",
+ "ratingValue": "5.0",
+ "ratingCount": "21"
+ },
+ "hasOfferCatalog": {
+ "@type": "OfferCatalog",
+ "name": "中醫服務",
+ "itemListElement": [
+ {
+ "@type": "Offer",
+ "itemOffered": {
+ "@type": "MedicalProcedure",
+ "name": "中醫診症",
+ "description": "註冊中醫師全科診療"
+ }
+ },
+ {
+ "@type": "Offer",
+ "itemOffered": {
+ "@type": "MedicalProcedure",
+ "name": "針灸治療",
+ "description": "傳統針灸及電針治療"
+ }
+ },
+ {
+ "@type": "Offer",
+ "itemOffered": {
+ "@type": "MedicalProcedure",
+ "name": "正骨推拿",
+ "description": "中醫骨傷科治療"
+ }
+ },
+ {
+ "@type": "Offer",
+ "itemOffered": {
+ "@type": "MedicalProcedure",
+ "name": "婦科調理",
+ "description": "月經調理、產前產後調養"
+ }
+ }
+ ]
+ },
+ "parentOrganization": {
+ "@id": "https://www.edenclinic.hk/#organization"
+ }
+ },
+ {
+ "@type": [
+ "MedicalClinic",
+ "LocalBusiness"
+ ],
+ "@id": "https://www.edenclinic.hk/#jordan",
+ "name": "醫天圓中醫診所 - 佐敦店",
+ "alternateName": "Eden TCM Clinic - Jordan",
+ "url": "https://www.edenclinic.hk",
+ "image": "https://www.edenclinic.hk/wp-content/uploads/2016/09/logo.png",
+ "telephone": "+852-3105-0733",
+ "email": "info@edenclinic.hk",
+ "address": {
+ "@type": "PostalAddress",
+ "streetAddress": "寶靈街6號佐敦中心7樓全層",
+ "addressLocality": "佐敦",
+ "addressRegion": "九龍",
+ "addressCountry": "HK"
+ },
+ "geo": {
+ "@type": "GeoCoordinates",
+ "latitude": "22.3042379",
+ "longitude": "114.1712264"
+ },
+ "openingHoursSpecification": [
+ {
+ "@type": "OpeningHoursSpecification",
+ "dayOfWeek": [
+ "Monday",
+ "Tuesday",
+ "Wednesday",
+ "Thursday",
+ "Friday"
+ ],
+ "opens": "11:00",
+ "closes": "14:00"
+ },
+ {
+ "@type": "OpeningHoursSpecification",
+ "dayOfWeek": [
+ "Monday",
+ "Tuesday",
+ "Wednesday",
+ "Thursday",
+ "Friday"
+ ],
+ "opens": "15:30",
+ "closes": "19:30"
+ },
+ {
+ "@type": "OpeningHoursSpecification",
+ "dayOfWeek": "Saturday",
+ "opens": "11:00",
+ "closes": "14:00"
+ },
+ {
+ "@type": "OpeningHoursSpecification",
+ "dayOfWeek": "Saturday",
+ "opens": "15:30",
+ "closes": "18:30"
+ }
+ ],
+ "hasMap": "https://g.page/EDENTCMJD?share",
+ "priceRange": "$$",
+ "currenciesAccepted": "HKD",
+ "paymentAccepted": "Cash, Credit Card, Medical Voucher, Health Insurance",
+ "aggregateRating": {
+ "@type": "AggregateRating",
+ "ratingValue": "5.0",
+ "ratingCount": "19"
+ },
+ "hasOfferCatalog": {
+ "@type": "OfferCatalog",
+ "name": "中醫服務",
+ "itemListElement": [
+ {
+ "@type": "Offer",
+ "itemOffered": {
+ "@type": "MedicalProcedure",
+ "name": "中醫診症"
+ }
+ },
+ {
+ "@type": "Offer",
+ "itemOffered": {
+ "@type": "MedicalProcedure",
+ "name": "針灸治療"
+ }
+ },
+ {
+ "@type": "Offer",
+ "itemOffered": {
+ "@type": "MedicalProcedure",
+ "name": "正骨推拿"
+ }
+ },
+ {
+ "@type": "Offer",
+ "itemOffered": {
+ "@type": "MedicalProcedure",
+ "name": "婦科調理"
+ }
+ }
+ ]
+ },
+ "parentOrganization": {
+ "@id": "https://www.edenclinic.hk/#organization"
+ }
+ },
+ {
+ "@type": [
+ "MedicalClinic",
+ "LocalBusiness"
+ ],
+ "@id": "https://www.edenclinic.hk/#tsuenwan",
+ "name": "醫天圓中醫診所 - 荃灣店",
+ "alternateName": "Eden TCM Clinic - Tsuen Wan",
+ "url": "https://www.edenclinic.hk",
+ "image": "https://www.edenclinic.hk/wp-content/uploads/2016/09/logo.png",
+ "telephone": "+852-2698-5422",
+ "email": "info@edenclinic.hk",
+ "address": {
+ "@type": "PostalAddress",
+ "streetAddress": "德士古道24號富麗花園商場A座地下20號舖",
+ "addressLocality": "荃灣",
+ "addressRegion": "新界",
+ "addressCountry": "HK"
+ },
+ "geo": {
+ "@type": "GeoCoordinates",
+ "latitude": "22.3687384",
+ "longitude": "114.1222658"
+ },
+ "openingHoursSpecification": [
+ {
+ "@type": "OpeningHoursSpecification",
+ "dayOfWeek": [
+ "Monday",
+ "Tuesday",
+ "Thursday",
+ "Friday",
+ "Saturday",
+ "Sunday"
+ ],
+ "opens": "10:30",
+ "closes": "14:00"
+ },
+ {
+ "@type": "OpeningHoursSpecification",
+ "dayOfWeek": [
+ "Monday",
+ "Tuesday",
+ "Thursday",
+ "Friday",
+ "Saturday",
+ "Sunday"
+ ],
+ "opens": "15:30",
+ "closes": "19:00"
+ }
+ ],
+ "hasMap": "https://goo.gl/maps/rfnqmpjh2tC2",
+ "priceRange": "$$",
+ "currenciesAccepted": "HKD",
+ "paymentAccepted": "Cash, Credit Card, Medical Voucher, Health Insurance",
+ "aggregateRating": {
+ "@type": "AggregateRating",
+ "ratingValue": "4.7",
+ "ratingCount": "13"
+ },
+ "hasOfferCatalog": {
+ "@type": "OfferCatalog",
+ "name": "中醫服務",
+ "itemListElement": [
+ {
+ "@type": "Offer",
+ "itemOffered": {
+ "@type": "MedicalProcedure",
+ "name": "中醫診症"
+ }
+ },
+ {
+ "@type": "Offer",
+ "itemOffered": {
+ "@type": "MedicalProcedure",
+ "name": "針灸治療"
+ }
+ },
+ {
+ "@type": "Offer",
+ "itemOffered": {
+ "@type": "MedicalProcedure",
+ "name": "正骨推拿"
+ }
+ },
+ {
+ "@type": "Offer",
+ "itemOffered": {
+ "@type": "MedicalProcedure",
+ "name": "婦科調理"
+ }
+ }
+ ]
+ },
+ "parentOrganization": {
+ "@id": "https://www.edenclinic.hk/#organization"
+ }
+ },
+ {
+ "@type": "Person",
+ "@id": "https://www.edenclinic.hk/#dr-chan-ka-fu",
+ "name": "陳家富醫師",
+ "alternateName": "Dr. Chan Ka-Fu",
+ "identifier": "006619",
+ "jobTitle": "註冊中醫師",
+ "image": "https://www.edenclinic.hk/wp-content/uploads/2021/05/醫天圓中醫-陳家富中醫師，中醫全科，骨傷科，兒科，中醫醫長者推介，佐敦中醫師推介，荃灣中醫師推介，中醫家庭醫生.jpg",
+ "worksFor": {
+ "@id": "https://www.edenclinic.hk/#organization"
+ },
+ "alumniOf": {
+ "@type": "EducationalOrganization",
+ "name": "香港中文大學",
+ "sameAs": "https://www.cuhk.edu.hk/"
+ },
+ "hasCredential": [
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "degree",
+ "name": "香港中文大學中醫學學士"
+ },
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "license",
+ "name": "香港註冊中醫師執照",
+ "identifier": "006619",
+ "recognizedBy": {
+ "@type": "Organization",
+ "name": "香港中醫藥管理委員會"
+ }
+ }
+ ],
+ "knowsAbout": [
+ "Traditional Chinese Medicine",
+ "Orthopedics",
+ "Pediatrics",
+ "中醫全科",
+ "骨傷科",
+ "兒科",
+ "痛症治療",
+ "正骨推拿"
+ ]
+ },
+ {
+ "@type": "Person",
+ "@id": "https://www.edenclinic.hk/#dr-lee-chin-lam",
+ "name": "李芊霖醫師",
+ "alternateName": "Dr. Lee Chin Lam",
+ "identifier": "007814",
+ "jobTitle": "註冊中醫師",
+ "image": "https://www.edenclinic.hk/wp-content/uploads/2021/05/醫天圓中醫-李芊霖中醫師，營養學中醫師，中醫減肥推介，中醫醫自律神經失調首選，中醫全科，中醫全科，中醫婦科.jpg",
+ "worksFor": {
+ "@id": "https://www.edenclinic.hk/#organization"
+ },
+ "alumniOf": [
+ {
+ "@type": "EducationalOrganization",
+ "name": "香港中文大學",
+ "sameAs": "https://www.cuhk.edu.hk/"
+ },
+ {
+ "@type": "EducationalOrganization",
+ "name": "香港浸會大學",
+ "sameAs": "https://www.hkbu.edu.hk/"
+ },
+ {
+ "@type": "EducationalOrganization",
+ "name": "香港大學",
+ "sameAs": "https://www.hku.hk/"
+ },
+ {
+ "@type": "EducationalOrganization",
+ "name": "Manchester Metropolitan University",
+ "sameAs": "https://www.mmu.ac.uk/"
+ }
+ ],
+ "hasCredential": [
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "degree",
+ "name": "香港中文大學中醫學學士"
+ },
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "degree",
+ "name": "香港浸會大學中醫學碩士"
+ },
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "certificate",
+ "name": "香港大學中醫學深造證書（臨床婦科學）"
+ },
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "degree",
+ "name": "英國曼徹斯特都會大學人類營養學碩士"
+ },
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "license",
+ "name": "香港註冊中醫師執照",
+ "identifier": "007814",
+ "recognizedBy": {
+ "@type": "Organization",
+ "name": "香港中醫藥管理委員會"
+ }
+ }
+ ],
+ "knowsAbout": [
+ "Traditional Chinese Medicine",
+ "Gynecology",
+ "Acupuncture",
+ "Nutrition",
+ "中醫全科",
+ "中醫婦科",
+ "針灸",
+ "婦科調理",
+ "中醫營養學",
+ "中醫減肥",
+ "自律神經失調"
+ ]
+ },
+ {
+ "@type": "Person",
+ "@id": "https://www.edenclinic.hk/#dr-hon-hiu-yan",
+ "name": "韓曉恩醫師",
+ "alternateName": "Dr. Hon Hiu Yan",
+ "identifier": "009903",
+ "jobTitle": "註冊中醫師",
+ "worksFor": {
+ "@id": "https://www.edenclinic.hk/#organization"
+ },
+ "alumniOf": {
+ "@type": "EducationalOrganization",
+ "name": "香港大學",
+ "sameAs": "https://www.hku.hk/"
+ },
+ "hasCredential": [
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "degree",
+ "name": "香港大學中醫全科學士"
+ },
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "license",
+ "name": "香港註冊中醫師執照",
+ "identifier": "009903",
+ "recognizedBy": {
+ "@type": "Organization",
+ "name": "香港中醫藥管理委員會"
+ }
+ }
+ ],
+ "knowsAbout": [
+ "Traditional Chinese Medicine",
+ "中醫全科"
+ ]
+ },
+ {
+ "@type": "Person",
+ "@id": "https://www.edenclinic.hk/#dr-chau-tak-kin",
+ "name": "周德健醫師",
+ "alternateName": "Dr. Chau Tak Kin",
+ "identifier": "009039",
+ "jobTitle": "註冊中醫師",
+ "worksFor": {
+ "@id": "https://www.edenclinic.hk/#organization"
+ },
+ "alumniOf": {
+ "@type": "EducationalOrganization",
+ "name": "廣州中醫藥大學"
+ },
+ "hasCredential": [
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "degree",
+ "name": "廣州中醫藥大學中醫學學士"
+ },
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "license",
+ "name": "香港註冊中醫師執照",
+ "identifier": "009039",
+ "recognizedBy": {
+ "@type": "Organization",
+ "name": "香港中醫藥管理委員會"
+ }
+ }
+ ],
+ "knowsAbout": [
+ "Traditional Chinese Medicine",
+ "中醫全科"
+ ]
+ },
+ {
+ "@type": "Person",
+ "@id": "https://www.edenclinic.hk/#dr-cheung-tin-wai",
+ "name": "張天慧醫師",
+ "alternateName": "Dr. Cheung Tin Wai",
+ "identifier": "006247",
+ "jobTitle": "註冊中醫師",
+ "worksFor": {
+ "@id": "https://www.edenclinic.hk/#organization"
+ },
+ "alumniOf": {
+ "@type": "EducationalOrganization",
+ "name": "香港中文大學",
+ "sameAs": "https://www.cuhk.edu.hk/"
+ },
+ "hasCredential": [
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "degree",
+ "name": "香港中文大學中醫理學碩士"
+ },
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "degree",
+ "name": "香港中文大學中醫學學士"
+ },
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "license",
+ "name": "香港註冊中醫師執照",
+ "identifier": "006247",
+ "recognizedBy": {
+ "@type": "Organization",
+ "name": "香港中醫藥管理委員會"
+ }
+ }
+ ],
+ "knowsAbout": [
+ "Traditional Chinese Medicine",
+ "中醫全科"
+ ]
+ },
+ {
+ "@type": "Person",
+ "@id": "https://www.edenclinic.hk/#dr-leung-chung-wai",
+ "name": "梁仲威醫師",
+ "alternateName": "Dr. Leung Chung Wai",
+ "identifier": "006627",
+ "jobTitle": "註冊中醫師",
+ "worksFor": {
+ "@id": "https://www.edenclinic.hk/#organization"
+ },
+ "alumniOf": {
+ "@type": "EducationalOrganization",
+ "name": "香港中文大學",
+ "sameAs": "https://www.cuhk.edu.hk/"
+ },
+ "hasCredential": [
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "degree",
+ "name": "香港中文大學中醫學學士"
+ },
+ {
+ "@type": "EducationalOccupationalCredential",
+ "credentialCategory": "license",
+ "name": "香港註冊中醫師執照",
+ "identifier": "006627",
+ "recognizedBy": {
+ "@type": "Organization",
+ "name": "香港中醫藥管理委員會"
+ }
+ }
+ ],
+ "knowsAbout": [
+ "Traditional Chinese Medicine",
+ "中醫全科"
+ ]
+ }
+ ]
+} </script><meta property="og:title" content="找不到符合條件的頁面 &#8211; 醫天圓中醫診所"><meta property="og:type" content="website"><meta property="og:locale" content="zh_TW"><meta property="og:site_name" content="醫天圓中醫診所"><meta name="twitter:card" content="summary_large_image"><link rel='dns-prefetch' href='//fonts.googleapis.com' /><link rel="alternate" type="application/rss+xml" title="訂閱《醫天圓中醫診所》&raquo; 資訊提供" href="https://www.edenclinic.hk/feed/" /><link rel="alternate" type="application/rss+xml" title="訂閱《醫天圓中醫診所》&raquo; 留言的資訊提供" href="https://www.edenclinic.hk/comments/feed/" /> <style id='wp-img-auto-sizes-contain-inline-css' type='text/css'> img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
+/*# sourceURL=wp-img-auto-sizes-contain-inline-css */ </style> <style id='wp-block-library-inline-css' type='text/css'> :root{--wp-block-synced-color:#7a00df;--wp-block-synced-color--rgb:122,0,223;--wp-bound-block-color:var(--wp-block-synced-color);--wp-editor-canvas-background:#ddd;--wp-admin-theme-color:#007cba;--wp-admin-theme-color--rgb:0,124,186;--wp-admin-theme-color-darker-10:#006ba1;--wp-admin-theme-color-darker-10--rgb:0,107,160.5;--wp-admin-theme-color-darker-20:#005a87;--wp-admin-theme-color-darker-20--rgb:0,90,135;--wp-admin-border-width-focus:2px}@media (min-resolution:192dpi){:root{--wp-admin-border-width-focus:1.5px}}.wp-element-button{cursor:pointer}:root .has-very-light-gray-background-color{background-color:#eee}:root .has-very-dark-gray-background-color{background-color:#313131}:root .has-very-light-gray-color{color:#eee}:root .has-very-dark-gray-color{color:#313131}:root .has-vivid-green-cyan-to-vivid-cyan-blue-gradient-background{background:linear-gradient(135deg,#00d084,#0693e3)}:root .has-purple-crush-gradient-background{background:linear-gradient(135deg,#34e2e4,#4721fb 50%,#ab1dfe)}:root .has-hazy-dawn-gradient-background{background:linear-gradient(135deg,#faaca8,#dad0ec)}:root .has-subdued-olive-gradient-background{background:linear-gradient(135deg,#fafae1,#67a671)}:root .has-atomic-cream-gradient-background{background:linear-gradient(135deg,#fdd79a,#004a59)}:root .has-nightshade-gradient-background{background:linear-gradient(135deg,#330968,#31cdcf)}:root .has-midnight-gradient-background{background:linear-gradient(135deg,#020381,#2874fc)}:root{--wp--preset--font-size--normal:16px;--wp--preset--font-size--huge:42px}.has-regular-font-size{font-size:1em}.has-larger-font-size{font-size:2.625em}.has-normal-font-size{font-size:var(--wp--preset--font-size--normal)}.has-huge-font-size{font-size:var(--wp--preset--font-size--huge)}.has-text-align-center{text-align:center}.has-text-align-left{text-align:left}.has-text-align-right{text-align:right}.has-fit-text{white-space:nowrap!important}#end-resizable-editor-section{display:none}.aligncenter{clear:both}.items-justified-left{justify-content:flex-start}.items-justified-center{justify-content:center}.items-justified-right{justify-content:flex-end}.items-justified-space-between{justify-content:space-between}.screen-reader-text{border:0;clip-path:inset(50%);height:1px;margin:-1px;overflow:hidden;padding:0;position:absolute;width:1px;word-wrap:normal!important}.screen-reader-text:focus{background-color:#ddd;clip-path:none;color:#444;display:block;font-size:1em;height:auto;left:5px;line-height:normal;padding:15px 23px 14px;text-decoration:none;top:5px;width:auto;z-index:100000}html :where(.has-border-color){border-style:solid}html :where([style*=border-top-color]){border-top-style:solid}html :where([style*=border-right-color]){border-right-style:solid}html :where([style*=border-bottom-color]){border-bottom-style:solid}html :where([style*=border-left-color]){border-left-style:solid}html :where([style*=border-width]){border-style:solid}html :where([style*=border-top-width]){border-top-style:solid}html :where([style*=border-right-width]){border-right-style:solid}html :where([style*=border-bottom-width]){border-bottom-style:solid}html :where([style*=border-left-width]){border-left-style:solid}html :where(img[class*=wp-image-]){height:auto;max-width:100%}:where(figure){margin:0 0 1em}html :where(.is-position-sticky){--wp-admin--admin-bar--position-offset:var(--wp-admin--admin-bar--height,0px)}@media screen and (max-width:600px){html :where(.is-position-sticky){--wp-admin--admin-bar--position-offset:0px}}
+/*# sourceURL=wp-block-library-inline-css */ </style> <style id='classic-theme-styles-inline-css' type='text/css'> /*! This file is auto-generated */
+.wp-block-button__link{color:#fff;background-color:#32373c;border-radius:9999px;box-shadow:none;text-decoration:none;padding:calc(.667em + 2px) calc(1.333em + 2px);font-size:1.125em}.wp-block-file__button{background:#32373c;color:#fff;text-decoration:none}
+/*# sourceURL=/wp-includes/css/classic-themes.min.css */ </style> <style id='global-styles-inline-css' type='text/css'> :root{--wp--preset--aspect-ratio--square: 1;--wp--preset--aspect-ratio--4-3: 4/3;--wp--preset--aspect-ratio--3-4: 3/4;--wp--preset--aspect-ratio--3-2: 3/2;--wp--preset--aspect-ratio--2-3: 2/3;--wp--preset--aspect-ratio--16-9: 16/9;--wp--preset--aspect-ratio--9-16: 9/16;--wp--preset--color--black: #000000;--wp--preset--color--cyan-bluish-gray: #abb8c3;--wp--preset--color--white: #ffffff;--wp--preset--color--pale-pink: #f78da7;--wp--preset--color--vivid-red: #cf2e2e;--wp--preset--color--luminous-vivid-orange: #ff6900;--wp--preset--color--luminous-vivid-amber: #fcb900;--wp--preset--color--light-green-cyan: #7bdcb5;--wp--preset--color--vivid-green-cyan: #00d084;--wp--preset--color--pale-cyan-blue: #8ed1fc;--wp--preset--color--vivid-cyan-blue: #0693e3;--wp--preset--color--vivid-purple: #9b51e0;--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple: linear-gradient(135deg,rgb(6,147,227) 0%,rgb(155,81,224) 100%);--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan: linear-gradient(135deg,rgb(122,220,180) 0%,rgb(0,208,130) 100%);--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange: linear-gradient(135deg,rgb(252,185,0) 0%,rgb(255,105,0) 100%);--wp--preset--gradient--luminous-vivid-orange-to-vivid-red: linear-gradient(135deg,rgb(255,105,0) 0%,rgb(207,46,46) 100%);--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray: linear-gradient(135deg,rgb(238,238,238) 0%,rgb(169,184,195) 100%);--wp--preset--gradient--cool-to-warm-spectrum: linear-gradient(135deg,rgb(74,234,220) 0%,rgb(151,120,209) 20%,rgb(207,42,186) 40%,rgb(238,44,130) 60%,rgb(251,105,98) 80%,rgb(254,248,76) 100%);--wp--preset--gradient--blush-light-purple: linear-gradient(135deg,rgb(255,206,236) 0%,rgb(152,150,240) 100%);--wp--preset--gradient--blush-bordeaux: linear-gradient(135deg,rgb(254,205,165) 0%,rgb(254,45,45) 50%,rgb(107,0,62) 100%);--wp--preset--gradient--luminous-dusk: linear-gradient(135deg,rgb(255,203,112) 0%,rgb(199,81,192) 50%,rgb(65,88,208) 100%);--wp--preset--gradient--pale-ocean: linear-gradient(135deg,rgb(255,245,203) 0%,rgb(182,227,212) 50%,rgb(51,167,181) 100%);--wp--preset--gradient--electric-grass: linear-gradient(135deg,rgb(202,248,128) 0%,rgb(113,206,126) 100%);--wp--preset--gradient--midnight: linear-gradient(135deg,rgb(2,3,129) 0%,rgb(40,116,252) 100%);--wp--preset--font-size--small: 13px;--wp--preset--font-size--medium: 20px;--wp--preset--font-size--large: 36px;--wp--preset--font-size--x-large: 42px;--wp--preset--spacing--20: 0.44rem;--wp--preset--spacing--30: 0.67rem;--wp--preset--spacing--40: 1rem;--wp--preset--spacing--50: 1.5rem;--wp--preset--spacing--60: 2.25rem;--wp--preset--spacing--70: 3.38rem;--wp--preset--spacing--80: 5.06rem;--wp--preset--shadow--natural: 6px 6px 9px rgba(0, 0, 0, 0.2);--wp--preset--shadow--deep: 12px 12px 50px rgba(0, 0, 0, 0.4);--wp--preset--shadow--sharp: 6px 6px 0px rgba(0, 0, 0, 0.2);--wp--preset--shadow--outlined: 6px 6px 0px -3px rgb(255, 255, 255), 6px 6px rgb(0, 0, 0);--wp--preset--shadow--crisp: 6px 6px 0px rgb(0, 0, 0);}:where(.is-layout-flex){gap: 0.5em;}:where(.is-layout-grid){gap: 0.5em;}body .is-layout-flex{display: flex;}.is-layout-flex{flex-wrap: wrap;align-items: center;}.is-layout-flex > :is(*, div){margin: 0;}body .is-layout-grid{display: grid;}.is-layout-grid > :is(*, div){margin: 0;}:where(.wp-block-columns.is-layout-flex){gap: 2em;}:where(.wp-block-columns.is-layout-grid){gap: 2em;}:where(.wp-block-post-template.is-layout-flex){gap: 1.25em;}:where(.wp-block-post-template.is-layout-grid){gap: 1.25em;}.has-black-color{color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-color{color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-color{color: var(--wp--preset--color--white) !important;}.has-pale-pink-color{color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-color{color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-color{color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-color{color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-color{color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-color{color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-color{color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-color{color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-color{color: var(--wp--preset--color--vivid-purple) !important;}.has-black-background-color{background-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-background-color{background-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-background-color{background-color: var(--wp--preset--color--white) !important;}.has-pale-pink-background-color{background-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-background-color{background-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-background-color{background-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-background-color{background-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-background-color{background-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-background-color{background-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-background-color{background-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-background-color{background-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-background-color{background-color: var(--wp--preset--color--vivid-purple) !important;}.has-black-border-color{border-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-border-color{border-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-border-color{border-color: var(--wp--preset--color--white) !important;}.has-pale-pink-border-color{border-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-border-color{border-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-border-color{border-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-border-color{border-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-border-color{border-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-border-color{border-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-border-color{border-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-border-color{border-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-border-color{border-color: var(--wp--preset--color--vivid-purple) !important;}.has-vivid-cyan-blue-to-vivid-purple-gradient-background{background: var(--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple) !important;}.has-light-green-cyan-to-vivid-green-cyan-gradient-background{background: var(--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan) !important;}.has-luminous-vivid-amber-to-luminous-vivid-orange-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange) !important;}.has-luminous-vivid-orange-to-vivid-red-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-orange-to-vivid-red) !important;}.has-very-light-gray-to-cyan-bluish-gray-gradient-background{background: var(--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray) !important;}.has-cool-to-warm-spectrum-gradient-background{background: var(--wp--preset--gradient--cool-to-warm-spectrum) !important;}.has-blush-light-purple-gradient-background{background: var(--wp--preset--gradient--blush-light-purple) !important;}.has-blush-bordeaux-gradient-background{background: var(--wp--preset--gradient--blush-bordeaux) !important;}.has-luminous-dusk-gradient-background{background: var(--wp--preset--gradient--luminous-dusk) !important;}.has-pale-ocean-gradient-background{background: var(--wp--preset--gradient--pale-ocean) !important;}.has-electric-grass-gradient-background{background: var(--wp--preset--gradient--electric-grass) !important;}.has-midnight-gradient-background{background: var(--wp--preset--gradient--midnight) !important;}.has-small-font-size{font-size: var(--wp--preset--font-size--small) !important;}.has-medium-font-size{font-size: var(--wp--preset--font-size--medium) !important;}.has-large-font-size{font-size: var(--wp--preset--font-size--large) !important;}.has-x-large-font-size{font-size: var(--wp--preset--font-size--x-large) !important;}
+/*# sourceURL=global-styles-inline-css */ </style> <style id='uncode-style-inline-css' type='text/css'> @media (max-width: 959px) { .navbar-brand > * { height: 60px !important;}}
+@media (min-width: 960px) { .limit-width { max-width: 1200px; margin: auto;}}
+.menu-primary ul.menu-smart > li > a, .menu-primary ul.menu-smart li.dropdown > a, .menu-primary ul.menu-smart li.mega-menu > a, .vmenu-container ul.menu-smart > li > a, .vmenu-container ul.menu-smart li.dropdown > a { text-transform: uppercase; }
+body.menu-custom-padding .col-lg-0.logo-container, body.menu-custom-padding .col-lg-2.logo-container, body.menu-custom-padding .col-lg-12 .logo-container, body.menu-custom-padding .col-lg-4.logo-container { padding-top: 18px; padding-bottom: 18px; }
+body.menu-custom-padding .col-lg-0.logo-container.shrinked, body.menu-custom-padding .col-lg-2.logo-container.shrinked, body.menu-custom-padding .col-lg-12 .logo-container.shrinked, body.menu-custom-padding .col-lg-4.logo-container.shrinked { padding-top: 9px; padding-bottom: 9px; }
+@media (max-width: 959px) { body.menu-custom-padding .menu-container .logo-container { padding-top: 9px !important; padding-bottom: 9px !important; } }
+/*# sourceURL=uncode-style-inline-css */ </style> <style id='uncode-custom-style-inline-css' type='text/css'> mark {background:linear-gradient(to bottom, transparent 75%, #fff799 75%);color:inherit;font-weight:bold;padding:1px 2px;border-radius:0;}.search-icon:lang(en-US) { display:none !important;}.nav-tabs > li > a span { font-size:18px; }.icon-lineh .fa { line-height:1.8em; }.site-footer .icon-box-left .icon-box-content { padding-left:5px; }.post-info { display:none; }
+/*# sourceURL=uncode-custom-style-inline-css */ </style> <script type="text/javascript" src="https://www.edenclinic.hk/wp-includes/js/jquery/jquery.min.js?ver=3.7.1" id="jquery-core-js"></script> <script type="text/javascript" src="https://www.edenclinic.hk/wp-includes/js/jquery/jquery-migrate.min.js?ver=3.4.1" id="jquery-migrate-js"></script> <script type="text/javascript" id="uncode-init-js-extra"> /* <![CDATA[ */
+var SiteParameters = {"days":"days","hours":"hours","minutes":"minutes","seconds":"seconds","constant_scroll":"on","scroll_speed":"2","parallax_factor":"0.25","loading":"Loading\u2026","slide_name":"slide","slide_footer":"footer","ajax_url":"https://www.edenclinic.hk/wp-admin/admin-ajax.php","nonce_adaptive_images":"35beb2b3a1","enable_debug":"","block_mobile_videos":"","is_frontend_editor":"","mobile_parallax_allowed":"","wireframes_plugin_active":"","sticky_elements":"off","lazyload_type":"","update_wc_fragments":"1"};
+//# sourceURL=uncode-init-js-extra
+/* ]]> */ </script> <script type="text/javascript" src="https://www.edenclinic.hk/wp-content/themes/uncode/library/js/min/init.min.js" id="uncode-init-js"></script><link rel="https://api.w.org/" href="https://www.edenclinic.hk/wp-json/" /><link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://www.edenclinic.hk/xmlrpc.php?rsd" /><meta name="generator" content="WordPress 6.9.4" /><link rel="icon" href="https://www.edenclinic.hk/wp-content/uploads/2017/11/cropped-cropped-新醫天去背LOGO-300x300.png" sizes="32x32" /><link rel="icon" href="https://www.edenclinic.hk/wp-content/uploads/2017/11/cropped-cropped-新醫天去背LOGO-300x300.png" sizes="192x192" /><link rel="apple-touch-icon" href="https://www.edenclinic.hk/wp-content/uploads/2017/11/cropped-cropped-新醫天去背LOGO-300x300.png" /><meta name="msapplication-TileImage" content="https://www.edenclinic.hk/wp-content/uploads/2017/11/cropped-cropped-新醫天去背LOGO-300x300.png" /> <style type="text/css" id="wp-custom-css"> Add new colors to stylesheet
+.pink {
+ color: #f85998;}
+#main-logo .navbar-brand img {
+ width: auto;
+ height: 100%;
+ display: block;
+ margin: auto;
+}
+.zi_box_1 {
+position: relative;
+margin: 2em 0;
+padding: 1em;
+background-color:#fefdfa; 
+border: solid 2px #3A6813; /*框線*/
+border-radius: 8px;
+}
+.zi_box_1 .zi_box_2 {
+position: absolute;
+display: inline-block;
+top: -27px;
+left: -3px;
+padding: 0 9px;
+height: 25px;
+line-height: 25px;
+font-size: 17px;
+background:#3A6813;/*標題底色*/
+color: #FFFFFF;
+font-weight: bold;
+border-radius:8px 8px 0 0;
+}
+.zi_box_3 {
+border: 5px solid #74a17d;/* 框線顏色 */
+margin: 2em 0;
+padding: 20px;
+position: relative;
+}
+.zi_box_3::before {
+background-color: #fff;
+color: #6c8457;
+content: "注意!";/*標題*/
+font-weight: bold;
+left: 1em;
+padding: 0 .5em;
+position: absolute;
+top: -1em;
+}
+mark_1 {
+background: linear-gradient(#fff 75%, #fff799 0%) !important;
+font-weight:bold; 
+}
+.zi_box_4 {
+border: 2px solid #6b966b;/* 框線顏色 */
+margin: 1em 0;
+padding: 10px;
+position: relative;
+border-radius:8px 8px 8px 8px;
+} </style> <noscript><style> .wpb_animate_when_almost_visible { opacity: 1; }</style></noscript></head><body class="error404 wp-theme-uncode  style-color-xsdn-bg group-blog hormenu-position-left hmenu hmenu-position-center header-full-width main-center-align menu-mobile-animated menu-mobile-transparent menu-custom-padding mobile-parallax-not-allowed ilb-no-bounce qw-body-scroll-disabled wpb-js-composer js-comp-ver-6.6.0 vc_responsive" data-border="0"><div class="body-borders" data-border="0"><div class="top-border body-border-shadow"></div><div class="right-border body-border-shadow"></div><div class="bottom-border body-border-shadow"></div><div class="left-border body-border-shadow"></div><div class="top-border style-light-bg"></div><div class="right-border style-light-bg"></div><div class="bottom-border style-light-bg"></div><div class="left-border style-light-bg"></div></div><div class="box-wrapper"><div class="box-container"> <script type="text/javascript" id="initBox">UNCODE.initBox();</script><div class="menu-wrapper menu-shrink menu-sticky"><header id="masthead" class="navbar menu-primary menu-light submenu-light menu-transparent menu-add-padding style-light-original menu-absolute menu-animated menu-with-logo"><div class="menu-container style-color-xsdn-bg menu-no-borders"><div class="row-menu"><div class="row-menu-inner"><div id="logo-container-mobile" class="col-lg-0 logo-container middle"><div id="main-logo" class="navbar-header style-light"> <a href="https://www.edenclinic.hk/" class="navbar-brand" data-padding-shrink ="9" data-minheight="40"><div class="logo-image main-logo logo-skinnable" data-maxheight="100" style="height: 100px;"><img fetchpriority="high" decoding="async" src="https://www.edenclinic.hk/wp-content/uploads/2017/11/logo2018@2x.png" alt="logo" width="600" height="229" class="img-responsive" /></div></a></div><div class="mmb-container"><div class="mobile-additional-icons"></div><div class="mobile-menu-button 1 mobile-menu-button-light lines-button x2"><span class="lines"></span></div></div></div><div class="col-lg-12 main-menu-container middle"><div class="menu-horizontal menu-dd-shadow-lg"><div class="menu-horizontal-inner"><div class="nav navbar-nav navbar-main navbar-nav-first"><ul id="menu-revamp-menu-2019" class="menu-primary-inner menu-smart sm"><li id="menu-item-35899" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-home menu-item-35899 menu-item-link"><a title="主頁" href="https://www.edenclinic.hk/" data-ps2id-api="true">主頁<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-3528" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-3528 dropdown menu-item-link"><a title="關於我們" href="#" data-toggle="dropdown" class="dropdown-toggle" data-ps2id-api="true" data-type="title">關於我們<i class="fa fa-angle-down fa-dropdown"></i></a><ul role="menu" class="drop-menu"><li id="menu-item-6680" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-6680 dropdown"><a title="關於醫天圓" href="https://www.edenclinic.hk/%e9%97%9c%e6%96%bc%e6%88%91%e5%80%91/%e9%97%9c%e6%96%bc%e9%86%ab%e5%a4%a9%e5%9c%93/" data-ps2id-api="true" data-type="title">關於醫天圓<i class="fa fa-angle-down fa-dropdown"></i></a><ul role="menu" class="drop-menu"><li id="menu-item-3863" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-3863"><a title="創辦人的話" href="https://www.edenclinic.hk/%e9%97%9c%e6%96%bc%e6%88%91%e5%80%91/%e5%89%b5%e8%be%a6%e4%ba%ba%e7%9a%84%e8%a9%b1/%e6%a2%81%e4%bb%b2%e5%a8%81%e9%86%ab%e5%b8%ab/" data-ps2id-api="true">創辦人的話<i class="fa fa-angle-right fa-dropdown"></i></a></li></ul></li><li id="menu-item-3864" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-3864"><a title="團隊簡歷及即時預約" href="https://www.edenclinic.hk/%e9%97%9c%e6%96%bc%e6%88%91%e5%80%91/%e9%86%ab%e5%b8%ab%e7%b0%a1%e6%ad%b7%e5%8f%8a%e6%87%89%e8%a8%ba%e6%99%82%e9%96%93/" data-ps2id-api="true">團隊簡歷及即時預約<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-45191" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-45191"><a title="診所應診時間表" href="https://www.edenclinic.hk/timetable/" data-ps2id-api="true">診所應診時間表<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-3865" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-3865"><a title="診所地址及聯絡方法" href="https://www.edenclinic.hk/%e9%97%9c%e6%96%bc%e6%88%91%e5%80%91/%e8%a8%ba%e6%89%80%e5%9c%b0%e5%9d%80%e5%8f%8a%e8%81%af%e7%b5%a1%e6%96%b9%e6%b3%95/" data-ps2id-api="true">診所地址及聯絡方法<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-6937" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-6937"><a title="收費詳情" href="https://www.edenclinic.hk/%e9%97%9c%e6%96%bc%e6%88%91%e5%80%91/%e6%94%b6%e8%b2%bb/" data-ps2id-api="true">收費詳情<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-25298" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-25298"><a title="醫天圓上門應診服務" href="https://www.edenclinic.hk/%e9%86%ab%e5%a4%a9%e5%9c%93%e8%b3%87%e8%a8%8a/%e4%b8%8a%e9%96%80%e6%87%89%e8%a8%ba%e6%9c%8d%e5%8b%99/" data-ps2id-api="true">醫天圓上門應診服務<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-3866" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-3866"><a title="惡劣天氣安排" href="https://www.edenclinic.hk/%e9%97%9c%e6%96%bc%e6%88%91%e5%80%91/%e6%83%a1%e5%8a%a3%e5%a4%a9%e6%b0%a3%e5%ae%89%e6%8e%92/" data-ps2id-api="true">惡劣天氣安排<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-6991" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-privacy-policy menu-item-6991"><a title="私隱政策及聲明" href="https://www.edenclinic.hk/%e9%97%9c%e6%96%bc%e6%88%91%e5%80%91/%e7%a7%81%e9%9a%b1%e6%94%bf%e7%ad%96%e5%8f%8a%e8%81%b2%e6%98%8e/" data-ps2id-api="true">私隱政策及聲明<i class="fa fa-angle-right fa-dropdown"></i></a></li></ul></li><li id="menu-item-15775" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-15775 menu-item-link"><a title="醫天圓視像應診" href="https://www.edenclinic.hk/%e9%86%ab%e5%a4%a9%e5%9c%93%e8%a6%96%e5%83%8f%e6%87%89%e8%a8%ba%e6%9c%8d%e5%8b%99/" data-ps2id-api="true">醫天圓視像應診<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-7133" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-7133 dropdown menu-item-link"><a title="醫天圓療程資訊" href="#" data-toggle="dropdown" class="dropdown-toggle" data-ps2id-api="true" data-type="title">醫天圓療程資訊<i class="fa fa-angle-down fa-dropdown"></i></a><ul role="menu" class="drop-menu"><li id="menu-item-29508" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-29508"><a title="慢性痛症療程" href="https://www.edenclinic.hk/%e9%86%ab%e5%a4%a9%e5%9c%93%e7%97%9b%e7%97%87%e7%99%82%e7%a8%8b1/" data-ps2id-api="true">慢性痛症療程<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-32181" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-32181"><a title="中醫針灸助孕、輔助IVF-ET生殖療程" href="https://www.edenclinic.hk/%e9%87%9d%e7%81%b8%e8%88%87ivf-et%e8%bc%94%e5%8a%a9%e7%94%9f%e6%ae%96%e7%99%82%e7%a8%8b/" data-ps2id-api="true">中醫針灸助孕、輔助IVF-ET生殖療程<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-18991" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-18991"><a title="中醫產後調理療程" href="https://www.edenclinic.hk/%e7%94%a2%e5%be%8c%e8%aa%bf%e7%90%86%e7%99%82%e7%a8%8b/" data-ps2id-api="true">中醫產後調理療程<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-43771" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-43771"><a title="中醫美胸經絡按摩療程" href="https://www.edenclinic.hk/%e9%86%ab%e5%a4%a9%e5%9c%93%e4%b8%ad%e9%86%ab%e7%be%8e%e8%83%b8%e7%99%82%e7%a8%8b/" data-ps2id-api="true">中醫美胸經絡按摩療程<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33604" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33604"><a title="中醫減肥療程" href="https://www.edenclinic.hk/eden-beauty-2/" data-ps2id-api="true">中醫減肥療程<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-17885" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-17885"><a title="慢性濕疹療程" href="https://www.edenclinic.hk/%e6%85%a2%e6%80%a7%e6%bf%95%e7%96%b9%e7%99%82%e7%a8%8b/" data-ps2id-api="true">慢性濕疹療程<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33605" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33605"><a title="其他療法" href="https://www.edenclinic.hk/%e9%97%9c%e6%96%bc%e6%88%91%e5%80%91/%e7%99%82%e6%b3%95%e4%bb%8b%e7%b4%b9/" data-ps2id-api="true">其他療法<i class="fa fa-angle-right fa-dropdown"></i></a></li></ul></li><li id="menu-item-3867" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-3867 dropdown menu-item-link"><a title="醫天圓中醫保健博客" href="https://www.edenclinic.hk/blog/" data-toggle="dropdown" class="dropdown-toggle" data-ps2id-api="true" data-type="title">醫天圓中醫保健博客<i class="fa fa-angle-down fa-dropdown"></i></a><ul role="menu" class="drop-menu"><li id="menu-item-38867" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-38867"><a title="熱門：中醫治療扭傷、各類痛症" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%ef%bc%9a%e6%89%ad%e5%82%b7%ef%bc%8c%e7%97%9b%e7%97%87/" data-ps2id-api="true">熱門：中醫治療扭傷、各類痛症<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-13632" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-13632 dropdown"><a title="生活保養" href="https://www.edenclinic.hk/blog/%e7%94%9f%e6%b4%bb%e4%bf%9d%e9%a4%8a/" data-ps2id-api="true" data-type="title">生活保養<i class="fa fa-angle-down fa-dropdown"></i></a><ul role="menu" class="drop-menu"><li id="menu-item-46621" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-46621"><a title="中醫經絡按摩" href="https://www.edenclinic.hk/blog/masseuse/" data-ps2id-api="true">中醫經絡按摩<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33477" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33477"><a title="增肌丨減肥" href="https://www.edenclinic.hk/%e5%8d%9a%e5%ae%a2%e6%90%9c%e5%b0%8b%e6%b8%9b%e8%82%a5/" data-ps2id-api="true">增肌丨減肥<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-46657" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-46657"><a title="計劃懷孕" href="https://www.edenclinic.hk/%e5%8d%9a%e5%ae%a2%e6%90%9c%e5%b0%8b%e4%b8%8d%e5%ad%95%e3%80%81%e9%87%9d%e7%81%b8%e5%8a%a9%e5%ad%95%e3%80%81ivf%e6%88%96iui-%e9%87%9d%e7%81%b8%e8%bc%94%e5%8a%a9/" data-ps2id-api="true">計劃懷孕<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33475" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33475"><a title="懷孕丨產後調理" href="https://www.edenclinic.hk/%e5%8d%9a%e5%ae%a2%e6%90%9c%e5%b0%8b%e4%b8%8d%e5%ad%95%ef%bc%8f%e6%87%b7%e5%ad%95%ef%bc%8f%e7%94%a2%e5%be%8c/" data-ps2id-api="true">懷孕丨產後調理<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33480" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33480"><a title="婦科丨更年期調理" href="https://www.edenclinic.hk/%e5%8d%9a%e5%ae%a2%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%e5%a9%a6%e7%a7%91/" data-ps2id-api="true">婦科丨更年期調理<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33479" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33479"><a title="養生飲食丨中藥介紹" href="https://www.edenclinic.hk/%e5%8d%9a%e5%ae%a2%e6%90%9c%e5%b0%8b%e9%a3%b2%e9%a3%9f/" data-ps2id-api="true">養生飲食丨中藥介紹<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-42781" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-42781"><a title="中醫體質飲食及養生指南" href="https://www.edenclinic.hk/tcmedenbabablog/%e4%b9%9d%e5%9e%8b%e9%ab%94%e8%b3%aa%e5%88%86%e4%ba%ab/" data-ps2id-api="true">中醫體質飲食及養生指南<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-16102" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-16102"><a title="脊椎健康丨六大壞姿勢及矯正方法" href="https://www.edenclinic.hk/%e6%a2%81%e9%86%ab%e5%b8%ab%e6%ad%a3%e5%a7%bf%e5%9c%b0%e5%9c%96/%e6%97%a5%e5%b8%b8%e5%85%ad%e5%a4%a7%e5%a3%9e%e5%a7%bf%e5%8b%a2/" data-ps2id-api="true">脊椎健康丨六大壞姿勢及矯正方法<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-28782" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-28782 dropdown"><a title="醫天圓運動系列推介" href="https://www.edenclinic.hk/%e6%a2%81%e9%86%ab%e5%b8%ab%e6%ad%a3%e5%a7%bf%e5%9c%b0%e5%9c%96/%e9%86%ab%e5%a4%a9%e5%9c%93%e9%81%8b%e5%8b%95%e7%b3%bb%e5%88%97/" data-ps2id-api="true" data-type="title">醫天圓運動系列推介<i class="fa fa-angle-down fa-dropdown"></i></a><ul role="menu" class="drop-menu"><li id="menu-item-16093" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-16093"><a title="正S運動系列" href="https://www.edenclinic.hk/%e6%a2%81%e9%86%ab%e5%b8%ab%e6%ad%a3%e5%a7%bf%e5%9c%b0%e5%9c%96/%e6%ad%a3s%e9%81%8b%e5%8b%95%e7%b3%bb%e5%88%97/" data-ps2id-api="true">正S運動系列<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-28391" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-28391"><a title="螺旋運動系列" href="https://www.edenclinic.hk/%e8%9e%ba%e6%97%8b%e9%81%8b%e5%8b%95%e5%a4%a7%e7%b6%b2/" data-ps2id-api="true">螺旋運動系列<i class="fa fa-angle-right fa-dropdown"></i></a></li></ul></li></ul></li><li id="menu-item-13631" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-has-children menu-item-13631 dropdown"><a title="各類病症及草藥專題" href="https://www.edenclinic.hk/%e7%97%85%e7%97%87%e5%8f%8a%e8%8d%89%e8%97%a5%e5%b0%88%e9%a1%8c/" data-ps2id-api="true" data-type="title">各類病症及草藥專題<i class="fa fa-angle-down fa-dropdown"></i></a><ul role="menu" class="drop-menu"><li id="menu-item-39249" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-39249"><a title="新冠病毒丨傷風感冒丨流感丨久咳不癒" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%ef%bc%9a%e5%82%b7%e9%a2%a8%e6%84%9f%e5%86%92%e6%b5%81%e6%84%9f/" data-ps2id-api="true">新冠病毒丨傷風感冒丨流感丨久咳不癒<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33478" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33478"><a title="皮膚科丨濕疹丨粉瘤丨玫瑰痤瘡丨皮膚美容" href="https://www.edenclinic.hk/%e5%8d%9a%e5%ae%a2%e6%90%9c%e5%b0%8b%e7%9a%ae%e8%86%9a/" data-ps2id-api="true">皮膚科丨濕疹丨粉瘤丨玫瑰痤瘡丨皮膚美容<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33474" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33474"><a title="頭丨腦丨脫髮丨失眠" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%ef%bc%9a%e9%a0%ad%ef%bc%8c%e8%85%a6%ef%bc%8c%e8%84%ab%e9%ab%ae/" data-ps2id-api="true">頭丨腦丨脫髮丨失眠<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33472" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33472"><a title="眼丨耳" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%e7%9c%bc%ef%bc%8c%e8%80%b3/" data-ps2id-api="true">眼丨耳<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33473" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33473"><a title="鼻丨氣管丨肺" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%e9%bc%bb%ef%bc%8c-%e6%b0%a3%e7%ae%a1%ef%bc%8c%e8%82%ba/" data-ps2id-api="true">鼻丨氣管丨肺<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33471" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33471"><a title="口丨喉嚨丨聲帶丨頸部" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%ef%bc%9a%e5%8f%a3%ef%bc%8c%e5%96%89%e5%9a%a8%ef%bc%8c%e8%81%b2%e5%b8%b6/" data-ps2id-api="true">口丨喉嚨丨聲帶丨頸部<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33476" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33476"><a title="乳房丨豐胸" href="https://www.edenclinic.hk/%e7%97%85%e7%97%87%e5%8f%8a%e8%8d%89%e8%97%a5%e5%b0%88%e9%a1%8c/%e5%8d%9a%e5%ae%a2%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%e4%b9%b3%e6%88%bf/" data-ps2id-api="true">乳房丨豐胸<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-36227" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-36227"><a title="手丨手指" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%ef%bc%9a%e6%89%8b%e3%80%81%e6%89%8b%e6%8c%87/" data-ps2id-api="true">手丨手指<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33470" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33470"><a title="食道丨胃" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%ef%bc%9a%e9%a3%9f%e9%81%93%ef%bc%8c%e8%83%83/" data-ps2id-api="true">食道丨胃<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33468" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33468"><a title="肝丨腎丨泌尿系統丨痛風" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%ef%bc%9a%e8%82%9d%ef%bc%8c%e8%85%8e%ef%bc%8c%e6%b3%8c%e5%b0%bf%e7%a7%91/" data-ps2id-api="true">肝丨腎丨泌尿系統丨痛風<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33469" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33469"><a title="腸道丨痔瘡" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%ef%bc%9a%e8%85%b8%e9%81%93%ef%bc%8c%e7%97%94%e7%98%a1/" data-ps2id-api="true">腸道丨痔瘡<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33462" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33462"><a title="子宮丨陰道丨女性生殖器官" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%ef%bc%9a%e8%86%80%e8%85%94%ef%bc%8c%e5%b0%bf%e9%81%93%ef%bc%8c%e7%94%9f%e6%ae%96%e5%99%a8%e5%ae%98/" data-ps2id-api="true">子宮丨陰道丨女性生殖器官<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-55174" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-55174"><a title="前列腺丨男性生殖器官" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%ef%bc%9a%e5%89%8d%e5%88%97%e8%85%ba%e3%80%81%e7%94%b7%e6%80%a7%e7%94%9f%e6%ae%96%e5%99%a8%e5%ae%98/" data-ps2id-api="true">前列腺丨男性生殖器官<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-46634" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-46634"><a title="不孕、難孕丨IVF、IUI - 針灸輔助" href="https://www.edenclinic.hk/%e5%8d%9a%e5%ae%a2%e6%90%9c%e5%b0%8b%e4%b8%8d%e5%ad%95%e3%80%81%e9%87%9d%e7%81%b8%e5%8a%a9%e5%ad%95%e3%80%81ivf%e6%88%96iui-%e9%87%9d%e7%81%b8%e8%bc%94%e5%8a%a9/" data-ps2id-api="true">不孕、難孕丨IVF、IUI &#8211; 針灸輔助<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33467" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33467"><a title="血壓丨血脂丨貧血丨血糖" href="https://www.edenclinic.hk/%e8%a1%80%e5%a3%93%ef%bc%8c%e8%a1%80%e8%84%82%ef%bc%8c%e8%b2%a7%e8%a1%80/" data-ps2id-api="true">血壓丨血脂丨貧血丨血糖<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33465" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33465"><a title="扭傷跌打丨痛症丨神經麻痺" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%ef%bc%9a%e6%89%ad%e5%82%b7%ef%bc%8c%e7%97%9b%e7%97%87/" data-ps2id-api="true">扭傷跌打丨痛症丨神經麻痺<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-33464" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-33464"><a title="抑鬱症丨焦慮症丨注意力不足過動症ADHD丨中醫戒毒" href="https://www.edenclinic.hk/%e6%90%9c%e5%b0%8b%e7%b5%90%e6%9e%9c%ef%bc%9a%e6%8a%91%e9%ac%b1%ef%bc%8c%e7%84%a6%e6%85%ae/" data-ps2id-api="true">抑鬱症丨焦慮症丨注意力不足過動症ADHD丨中醫戒毒<i class="fa fa-angle-right fa-dropdown"></i></a></li></ul></li><li id="menu-item-27032" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-27032"><a title="現代中藥藥理研究" href="https://www.edenclinic.hk/%e8%91%89%e7%b4%99/%e7%8f%be%e4%bb%a3%e4%b8%ad%e8%97%a5%e8%97%a5%e7%90%86%e7%a0%94%e7%a9%b6/" data-ps2id-api="true">現代中藥藥理研究<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-29377" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-29377"><a title="中醫師手中的花、草、種子" href="https://www.edenclinic.hk/%e8%91%89%e7%b4%99/%e4%b8%ad%e9%86%ab%e5%b8%ab%e6%89%8b%e4%b8%ad%e7%9a%84%e8%8a%b1%e3%80%81%e8%8d%89%e3%80%81%e7%a8%ae%e5%ad%90/" data-ps2id-api="true">中醫師手中的花、草、種子<i class="fa fa-angle-right fa-dropdown"></i></a></li><li id="menu-item-28191" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-28191"><a title="PLANTS IN BIBLE 聖經中的植物世界" href="https://www.edenclinic.hk/%e8%91%89%e7%b4%99/plants-in-bible-%e8%81%96%e7%b6%93%e4%b8%ad%e7%9a%84%e6%a4%8d%e7%89%a9%e4%b8%96%e7%95%8c/" data-ps2id-api="true">PLANTS IN BIBLE 聖經中的植物世界<i class="fa fa-angle-right fa-dropdown"></i></a></li></ul></li><li id="menu-item-7140" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-has-children menu-item-7140 dropdown menu-item-link"><a title="合作機會" href="#" data-toggle="dropdown" class="dropdown-toggle" data-ps2id-api="true" data-type="title">合作機會<i class="fa fa-angle-down fa-dropdown"></i></a><ul role="menu" class="drop-menu"><li id="menu-item-25045" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-25045"><a title="承辦中醫講座" href="https://www.edenclinic.hk/%e6%89%bf%e8%be%a6%e4%b8%ad%e9%86%ab%e8%ac%9b%e5%ba%a71/" data-ps2id-api="true">承辦中醫講座<i class="fa fa-angle-right fa-dropdown"></i></a></li></ul></li></ul></div><div class="nav navbar-nav navbar-nav-last"><ul class="menu-smart sm menu-icons"><li class="menu-item-link search-icon style-light dropdown "><a href="#" class="trigger-overlay search-icon" data-area="search" data-container="box-container"> <i class="fa fa-search3"></i><span class="desktop-hidden"><span>Search</span></span><i class="fa fa-angle-down fa-dropdown desktop-hidden"></i> </a><ul role="menu" class="drop-menu desktop-hidden"><li><form class="search ccc" method="get" action="https://www.edenclinic.hk/"> <input type="search" class="search-field no-livesearch" placeholder="Search…" value="" name="s" title="Search…" /></form></li></ul></li></ul></div></div></div></div></div></div></div></header></div> <script type="text/javascript" id="fixMenuHeight">UNCODE.fixMenuHeight();</script><div class="main-wrapper"><div class="main-container"><div class="page-wrapper"><div class="sections-container"> <script type="text/javascript">UNCODE.initHeader();</script><div class="page-body style-color-xsdn-bg standard-404"><div class="post-wrapper"><div class="post-body"><div class="row-container limit-width"><div class="row row-parent style-light double-bottom-padding"><div class="row-inner"><div class="pos-middle pos-center align_center column_parent col-lg-12 single-internal-gutter"><div class="uncol"><div class="uncoltable"><div class="uncell"><div class="uncont"><div class="heading-text el-text heading-bigtext"><h1 class="bigtext"><span>404</span></h1></div><h2>Oops! Something went wrong…</h2><p>Page not found. Please continue to our <a href="https://www.edenclinic.hk/">home page</a></p><hr class="separator-break separator-accent separator-double-padding"><form action="https://www.edenclinic.hk/" method="get"><div class="search-container-inner"> <input type="search" class="search-field form-fluid no-livesearch" placeholder="Search…" value="" name="s" title="Search for:"> <i class="fa fa-search3"></i></div></form></div></div></div></div></div></div><!-- .row-inner --></div></div></div></div></div></div><!-- sections container --></div><!-- page wrapper --><footer id="colophon" class="site-footer"><div data-parent="true" class="vc_row row-container" id="row-688580"><div class="row-background background-element"><div class="background-wrapper"><div class="background-inner" style="background-image: url(https://www.edenclinic.hk/wp-content/uploads/2017/12/header_bg_3-ss-37.jpg);background-repeat: no-repeat;background-position: center center;background-attachment: scroll;background-size: cover;"></div><div class="block-bg-overlay style-color-912620-bg" style="opacity: 0.9;"></div></div></div><div class="row quad-top-padding quad-bottom-padding single-h-padding full-width row-parent"><div class="wpb_row row-inner"><div class="wpb_column pos-top pos-center align_center column_parent col-lg-4 single-internal-gutter"><div class="uncol style-dark animate_when_almost_visible bottom-t-top"  data-delay="100"><div class="uncoltable"><div class="uncell no-block-padding"><div class="uncont"><div class="vc_custom_heading_wrap "><div class="heading-text el-text" ><h4 class="h4" ><span><a href="https://www.edenclinic.hk/%e9%97%9c%e6%96%bc%e6%88%91%e5%80%91/%e8%a8%ba%e6%89%80%e5%9c%b0%e5%9d%80%e5%8f%8a%e8%81%af%e7%b5%a1%e6%96%b9%e6%b3%95/">中環診所</a></span></h4></div><div class="clear"></div></div><div class="icon-box icon-box-top" ><div class="icon-box-icon fa-container"><a href="https://goo.gl/maps/2YF5At4LXHw" target="_blank" class="fa fa-stack fa-2x btn-default fa-rounded custom-link"><i class="fa fa-map-marker"></i></a></div><div class="icon-box-content"><p>香港中環皇后大道中70號<br /> 卡佛大廈23樓2310室</p></div></div><div class="icon-box icon-box-left  icon-lineh icon-inline" ><div class="icon-box-icon fa-container"><a href="tel: 35759733" class="text-default-color custom-link"><i class="fa fa-phone fa-1x fa-fw"></i></a></div><div class="icon-box-content"><p>3575 9733</p></div></div><div class="icon-box icon-box-left  icon-lineh icon-inline" ><div class="icon-box-icon fa-container"><a href="https://api.whatsapp.com/send?phone=85267333234" target="_blank" class="text-default-color custom-link"><i class="fa fa-whatsapp fa-1x fa-fw"></i></a></div><div class="icon-box-content"><p><a href="https://api.whatsapp.com/send?phone=85267333234">6733 3234</a></p></div></div></div></div></div></div></div><div class="wpb_column pos-middle pos-center align_center column_parent col-lg-4 single-internal-gutter"><div class="uncol style-dark animate_when_almost_visible bottom-t-top"  data-delay="300"><div class="uncoltable"><div class="uncell no-block-padding"><div class="uncont"><div class="vc_custom_heading_wrap "><div class="heading-text el-text" ><h4 class="h4" ><span><a href="https://www.edenclinic.hk/%e9%97%9c%e6%96%bc%e6%88%91%e5%80%91/%e8%a8%ba%e6%89%80%e5%9c%b0%e5%9d%80%e5%8f%8a%e8%81%af%e7%b5%a1%e6%96%b9%e6%b3%95/">佐敦診所</a></span></h4></div><div class="clear"></div></div><div class="icon-box icon-box-top" ><div class="icon-box-icon fa-container"><a href="https://g.page/EDENTCMJD?share" target="_blank" class="fa fa-stack fa-2x btn-default fa-rounded custom-link"><i class="fa fa-map-marker"></i></a></div><div class="icon-box-content"><p>九龍佐敦寶靈街6號<br /> 佐敦中心7樓全層</p></div></div><div class="icon-box icon-box-left  icon-lineh icon-inline" ><div class="icon-box-icon fa-container"><a href="tel: 31050733" class="text-default-color custom-link"><i class="fa fa-phone fa-1x fa-fw"></i></a></div><div class="icon-box-content"><p>3105 0733</p></div></div><div class="icon-box icon-box-left  icon-lineh icon-inline" ><div class="icon-box-icon fa-container"><a href="https://api.whatsapp.com/send?phone=85267333801" target="_blank" class="text-default-color custom-link"><i class="fa fa-whatsapp fa-1x fa-fw"></i></a></div><div class="icon-box-content"><p><a href="https://api.whatsapp.com/send?phone=85267333801">6733 3801</a></p></div></div></div></div></div></div></div><div class="wpb_column pos-top pos-center align_center column_parent col-lg-4 single-internal-gutter"><div class="uncol style-dark animate_when_almost_visible bottom-t-top"  data-delay="500"><div class="uncoltable"><div class="uncell no-block-padding"><div class="uncont"><div class="vc_custom_heading_wrap "><div class="heading-text el-text" ><h4 class="h4" ><span><a href="https://www.edenclinic.hk/%e9%97%9c%e6%96%bc%e6%88%91%e5%80%91/%e8%a8%ba%e6%89%80%e5%9c%b0%e5%9d%80%e5%8f%8a%e8%81%af%e7%b5%a1%e6%96%b9%e6%b3%95/">荃灣診所</a></span></h4></div><div class="clear"></div></div><div class="icon-box icon-box-top" ><div class="icon-box-icon fa-container"><a href="https://goo.gl/maps/rfnqmpjh2tC2" target="_blank" class="fa fa-stack fa-2x btn-default fa-rounded custom-link"><i class="fa fa-map-marker"></i></a></div><div class="icon-box-content"><p>新界荃灣德士古道24號<br /> 富麗花園商場A座地下20號舖</p></div></div><div class="icon-box icon-box-left  icon-lineh icon-inline" ><div class="icon-box-icon fa-container"><a href="tel: 2698 5422" class="text-default-color custom-link"><i class="fa fa-phone fa-1x fa-fw"></i></a></div><div class="icon-box-content"><p>2698 5422</p></div></div><div class="icon-box icon-box-left  icon-lineh icon-inline" ><div class="icon-box-icon fa-container"><a href="https://api.whatsapp.com/send?phone=85251899065" target="_blank" class="text-default-color custom-link"><i class="fa fa-whatsapp fa-1x fa-fw"></i></a></div><div class="icon-box-content"><p><a href="https://api.whatsapp.com/send?phone=85251899065">5189 9065</a></p></div></div></div></div></div></div></div><script id="script-row-688580" data-row="script-row-688580" type="text/javascript" class="vc_controls">UNCODE.initRow(document.getElementById("row-688580"));</script></div></div></div><div class="row-container style-dark-bg footer-last"><div class="row row-parent style-dark no-top-padding no-h-padding no-bottom-padding"><div class="site-info uncell col-lg-6 pos-middle text-left"><p>© 2022 醫天圓中醫診所. 版權所有 不得轉載.     <a href="/?page_id=2585">隱私權政策</a>     <a href="/?page_id=426">免責聲明</a></p></div><!-- site info --></div></div></footer></div><!-- main container --></div><!-- main wrapper --></div><!-- box container --></div><!-- box wrapper --><div class="style-light footer-scroll-top footer-scroll-higher"><a href="#" class="scroll-top"><i class="fa fa-angle-up fa-stack btn-default btn-hover-nobg"></i></a></div><div class="overlay overlay-sequential style-dark style-dark-bg overlay-search" data-area="search" data-container="box-container"><div class="mmb-container"><div class="menu-close-search mobile-menu-button menu-button-offcanvas mobile-menu-button-dark lines-button x2 overlay-close close" data-area="search" data-container="box-container"><span class="lines"></span></div></div><div class="search-container"><form action="https://www.edenclinic.hk/" method="get"><div class="search-container-inner"> <input type="search" class="search-field form-fluid no-livesearch" placeholder="Search…" value="" name="s" title="Search for:"> <i class="fa fa-search3"></i></div></form></div></div> <script type="speculationrules"> {"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":["/wp-*.php","/wp-admin/*","/wp-content/uploads/*","/wp-content/*","/wp-content/plugins/*","/wp-content/themes/uncode/*","/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]} </script> <!-- Global site tag (gtag.js) - Google Analytics --> <script async src="https://www.googletagmanager.com/gtag/js?id=UA-28787643-4"></script> <script> window.dataLayer = window.dataLayer || [];
+ function gtag(){dataLayer.push(arguments);}
+ gtag('js', new Date());
+ gtag('config', 'UA-28787643-4'); </script><!-- FOOTER HOOK WORKS --><div id="eden-chatbot-wrapper"></div> <style> #eden-chatbot-wrapper {
+ position: fixed;
+ bottom: 0;
+ right: 0;
+ z-index: 999999;
+ width: 200px;  /* 修复：从 76px 改为 200px，足够容纳按钮（160px + padding） */
+ height: 100px;  /* 修复：从 76px 改为 100px，足够容纳按钮（56px + padding） */
+ pointer-events: auto;
+ transition: width 0.3s ease, height 0.3s ease;
+ overflow: visible; /* 确保内容不被裁剪 */
+ }
+ #eden-chatbot-wrapper iframe {
+ width: 100%;
+ height: 100%;
+ border: none;
+ background: transparent;
+ pointer-events: auto;
+ }
+ #eden-chatbot-wrapper.open {
+ width: 420px;
+ height: 700px;
+ }
+ #eden-chatbot-wrapper.open iframe {
+ pointer-events: auto;
+ }
+ @media (max-width: 480px) {
+ #eden-chatbot-wrapper.open {
+ width: 100%;
+ height: 100%;
+ }
+ } </style> <script> (() => {
+ const wrapper = document.getElementById('eden-chatbot-wrapper');
+ if (!wrapper) return;
+ wrapper.innerHTML = ` <iframe
+ id="eden-chatbot-iframe"
+ src="https://edenchatbot-production.up.railway.app/embed?v=6"
+ allow="clipboard-write"
+ ></iframe> `;
+ window.addEventListener('message', (e) => {
+ if (e.data?.type !== 'chatbot-state') return;
+ const iframe = wrapper.querySelector('iframe');
+ if (!iframe) return;
+ if (e.data.open) {
+ wrapper.classList.add('open');
+ wrapper.style.pointerEvents = 'auto';
+ iframe.style.pointerEvents = 'auto';
+ } else {
+ wrapper.classList.remove('open');
+ wrapper.style.pointerEvents = 'auto';
+ iframe.style.pointerEvents = 'auto';
+ }
+ });
+ })(); </script> <script type="application/ld+json" id="slim-seo-schema">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://www.edenclinic.hk/#website","url":"https://www.edenclinic.hk/","name":"醫天圓中醫診所","inLanguage":"zh-TW","potentialAction":{"@id":"https://www.edenclinic.hk/#searchaction"},"publisher":{"@id":"https://www.edenclinic.hk/#organization"}},{"@type":"SearchAction","@id":"https://www.edenclinic.hk/#searchaction","target":"https://www.edenclinic.hk/?s={search_term_string}","query-input":"required name=search_term_string"},{"@type":"BreadcrumbList","name":"導覽標記","@id":"https://www.edenclinic.hk/wp-content/uploads/2021/05/%E9%86%AB%E5%A4%A9%E5%9C%93%E4%B8%AD%E9%86%AB-%E9%99%B3%E5%AE%B6%E5%AF%8C%E4%B8%AD%E9%86%AB%E5%B8%AB%EF%BC%8C%E4%B8%AD%E9%86%AB%E5%85%A8%E7%A7%91%EF%BC%8C%E9%AA%A8%E5%82%B7%E7%A7%91%EF%BC%8C%E5%85%92%E7%A7%91%EF%BC%8C%E4%B8%AD%E9%86%AB%E9%86%AB%E9%95%B7%E8%80%85%E6%8E%A8%E4%BB%8B%EF%BC%8C%E4%BD%90%E6%95%A6%E4%B8%AD%E9%86%AB%E5%B8%AB%E6%8E%A8%E4%BB%8B%EF%BC%8C%E8%8D%83%E7%81%A3%E4%B8%AD%E9%86%AB%E5%B8%AB%E6%8E%A8%E4%BB%8B%EF%BC%8C%E4%B8%AD%E9%86%AB%E5%AE%B6%E5%BA%AD%E9%86%AB%E7%94%9F.jpg#breadcrumblist","itemListElement":[{"@type":"ListItem","position":1,"name":"首頁","item":"https://www.edenclinic.hk/"},{"@type":"ListItem","position":2,"name":"找不到符合條件的頁面"}]},{"@type":"WebPage","@id":"https://www.edenclinic.hk/wp-content/uploads/2021/05/%E9%86%AB%E5%A4%A9%E5%9C%93%E4%B8%AD%E9%86%AB-%E9%99%B3%E5%AE%B6%E5%AF%8C%E4%B8%AD%E9%86%AB%E5%B8%AB%EF%BC%8C%E4%B8%AD%E9%86%AB%E5%85%A8%E7%A7%91%EF%BC%8C%E9%AA%A8%E5%82%B7%E7%A7%91%EF%BC%8C%E5%85%92%E7%A7%91%EF%BC%8C%E4%B8%AD%E9%86%AB%E9%86%AB%E9%95%B7%E8%80%85%E6%8E%A8%E4%BB%8B%EF%BC%8C%E4%BD%90%E6%95%A6%E4%B8%AD%E9%86%AB%E5%B8%AB%E6%8E%A8%E4%BB%8B%EF%BC%8C%E8%8D%83%E7%81%A3%E4%B8%AD%E9%86%AB%E5%B8%AB%E6%8E%A8%E4%BB%8B%EF%BC%8C%E4%B8%AD%E9%86%AB%E5%AE%B6%E5%BA%AD%E9%86%AB%E7%94%9F.jpg#webpage","url":"https://www.edenclinic.hk/wp-content/uploads/2021/05/%E9%86%AB%E5%A4%A9%E5%9C%93%E4%B8%AD%E9%86%AB-%E9%99%B3%E5%AE%B6%E5%AF%8C%E4%B8%AD%E9%86%AB%E5%B8%AB%EF%BC%8C%E4%B8%AD%E9%86%AB%E5%85%A8%E7%A7%91%EF%BC%8C%E9%AA%A8%E5%82%B7%E7%A7%91%EF%BC%8C%E5%85%92%E7%A7%91%EF%BC%8C%E4%B8%AD%E9%86%AB%E9%86%AB%E9%95%B7%E8%80%85%E6%8E%A8%E4%BB%8B%EF%BC%8C%E4%BD%90%E6%95%A6%E4%B8%AD%E9%86%AB%E5%B8%AB%E6%8E%A8%E4%BB%8B%EF%BC%8C%E8%8D%83%E7%81%A3%E4%B8%AD%E9%86%AB%E5%B8%AB%E6%8E%A8%E4%BB%8B%EF%BC%8C%E4%B8%AD%E9%86%AB%E5%AE%B6%E5%BA%AD%E9%86%AB%E7%94%9F.jpg","inLanguage":"zh-TW","name":"找不到符合條件的頁面 &#8211; 醫天圓中醫診所","isPartOf":{"@id":"https://www.edenclinic.hk/#website"},"breadcrumb":{"@id":"https://www.edenclinic.hk/wp-content/uploads/2021/05/%E9%86%AB%E5%A4%A9%E5%9C%93%E4%B8%AD%E9%86%AB-%E9%99%B3%E5%AE%B6%E5%AF%8C%E4%B8%AD%E9%86%AB%E5%B8%AB%EF%BC%8C%E4%B8%AD%E9%86%AB%E5%85%A8%E7%A7%91%EF%BC%8C%E9%AA%A8%E5%82%B7%E7%A7%91%EF%BC%8C%E5%85%92%E7%A7%91%EF%BC%8C%E4%B8%AD%E9%86%AB%E9%86%AB%E9%95%B7%E8%80%85%E6%8E%A8%E4%BB%8B%EF%BC%8C%E4%BD%90%E6%95%A6%E4%B8%AD%E9%86%AB%E5%B8%AB%E6%8E%A8%E4%BB%8B%EF%BC%8C%E8%8D%83%E7%81%A3%E4%B8%AD%E9%86%AB%E5%B8%AB%E6%8E%A8%E4%BB%8B%EF%BC%8C%E4%B8%AD%E9%86%AB%E5%AE%B6%E5%BA%AD%E9%86%AB%E7%94%9F.jpg#breadcrumblist"}},{"@type":"Organization","@id":"https://www.edenclinic.hk/#organization","url":"https://www.edenclinic.hk/","name":"醫天圓中醫診所"}]}</script> <!-- Eden Chatbot - 鑽石玻璃終極版 --> <!-- 最強玻璃質感 + 位置下調 --><div id="eden-custom-btn"><div class="btn-icon"> <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"> <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path> </svg></div><div class="btn-text"> 立即<br>查詢</div></div><div id="eden-chatbot-mask"></div> <script> !function(){
+ const mask = document.getElementById('eden-chatbot-mask');
+ const customBtn = document.getElementById('eden-custom-btn');
+ if(!mask) return;
+ function createChatbot() {
+ mask.innerHTML = '<iframe id="eden-chatbot-iframe" src="https://edenchatbot-production.up.railway.app/embed?v=6" allow="microphone; clipboard-write" allowtransparency="true"></iframe>';
+ }
+ createChatbot();
+ setTimeout(createChatbot, 1500);
+ window.addEventListener('message', function(t){
+ if(t.data?.type === 'chatbot-state'){
+ const iframe = document.getElementById('eden-chatbot-iframe');
+ if(iframe) {
+ if(t.data.open) {
+ mask.classList.add('open');
+ customBtn.style.display = 'none';
+ } else {
+ mask.classList.remove('open');
+ customBtn.style.display = 'flex';
+ }
+ }
+ }
+ });
+}(); </script> <style> /* =========================================
+ 鑽石級玻璃按鈕
+ ========================================= */
+ #eden-custom-btn {
+ position: fixed;
+ z-index: 2147483646;
+ width: 50px; 
+ height: 145px; 
+ /* 位置下調：從 180 改為 150 */
+ bottom: 150px;
+ right: 0; 
+ /* 鑽石級玻璃材質 */
+ background: linear-gradient(
+ 125deg,
+ rgba(255, 255, 255, 0.8) 0%,
+ rgba(255, 255, 255, 0.4) 100%
+ ); 
+ /* 超強模糊 */
+ backdrop-filter: blur(40px) saturate(200%);
+ -webkit-backdrop-filter: blur(40px) saturate(200%); 
+ /* 鑽石邊框：左側與上下有亮邊，右側貼邊 */
+ border-top: 1.5px solid rgba(255, 255, 255, 0.95);
+ border-bottom: 1.5px solid rgba(255, 255, 255, 0.5);
+ border-left: 1.5px solid rgba(255, 255, 255, 0.8);
+ border-right: none; 
+ border-radius: 25px 0 0 25px; 
+ /* 立體光影 */
+ box-shadow: 
+ -8px 8px 20px 0 rgba(31, 38, 135, 0.15), /* 深邃陰影 */
+ inset 2px 2px 5px 0 rgba(255, 255, 255, 0.8), /* 頂部高光 */
+ inset -2px -2px 5px 0 rgba(255, 255, 255, 0.2); /* 底部反光 */
+ display: flex;
+ flex-direction: column;
+ justify-content: center;
+ align-items: center;
+ font-family: "PingFang HK", "Microsoft JhengHei", sans-serif;
+ transition: all 0.3s ease;
+ } 
+ /* 點擊反饋 */
+ #eden-custom-btn:active {
+ transform: scale(0.98);
+ box-shadow: -4px 4px 10px 0 rgba(31, 38, 135, 0.1);
+ }
+ .btn-text {
+ font-size: 15px; /* 字體加大 */
+ font-weight: 900; /* 極粗 */
+ color: #1a5f3a;   /* 翡翠綠 */
+ writing-mode: vertical-rl;
+ text-orientation: upright;
+ letter-spacing: 5px;
+ margin-top: 15px;
+ text-shadow: 0 1px 0 rgba(255,255,255,0.9); /* 刻字效果 */
+ }
+ .btn-icon {
+ color: #27ae60;
+ /* 螢光濾鏡 */
+ filter: drop-shadow(0 0 5px rgba(39, 174, 96, 0.4)); 
+ }
+ /* =========================================
+ 遮罩與定位
+ ========================================= */
+ #eden-chatbot-mask {
+ position: fixed;
+ z-index: 2147483647;
+ width: 60px;
+ height: 160px; 
+ /* 跟隨按鈕位置下調 */
+ bottom: 140px; 
+ right: 0; 
+ overflow: hidden;
+ pointer-events: auto;
+ opacity: 0; 
+ }
+ #eden-chatbot-iframe {
+ position: absolute;
+ border: none;
+ background: transparent;
+ width: 300px;
+ height: 400px; 
+ /* 保持下沉定位 */
+ bottom: -50px; 
+ right: -20px;
+ }
+ #eden-chatbot-mask.open {
+ width: 420px !important;
+ height: 720px !important;
+ bottom: 0 !important;
+ right: 0 !important;
+ opacity: 1 !important;
+ overflow: visible !important;
+ background: transparent !important;
+ }
+ #eden-chatbot-mask.open iframe {
+ width: 100% !important;
+ height: 100% !important;
+ bottom: 0 !important;
+ right: 0 !important;
+ }
+ @media (max-width: 768px) {
+ #eden-chatbot-mask.open {
+ width: 100vw !important;
+ height: 100vh !important;
+ bottom: 0 !important;
+ right: 0 !important;
+ }
+ } </style> <!-- Instagram Feed JS --> <script type="text/javascript"> var sbiajaxurl = "https://www.edenclinic.hk/wp-admin/admin-ajax.php"; </script> <script type="text/html" id="wpb-modifications"></script><script type="text/javascript" src="https://www.edenclinic.hk/wp-includes/js/underscore.min.js?ver=1.13.7" id="underscore-js"></script> <script type="text/javascript" id="daves-wordpress-live-search-js-extra"> /* <![CDATA[ */
+var DavesWordPressLiveSearchConfig = {"resultsDirection":"","showThumbs":"false","showExcerpt":"false","displayPostCategory":"false","showMoreResultsLink":"true","activateWidgetLink":"true","minCharsToSearch":"0","xOffset":"0","yOffset":"0","blogURL":"https://www.edenclinic.hk","ajaxURL":"https://www.edenclinic.hk/wp-admin/admin-ajax.php","viewMoreText":"View more results","outdatedJQuery":"Dave's WordPress Live Search requires jQuery 1.2.6 or higher. WordPress ships with current jQuery versions. But if you are seeing this message, it's likely that another plugin is including an earlier version.","resultTemplate":"\u003Cul id=\"dwls_search_results\" class=\"search_results dwls_search_results\"\u003E\n\u003Cinput type=\"hidden\" name=\"query\" value=\"\u003C%- resultsSearchTerm %\u003E\" /\u003E\n\u003C% _.each(searchResults, function(searchResult, index, list) { %\u003E\n        \u003C%\n        // Thumbnails\n        if(DavesWordPressLiveSearchConfig.showThumbs == \"true\" && searchResult.attachment_thumbnail) {\n                liClass = \"post_with_thumb\";\n        }\n        else {\n                liClass = \"\";\n        }\n        %\u003E\n        \u003Cli class=\"post-\u003C%= searchResult.ID %\u003E daves-wordpress-live-search_result \u003C%- liClass %\u003E\"\u003E\n\n        \u003Ca href=\"\u003C%= searchResult.permalink %\u003E\" class=\"daves-wordpress-live-search_title\"\u003E\n        \u003C% if(DavesWordPressLiveSearchConfig.displayPostCategory == \"true\" && searchResult.post_category !== undefined) { %\u003E\n                \u003Cspan class=\"search-category\"\u003E\u003C%= searchResult.post_category %\u003E\u003C/span\u003E\n        \u003C% } %\u003E\u003Cspan class=\"search-title\"\u003E\u003C%= searchResult.post_title %\u003E\u003C/span\u003E\u003C/a\u003E\n\n        \u003C% if(searchResult.post_price !== undefined) { %\u003E\n                \u003Cp class=\"price\"\u003E\u003C%- searchResult.post_price %\u003E\u003C/p\u003E\n        \u003C% } %\u003E\n\n        \u003C% if(DavesWordPressLiveSearchConfig.showExcerpt == \"true\" && searchResult.post_excerpt) { %\u003E\n                \u003C%= searchResult.post_excerpt %\u003E\n        \u003C% } %\u003E\n\n        \u003C% if(e.displayPostMeta) { %\u003E\n                \u003Cp class=\"meta clearfix daves-wordpress-live-search_author\" id=\"daves-wordpress-live-search_author\"\u003EPosted by \u003C%- searchResult.post_author_nicename %\u003E\u003C/p\u003E\u003Cp id=\"daves-wordpress-live-search_date\" class=\"meta clearfix daves-wordpress-live-search_date\"\u003E\u003C%- searchResult.post_date %\u003E\u003C/p\u003E\n        \u003C% } %\u003E\n        \u003Cdiv class=\"clearfix\"\u003E\u003C/div\u003E\u003C/li\u003E\n\u003C% }); %\u003E\n\n\u003C% if(searchResults[0].show_more !== undefined && searchResults[0].show_more && DavesWordPressLiveSearchConfig.showMoreResultsLink == \"true\") { %\u003E\n        \u003Cdiv class=\"clearfix search_footer\"\u003E\u003Ca href=\"\u003C%= DavesWordPressLiveSearchConfig.blogURL %\u003E/?s=\u003C%-  resultsSearchTerm %\u003E\"\u003E\u003C%- DavesWordPressLiveSearchConfig.viewMoreText %\u003E\u003C/a\u003E\u003C/div\u003E\n\u003C% } %\u003E\n\n\u003C/ul\u003E"};
+//# sourceURL=daves-wordpress-live-search-js-extra
+/* ]]> */ </script> <script type="text/javascript" src="https://www.edenclinic.hk/wp-content/plugins/uncode-daves-wordpress-live-search/js/daves-wordpress-live-search.js?ver=6.9.4" id="daves-wordpress-live-search-js"></script> <script type="text/javascript" id="page-scroll-to-id-plugin-script-js-extra"> /* <![CDATA[ */
+var mPS2id_params = {"instances":{"mPS2id_instance_0":{"selector":"a[href*='#']:not([href='#'])","autoSelectorMenuLinks":"true","excludeSelector":"a[href^='#tab-'], a[href^='#tabs-'], a[data-toggle]:not([data-toggle='tooltip']), a[data-slide], a[data-vc-tabs], a[data-vc-accordion], a.screen-reader-text.skip-link","scrollSpeed":800,"autoScrollSpeed":"true","scrollEasing":"easeInOutQuint","scrollingEasing":"easeOutQuint","forceScrollEasing":"false","pageEndSmoothScroll":"true","stopScrollOnUserAction":"false","autoCorrectScroll":"false","autoCorrectScrollExtend":"false","layout":"vertical","offset":0,"dummyOffset":"false","highlightSelector":"","clickedClass":"mPS2id-clicked","targetClass":"mPS2id-target","highlightClass":"mPS2id-highlight","forceSingleHighlight":"false","keepHighlightUntilNext":"false","highlightByNextTarget":"false","appendHash":"false","scrollToHash":"true","scrollToHashForAll":"true","scrollToHashDelay":0,"scrollToHashUseElementData":"true","scrollToHashRemoveUrlHash":"false","disablePluginBelow":0,"adminDisplayWidgetsId":"true","adminTinyMCEbuttons":"true","unbindUnrelatedClickEvents":"false","unbindUnrelatedClickEventsSelector":"","normalizeAnchorPointTargets":"false","encodeLinks":"false"}},"total_instances":"1","shortcode_class":"_ps2id"};
+//# sourceURL=page-scroll-to-id-plugin-script-js-extra
+/* ]]> */ </script> <script type="text/javascript" src="https://www.edenclinic.hk/wp-content/plugins/page-scroll-to-id/js/page-scroll-to-id.min.js?ver=1.7.9" id="page-scroll-to-id-plugin-script-js"></script> <script type="text/javascript" id="mediaelement-core-js-before"> /* <![CDATA[ */
+var mejsL10n = {"language":"zh","strings":{"mejs.download-file":"\u4e0b\u8f09\u6a94\u6848","mejs.install-flash":"\u76ee\u524d\u4f7f\u7528\u7684\u700f\u89bd\u5668\u5c1a\u672a\u555f\u7528\u6216\u5b89\u88dd Flash Player\u3002\u8acb\u70ba\u700f\u89bd\u5668\u555f\u7528 Flash Player \u6216\u5f9e https://get.adobe.com/flashplayer/ \u4e0b\u8f09\u6700\u65b0\u7248\u672c\u3002","mejs.fullscreen":"\u5168\u87a2\u5e55","mejs.play":"\u64ad\u653e","mejs.pause":"\u66ab\u505c","mejs.time-slider":"\u6642\u9593\u6ed1\u687f","mejs.time-help-text":"\u4f7f\u7528\u5411\u5de6/\u5411\u53f3\u9375\u5012\u8f49/\u5feb\u8f49 1 \u79d2\uff0c\u5411\u4e0a/\u5411\u4e0b\u9375\u5012\u8f49/\u5feb\u8f49 10 \u79d2\u3002","mejs.live-broadcast":"\u76f4\u64ad","mejs.volume-help-text":"\u4f7f\u7528\u5411\u4e0a/\u5411\u4e0b\u9375\u4ee5\u63d0\u9ad8\u6216\u964d\u4f4e\u97f3\u91cf\u3002","mejs.unmute":"\u53d6\u6d88\u975c\u97f3","mejs.mute":"\u975c\u97f3","mejs.volume-slider":"\u97f3\u91cf\u6ed1\u687f","mejs.video-player":"\u8996\u8a0a\u64ad\u653e\u5668","mejs.audio-player":"\u97f3\u8a0a\u64ad\u653e\u5668","mejs.captions-subtitles":"\u7121\u969c\u7919\u5b57\u5e55/\u5c0d\u767d\u5b57\u5e55","mejs.captions-chapters":"\u7ae0\u7bc0","mejs.none":"\u7121","mejs.afrikaans":"\u5357\u975e\u8377\u862d\u6587","mejs.albanian":"\u963f\u723e\u5df4\u5c3c\u4e9e\u6587","mejs.arabic":"\u963f\u62c9\u4f2f\u6587","mejs.belarusian":"\u767d\u7f85\u65af\u6587","mejs.bulgarian":"\u4fdd\u52a0\u5229\u4e9e\u6587","mejs.catalan":"\u52a0\u6cf0\u7f85\u5c3c\u4e9e\u6587","mejs.chinese":"\u4e2d\u6587","mejs.chinese-simplified":"\u7c21\u9ad4\u4e2d\u6587","mejs.chinese-traditional":"\u7e41\u9ad4\u4e2d\u6587","mejs.croatian":"\u514b\u7f85\u57c3\u897f\u4e9e\u6587","mejs.czech":"\u6377\u514b\u6587","mejs.danish":"\u4e39\u9ea5\u6587","mejs.dutch":"\u8377\u862d\u6587","mejs.english":"\u82f1\u6587","mejs.estonian":"\u611b\u6c99\u5c3c\u4e9e\u6587","mejs.filipino":"\u83f2\u5f8b\u8cd3\u6587","mejs.finnish":"\u82ac\u862d\u6587","mejs.french":"\u6cd5\u6587","mejs.galician":"\u52a0\u91cc\u897f\u4e9e\u6587","mejs.german":"\u5fb7\u6587","mejs.greek":"\u5e0c\u81d8\u6587","mejs.haitian-creole":"\u6d77\u5730\u514b\u91cc\u5967\u6587","mejs.hebrew":"\u5e0c\u4f2f\u4f86\u6587","mejs.hindi":"\u5370\u5ea6\u6587","mejs.hungarian":"\u5308\u7259\u5229\u6587","mejs.icelandic":"\u51b0\u5cf6\u6587","mejs.indonesian":"\u5370\u5c3c\u6587","mejs.irish":"\u611b\u723e\u862d\u6587","mejs.italian":"\u7fa9\u5927\u5229\u6587","mejs.japanese":"\u65e5\u6587","mejs.korean":"\u97d3\u6587","mejs.latvian":"\u62c9\u812b\u7dad\u4e9e\u6587","mejs.lithuanian":"\u7acb\u9676\u5b9b\u6587","mejs.macedonian":"\u99ac\u5176\u9813\u6587","mejs.malay":"\u99ac\u4f86\u6587","mejs.maltese":"\u99ac\u723e\u4ed6\u6587","mejs.norwegian":"\u632a\u5a01\u6587","mejs.persian":"\u6ce2\u65af\u6587","mejs.polish":"\u6ce2\u862d\u6587","mejs.portuguese":"\u8461\u8404\u7259\u6587","mejs.romanian":"\u7f85\u99ac\u5c3c\u4e9e\u6587","mejs.russian":"\u4fc4\u6587","mejs.serbian":"\u585e\u723e\u7dad\u4e9e\u6587","mejs.slovak":"\u65af\u6d1b\u4f10\u514b\u6587","mejs.slovenian":"\u65af\u6d1b\u7dad\u5c3c\u4e9e\u6587","mejs.spanish":"\u897f\u73ed\u7259\u6587","mejs.swahili":"\u65af\u74e6\u5e0c\u91cc\u6587","mejs.swedish":"\u745e\u5178\u6587","mejs.tagalog":"\u5854\u52a0\u62c9\u65cf\u6587","mejs.thai":"\u6cf0\u6587","mejs.turkish":"\u571f\u8033\u5176\u6587","mejs.ukrainian":"\u70cf\u514b\u862d\u6587","mejs.vietnamese":"\u8d8a\u5357\u6587","mejs.welsh":"\u5a01\u723e\u65af\u6587","mejs.yiddish":"\u610f\u7b2c\u7dd2\u6587"}};
+//# sourceURL=mediaelement-core-js-before
+/* ]]> */ </script> <script type="text/javascript" src="https://www.edenclinic.hk/wp-includes/js/mediaelement/mediaelement-and-player.min.js?ver=4.2.17" id="mediaelement-core-js"></script> <script type="text/javascript" src="https://www.edenclinic.hk/wp-includes/js/mediaelement/mediaelement-migrate.min.js?ver=6.9.4" id="mediaelement-migrate-js"></script> <script type="text/javascript" id="mediaelement-js-extra"> /* <![CDATA[ */
+var _wpmejsSettings = {"pluginPath":"/wp-includes/js/mediaelement/","classPrefix":"mejs-","stretching":"responsive","audioShortcodeLibrary":"mediaelement","videoShortcodeLibrary":"mediaelement"};
+//# sourceURL=mediaelement-js-extra
+/* ]]> */ </script> <script type="text/javascript" src="https://www.edenclinic.hk/wp-includes/js/mediaelement/wp-mediaelement.min.js?ver=6.9.4" id="wp-mediaelement-js"></script> <script type="text/javascript" src="https://www.edenclinic.hk/wp-content/themes/uncode/library/js/min/plugins.min.js" id="uncode-plugins-js"></script> <script type="text/javascript" src="https://www.edenclinic.hk/wp-content/themes/uncode/library/js/min/app.min.js" id="uncode-app-js"></script></body></html>
