@@ -43,25 +43,57 @@ function formatTime(iso: string) {
 }
 
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+const MARKDOWN_LINK_REGEX = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
 
-function renderMessageContent(content: string, isUser: boolean) {
-  return content.split(URL_REGEX).map((part, index) => {
+function renderLink(href: string, label: string, isUser: boolean, key: string) {
+  return (
+    <a
+      key={key}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`underline decoration-1 underline-offset-2 ${
+        isUser ? "text-white/95" : "text-primary hover:text-primary-hover"
+      }`}
+    >
+      {label}
+    </a>
+  );
+}
+
+function renderAutoLinkedText(text: string, isUser: boolean, keyPrefix: string) {
+  return text.split(URL_REGEX).map((part, index) => {
     if (!part.match(URL_REGEX)) return part;
 
-    return (
-      <a
-        key={`${part}-${index}`}
-        href={part}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`underline decoration-1 underline-offset-2 ${
-          isUser ? "text-white/95" : "text-primary hover:text-primary-hover"
-        }`}
-      >
-        {part}
-      </a>
-    );
+    return renderLink(part, part, isUser, `${keyPrefix}-url-${index}`);
   });
+}
+
+function renderMessageContent(content: string, isUser: boolean) {
+  const nodes: Array<string | JSX.Element> = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  MARKDOWN_LINK_REGEX.lastIndex = 0;
+
+  while ((match = MARKDOWN_LINK_REGEX.exec(content)) !== null) {
+    const [fullMatch, label, href] = match;
+    const leadingText = content.slice(lastIndex, match.index);
+
+    if (leadingText) {
+      nodes.push(...renderAutoLinkedText(leadingText, isUser, `text-${lastIndex}`));
+    }
+
+    nodes.push(renderLink(href, label, isUser, `md-${match.index}`));
+    lastIndex = match.index + fullMatch.length;
+  }
+
+  const trailingText = content.slice(lastIndex);
+  if (trailingText) {
+    nodes.push(...renderAutoLinkedText(trailingText, isUser, `text-${lastIndex}`));
+  }
+
+  return nodes.length > 0 ? nodes : content;
 }
 
 export function MessageList({ messages, loading, sessionId }: MessageListProps) {

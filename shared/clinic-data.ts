@@ -11,6 +11,11 @@ export type PhysicalClinicId = (typeof PHYSICAL_CLINIC_IDS)[number];
 
 const DOCTOR_ID_SET = new Set<string>(DOCTOR_IDS);
 const CLINIC_ID_SET = new Set<string>(CLINIC_IDS);
+const CLINIC_GOOGLE_MAP_URLS: Record<PhysicalClinicId, string> = {
+  central: 'https://maps.app.goo.gl/G3S73hfG6qk5o3cs8?g_st=ic',
+  jordan: 'https://maps.app.goo.gl/2pH44Tx6QQcWpn538?g_st=ic',
+  tsuenwan: 'https://maps.app.goo.gl/i18v8oYQAoG65XM66?g_st=ic',
+};
 
 export type DoctorProfile = {
   id: DoctorId;
@@ -36,10 +41,6 @@ export type ClinicProfile = {
   routeMapUrl?: string;
 };
 
-function buildGoogleMapSearchUrl(query: string): string {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-}
-
 export const CLINICS: ClinicProfile[] = [
   {
     id: 'central',
@@ -50,7 +51,7 @@ export const CLINICS: ClinicProfile[] = [
     contactPhone: '6733 3234',
     whatsappUrl: 'https://wa.me/85267333234',
     hoursText: '週一至五 11:00-14:00, 15:30-19:30；週六日及公眾假期休息',
-    googleMapUrl: buildGoogleMapSearchUrl('中環皇后大道中70號卡佛大廈23樓2310室'),
+    googleMapUrl: CLINIC_GOOGLE_MAP_URLS.central,
     routeMapUrl: 'https://www.edenclinic.hk/中環街景路線圖/',
   },
   {
@@ -62,7 +63,7 @@ export const CLINICS: ClinicProfile[] = [
     contactPhone: '6733 3801',
     whatsappUrl: 'https://wa.me/85267333801',
     hoursText: '週一至五 11:00-14:00, 15:30-19:30；週六 11:00-14:00, 15:30-18:30；週日及公眾假期休息',
-    googleMapUrl: buildGoogleMapSearchUrl('九龍佐敦寶靈街6號佐敦中心7樓全層'),
+    googleMapUrl: CLINIC_GOOGLE_MAP_URLS.jordan,
     routeMapUrl: 'https://www.edenclinic.hk/佐敦街景路線圖/',
   },
   {
@@ -70,11 +71,11 @@ export const CLINICS: ClinicProfile[] = [
     nameZh: '荃灣',
     nameEn: 'Tsuen Wan',
     address: '荃灣富麗花園商場A座地下20號舖',
-    phones: ['5189 9065'],
-    contactPhone: '5189 9065',
+    phones: ['2698 5422', '5189 9065'],
+    contactPhone: '2698 5422 / 5189 9065',
     whatsappUrl: 'https://wa.me/85251899065',
     hoursText: '週一、二、四至日 10:30-14:00，15:30-19:00；週三及公眾假期休息',
-    googleMapUrl: buildGoogleMapSearchUrl('荃灣富麗花園商場A座地下20號舖'),
+    googleMapUrl: CLINIC_GOOGLE_MAP_URLS.tsuenwan,
     routeMapUrl: 'https://www.edenclinic.hk/荃灣街景路線圖/',
   },
   {
