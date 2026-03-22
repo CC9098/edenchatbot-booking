@@ -51,7 +51,7 @@ export function ChatWidget() {
     phone: '',
   });
   const [bookingMode, setBookingMode] = useState(false);
-  const [booking, setBooking] = useState<BookingState>({ step: 'doctor' });
+  const [booking, setBooking] = useState<BookingState>({ step: 'entry' });
   const [, setIsLoading] = useState(false);
   const [bookableDoctors, setBookableDoctors] = useState<BookableDoctorSchedule[]>([]);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -179,6 +179,7 @@ export function ChatWidget() {
   }, [open]);
 
   const showInput = aiMode || formMode || (bookingMode && [
+    'manageBookingId', 'managePhone',
     'lastName', 'firstName', 'phone', 'email',
     'idCard', 'dob', 'allergies', 'medications', 'symptoms'
   ].includes(booking.step));
@@ -207,6 +208,13 @@ export function ChatWidget() {
   const bookableDoctorByName = useMemo(
     () => new Map(bookableDoctors.map((doctor) => [doctor.doctorNameZh, doctor])),
     [bookableDoctors]
+  );
+
+  const buildDoctorOptions = () => (
+    bookableDoctorNames.map((name) => ({
+      label: name,
+      value: `doctor-${name}` as OptionKey,
+    }))
   );
 
   useEffect(() => {
@@ -269,12 +277,86 @@ export function ChatWidget() {
     setAiMode(false);
     setFormMode(false);
     setBookingMode(false);
-    setBooking({ step: 'doctor' });
+    setBooking({ step: 'entry' });
     setIsLoading(false);
     setFormStep(0);
     setInput('');
     setFormError('');
     setConsultationFormData({ reason: '', name: '', email: '', phone: '' });
+  };
+
+  const showBookingEntryOptions = (message = '你想新預約，定更改／取消現有預約？') => {
+    setBookingMode(true);
+    setBooking({ step: 'entry' });
+    addBotMessage(message);
+    setOptions([
+      { label: '新預約', value: 'booking_new' },
+      { label: '更改預約', value: 'booking_manage_reschedule' },
+      { label: '取消預約', value: 'booking_manage_cancel' },
+      returnMainOption,
+    ]);
+  };
+
+  const showNewBookingDoctorOptions = () => {
+    if (bookableDoctorNames.length === 0) {
+      const whatsappLines = getWhatsappContactLines().join('\n');
+      addBotMessage(
+        `目前未能同步最新醫師時間表，請稍後再試，或直接聯絡姑娘協助安排：\n${whatsappLines}`
+      );
+      setOptions([returnMainOption]);
+      return;
+    }
+
+    setBookingMode(true);
+    setBooking({ step: 'doctor', mode: 'new' });
+    addBotMessage(widgetSettings.flows.booking.prompt);
+    setOptions([...buildDoctorOptions(), returnMainOption]);
+  };
+
+  const buildDateOptionsForClinic = (
+    doctorNameZh: string | undefined,
+    clinicId: string | undefined,
+    startOffsetDays: number,
+  ) => {
+    const doctor = doctorNameZh ? bookableDoctorByName.get(doctorNameZh) : undefined;
+    const clinic = doctor?.clinics.find((entry) => entry.clinicId === clinicId);
+    if (!clinic) {
+      return null;
+    }
+
+    const today = new Date();
+    const dateOptions: Option[] = [];
+
+    for (let i = startOffsetDays; i <= 14; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const dayOfWeek = d.getDay();
+      const daySchedule = getScheduleForDayFromPublicSchedule(clinic.schedule, dayOfWeek);
+
+      if (!daySchedule || daySchedule.length === 0) {
+        continue;
+      }
+
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      const dayName = DAY_NAMES[dayOfWeek];
+      const dateStr = `${d.getFullYear()}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      dateOptions.push({
+        label: `${month}/${day} (${dayName})`,
+        value: `booking_date-${dateStr}` as OptionKey,
+      });
+    }
+
+    return dateOptions;
+  };
+
+  const showManageBlockedMessage = (message: string, clinicWhatsappUrl?: string | null) => {
+    const whatsappLine = clinicWhatsappUrl
+      ? `姑娘 WhatsApp： [按此聯絡姑娘](${clinicWhatsappUrl})`
+      : getWhatsappContactLines().join('\n');
+
+    addBotMessage(`${message}\n\n${whatsappLine}`);
+    setOptions([returnMainOption]);
   };
 
   const handleAIResponse = async (text: string) => {
@@ -352,23 +434,25 @@ export function ChatWidget() {
         break;
       }
       case 'booking': {
-        if (bookableDoctorNames.length === 0) {
-          const whatsappLines = getWhatsappContactLines().join('\n');
-          addBotMessage(
-            `目前未能同步最新醫師時間表，請稍後再試，或直接聯絡姑娘協助安排：\n${whatsappLines}`
-          );
-          setOptions([returnMainOption]);
-          break;
-        }
-
-        addBotMessage(widgetSettings.flows.booking.prompt);
+        showBookingEntryOptions();
+        break;
+      }
+      case 'booking_new': {
+        showNewBookingDoctorOptions();
+        break;
+      }
+      case 'booking_manage_reschedule': {
         setBookingMode(true);
-        setBooking({ step: 'doctor' });
-        const doctorOpts: Option[] = bookableDoctorNames.map((name) => ({
-          label: name,
-          value: `doctor-${name}`,
-        }));
-        setOptions([...doctorOpts, returnMainOption]);
+        setBooking({ step: 'manageBookingId', mode: 'reschedule' });
+        addBotMessage('請輸入預約編號：');
+        setOptions([returnMainOption]);
+        break;
+      }
+      case 'booking_manage_cancel': {
+        setBookingMode(true);
+        setBooking({ step: 'manageBookingId', mode: 'cancel' });
+        addBotMessage('請輸入預約編號：');
+        setOptions([returnMainOption]);
         break;
       }
 
@@ -507,35 +591,11 @@ export function ChatWidget() {
 
   const handleBookingVisitTypeSelect = (isFirstVisit: boolean) => {
     setBooking(prev => ({ ...prev, step: 'date', isFirstVisit }));
-
-    const doctor = booking.doctorNameZh ? bookableDoctorByName.get(booking.doctorNameZh) : undefined;
-    const clinic = doctor?.clinics.find((entry) => entry.clinicId === booking.clinicId);
-    if (!clinic) {
+    const dateOptions = buildDateOptionsForClinic(booking.doctorNameZh, booking.clinicId, 1);
+    if (!dateOptions) {
       addBotMessage('抱歉，找不到此醫師在該診所的排班。');
       setOptions([returnMainOption]);
       return;
-    }
-
-    // Generate available dates for next 14 days
-    const today = new Date();
-    const dateOptions: Option[] = [];
-
-    for (let i = 1; i <= 14; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      const dayOfWeek = d.getDay();
-      const daySchedule = getScheduleForDayFromPublicSchedule(clinic.schedule, dayOfWeek);
-
-      if (daySchedule && daySchedule.length > 0) {
-        const month = d.getMonth() + 1;
-        const day = d.getDate();
-        const dayName = DAY_NAMES[dayOfWeek];
-        const dateStr = `${d.getFullYear()}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        dateOptions.push({
-          label: `${month}/${day} (${dayName})`,
-          value: `booking_date-${dateStr}` as OptionKey,
-        });
-      }
     }
 
     if (dateOptions.length === 0) {
@@ -546,6 +606,127 @@ export function ChatWidget() {
 
     addBotMessage(`${isFirstVisit ? '首診' : '覆診'}，請選擇日期：`);
     setOptions([...dateOptions, ...bookingBackCancelOptions]);
+  };
+
+  const restartManageLookup = (message: string, mode: 'reschedule' | 'cancel') => {
+    addBotMessage(`${message}\n\n請重新輸入預約編號：`);
+    setBooking({ step: 'manageBookingId', mode });
+    setOptions([returnMainOption]);
+  };
+
+  const handleManageLookup = async (bookingIdValue: string, phoneValue: string, mode: 'reschedule' | 'cancel') => {
+    setOptions([]);
+    setIsLoading(true);
+    addBotMessage('正在查詢預約... ⏳');
+
+    try {
+      const response = await fetch('/api/widget-booking/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingId: bookingIdValue,
+          phone: phoneValue,
+        }),
+      });
+
+      const data = await response.json();
+      setIsLoading(false);
+      removeMessageByExactText('正在查詢預約... ⏳');
+
+      if (!response.ok || !data?.success) {
+        restartManageLookup(data?.error || '找不到預約。', mode);
+        return;
+      }
+
+      const nextBooking: BookingState = {
+        step: mode === 'cancel' ? 'manageConfirmCancel' : 'manageConfirmReschedule',
+        mode,
+        bookingId: data.booking.bookingId,
+        manageToken: data.manageToken,
+        manageMessage: data.message,
+        doctorId: data.booking.doctorId,
+        doctorNameZh: data.booking.doctorNameZh,
+        clinicId: data.booking.clinicId,
+        clinicNameZh: data.booking.clinicNameZh,
+        date: data.booking.appointmentDate,
+        time: data.booking.appointmentTime,
+        phone: phoneValue,
+        clinicWhatsappUrl: data.booking.clinicWhatsappUrl,
+      };
+
+      if (!data.canSelfManage || !data.manageToken) {
+        setBooking(nextBooking);
+        showManageBlockedMessage(
+          [
+            '已找到你的預約：',
+            '',
+            `預約編號：${data.booking.bookingId}`,
+            `醫師：${data.booking.doctorNameZh}`,
+            `診所：${data.booking.clinicNameZh}`,
+            `日期：${data.booking.appointmentDate}`,
+            `時間：${data.booking.appointmentTime}`,
+            '',
+            data.message,
+          ].join('\n'),
+          data.booking.clinicWhatsappUrl,
+        );
+        return;
+      }
+
+      if (mode === 'cancel') {
+        setBooking(nextBooking);
+        addBotMessage(`${[
+          '已找到你的預約：',
+          '',
+          `預約編號：${data.booking.bookingId}`,
+          `醫師：${data.booking.doctorNameZh}`,
+          `診所：${data.booking.clinicNameZh}`,
+          `日期：${data.booking.appointmentDate}`,
+          `時間：${data.booking.appointmentTime}`,
+          '',
+          '確認要取消這個預約嗎？',
+        ].join('\n')}`);
+        setOptions([
+          { label: '確認取消預約', value: 'booking_confirm' },
+          { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' },
+          returnMainOption,
+        ]);
+        return;
+      }
+
+      const dateOptions = buildDateOptionsForClinic(
+        data.booking.doctorNameZh,
+        data.booking.clinicId,
+        0,
+      );
+
+      setBooking({ ...nextBooking, step: 'date' });
+
+      if (!dateOptions || dateOptions.length === 0) {
+        showManageBlockedMessage(
+          '暫時未能提供可改期日期，請直接 WhatsApp 聯絡姑娘。',
+          data.booking.clinicWhatsappUrl,
+        );
+        return;
+      }
+
+      addBotMessage(`${[
+        '已找到你的預約：',
+        '',
+        `預約編號：${data.booking.bookingId}`,
+        `目前時間：${data.booking.appointmentDate} ${data.booking.appointmentTime}`,
+        '',
+        '請選擇新的日期：',
+      ].join('\n')}`);
+      setOptions([...dateOptions, { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' }, returnMainOption]);
+    } catch (error) {
+      setIsLoading(false);
+      removeMessageByExactText('正在查詢預約... ⏳');
+      restartManageLookup(
+        error instanceof Error ? error.message : '查詢預約時發生錯誤。',
+        mode,
+      );
+    }
   };
 
   const handleBookingDateSelect = async (dateStr: string) => {
@@ -574,13 +755,23 @@ export function ChatWidget() {
 
       if (data.isClosed) {
         addBotMessage(data.isHoliday ? '呢日係假期，醫師休息。請揀另一日。' : '呢日醫師唔應診。請揀另一日。');
-        handleBookingVisitTypeSelect(booking.isFirstVisit!);
+        if (booking.mode === 'reschedule') {
+          const dateOptions = buildDateOptionsForClinic(booking.doctorNameZh, booking.clinicId, 0);
+          setOptions([...(dateOptions || []), { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' }, returnMainOption]);
+        } else {
+          handleBookingVisitTypeSelect(booking.isFirstVisit!);
+        }
         return;
       }
 
       if (!data.slots || data.slots.length === 0) {
         addBotMessage('呢日已經滿晒 😅 請揀另一日。');
-        handleBookingVisitTypeSelect(booking.isFirstVisit!);
+        if (booking.mode === 'reschedule') {
+          const dateOptions = buildDateOptionsForClinic(booking.doctorNameZh, booking.clinicId, 0);
+          setOptions([...(dateOptions || []), { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' }, returnMainOption]);
+        } else {
+          handleBookingVisitTypeSelect(booking.isFirstVisit!);
+        }
         return;
       }
 
@@ -592,7 +783,15 @@ export function ChatWidget() {
         label: slot,
         value: `booking_time-${slot}` as OptionKey,
       }));
-      setOptions([...timeOpts, ...bookingBackCancelOptions]);
+      if (booking.mode === 'reschedule') {
+        setOptions([
+          ...timeOpts,
+          { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' },
+          returnMainOption,
+        ]);
+      } else {
+        setOptions([...timeOpts, ...bookingBackCancelOptions]);
+      }
     } catch (error) {
       setIsLoading(false);
       removeMessageByExactText('正在查詢可預約時段... ⏳');
@@ -602,6 +801,27 @@ export function ChatWidget() {
   };
 
   const handleBookingTimeSelect = (time: string) => {
+    if (booking.mode === 'reschedule') {
+      setBooking(prev => ({ ...prev, step: 'manageConfirmReschedule', time }));
+      addBotMessage(`${[
+        '請確認以下更改：',
+        '',
+        `預約編號：${booking.bookingId || '--'}`,
+        `醫師：${booking.doctorNameZh || '--'}`,
+        `診所：${booking.clinicNameZh || '--'}`,
+        `新日期：${booking.date || '--'}`,
+        `新時間：${time}`,
+        '',
+        '確認更改預約嗎？',
+      ].join('\n')}`);
+      setOptions([
+        { label: '確認更改預約', value: 'booking_confirm' },
+        { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' },
+        returnMainOption,
+      ]);
+      return;
+    }
+
     setBooking(prev => ({ ...prev, step: 'lastName', time }));
     addBotMessage(`好的，你選擇了 ${time}。\n\n請輸入你的姓氏（Last Name）：`);
     setOptions(bookingBackCancelOptions);
@@ -614,13 +834,91 @@ export function ChatWidget() {
     setIsLoading(true);
     addBotMessage('正在處理預約... ⏳');
 
+    if (booking.mode === 'cancel') {
+      try {
+        const response = await fetch('/api/widget-booking/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            manageToken: booking.manageToken,
+          }),
+        });
+
+        const data = await response.json();
+        setIsLoading(false);
+        removeMessageByExactText('正在處理預約... ⏳');
+
+        if (response.ok && data.success) {
+          addBotMessage(`✅ ${data.message}`);
+        } else {
+          showManageBlockedMessage(
+            data.error || '取消預約失敗，請稍後再試。',
+            data.clinicWhatsappUrl || booking.clinicWhatsappUrl,
+          );
+        }
+      } catch (error) {
+        setIsLoading(false);
+        removeMessageByExactText('正在處理預約... ⏳');
+        showManageBlockedMessage(
+          error instanceof Error ? error.message : '取消預約時發生錯誤。',
+          booking.clinicWhatsappUrl,
+        );
+      }
+
+      resetToMain();
+      return;
+    }
+
+    if (booking.mode === 'reschedule') {
+      try {
+        const response = await fetch('/api/widget-booking/reschedule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            manageToken: booking.manageToken,
+            date: booking.date,
+            time: booking.time,
+          }),
+        });
+
+        const data = await response.json();
+        setIsLoading(false);
+        removeMessageByExactText('正在處理預約... ⏳');
+
+        if (response.ok && data.success) {
+          addBotMessage(
+            `✅ ${data.message}\n\n` +
+            `預約編號：${data.booking.bookingId}\n` +
+            `醫師：${data.booking.doctorNameZh}\n` +
+            `診所：${data.booking.clinicNameZh}\n` +
+            `新時間：${data.booking.appointmentDate} ${data.booking.appointmentTime}`
+          );
+        } else {
+          showManageBlockedMessage(
+            data.error || '更改預約失敗，請稍後再試。',
+            data.clinicWhatsappUrl || booking.clinicWhatsappUrl,
+          );
+        }
+      } catch (error) {
+        setIsLoading(false);
+        removeMessageByExactText('正在處理預約... ⏳');
+        showManageBlockedMessage(
+          error instanceof Error ? error.message : '更改預約時發生錯誤。',
+          booking.clinicWhatsappUrl,
+        );
+      }
+
+      resetToMain();
+      return;
+    }
+
     const pickupLabel = PICKUP_LABELS[booking.medicationPickup || ''] || booking.medicationPickup || '';
     const notes = booking.isFirstVisit
       ? `[首診] ID: ${booking.idCard || 'N/A'} | DOB: ${booking.dob || 'N/A'} | Gender: ${booking.gender || 'N/A'} | Allergies: ${booking.allergies || 'None'} | Medications: ${booking.medications || 'None'} | Symptoms: ${booking.symptoms || 'N/A'} | Referral: ${booking.referralSource || 'N/A'} | Receipt: ${booking.needReceipt} | 取藥方法: ${pickupLabel}`
       : `[覆診] Receipt: ${booking.needReceipt} | 取藥方法: ${pickupLabel}`;
 
     try {
-      const response = await fetch('/api/booking', {
+      const response = await fetch('/api/booking-whatsapp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -636,6 +934,16 @@ export function ChatWidget() {
           patientName: `${booking.lastName} ${booking.firstName}`,
           phone: booking.phone,
           email: booking.email || '',
+          visitType: booking.isFirstVisit ? 'first' : 'followup',
+          needReceipt: booking.needReceipt || 'no',
+          medicationPickup: booking.medicationPickup || 'none',
+          idCard: booking.idCard,
+          dateOfBirth: booking.dob,
+          gender: booking.gender,
+          allergies: booking.allergies,
+          medications: booking.medications,
+          symptoms: booking.symptoms,
+          referralSource: booking.referralSource,
           notes,
         }),
       });
@@ -649,6 +957,9 @@ export function ChatWidget() {
       if (data.success) {
         const d = new Date(booking.date!);
         const dayName = DAY_NAMES[d.getDay()];
+        const whatsappStatusText = data.whatsappSent
+          ? '姑娘會透過 WhatsApp 發送確認訊息到你提供的電話。'
+          : '預約已建立，WhatsApp 確認訊息暫時未能自動發送，姑娘會再跟進。';
         addBotMessage(
           `✅ 預約成功！\n\n` +
           `📋 預約資料：\n` +
@@ -661,7 +972,7 @@ export function ChatWidget() {
           `📞 電話：${booking.phone}\n` +
           (booking.email ? `📧 電郵：${booking.email}\n` : '') +
           `\n預約編號：${data.bookingId}\n` +
-          `\n📍 成功預約後會收到確認電郵通知。如需更改或取消預約，可在電郵內更改。\n祝你身體健康！🌿`
+          `\n📍 ${whatsappStatusText}\n如需更改或取消預約，可在本 widget 內使用管理預約。\n祝你身體健康！🌿`
         );
       } else {
         addBotMessage(`抱歉，預約未能完成：${data.error || '未知錯誤'}\n\n請稍後再試或直接聯絡我們。`);
@@ -829,7 +1140,26 @@ export function ChatWidget() {
     if (!trimmed) return;
     setFormError('');
 
-    if (booking.step === 'lastName') {
+    if (booking.step === 'manageBookingId') {
+      addMessage('user', trimmed);
+      setBooking(prev => ({ ...prev, step: 'managePhone', bookingId: trimmed }));
+      setInput('');
+      addBotMessage('請輸入預約時填寫的電話號碼：');
+      setOptions([
+        { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' },
+        returnMainOption,
+      ]);
+    } else if (booking.step === 'managePhone') {
+      if (!/^[0-9+\-\s]{8,}$/.test(trimmed)) {
+        setFormError('電話格式唔正確，請輸入至少8位數字');
+        return;
+      }
+      const activeMode = booking.mode === 'cancel' ? 'cancel' : 'reschedule';
+      addMessage('user', trimmed);
+      setInput('');
+      setBooking(prev => ({ ...prev, phone: trimmed }));
+      void handleManageLookup(booking.bookingId || '', trimmed, activeMode);
+    } else if (booking.step === 'lastName') {
       if (trimmed.length < 1) { setFormError('請輸入姓氏'); return; }
       addMessage('user', trimmed);
       setBooking(prev => ({ ...prev, step: 'firstName', lastName: trimmed }));
@@ -957,20 +1287,49 @@ export function ChatWidget() {
     setFormError('');
     setInput('');
 
-    if (s === 'clinic') {
+    if (s === 'entry') {
+      resetToMain();
+    } else if (s === 'doctor') {
+      showBookingEntryOptions('你想新預約，定更改／取消現有預約？');
+    } else if (s === 'manageBookingId') {
+      showBookingEntryOptions('你想新預約，定更改／取消現有預約？');
+    } else if (s === 'managePhone') {
+      setBooking(prev => ({ ...prev, step: 'manageBookingId' }));
+      addBotMessage('請輸入預約編號：');
+      setOptions([returnMainOption]);
+    } else if (s === 'manageConfirmCancel') {
+      setBooking(prev => ({ ...prev, step: 'manageBookingId' }));
+      addBotMessage('請重新輸入預約編號：');
+      setOptions([returnMainOption]);
+    } else if (s === 'manageConfirmReschedule') {
+      const dateOptions = buildDateOptionsForClinic(booking.doctorNameZh, booking.clinicId, 0);
+      setBooking(prev => ({ ...prev, step: 'date' }));
+      addBotMessage('請重新選擇新的日期：');
+      setOptions([...(dateOptions || []), { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' }, returnMainOption]);
+    } else if (s === 'clinic') {
       // Back to doctor selection
       addBotMessage(widgetSettings.flows.booking.prompt);
       setBooking(prev => ({ ...prev, step: 'doctor' }));
-      const doctorOpts: Option[] = bookableDoctorNames.map((name) => ({
-        label: name, value: `doctor-${name}` as OptionKey,
-      }));
-      setOptions([...doctorOpts, returnMainOption]);
+      setOptions([...buildDoctorOptions(), returnMainOption]);
     } else if (s === 'visitType') {
       handleBookingDoctorSelect(booking.doctorNameZh!);
     } else if (s === 'date') {
-      handleBookingClinicSelect(booking.clinicId!);
+      if (booking.mode === 'reschedule') {
+        setBooking(prev => ({ ...prev, step: 'manageBookingId' }));
+        addBotMessage('請重新輸入預約編號：');
+        setOptions([returnMainOption]);
+      } else {
+        handleBookingClinicSelect(booking.clinicId!);
+      }
     } else if (s === 'time') {
-      handleBookingVisitTypeSelect(booking.isFirstVisit!);
+      if (booking.mode === 'reschedule') {
+        const dateOptions = buildDateOptionsForClinic(booking.doctorNameZh, booking.clinicId, 0);
+        setBooking(prev => ({ ...prev, step: 'date' }));
+        addBotMessage('請重新選擇新的日期：');
+        setOptions([...(dateOptions || []), { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' }, returnMainOption]);
+      } else {
+        handleBookingVisitTypeSelect(booking.isFirstVisit!);
+      }
     } else if (s === 'lastName') {
       handleBookingDateSelect(booking.date!);
     } else if (s === 'firstName') {
@@ -1085,6 +1444,8 @@ export function ChatWidget() {
 
   const placeholder = useMemo(() => {
     const placeholders: Partial<Record<BookingStep, string>> = {
+      manageBookingId: '輸入預約編號',
+      managePhone: '輸入預約電話',
       lastName: '輸入姓氏（例如：陳）',
       firstName: '輸入名字（例如：大文）',
       phone: '輸入電話號碼',

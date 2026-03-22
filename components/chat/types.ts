@@ -13,6 +13,9 @@ export type OptionKey =
   | 'hours'
   | 'addresses'
   | 'booking'
+  | 'booking_new'
+  | 'booking_manage_reschedule'
+  | 'booking_manage_cancel'
   | 'timetable'
   | 'other'
   | 'consult'
@@ -38,14 +41,17 @@ export type FormStepKey = 'reason' | 'name' | 'email' | 'phone';
 export type ConsultationFormData = Record<FormStepKey, string>;
 
 export type BookingStep =
+  | 'entry'
   | 'doctor' | 'clinic' | 'visitType' | 'date' | 'time'
   | 'lastName' | 'firstName' | 'phone' | 'email'
   | 'receipt' | 'medicationPickup'
   | 'idCard' | 'dob' | 'gender' | 'allergies' | 'medications' | 'symptoms' | 'referralSource'
+  | 'manageBookingId' | 'managePhone' | 'manageConfirmCancel' | 'manageConfirmReschedule'
   | 'confirm';
 
 export type BookingState = {
   step: BookingStep;
+  mode?: 'new' | 'reschedule' | 'cancel';
   doctorId?: string;
   doctorNameZh?: string;
   doctorName?: string;
@@ -59,6 +65,10 @@ export type BookingState = {
   firstName?: string;
   phone?: string;
   email?: string;
+  bookingId?: string;
+  manageToken?: string;
+  manageMessage?: string;
+  clinicWhatsappUrl?: string | null;
   needReceipt?: string;
   medicationPickup?: string;
   idCard?: string;
