@@ -100,7 +100,7 @@ export const DOCTORS: DoctorProfile[] = [
     nameZh: '李芊霖醫師',
     nameEn: 'Dr. Lee',
     avatarSrc: '/doctor-avatars/lee.jpg',
-    avatarObjectPosition: '78% center',
+    avatarObjectPosition: '84% center',
     bookingUrl: buildBookingUrl({ doctorId: 'lee' }),
   },
   {
@@ -108,7 +108,7 @@ export const DOCTORS: DoctorProfile[] = [
     nameZh: '韓曉恩醫師',
     nameEn: 'Dr. Hon',
     avatarSrc: '/doctor-avatars/hon.jpg',
-    avatarObjectPosition: '34% center',
+    avatarObjectPosition: '38% center',
     bookingUrl: buildBookingUrl({ doctorId: 'hon' }),
     scheduleNote:
       '2026年3月1日至2026年3月9日如欲預約，請致電或 WhatsApp 聯絡診所；2026年3月10日至2026年4月30日韓醫師進修休診，會由張天慧醫師及梁仲威醫師駐診。',
@@ -118,7 +118,7 @@ export const DOCTORS: DoctorProfile[] = [
     nameZh: '周德健醫師',
     nameEn: 'Dr. Chau',
     avatarSrc: '/doctor-avatars/chau.jpg',
-    avatarObjectPosition: '76% center',
+    avatarObjectPosition: '82% center',
     bookingUrl: buildBookingUrl({ doctorId: 'chau' }),
   },
   {
@@ -126,7 +126,7 @@ export const DOCTORS: DoctorProfile[] = [
     nameZh: '張天慧醫師',
     nameEn: 'Dr. Cheung',
     avatarSrc: '/doctor-avatars/cheung.jpg',
-    avatarObjectPosition: '74% center',
+    avatarObjectPosition: '80% center',
     bookingUrl: buildBookingUrl({ doctorId: 'cheung' }),
   },
   {
@@ -134,7 +134,7 @@ export const DOCTORS: DoctorProfile[] = [
     nameZh: '梁仲威醫師',
     nameEn: 'Dr. Leung',
     avatarSrc: '/doctor-avatars/leung.jpg',
-    avatarObjectPosition: '80% center',
+    avatarObjectPosition: '88% center',
     bookingUrl: buildBookingUrl({ doctorId: 'leung' }),
   },
 ];
