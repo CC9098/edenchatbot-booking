@@ -75,7 +75,7 @@ function cloneSettings(settings: WidgetChatbotSettings): WidgetChatbotSettings {
 function buildPreview(settings: WidgetChatbotSettings, node: WidgetChatbotFlowNode): PreviewState {
   const mainMenuButtons = buildWidgetMainMenuOptions(settings).map((item) => item.label);
   const consultFlow = buildConsultationFormFlow(settings);
-  const greeting = buildWidgetGreetingMessage(settings, ["5189 9065", "https://wa.me/85251899065"]);
+  const greeting = buildWidgetGreetingMessage(settings, ["荃灣診所 WhatsApp：按此聯絡姑娘"]);
 
   switch (node.id) {
     case "welcome":
@@ -164,7 +164,7 @@ function buildPreview(settings: WidgetChatbotSettings, node: WidgetChatbotFlowNo
           { role: "user", text: getWidgetChatbotMenuLabelByTarget(settings, "other") },
           {
             role: "assistant",
-            text: `${settings.flows.other.prompt}\n5189 9065\nhttps://wa.me/85251899065`,
+            text: `${settings.flows.other.prompt}\n荃灣診所 WhatsApp：按此聯絡姑娘`,
           },
           { role: "system", text: settings.flows.other.aiLoadingText },
         ],

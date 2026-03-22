@@ -36,10 +36,15 @@ export type ClinicProfile = {
   phones: string[];
   contactPhone?: string;
   whatsappUrl?: string;
+  whatsappLabel?: string;
   hoursText: string;
   googleMapUrl?: string;
   routeMapUrl?: string;
 };
+
+function formatMarkdownLink(label: string, href: string): string {
+  return `[${label}](${href})`;
+}
 
 export const CLINICS: ClinicProfile[] = [
   {
@@ -50,6 +55,7 @@ export const CLINICS: ClinicProfile[] = [
     phones: ['3575 9733', '6733 3234'],
     contactPhone: '6733 3234',
     whatsappUrl: 'https://wa.me/85267333234',
+    whatsappLabel: '按此聯絡姑娘',
     hoursText: '週一至五 11:00-14:00, 15:30-19:30；週六日及公眾假期休息',
     googleMapUrl: CLINIC_GOOGLE_MAP_URLS.central,
     routeMapUrl: 'https://www.edenclinic.hk/中環街景路線圖/',
@@ -62,6 +68,7 @@ export const CLINICS: ClinicProfile[] = [
     phones: ['3105 0733', '6733 3801'],
     contactPhone: '6733 3801',
     whatsappUrl: 'https://wa.me/85267333801',
+    whatsappLabel: '按此聯絡姑娘',
     hoursText: '週一至五 11:00-14:00, 15:30-19:30；週六 11:00-14:00, 15:30-18:30；週日及公眾假期休息',
     googleMapUrl: CLINIC_GOOGLE_MAP_URLS.jordan,
     routeMapUrl: 'https://www.edenclinic.hk/佐敦街景路線圖/',
@@ -74,6 +81,7 @@ export const CLINICS: ClinicProfile[] = [
     phones: ['2698 5422', '5189 9065'],
     contactPhone: '2698 5422 / 5189 9065',
     whatsappUrl: 'https://wa.me/85251899065',
+    whatsappLabel: '按此聯絡姑娘',
     hoursText: '週一、二、四至日 10:30-14:00，15:30-19:00；週三及公眾假期休息',
     googleMapUrl: CLINIC_GOOGLE_MAP_URLS.tsuenwan,
     routeMapUrl: 'https://www.edenclinic.hk/荃灣街景路線圖/',
@@ -208,7 +216,10 @@ export function getWhatsappContactLines(): string[] {
     .map((clinicId) => {
       const clinic = CLINIC_BY_ID[clinicId];
       if (!clinic.whatsappUrl) return null;
-      return `${clinic.nameZh}診所 WhatsApp: ${clinic.whatsappUrl}`;
+      return `${clinic.nameZh}診所 WhatsApp：${formatMarkdownLink(
+        clinic.whatsappLabel || '按此聯絡姑娘',
+        clinic.whatsappUrl,
+      )}`;
     })
     .filter((value): value is string => Boolean(value));
 }
@@ -218,8 +229,12 @@ export function getPromptClinicInfoLines(): string[] {
     const clinic = CLINIC_BY_ID[clinicId];
     const contactPhone = clinic.contactPhone || clinic.phones[0] || '';
     const phoneInfo = contactPhone ? ` | 聯絡電話：${contactPhone}` : '';
-    const whatsappInfo = clinic.whatsappUrl ? ` | WhatsApp：${clinic.whatsappUrl}` : '';
-    const mapInfo = clinic.googleMapUrl ? ` | Google地圖：${clinic.googleMapUrl}` : '';
+    const whatsappInfo = clinic.whatsappUrl
+      ? ` | WhatsApp：${formatMarkdownLink(clinic.whatsappLabel || '按此聯絡姑娘', clinic.whatsappUrl)}`
+      : '';
+    const mapInfo = clinic.googleMapUrl
+      ? ` | Google地圖：${formatMarkdownLink(`${clinic.nameZh}診所 Google 地圖`, clinic.googleMapUrl)}`
+      : '';
     return `${clinic.nameZh}診所：地址：${clinic.address}${phoneInfo}${whatsappInfo} | ${clinic.hoursText}${mapInfo}`;
   });
 }

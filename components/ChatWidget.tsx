@@ -217,23 +217,51 @@ export function ChatWidget() {
 
   const linkify = (text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
-    return text.split(urlRegex).map((part, index) => {
-      if (urlRegex.test(part)) {
-        return (
-          <a
-            key={`${part}-${index}`}
-            href={part}
-            target="_blank"
-            rel="noreferrer"
-            className="break-all underline decoration-[--primary]/70 decoration-2 underline-offset-2 hover:text-[--primary]"
-            style={{ ['--primary' as string]: PRIMARY }}
-          >
-            {part}
-          </a>
-        );
+    const markdownLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+    const renderLink = (href: string, label: string, key: string) => (
+      <a
+        key={key}
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="underline decoration-[--primary]/70 decoration-2 underline-offset-2 hover:text-[--primary]"
+        style={{ ['--primary' as string]: PRIMARY }}
+      >
+        {label}
+      </a>
+    );
+    const renderAutoLinkedText = (segment: string, keyPrefix: string) =>
+      segment.split(urlRegex).map((part, index) => {
+        if (!part.match(urlRegex)) {
+          return <span key={`${keyPrefix}-text-${index}`}>{part}</span>;
+        }
+        return renderLink(part, part, `${keyPrefix}-url-${index}`);
+      });
+
+    const nodes: JSX.Element[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    markdownLinkRegex.lastIndex = 0;
+
+    while ((match = markdownLinkRegex.exec(text)) !== null) {
+      const [fullMatch, label, href] = match;
+      const leadingText = text.slice(lastIndex, match.index);
+
+      if (leadingText) {
+        nodes.push(...renderAutoLinkedText(leadingText, `lead-${lastIndex}`));
       }
-      return <span key={index}>{part}</span>;
-    });
+
+      nodes.push(renderLink(href, label, `md-${match.index}`));
+      lastIndex = match.index + fullMatch.length;
+    }
+
+    const trailingText = text.slice(lastIndex);
+    if (trailingText) {
+      nodes.push(...renderAutoLinkedText(trailingText, `tail-${lastIndex}`));
+    }
+
+    return nodes.length > 0 ? nodes : [<span key="plain">{text}</span>];
   };
 
   const resetToMain = () => {
