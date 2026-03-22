@@ -11,7 +11,7 @@ Booking system backend and frontend for Eden TCM Clinic (醫天圓).
 ## Configuration
 
 > [!IMPORTANT]
-> **Correctly setting `BASE_URL` is critical for email links to work.**
+> **Correctly setting `BASE_URL` is critical for email links and Chatwoot / WhatsApp outbound booking links to work.**
 
 ### Environment Variables (.env)
 
@@ -22,7 +22,7 @@ Booking system backend and frontend for Eden TCM Clinic (醫天圓).
 | `GOOGLE_CLIENT_ID` | OAuth2 Client ID |
 | `GOOGLE_CLIENT_SECRET` | OAuth2 Client Secret |
 | `GOOGLE_REFRESH_TOKEN` | OAuth2 Refresh Token (offline access) |
-| `BASE_URL` | **Domain of your deployed app**. e.g. `https://your-project.vercel.app` |
+| `BASE_URL` | **Canonical public domain of your deployed app**. Do not use preview / developer Vercel URLs |
 | `CHATWOOT_BASE_URL` | Chatwoot base URL for Agent Bot callbacks. e.g. `https://chat.example.com` |
 | `CHATWOOT_API_ACCESS_TOKEN` | Chatwoot API access token used to send bot replies and update conversation attributes |
 | `CHATWOOT_ACCOUNT_ID` | Optional. Chatwoot account ID for outbound WhatsApp confirmations. If omitted, the app will try to infer it from `/api/v1/profile` |
@@ -34,9 +34,14 @@ Booking system backend and frontend for Eden TCM Clinic (醫天圓).
 
 ### URL Resolution Logic
 The system determines the public URL in this order:
-1.  `process.env.BASE_URL` (Manual override, **Recommended for Production**)
-2.  `process.env.VERCEL_URL` (Automatic on Vercel)
-3.  `http://localhost:3000` (Local fallback)
+1.  `process.env.NEXT_PUBLIC_BASE_URL`
+2.  `process.env.NEXT_PUBLIC_SITE_URL`
+3.  `process.env.BASE_URL`
+4.  `process.env.VERCEL_PROJECT_PRODUCTION_URL`
+5.  `process.env.VERCEL_URL` only when it is already the production host
+6.  Canonical production fallback: `https://edenchatbot-booking.vercel.app`
+
+Preview / developer `*.vercel.app` deployment URLs are rejected for server-generated outbound links so patients do not receive protected preview links by mistake.
 
 **AI Assistant Note:** Never hardcode `localhost` in email templates or redirects. Always use the `BASE_URL` environment variable logic.
 
@@ -45,7 +50,7 @@ The system determines the public URL in this order:
 1.  Connect your GitHub repository to Vercel.
 2.  Add all Environment Variables in Vercel Project Settings.
 3.  Deploy.
-4.  **After deployment, copy your Vercel domain and set it as `BASE_URL` in the Environment Variables, then Redeploy.** This ensures email links point to the correct domain.
+4.  **After deployment, set `BASE_URL` and `NEXT_PUBLIC_BASE_URL` to your canonical production domain, then Redeploy.** This ensures email links and Chatwoot booking links point to the correct public domain.
 
 ## Project Structure
 -   `app/api/booking`: Handles Booking creation (POST), retrieval (GET), cancellation (DELETE), rescheduling (PATCH).
