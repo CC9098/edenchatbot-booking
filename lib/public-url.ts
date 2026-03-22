@@ -1,21 +1,50 @@
+const DEFAULT_PUBLIC_BASE_URL = "https://edenchatbot-booking.vercel.app";
+
+function normalizeBaseUrl(value?: string | null): string | null {
+  if (!value) return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed.replace(/\/+$/, "");
+  }
+
+  return `https://${trimmed.replace(/\/+$/, "")}`;
+}
+
 export function getPublicBaseUrl(): string {
   if (typeof window !== "undefined" && window.location?.origin) {
     return window.location.origin.replace(/\/$/, "");
   }
 
-  if (process.env.NEXT_PUBLIC_BASE_URL) {
-    return process.env.NEXT_PUBLIC_BASE_URL.replace(/\/$/, "");
+  const configuredBaseUrl =
+    normalizeBaseUrl(process.env.NEXT_PUBLIC_BASE_URL) ||
+    normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
+    normalizeBaseUrl(process.env.BASE_URL);
+
+  if (configuredBaseUrl) {
+    return configuredBaseUrl;
   }
 
-  if (process.env.BASE_URL) {
-    return process.env.BASE_URL.replace(/\/$/, "");
+  const vercelProductionUrl = normalizeBaseUrl(process.env.VERCEL_PROJECT_PRODUCTION_URL);
+  if (vercelProductionUrl) {
+    return vercelProductionUrl;
   }
 
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
+  if (process.env.VERCEL_ENV === "production") {
+    const vercelProductionDeploymentUrl = normalizeBaseUrl(process.env.VERCEL_URL);
+    if (vercelProductionDeploymentUrl) {
+      return vercelProductionDeploymentUrl;
+    }
   }
 
-  return "http://localhost:3000";
+  const previewDeploymentUrl = normalizeBaseUrl(process.env.VERCEL_URL);
+  if (previewDeploymentUrl) {
+    return previewDeploymentUrl;
+  }
+
+  return DEFAULT_PUBLIC_BASE_URL;
 }
 
 export function buildPublicUrl(path: string): string {
