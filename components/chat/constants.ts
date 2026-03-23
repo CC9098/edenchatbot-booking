@@ -38,8 +38,8 @@ export const FORM_FLOW: { key: FormStepKey; prompt: string; placeholder: string 
 ];
 
 export const TEXT_INPUT_STEPS: BookingStep[] = [
-  'manageBookingId',
   'managePhone',
+  'manageOtp',
   'lastName', 'firstName', 'phone', 'email',
   'idCard', 'dob', 'allergies', 'medications', 'symptoms',
 ];

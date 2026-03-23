@@ -1,9 +1,10 @@
 import "server-only";
 
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, randomInt, randomUUID, timingSafeEqual } from "crypto";
 
 import { fromZonedTime } from "date-fns-tz";
 
+import { sendBookingManageOtpWhatsapp } from "@/lib/chatwoot-whatsapp";
 import { normalizePhoneForSearch } from "@/lib/contact-utils";
 import { isSlotAvailableUtc } from "@/lib/booking-helpers";
 import {
@@ -18,12 +19,16 @@ import {
 } from "@/lib/google-calendar";
 import { createServiceClient } from "@/lib/supabase";
 import { resolveOnlineSourceMappingForSlot } from "@/lib/virtual-online-booking";
+import { getClinicWhatsappPhone } from "@/lib/whatsapp-booking";
 import { CLINIC_BY_ID, isClinicId } from "@/shared/clinic-data";
 
 const HONG_KONG_TIMEZONE = "Asia/Hong_Kong";
 const MANAGE_TOKEN_TTL_MS = 1000 * 60 * 15;
+const OTP_MAX_ATTEMPTS = 5;
 const SELF_SERVICE_CUTOFF_MS = 1000 * 60 * 60;
 const STATIC_WIDGET_MANAGE_SECRET = "eden-widget-booking-manage-sign";
+const STATIC_WIDGET_OTP_SECRET = "eden-widget-booking-otp-sign";
+const DEFAULT_OTP_TTL_MINUTES = 10;
 
 type BookingStatus = "pending" | "confirmed" | "cancelled" | "failed";
 
@@ -41,8 +46,19 @@ type WidgetBookingRow = {
   duration_minutes: number;
   patient_name: string;
   phone: string;
+  phone_digits: string | null;
   email: string;
   visit_type: "first" | "followup";
+};
+
+type WidgetVerificationRow = {
+  id: string;
+  phone_digits: string;
+  code_hash: string;
+  attempt_count: number;
+  max_attempts: number;
+  expires_at: string;
+  consumed_at: string | null;
 };
 
 type ManageTokenPayload = {
@@ -52,23 +68,31 @@ type ManageTokenPayload = {
   expiresAtMs: number;
 };
 
+type WidgetBookingSummary = {
+  bookingId: string;
+  status: BookingStatus;
+  patientName: string;
+  doctorId: string;
+  doctorNameZh: string;
+  clinicId: string;
+  clinicNameZh: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  durationMinutes: number;
+  visitType: "first" | "followup";
+  clinicWhatsappUrl: string | null;
+};
+
+type WidgetManagedBooking = WidgetBookingSummary & {
+  canSelfManage: boolean;
+  message: string;
+  manageToken?: string;
+};
+
 export type WidgetBookingLookupResult =
   | {
       success: true;
-      booking: {
-        bookingId: string;
-        status: BookingStatus;
-        patientName: string;
-        doctorId: string;
-        doctorNameZh: string;
-        clinicId: string;
-        clinicNameZh: string;
-        appointmentDate: string;
-        appointmentTime: string;
-        durationMinutes: number;
-        visitType: "first" | "followup";
-        clinicWhatsappUrl: string | null;
-      };
+      booking: WidgetBookingSummary;
       canSelfManage: boolean;
       message: string;
       manageToken?: string;
@@ -76,6 +100,31 @@ export type WidgetBookingLookupResult =
   | {
       success: false;
       error: string;
+    };
+
+export type WidgetBookingRequestCodeResult =
+  | {
+      success: true;
+      message: string;
+      maskedPhone: string;
+    }
+  | {
+      success: false;
+      error: string;
+      clinicWhatsappUrl?: string | null;
+    };
+
+export type WidgetBookingVerifyCodeResult =
+  | {
+      success: true;
+      message: string;
+      maskedPhone: string;
+      bookings: WidgetManagedBooking[];
+    }
+  | {
+      success: false;
+      error: string;
+      clinicWhatsappUrl?: string | null;
     };
 
 type WidgetBookingActionResult =
@@ -99,8 +148,53 @@ type WidgetBookingActionResult =
       clinicWhatsappUrl?: string | null;
     };
 
+const BOOKING_SELECT_FIELDS = [
+  "id",
+  "status",
+  "google_event_id",
+  "calendar_id",
+  "doctor_id",
+  "doctor_name_zh",
+  "clinic_id",
+  "clinic_name_zh",
+  "appointment_date",
+  "appointment_time",
+  "duration_minutes",
+  "patient_name",
+  "phone",
+  "phone_digits",
+  "email",
+  "visit_type",
+].join(", ");
+
 function getWidgetManageSecret() {
   return process.env.WIDGET_BOOKING_MANAGE_SECRET?.trim() || STATIC_WIDGET_MANAGE_SECRET;
+}
+
+function getWidgetOtpSecret() {
+  return process.env.WIDGET_BOOKING_OTP_SECRET?.trim() || STATIC_WIDGET_OTP_SECRET;
+}
+
+function getWidgetOtpTtlMinutes() {
+  const raw = Number(process.env.WIDGET_BOOKING_OTP_TTL_MINUTES);
+  if (Number.isFinite(raw) && raw > 0) {
+    return Math.max(1, Math.floor(raw));
+  }
+
+  return DEFAULT_OTP_TTL_MINUTES;
+}
+
+function getWidgetOtpTtlMs() {
+  return getWidgetOtpTtlMinutes() * 60 * 1000;
+}
+
+function getTodayInHongKongDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: HONG_KONG_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 function toBase64Url(value: string) {
@@ -117,6 +211,12 @@ function signManagePayload(encodedPayload: string) {
     .digest("base64url");
 }
 
+function hashOtpCode(verificationId: string, phoneDigits: string, code: string) {
+  return createHmac("sha256", getWidgetOtpSecret())
+    .update(`widget-booking-otp:${verificationId}:${phoneDigits}:${code}`)
+    .digest("base64url");
+}
+
 function createManageToken(payload: Omit<ManageTokenPayload, "expiresAtMs">) {
   const tokenPayload: ManageTokenPayload = {
     ...payload,
@@ -130,33 +230,33 @@ function createManageToken(payload: Omit<ManageTokenPayload, "expiresAtMs">) {
 function verifyManageToken(token: string) {
   const [encodedPayload, signatureRaw] = token.split(".");
   if (!encodedPayload || !signatureRaw) {
-    return { success: false as const, error: "管理憑證無效，請重新查詢預約。" };
+    return { success: false as const, error: "管理憑證無效，請重新驗證。" };
   }
 
   const expected = signManagePayload(encodedPayload);
   const expectedBuffer = Buffer.from(expected, "utf8");
   const actualBuffer = Buffer.from(signatureRaw, "utf8");
   if (expectedBuffer.length !== actualBuffer.length) {
-    return { success: false as const, error: "管理憑證無效，請重新查詢預約。" };
+    return { success: false as const, error: "管理憑證無效，請重新驗證。" };
   }
 
   if (!timingSafeEqual(expectedBuffer, actualBuffer)) {
-    return { success: false as const, error: "管理憑證無效，請重新查詢預約。" };
+    return { success: false as const, error: "管理憑證無效，請重新驗證。" };
   }
 
   let parsed: ManageTokenPayload;
   try {
     parsed = JSON.parse(fromBase64Url(encodedPayload)) as ManageTokenPayload;
   } catch {
-    return { success: false as const, error: "管理憑證無效，請重新查詢預約。" };
+    return { success: false as const, error: "管理憑證無效，請重新驗證。" };
   }
 
   if (!parsed?.intakeId || !parsed?.bookingId || !parsed?.phoneDigits) {
-    return { success: false as const, error: "管理憑證無效，請重新查詢預約。" };
+    return { success: false as const, error: "管理憑證無效，請重新驗證。" };
   }
 
   if (!Number.isFinite(parsed.expiresAtMs) || parsed.expiresAtMs <= Date.now()) {
-    return { success: false as const, error: "管理逾時，請重新查詢預約。" };
+    return { success: false as const, error: "管理時段已逾時，請重新驗證。" };
   }
 
   return { success: true as const, payload: parsed };
@@ -175,10 +275,27 @@ function isWidgetBookingRow(value: unknown): value is WidgetBookingRow {
     typeof row.clinic_name_zh === "string" &&
     typeof row.appointment_date === "string" &&
     typeof row.appointment_time === "string" &&
+    typeof row.duration_minutes === "number" &&
     typeof row.patient_name === "string" &&
     typeof row.phone === "string" &&
+    (typeof row.phone_digits === "string" || row.phone_digits === null) &&
     typeof row.email === "string" &&
     typeof row.visit_type === "string"
+  );
+}
+
+function isWidgetVerificationRow(value: unknown): value is WidgetVerificationRow {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+
+  return (
+    typeof row.id === "string" &&
+    typeof row.phone_digits === "string" &&
+    typeof row.code_hash === "string" &&
+    typeof row.attempt_count === "number" &&
+    typeof row.max_attempts === "number" &&
+    typeof row.expires_at === "string" &&
+    (typeof row.consumed_at === "string" || row.consumed_at === null)
   );
 }
 
@@ -219,68 +336,220 @@ function canSelfManage(row: WidgetBookingRow) {
   return getSelfManageBlockMessage(row) === "";
 }
 
+function getRowPhoneDigits(row: Pick<WidgetBookingRow, "phone" | "phone_digits">) {
+  return row.phone_digits || normalizePhoneForSearch(row.phone);
+}
+
+function toWidgetBookingSummary(row: WidgetBookingRow): WidgetBookingSummary {
+  return {
+    bookingId: row.google_event_id || row.id,
+    status: row.status,
+    patientName: row.patient_name,
+    doctorId: row.doctor_id,
+    doctorNameZh: row.doctor_name_zh,
+    clinicId: row.clinic_id,
+    clinicNameZh: row.clinic_name_zh,
+    appointmentDate: row.appointment_date,
+    appointmentTime: row.appointment_time,
+    durationMinutes: row.duration_minutes,
+    visitType: row.visit_type,
+    clinicWhatsappUrl: getClinicWhatsappUrl(row.clinic_id),
+  };
+}
+
+function toManagedBooking(row: WidgetBookingRow): WidgetManagedBooking {
+  const allowed = canSelfManage(row);
+  const phoneDigits = getRowPhoneDigits(row);
+
+  return {
+    ...toWidgetBookingSummary(row),
+    canSelfManage: allowed,
+    message: allowed
+      ? "已驗證，可繼續自助處理。"
+      : getSelfManageBlockMessage(row),
+    ...(allowed
+      ? {
+          manageToken: createManageToken({
+            intakeId: row.id,
+            bookingId: row.google_event_id || row.id,
+            phoneDigits,
+          }),
+        }
+      : {}),
+  };
+}
+
+function maskPhoneForDisplay(phoneDigits: string) {
+  if (!phoneDigits) return "";
+
+  if (phoneDigits.startsWith("852") && phoneDigits.length >= 7) {
+    const local = phoneDigits.slice(3);
+    return `+852 ${local.slice(0, 2)}****${local.slice(-2)}`;
+  }
+
+  if (phoneDigits.length <= 4) {
+    return phoneDigits;
+  }
+
+  return `${phoneDigits.slice(0, 2)}****${phoneDigits.slice(-2)}`;
+}
+
+function getWhatsappContactEmail(row: WidgetBookingRow) {
+  const normalizedEmail = row.email.trim().toLowerCase();
+  if (normalizedEmail) {
+    return normalizedEmail;
+  }
+
+  return `patient-${getRowPhoneDigits(row)}@manage.edenclinic.invalid`;
+}
+
+function normalizeVerificationCode(value: string) {
+  return value.replace(/\D/g, "").slice(0, 6);
+}
+
+async function listMatchingBookingRowsByPhone(phone: string): Promise<WidgetBookingRow[]> {
+  const phoneDigits = normalizePhoneForSearch(phone);
+  if (!phoneDigits) {
+    return [];
+  }
+
+  const supabase = createServiceClient();
+  const today = getTodayInHongKongDate();
+
+  const directResult = await supabase
+    .from("booking_intake")
+    .select(BOOKING_SELECT_FIELDS)
+    .eq("phone_digits", phoneDigits)
+    .in("status", ["pending", "confirmed"])
+    .gte("appointment_date", today)
+    .order("appointment_date", { ascending: true })
+    .order("appointment_time", { ascending: true })
+    .limit(20);
+
+  if (directResult.error) {
+    throw new Error(directResult.error.message);
+  }
+
+  const directRows = Array.isArray(directResult.data)
+    ? (directResult.data as unknown[]).filter(isWidgetBookingRow)
+    : [];
+  if (directRows.length > 0) {
+    return directRows;
+  }
+
+  const fallbackResult = await supabase
+    .from("booking_intake")
+    .select(BOOKING_SELECT_FIELDS)
+    .in("status", ["pending", "confirmed"])
+    .gte("appointment_date", today)
+    .order("appointment_date", { ascending: true })
+    .order("appointment_time", { ascending: true })
+    .limit(200);
+
+  if (fallbackResult.error) {
+    throw new Error(fallbackResult.error.message);
+  }
+
+  return Array.isArray(fallbackResult.data)
+    ? (fallbackResult.data as unknown[])
+        .filter(isWidgetBookingRow)
+        .filter((row) => getRowPhoneDigits(row) === phoneDigits)
+    : [];
+}
+
 async function findMatchingBookingRow(
   bookingId: string,
   phone: string,
 ): Promise<WidgetBookingRow | null> {
   const normalizedBookingId = bookingId.trim();
-  const phoneDigits = normalizePhoneForSearch(phone);
-  if (!normalizedBookingId || !phoneDigits) {
+  if (!normalizedBookingId) {
     return null;
   }
 
+  const rows = await listMatchingBookingRowsByPhone(phone);
+  return rows.find((row) => row.google_event_id === normalizedBookingId || row.id === normalizedBookingId) || null;
+}
+
+async function invalidateExistingPhoneVerifications(phoneDigits: string) {
   const supabase = createServiceClient();
-  const selectFields = [
-    "id",
-    "status",
-    "google_event_id",
-    "calendar_id",
-    "doctor_id",
-    "doctor_name_zh",
-    "clinic_id",
-    "clinic_name_zh",
-    "appointment_date",
-    "appointment_time",
-    "duration_minutes",
-    "patient_name",
-    "phone",
-    "email",
-    "visit_type",
-  ].join(", ");
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("widget_booking_verifications")
+    .update({
+      consumed_at: now,
+      updated_at: now,
+    })
+    .eq("phone_digits", phoneDigits)
+    .eq("purpose", "manage_booking")
+    .is("consumed_at", null);
 
-  const queries = [
-    supabase
-      .from("booking_intake")
-      .select(selectFields)
-      .eq("google_event_id", normalizedBookingId)
-      .order("created_at", { ascending: false })
-      .limit(5),
-    supabase
-      .from("booking_intake")
-      .select(selectFields)
-      .eq("id", normalizedBookingId)
-      .order("created_at", { ascending: false })
-      .limit(1),
-  ];
+  if (error) {
+    throw new Error(error.message);
+  }
+}
 
-  for (const query of queries) {
-    const { data, error } = await query;
-    if (error) {
-      throw new Error(error.message);
-    }
+async function getLatestActiveVerification(phoneDigits: string): Promise<WidgetVerificationRow | null> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("widget_booking_verifications")
+    .select("id, phone_digits, code_hash, attempt_count, max_attempts, expires_at, consumed_at")
+    .eq("phone_digits", phoneDigits)
+    .eq("purpose", "manage_booking")
+    .is("consumed_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-    const rows: WidgetBookingRow[] = Array.isArray(data)
-      ? (data as unknown[]).filter(isWidgetBookingRow)
-      : [];
-    const matched = rows.find(
-      (row) => normalizePhoneForSearch(row.phone) === phoneDigits,
-    );
-    if (matched) {
-      return matched;
-    }
+  if (error) {
+    throw new Error(error.message);
   }
 
-  return null;
+  return isWidgetVerificationRow(data) ? data : null;
+}
+
+async function markVerificationConsumed(id: string) {
+  const supabase = createServiceClient();
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("widget_booking_verifications")
+    .update({
+      consumed_at: now,
+      updated_at: now,
+    })
+    .eq("id", id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+async function registerVerificationFailure(row: WidgetVerificationRow) {
+  const supabase = createServiceClient();
+  const nextAttemptCount = row.attempt_count + 1;
+  const now = new Date().toISOString();
+  const payload: Record<string, unknown> = {
+    attempt_count: nextAttemptCount,
+    updated_at: now,
+  };
+
+  if (nextAttemptCount >= row.max_attempts) {
+    payload.consumed_at = now;
+  }
+
+  const { error } = await supabase
+    .from("widget_booking_verifications")
+    .update(payload)
+    .eq("id", row.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (nextAttemptCount >= row.max_attempts) {
+    return "驗證碼輸入錯誤次數過多，請重新索取新驗證碼。";
+  }
+
+  return "驗證碼不正確，請重新輸入。";
 }
 
 async function getBookingRowByManageToken(
@@ -297,41 +566,165 @@ async function getBookingRowByManageToken(
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("booking_intake")
-    .select(
-      [
-        "id",
-        "status",
-        "google_event_id",
-        "calendar_id",
-        "doctor_id",
-        "doctor_name_zh",
-        "clinic_id",
-        "clinic_name_zh",
-        "appointment_date",
-        "appointment_time",
-        "duration_minutes",
-        "patient_name",
-        "phone",
-        "email",
-        "visit_type",
-      ].join(", "),
-    )
+    .select(BOOKING_SELECT_FIELDS)
     .eq("id", tokenResult.payload.intakeId)
     .maybeSingle();
 
   if (error) {
-    return { success: false as const, error: error.message };
+    return { success: false, error: error.message };
   }
 
   if (!isWidgetBookingRow(data)) {
-    return { success: false as const, error: "找不到對應預約，請重新查詢。" };
+    return { success: false, error: "找不到對應預約，請重新驗證。" };
   }
 
-  if (normalizePhoneForSearch(data.phone) !== tokenResult.payload.phoneDigits) {
-    return { success: false as const, error: "驗證資料不符，請重新查詢預約。" };
+  if (getRowPhoneDigits(data) !== tokenResult.payload.phoneDigits) {
+    return { success: false, error: "驗證資料不符，請重新驗證。" };
   }
 
-  return { success: true as const, row: data };
+  return { success: true, row: data };
+}
+
+export async function requestWidgetBookingVerificationCode(
+  phone: string,
+): Promise<WidgetBookingRequestCodeResult> {
+  try {
+    const phoneDigits = normalizePhoneForSearch(phone);
+    if (!phoneDigits) {
+      return { success: false, error: "請輸入有效的 WhatsApp 電話號碼。" };
+    }
+
+    const rows = await listMatchingBookingRowsByPhone(phoneDigits);
+    if (rows.length === 0) {
+      return {
+        success: false,
+        error: "這個電話號碼暫時找不到可管理的未來預約。",
+      };
+    }
+
+    const primaryRow = rows[0];
+    const verificationId = randomUUID();
+    const verificationCode = String(randomInt(0, 1000000)).padStart(6, "0");
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + getWidgetOtpTtlMs()).toISOString();
+
+    await invalidateExistingPhoneVerifications(phoneDigits);
+
+    const supabase = createServiceClient();
+    const { error: insertError } = await supabase
+      .from("widget_booking_verifications")
+      .insert({
+        id: verificationId,
+        phone_digits: phoneDigits,
+        purpose: "manage_booking",
+        code_hash: hashOtpCode(verificationId, phoneDigits, verificationCode),
+        attempt_count: 0,
+        max_attempts: OTP_MAX_ATTEMPTS,
+        delivery_channel: "whatsapp",
+        expires_at: expiresAt,
+        metadata: {
+          booking_count: rows.length,
+          primary_booking_intake_id: primaryRow.id,
+        },
+        updated_at: now,
+      });
+
+    if (insertError) {
+      throw new Error(insertError.message);
+    }
+
+    const whatsappResult = await sendBookingManageOtpWhatsapp({
+      patientName: primaryRow.patient_name,
+      phone: primaryRow.phone,
+      email: getWhatsappContactEmail(primaryRow),
+      code: verificationCode,
+      expiryMinutes: getWidgetOtpTtlMinutes(),
+      clinicWhatsappPhone: getClinicWhatsappPhone(primaryRow.clinic_id),
+    });
+
+    if (!whatsappResult.success) {
+      await markVerificationConsumed(verificationId).catch(() => undefined);
+      return {
+        success: false,
+        error: "驗證碼暫時未能送出，請稍後再試或直接 WhatsApp 聯絡姑娘。",
+        clinicWhatsappUrl: getClinicWhatsappUrl(primaryRow.clinic_id),
+      };
+    }
+
+    return {
+      success: true,
+      message: `驗證碼已發送到 ${maskPhoneForDisplay(phoneDigits)} 的 WhatsApp。`,
+      maskedPhone: maskPhoneForDisplay(phoneDigits),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "發送驗證碼時發生錯誤。",
+    };
+  }
+}
+
+export async function verifyWidgetBookingVerificationCode(params: {
+  phone: string;
+  code: string;
+}): Promise<WidgetBookingVerifyCodeResult> {
+  try {
+    const phoneDigits = normalizePhoneForSearch(params.phone);
+    const code = normalizeVerificationCode(params.code);
+    if (!phoneDigits) {
+      return { success: false, error: "請輸入有效的 WhatsApp 電話號碼。" };
+    }
+
+    if (code.length !== 6) {
+      return { success: false, error: "請輸入 6 位數驗證碼。" };
+    }
+
+    const verification = await getLatestActiveVerification(phoneDigits);
+    if (!verification) {
+      return { success: false, error: "驗證碼已失效，請重新索取。" };
+    }
+
+    const expiresAtMs = new Date(verification.expires_at).getTime();
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+      await markVerificationConsumed(verification.id).catch(() => undefined);
+      return { success: false, error: "驗證碼已過期，請重新索取。" };
+    }
+
+    const expected = Buffer.from(hashOtpCode(verification.id, phoneDigits, code), "utf8");
+    const actual = Buffer.from(verification.code_hash, "utf8");
+    const isMatch = expected.length === actual.length && timingSafeEqual(expected, actual);
+
+    if (!isMatch) {
+      return { success: false, error: await registerVerificationFailure(verification) };
+    }
+
+    await markVerificationConsumed(verification.id);
+
+    const rows = await listMatchingBookingRowsByPhone(phoneDigits);
+    if (rows.length === 0) {
+      return {
+        success: false,
+        error: "已完成驗證，但這個電話號碼目前沒有可管理的未來預約。",
+      };
+    }
+
+    const bookings = rows.map(toManagedBooking);
+
+    return {
+      success: true,
+      message:
+        bookings.length === 1
+          ? "已完成驗證，請繼續管理你的預約。"
+          : `已完成驗證，找到 ${bookings.length} 個可管理預約。`,
+      maskedPhone: maskPhoneForDisplay(phoneDigits),
+      bookings,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "驗證預約時發生錯誤。",
+    };
+  }
 }
 
 export async function lookupWidgetBooking(
@@ -347,38 +740,14 @@ export async function lookupWidgetBooking(
       };
     }
 
-    const allowed = canSelfManage(row);
-    const message = allowed
-      ? "已找到你的預約，可以繼續自助處理。"
-      : getSelfManageBlockMessage(row);
+    const managedBooking = toManagedBooking(row);
 
     return {
       success: true,
-      booking: {
-        bookingId: row.google_event_id || row.id,
-        status: row.status,
-        patientName: row.patient_name,
-        doctorId: row.doctor_id,
-        doctorNameZh: row.doctor_name_zh,
-        clinicId: row.clinic_id,
-        clinicNameZh: row.clinic_name_zh,
-        appointmentDate: row.appointment_date,
-        appointmentTime: row.appointment_time,
-        durationMinutes: row.duration_minutes,
-        visitType: row.visit_type,
-        clinicWhatsappUrl: getClinicWhatsappUrl(row.clinic_id),
-      },
-      canSelfManage: allowed,
-      message,
-      ...(allowed
-        ? {
-            manageToken: createManageToken({
-              intakeId: row.id,
-              bookingId: row.google_event_id || row.id,
-              phoneDigits: normalizePhoneForSearch(row.phone),
-            }),
-          }
-        : {}),
+      booking: toWidgetBookingSummary(row),
+      canSelfManage: managedBooking.canSelfManage,
+      message: managedBooking.message,
+      ...(managedBooking.manageToken ? { manageToken: managedBooking.manageToken } : {}),
     };
   } catch (error) {
     return {

@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase";
+import { normalizePhoneForSearch } from "@/lib/contact-utils";
 
 export type BookingVisitType = "first" | "followup";
 export type BookingReceiptType = "no" | "yes_insurance" | "yes_not_insurance";
@@ -60,6 +61,7 @@ export async function createPendingBookingIntake(
       duration_minutes: input.durationMinutes,
       patient_name: input.patientName,
       phone: input.phone,
+      phone_digits: normalizePhoneForSearch(input.phone),
       email: normalizedEmail,
       visit_type: input.visitType,
       need_receipt: input.needReceipt,

@@ -106,10 +106,10 @@ export default async function Home() {
           <article className="rounded-2xl border border-primary/10 bg-white/90 p-5 shadow-sm">
             <p className="text-sm font-semibold text-slate-900">預約管理</p>
             <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              已預約者可登入後繼續使用；如需改期或取消，請使用確認電郵內的連結。
+              已預約者可透過 WhatsApp 驗證碼快速管理現有預約；會員登入則可繼續使用更多個人化功能。
             </p>
-            <Link href="/login" className="mt-4 inline-flex text-sm font-medium text-primary hover:underline">
-              登入帳號
+            <Link href="/manage-booking" className="mt-4 inline-flex text-sm font-medium text-primary hover:underline">
+              管理預約
             </Link>
           </article>
         </section>

@@ -1,5 +1,9 @@
 import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import {
+  buildWhatsappManageVerificationTemplateBodyParams,
+  buildWhatsappManageVerificationText,
+} from '@/lib/whatsapp-manage';
+import {
   buildWhatsappConfirmationText,
   buildWhatsappTemplateBodyParams,
   normalizeWhatsappPhoneNumber,
@@ -82,6 +86,15 @@ interface ChatwootMessagePayload {
 interface BookingWhatsappNotificationInput extends BookingWhatsappConfirmationInput {
   phone: string;
   email: string;
+  clinicWhatsappPhone?: string | null;
+}
+
+interface BookingManageWhatsappOtpInput {
+  patientName: string;
+  phone: string;
+  email: string;
+  code: string;
+  expiryMinutes?: number;
   clinicWhatsappPhone?: string | null;
 }
 
@@ -481,6 +494,44 @@ function getTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
   );
 }
 
+function getOtpTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
+  const configuredName = (process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_NAME || '').trim();
+  const configuredLanguage = (process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_LANGUAGE || 'zh_HK').trim();
+  const category = (process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_CATEGORY || 'UTILITY').trim();
+
+  if (!configuredName) {
+    return [];
+  }
+
+  const syncedTemplates = (inbox.message_templates || []).filter((template) => {
+    if (!template.name || !template.language) return false;
+    if (template.name !== configuredName) return false;
+    return String(template.status || '').toLowerCase() === 'approved';
+  });
+
+  if (syncedTemplates.length > 0) {
+    return syncedTemplates
+      .sort((left, right) => {
+        if (left.language === configuredLanguage) return -1;
+        if (right.language === configuredLanguage) return 1;
+        return 0;
+      })
+      .map((template) => ({
+        name: template.name || configuredName,
+        category: (template.category || category).trim(),
+        language: (template.language || configuredLanguage).trim(),
+      }));
+  }
+
+  return [
+    {
+      name: configuredName,
+      category,
+      language: configuredLanguage,
+    },
+  ];
+}
+
 async function sendMessageWithTemplateFallback(
   client: ChatwootWhatsappClient,
   accountId: number,
@@ -588,6 +639,111 @@ export async function sendBookingConfirmationWhatsapp(
     const bodyParams = buildWhatsappTemplateBodyParams(input);
 
     if (canUseTemplate) {
+      await sendMessageWithTemplateFallback(
+        client,
+        accountId,
+        conversationId,
+        content,
+        templateConfigs,
+        bodyParams,
+      );
+    } else {
+      await client.createMessage(accountId, conversationId, {
+        content,
+      });
+    }
+
+    return {
+      success: true,
+      whatsappSent: true,
+      conversationId,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      whatsappSent: false,
+      error: getSafeErrorMessage(error),
+    };
+  }
+}
+
+export async function sendBookingManageOtpWhatsapp(
+  input: BookingManageWhatsappOtpInput,
+): Promise<SendWhatsappBookingConfirmationResult> {
+  try {
+    const baseUrl = (process.env.CHATWOOT_BASE_URL || '').trim().replace(/\/$/, '');
+    const apiAccessToken = (process.env.CHATWOOT_API_ACCESS_TOKEN || '').trim();
+
+    if (!baseUrl) {
+      throw new Error('CHATWOOT_BASE_URL is not configured');
+    }
+
+    if (!apiAccessToken) {
+      throw new Error('CHATWOOT_API_ACCESS_TOKEN is not configured');
+    }
+
+    const client = new ChatwootWhatsappClient(baseUrl, apiAccessToken);
+    const accountId = await resolveAccountId(
+      client,
+      parseOptionalInteger(process.env.CHATWOOT_ACCOUNT_ID),
+    );
+    const initialInbox = await resolveWhatsappInboxId(
+      client,
+      accountId,
+      parseOptionalInteger(process.env.CHATWOOT_WHATSAPP_INBOX_ID),
+      input.clinicWhatsappPhone,
+    );
+    const inbox = await refreshInboxTemplates(client, accountId, initialInbox);
+    const inboxId = inbox.id;
+    if (!inboxId) {
+      throw new Error('Resolved Chatwoot WhatsApp inbox is missing an id');
+    }
+
+    const contact = await ensureWhatsappContact(
+      client,
+      accountId,
+      inboxId,
+      input.patientName,
+      input.phone,
+      input.email,
+    );
+
+    const conversationsResponse = await client.getContactConversations(accountId, contact.contactId);
+    const existingConversation = findExistingConversation(conversationsResponse.payload || [], inboxId);
+
+    let conversationId = existingConversation?.id;
+    if (!conversationId) {
+      const conversation = await client.createConversation(accountId, {
+        inbox_id: inboxId,
+        contact_id: contact.contactId,
+        source_id: contact.sourceId,
+        status: 'open',
+      });
+
+      if (!conversation.id) {
+        throw new Error('Failed to create Chatwoot conversation');
+      }
+
+      conversationId = conversation.id;
+    }
+
+    if (!conversationId) {
+      throw new Error('Failed to resolve Chatwoot conversation');
+    }
+
+    const content = buildWhatsappManageVerificationText({
+      patientName: input.patientName,
+      code: input.code,
+      expiryMinutes: input.expiryMinutes,
+    });
+    const templateConfigs = getOtpTemplateConfigs(inbox);
+    const bodyParams = buildWhatsappManageVerificationTemplateBodyParams({
+      patientName: input.patientName,
+      code: input.code,
+      expiryMinutes: input.expiryMinutes,
+    });
+
+    if (templateConfigs.length > 0) {
       await sendMessageWithTemplateFallback(
         client,
         accountId,

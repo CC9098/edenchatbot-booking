@@ -1,6 +1,15 @@
 import ChatWidget from '@/components/ChatWidget';
 
-export default function Embed() {
+export default function Embed({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
+  const intentParam = Array.isArray(searchParams?.intent)
+    ? searchParams?.intent[0]
+    : searchParams?.intent;
+  const initialIntent = intentParam === 'manage-booking' ? 'manage-booking' : undefined;
+
   return (
     <main 
       style={{ 
@@ -14,7 +23,7 @@ export default function Embed() {
         WebkitTapHighlightColor: 'transparent'
       }}
     >
-      <ChatWidget />
+      <ChatWidget autoOpen={Boolean(initialIntent)} initialIntent={initialIntent} />
     </main>
   );
 }

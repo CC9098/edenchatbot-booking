@@ -1,4 +1,5 @@
 import { type BookingVisitType } from '@/lib/booking-intake-storage';
+import { buildManageBookingUrl } from '@/lib/public-url';
 import { CLINIC_BY_ID, type ClinicId } from '@/shared/clinic-data';
 
 const VISIT_TYPE_LABELS: Record<BookingVisitType, string> = {
@@ -80,7 +81,8 @@ export function buildWhatsappConfirmationText(
     `診症類型：${VISIT_TYPE_LABELS[input.visitType]}`,
     `預約編號：${input.bookingId}`,
     '',
-    '如需更改或查詢，請直接以 WhatsApp 聯絡診所。',
+    `管理預約：${buildManageBookingUrl()}`,
+    '如需更改或取消，可打開以上連結，以 WhatsApp 驗證碼登入管理預約。',
   ].join('\n');
 }
 
@@ -94,5 +96,6 @@ export function buildWhatsappTemplateBodyParams(
     appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
     visit_type: VISIT_TYPE_LABELS[input.visitType],
     booking_id: input.bookingId,
+    manage_url: buildManageBookingUrl(),
   };
 }

@@ -141,3 +141,10 @@ export function buildBookingUrl(options?: {
   const query = params.toString();
   return buildPublicUrl(query ? `${pathname}?${query}` : pathname);
 }
+
+export function buildManageBookingUrl(options?: {
+  embed?: boolean;
+}): string {
+  const pathname = options?.embed ? "/embed?intent=manage-booking" : "/manage-booking";
+  return buildPublicUrl(pathname);
+}

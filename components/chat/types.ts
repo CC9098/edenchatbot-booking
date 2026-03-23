@@ -25,6 +25,7 @@ export type OptionKey =
   | `booking_clinic-${string}`
   | `booking_date-${string}`
   | `booking_time-${string}`
+  | `booking_manage_select-${number}`
   | 'booking_visit_first'
   | 'booking_visit_followup'
   | `booking_receipt-${string}`
@@ -46,8 +47,26 @@ export type BookingStep =
   | 'lastName' | 'firstName' | 'phone' | 'email'
   | 'receipt' | 'medicationPickup'
   | 'idCard' | 'dob' | 'gender' | 'allergies' | 'medications' | 'symptoms' | 'referralSource'
-  | 'manageBookingId' | 'managePhone' | 'manageConfirmCancel' | 'manageConfirmReschedule'
+  | 'managePhone' | 'manageOtp' | 'manageSelect' | 'manageConfirmCancel' | 'manageConfirmReschedule'
   | 'confirm';
+
+export type ManageBookingOption = {
+  bookingId: string;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'failed';
+  patientName: string;
+  doctorId: string;
+  doctorNameZh: string;
+  clinicId: string;
+  clinicNameZh: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  durationMinutes: number;
+  visitType: 'first' | 'followup';
+  clinicWhatsappUrl: string | null;
+  canSelfManage: boolean;
+  message: string;
+  manageToken?: string;
+};
 
 export type BookingState = {
   step: BookingStep;
@@ -68,6 +87,7 @@ export type BookingState = {
   bookingId?: string;
   manageToken?: string;
   manageMessage?: string;
+  manageBookings?: ManageBookingOption[];
   clinicWhatsappUrl?: string | null;
   needReceipt?: string;
   medicationPickup?: string;
