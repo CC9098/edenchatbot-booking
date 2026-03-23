@@ -30,6 +30,9 @@ Booking system backend and frontend for Eden TCM Clinic (醫天圓).
 | `CHATWOOT_WHATSAPP_TEMPLATE_NAME` | Approved WhatsApp template name used for new outbound booking confirmations |
 | `CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE` | Optional. WhatsApp template language, defaults to `zh_HK` |
 | `CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY` | Optional. WhatsApp template category, defaults to `UTILITY` |
+| `CHATWOOT_WHATSAPP_REMINDER_TEMPLATE_NAME` | Optional. Approved WhatsApp template name used for 24-hour reminder messages |
+| `CHATWOOT_WHATSAPP_REMINDER_TEMPLATE_LANGUAGE` | Optional. 24-hour reminder template language, defaults to `zh_HK` |
+| `CHATWOOT_WHATSAPP_REMINDER_TEMPLATE_CATEGORY` | Optional. 24-hour reminder template category, defaults to `UTILITY` |
 | `CHATWOOT_WEBHOOK_SECRET` | Optional but recommended. Validates the Agent Bot webhook signature |
 
 ### URL Resolution Logic

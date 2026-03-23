@@ -2,15 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { formatInTimeZone } from 'date-fns-tz';
 
 import { listEventsInRange, patchEventPrivateMetadata } from '@/lib/google-calendar';
+import { sendBookingReminderWhatsapp } from '@/lib/chatwoot-whatsapp';
 import { sendBookingReminderEmail } from '@/lib/gmail';
 import { getActiveCalendarIds } from '@/lib/doctor-schedule-store';
 import { CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
+import { getClinicWhatsappPhone } from '@/lib/whatsapp-booking';
+import { type BookingVisitType } from '@/lib/booking-intake-storage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
-const REMINDER_SENT_KEY = 'eden_reminder_24h_sent_at';
+const EMAIL_REMINDER_SENT_KEY = 'eden_reminder_24h_sent_at';
+const WHATSAPP_REMINDER_SENT_KEY = 'eden_reminder_24h_whatsapp_sent_at';
+
+function inferVisitType(description: string): BookingVisitType {
+  if (/first|首診/i.test(description)) {
+    return 'first';
+  }
+
+  return 'followup';
+}
 
 function parseLineValue(description: string, label: string): string {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -25,6 +37,7 @@ function extractBookingEmailMetadata(event: any) {
   const patientName =
     parseLineValue(description, 'Patient / 病人') ||
     summary.split(' - ').slice(1).join(' - ').trim();
+  const patientPhone = parseLineValue(description, 'Phone / 電話');
   const patientEmail = parseLineValue(description, 'Email / 電郵');
 
   const doctorMatch = description.match(/Doctor \/ 醫師:\s*(.+?)\s*\((.+?)\)/);
@@ -44,12 +57,15 @@ function extractBookingEmailMetadata(event: any) {
 
   return {
     patientName,
+    patientPhone,
     patientEmail,
     doctorName,
     doctorNameZh,
     clinicName,
     clinicNameZh,
     clinicAddress,
+    clinicId,
+    visitType: inferVisitType(description),
   };
 }
 
@@ -98,11 +114,16 @@ export async function GET(request: NextRequest) {
     calendars: 0,
     eventsScanned: 0,
     eligible: 0,
-    alreadySent: 0,
+    emailAlreadySent: 0,
+    whatsappAlreadySent: 0,
     skippedInvalid: 0,
-    wouldSend: 0,
-    sent: 0,
-    sendFailed: 0,
+    emailWouldSend: 0,
+    whatsappWouldSend: 0,
+    emailSent: 0,
+    whatsappSent: 0,
+    emailSendFailed: 0,
+    whatsappSendFailed: 0,
+    whatsappSkippedInvalid: 0,
     marked: 0,
     markFailed: 0,
     calendarErrors: [] as string[],
@@ -123,11 +144,8 @@ export async function GET(request: NextRequest) {
 
       if (event?.status === 'cancelled') continue;
 
-      const alreadySentAt = event?.extendedProperties?.private?.[REMINDER_SENT_KEY];
-      if (alreadySentAt) {
-        summary.alreadySent += 1;
-        continue;
-      }
+      const emailAlreadySentAt = event?.extendedProperties?.private?.[EMAIL_REMINDER_SENT_KEY];
+      const whatsappAlreadySentAt = event?.extendedProperties?.private?.[WHATSAPP_REMINDER_SENT_KEY];
 
       const payload = buildReminderPayload(event, calendarId);
       if (!payload) {
@@ -137,25 +155,81 @@ export async function GET(request: NextRequest) {
 
       summary.eligible += 1;
 
+      const shouldSendEmail = !emailAlreadySentAt;
+      const shouldSendWhatsapp = !whatsappAlreadySentAt;
+
+      if (!shouldSendEmail) {
+        summary.emailAlreadySent += 1;
+      }
+
+      if (!shouldSendWhatsapp) {
+        summary.whatsappAlreadySent += 1;
+      }
+
+      if (!shouldSendEmail && !shouldSendWhatsapp) {
+        continue;
+      }
+
       if (dryRun) {
-        summary.wouldSend += 1;
+        if (shouldSendEmail) {
+          summary.emailWouldSend += 1;
+        }
+
+        if (shouldSendWhatsapp) {
+          if (payload.patientPhone) {
+            summary.whatsappWouldSend += 1;
+          } else {
+            summary.whatsappSkippedInvalid += 1;
+          }
+        }
         continue;
       }
 
-      const sendResult = await sendBookingReminderEmail(payload);
-      if (!sendResult.success) {
-        summary.sendFailed += 1;
-        continue;
-      }
-      summary.sent += 1;
+      const metadataToPatch: Record<string, string> = {};
 
-      const markResult = await patchEventPrivateMetadata(calendarId, payload.eventId, {
-        [REMINDER_SENT_KEY]: nowIso,
-      });
-      if (markResult.success) {
-        summary.marked += 1;
-      } else {
-        summary.markFailed += 1;
+      if (shouldSendEmail) {
+        const emailResult = await sendBookingReminderEmail(payload);
+        if (!emailResult.success) {
+          summary.emailSendFailed += 1;
+        } else {
+          summary.emailSent += 1;
+          metadataToPatch[EMAIL_REMINDER_SENT_KEY] = nowIso;
+        }
+      }
+
+      if (shouldSendWhatsapp) {
+        if (!payload.patientPhone) {
+          summary.whatsappSkippedInvalid += 1;
+        } else {
+          const whatsappResult = await sendBookingReminderWhatsapp({
+            bookingId: payload.eventId,
+            patientName: payload.patientName,
+            phone: payload.patientPhone,
+            email: payload.patientEmail,
+            doctorNameZh: payload.doctorNameZh,
+            clinicNameZh: payload.clinicNameZh,
+            appointmentDate: payload.date,
+            appointmentTime: payload.time,
+            visitType: payload.visitType,
+            clinicWhatsappPhone: payload.clinicId ? getClinicWhatsappPhone(payload.clinicId) : null,
+          });
+
+          if (!whatsappResult.success) {
+            summary.whatsappSendFailed += 1;
+          } else {
+            summary.whatsappSent += 1;
+            metadataToPatch[WHATSAPP_REMINDER_SENT_KEY] = nowIso;
+          }
+        }
+      }
+
+      if (Object.keys(metadataToPatch).length > 0) {
+        const markResult = await patchEventPrivateMetadata(calendarId, payload.eventId, metadataToPatch);
+        if (markResult.success) {
+          summary.marked += 1;
+        } else {
+          summary.markFailed += 1;
+        }
       }
     }
   }
