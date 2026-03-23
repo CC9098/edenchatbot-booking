@@ -36,9 +36,17 @@ function formatClinicLabel(clinicNameZh?: string) {
 type ChatWidgetProps = {
   autoOpen?: boolean;
   initialIntent?: 'manage-booking';
+  initialManageAction?: 'reschedule' | 'cancel';
+  layout?: 'floating' | 'page';
 };
 
-export function ChatWidget({ autoOpen = false, initialIntent }: ChatWidgetProps = {}) {
+export function ChatWidget({
+  autoOpen = false,
+  initialIntent,
+  initialManageAction,
+  layout = 'floating',
+}: ChatWidgetProps = {}) {
+  const isPageLayout = layout === 'page';
   const [open, setOpen] = useState(false);
   const [widgetSessionId, setWidgetSessionId] = useState('');
   const [iosKeyboardOffset, setIosKeyboardOffset] = useState(0);
@@ -140,10 +148,10 @@ export function ChatWidget({ autoOpen = false, initialIntent }: ChatWidgetProps 
   }, [open]);
 
   useEffect(() => {
-    if (autoOpen) {
+    if (autoOpen || isPageLayout) {
       setOpen(true);
     }
-  }, [autoOpen]);
+  }, [autoOpen, isPageLayout]);
 
   useEffect(() => {
     if (open && messages.length === 0 && initialIntent !== 'manage-booking') {
@@ -385,16 +393,29 @@ export function ChatWidget({ autoOpen = false, initialIntent }: ChatWidgetProps 
     if (initialIntent === 'manage-booking') {
       initialIntentHandledRef.current = true;
       addBotMessage(buildWidgetGreetingMessage(widgetSettings, getWhatsappContactLines()));
-      setBookingMode(true);
-      setBooking({ step: 'entry' });
-      addBotMessage('請先選擇你要管理的預約操作：');
-      setOptions([
-        { label: '更改預約', value: 'booking_manage_reschedule' },
-        { label: '取消預約', value: 'booking_manage_cancel' },
-        returnMainOption,
-      ]);
+      if (initialManageAction) {
+        setBookingMode(true);
+        setBooking({
+          step: 'managePhone',
+          mode: initialManageAction,
+          manageBookings: [],
+        });
+        addBotMessage(
+          `${initialManageAction === 'cancel' ? '我會幫你處理取消預約。' : '我會幫你處理更改預約。'}\n\n請輸入你預約時使用的 WhatsApp 電話號碼。\n\n我們會發送 6 位數驗證碼到該 WhatsApp。`
+        );
+        setOptions([returnMainOption]);
+      } else {
+        setBookingMode(true);
+        setBooking({ step: 'entry' });
+        addBotMessage('請先選擇你要管理的預約操作：');
+        setOptions([
+          { label: '更改預約', value: 'booking_manage_reschedule' },
+          { label: '取消預約', value: 'booking_manage_cancel' },
+          returnMainOption,
+        ]);
+      }
     }
-  }, [open, initialIntent, messages.length, addBotMessage, widgetSettings, returnMainOption]);
+  }, [open, initialIntent, initialManageAction, messages.length, addBotMessage, widgetSettings, returnMainOption]);
 
   const buildDateOptionsForClinic = (
     doctorNameZh: string | undefined,
@@ -1501,8 +1522,10 @@ export function ChatWidget({ autoOpen = false, initialIntent }: ChatWidgetProps 
     } else if (s === 'doctor') {
       showBookingEntryOptions('你想新預約，定更改／取消現有預約？');
     } else if (s === 'managePhone') {
-      if (initialIntent === 'manage-booking') {
+      if (initialIntent === 'manage-booking' && !initialManageAction) {
         showManageActionOptions('請選擇你要處理的預約操作：');
+      } else if (initialManageAction) {
+        resetToMain();
       } else {
         showBookingEntryOptions('你想新預約，定更改／取消現有預約？');
       }
@@ -1679,6 +1702,150 @@ export function ChatWidget({ autoOpen = false, initialIntent }: ChatWidgetProps 
     return '';
   }, [aiMode, formMode, formStep, bookingMode, booking.step, consultationFlow]);
 
+  const chatPanel = (
+    <motion.div
+      initial={isPageLayout ? { opacity: 0, y: 28 } : { opacity: 0, scale: 0.9, y: 20 }}
+      animate={isPageLayout ? { opacity: 1, y: 0 } : { opacity: 1, scale: 1, y: 0 }}
+      exit={isPageLayout ? undefined : { opacity: 0, scale: 0.95, y: 12 }}
+      transition={{ type: 'spring', stiffness: 220, damping: 18 }}
+      className={isPageLayout ? 'relative w-full' : 'relative w-[calc(100vw-2.5rem)] sm:w-[380px]'}
+      style={{ pointerEvents: 'auto' }}
+    >
+      <div className={`flex flex-col overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-2xl ${
+        isPageLayout
+          ? 'h-[min(76vh,760px)] min-h-[560px]'
+          : 'h-[calc(100dvh-8rem)] max-h-[640px] min-h-[420px] sm:h-[560px]'
+      }`}>
+        <div className="relative overflow-hidden">
+          <div
+            className="flex items-center justify-between gap-3 px-5 py-3"
+            style={{ backgroundColor: PRIMARY }}
+          >
+            <div className="flex items-center gap-3 text-white">
+              <div className="flex flex-col leading-tight">
+                <span className="text-lg font-semibold">{widgetSettings.header.title}</span>
+                <span className="text-xs font-semibold text-white/90">{widgetSettings.header.subtitle}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-white">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  clearMessages();
+                  resetToMain();
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.currentTarget.style.opacity = '';
+                  clearMessages();
+                  resetToMain();
+                }}
+                onTouchStart={(e) => {
+                  e.currentTarget.style.opacity = '0.7';
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                }}
+                onTouchCancel={(e) => {
+                  e.currentTarget.style.opacity = '';
+                  e.currentTarget.style.backgroundColor = '';
+                }}
+                className="flex items-center gap-1 rounded-full px-2 py-1.5 text-xs transition hover:bg-white/20 active:bg-white/30"
+                style={{
+                  touchAction: 'manipulation',
+                  minHeight: '44px',
+                  minWidth: '44px',
+                  WebkitTapHighlightColor: 'transparent',
+                  WebkitUserSelect: 'none',
+                  userSelect: 'none'
+                }}
+                aria-label={widgetSettings.header.restartButtonLabel}
+                type="button"
+              >
+                <RotateCcw size={14} />
+                <span>{widgetSettings.header.restartButtonLabel}</span>
+              </button>
+              {!isPageLayout && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setOpen(false);
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.style.opacity = '';
+                    setOpen(false);
+                  }}
+                  onTouchStart={(e) => {
+                    e.currentTarget.style.opacity = '0.7';
+                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                  }}
+                  onTouchCancel={(e) => {
+                    e.currentTarget.style.opacity = '';
+                    e.currentTarget.style.backgroundColor = '';
+                  }}
+                  className="rounded-full p-2 transition hover:bg-white/20 active:bg-white/30"
+                  style={{
+                    touchAction: 'manipulation',
+                    minHeight: '44px',
+                    minWidth: '44px',
+                    WebkitTapHighlightColor: 'transparent',
+                    WebkitUserSelect: 'none',
+                    userSelect: 'none'
+                  }}
+                  aria-label="收起"
+                  type="button"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-gray-50 to-white">
+          <div
+            ref={viewportRef}
+            className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4 scrollbar-thin scrollbar-thumb-gray-200/70 scrollbar-track-transparent"
+          >
+            <ChatMessages
+              messages={messages}
+              linkify={linkify}
+              primaryColor={PRIMARY}
+              sessionId={widgetSessionId}
+            />
+          </div>
+
+          {options.length > 0 && (
+            <ChatOptions options={options} onSelect={handleOptionSelect} primaryColor={PRIMARY} />
+          )}
+        </div>
+
+        {showInput && (
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            placeholder={placeholder}
+            onSend={handleSend}
+            primaryColor={PRIMARY}
+            aiMode={aiMode}
+            formError={formError}
+          />
+        )}
+      </div>
+    </motion.div>
+  );
+
+  if (isPageLayout) {
+    return (
+      <div className="relative z-10 mx-auto flex w-full max-w-[460px] flex-1 px-4 pb-8 sm:px-0">
+        {chatPanel}
+      </div>
+    );
+  }
+
   return (
     <div
       className="fixed right-0 z-50 flex flex-col items-end gap-4 p-4"
@@ -1686,141 +1853,13 @@ export function ChatWidget({ autoOpen = false, initialIntent }: ChatWidgetProps 
         bottom: open
           ? `calc(env(safe-area-inset-bottom, 0px) + ${iosKeyboardOffset}px)`
           : 'calc(env(safe-area-inset-bottom, 0px) + 120px)',
-        pointerEvents: open ? 'auto' : 'none', // iOS/Safari 對子元素 pointer-events:auto 支援不一致，開啟時直接允許事件命中容器
+        pointerEvents: open ? 'auto' : 'none',
         touchAction: 'manipulation',
         transition: 'bottom 0.3s ease',
       }}
     >
       <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 12 }}
-            transition={{ type: 'spring', stiffness: 220, damping: 18 }}
-            className="relative w-[calc(100vw-2.5rem)] sm:w-[380px]"
-            style={{ pointerEvents: 'auto' }}
-          >
-            <div className="flex h-[calc(100dvh-8rem)] max-h-[640px] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:h-[560px]">
-              <div className="relative overflow-hidden">
-                <div
-                  className="flex items-center justify-between gap-3 px-5 py-3"
-                  style={{ backgroundColor: PRIMARY }}
-                >
-                  <div className="flex items-center gap-3 text-white">
-                    <div className="flex flex-col leading-tight">
-                      <span className="text-lg font-semibold">{widgetSettings.header.title}</span>
-                      <span className="text-xs font-semibold text-white/90">{widgetSettings.header.subtitle}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 text-white">
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        clearMessages();
-                        resetToMain();
-                      }}
-                      onTouchEnd={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        e.currentTarget.style.opacity = '';
-                        clearMessages();
-                        resetToMain();
-                      }}
-                      onTouchStart={(e) => {
-                        e.currentTarget.style.opacity = '0.7';
-                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
-                      }}
-                      onTouchCancel={(e) => {
-                        e.currentTarget.style.opacity = '';
-                        e.currentTarget.style.backgroundColor = '';
-                      }}
-                      className="flex items-center gap-1 rounded-full px-2 py-1.5 text-xs transition hover:bg-white/20 active:bg-white/30"
-                      style={{
-                        touchAction: 'manipulation',
-                        minHeight: '44px',
-                        minWidth: '44px',
-                        WebkitTapHighlightColor: 'transparent',
-                        WebkitUserSelect: 'none',
-                        userSelect: 'none'
-                      }}
-                      aria-label={widgetSettings.header.restartButtonLabel}
-                      type="button"
-                    >
-                      <RotateCcw size={14} />
-                      <span>{widgetSettings.header.restartButtonLabel}</span>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setOpen(false);
-                      }}
-                      onTouchEnd={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        e.currentTarget.style.opacity = '';
-                        setOpen(false);
-                      }}
-                      onTouchStart={(e) => {
-                        e.currentTarget.style.opacity = '0.7';
-                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
-                      }}
-                      onTouchCancel={(e) => {
-                        e.currentTarget.style.opacity = '';
-                        e.currentTarget.style.backgroundColor = '';
-                      }}
-                      className="rounded-full p-2 transition hover:bg-white/20 active:bg-white/30"
-                      style={{
-                        touchAction: 'manipulation',
-                        minHeight: '44px',
-                        minWidth: '44px',
-                        WebkitTapHighlightColor: 'transparent',
-                        WebkitUserSelect: 'none',
-                        userSelect: 'none'
-                      }}
-                      aria-label="收起"
-                      type="button"
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-gray-50 to-white">
-                <div
-                  ref={viewportRef}
-                  className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4 scrollbar-thin scrollbar-thumb-gray-200/70 scrollbar-track-transparent"
-                >
-                  <ChatMessages
-                    messages={messages}
-                    linkify={linkify}
-                    primaryColor={PRIMARY}
-                    sessionId={widgetSessionId}
-                  />
-                </div>
-
-                {options.length > 0 && (
-                  <ChatOptions options={options} onSelect={handleOptionSelect} primaryColor={PRIMARY} />
-                )}
-              </div>
-
-              {showInput && (
-                <ChatInput
-                  value={input}
-                  onChange={setInput}
-                  placeholder={placeholder}
-                  onSend={handleSend}
-                  primaryColor={PRIMARY}
-                  aiMode={aiMode}
-                  formError={formError}
-                />
-              )}
-            </div>
-          </motion.div>
-        )}
+        {open && chatPanel}
       </AnimatePresence>
 
       <button

@@ -144,7 +144,19 @@ export function buildBookingUrl(options?: {
 
 export function buildManageBookingUrl(options?: {
   embed?: boolean;
+  action?: "reschedule" | "cancel";
 }): string {
-  const pathname = options?.embed ? "/embed?intent=manage-booking" : "/manage-booking";
-  return buildPublicUrl(pathname);
+  const pathname = options?.embed ? "/embed" : "/manage-booking";
+  const params = new URLSearchParams();
+
+  if (options?.embed) {
+    params.set("intent", "manage-booking");
+  }
+
+  if (options?.action) {
+    params.set("action", options.action);
+  }
+
+  const query = params.toString();
+  return buildPublicUrl(query ? `${pathname}?${query}` : pathname);
 }

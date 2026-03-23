@@ -9,6 +9,13 @@ export default function Embed({
     ? searchParams?.intent[0]
     : searchParams?.intent;
   const initialIntent = intentParam === 'manage-booking' ? 'manage-booking' : undefined;
+  const actionParam = Array.isArray(searchParams?.action)
+    ? searchParams?.action[0]
+    : searchParams?.action;
+  const initialManageAction =
+    actionParam === 'reschedule' || actionParam === 'cancel'
+      ? actionParam
+      : undefined;
 
   return (
     <main 
@@ -23,7 +30,11 @@ export default function Embed({
         WebkitTapHighlightColor: 'transparent'
       }}
     >
-      <ChatWidget autoOpen={Boolean(initialIntent)} initialIntent={initialIntent} />
+      <ChatWidget
+        autoOpen={Boolean(initialIntent)}
+        initialIntent={initialIntent}
+        initialManageAction={initialManageAction}
+      />
     </main>
   );
 }
