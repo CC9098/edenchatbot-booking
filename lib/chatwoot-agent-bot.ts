@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { LegacyChatMessage } from '@/lib/legacy-chat-response';
 import { getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
-import { buildPublicUrl } from '@/lib/public-url';
+import { buildManageBookingUrl, buildPublicUrl } from '@/lib/public-url';
 import { createServiceClient } from '@/lib/supabase';
 import { DEFAULT_WIDGET_CHATBOT_SETTINGS } from '@/lib/widget-chatbot-settings';
 import {
@@ -14,12 +14,12 @@ import {
 export const CHATWOOT_MAIN_MENU_PROMPT = '你好，我們是醫天圓中醫診所，請問有什麼可以幫到你？';
 export const CHATWOOT_MAIN_MENU_ITEMS = [
   { title: '一般查詢', value: 'general' },
-  { title: '預約', value: 'booking' },
+  { title: '預約 / 更改', value: 'booking' },
   { title: '想直接與姑娘對話', value: 'human' },
 ] as const;
 export const CHATWOOT_MAIN_MENU_MESSAGE = `${CHATWOOT_MAIN_MENU_PROMPT}
 1. 一般查詢
-2. 預約
+2. 預約 / 更改
 3. 想直接與姑娘對話`;
 
 const widgetSettings = DEFAULT_WIDGET_CHATBOT_SETTINGS;
@@ -405,12 +405,19 @@ async function getChatwootBookableDoctors(): Promise<Array<{ id: string; nameZh:
 export async function buildChatwootBookingDoctorReply(): Promise<string> {
   const doctors = await getChatwootBookableDoctors();
   const genericBookingUrl = buildPublicUrl('/booking-whatsapp');
+  const manageRescheduleUrl = buildManageBookingUrl({ action: 'reschedule' });
+  const manageCancelUrl = buildManageBookingUrl({ action: 'cancel' });
 
   if (doctors.length === 0) {
     return [
-      '收到，你想預約。',
-      '請直接用以下 WhatsApp 預約頁揀醫師、診所同時段：',
+      '收到，呢度可以處理新預約同更改預約。',
+      '',
+      '新預約請用以下 WhatsApp 預約頁揀醫師、診所同時段：',
       genericBookingUrl,
+      '',
+      '如你想更改或取消已有預約，可用以下管理預約入口：',
+      `更改預約：${manageRescheduleUrl}`,
+      `取消預約：${manageCancelUrl}`,
       '',
       '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
     ].join('\n');
@@ -423,9 +430,13 @@ export async function buildChatwootBookingDoctorReply(): Promise<string> {
   ]);
 
   return [
-    '請問你想預約邊位醫師？以下每位醫師都有自己嘅專屬 WhatsApp 預約頁，直接按對應連結就可以進入：',
+    '如果你想新預約，可直接按以下醫師嘅專屬 WhatsApp 預約頁：',
     '',
     ...doctorLines.slice(0, -1),
+    '',
+    '如你想更改或取消已有預約，可用以下管理預約入口：',
+    `更改預約：${manageRescheduleUrl}`,
+    `取消預約：${manageCancelUrl}`,
     '',
     '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
   ].join('\n');
@@ -465,8 +476,8 @@ export function resolveMenuSelection(
     {
       kind: 'booking',
       pattern: allowNumeric
-        ? /^(?:2(?:[.)、\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u
-        : /^(?:預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u,
+        ? /^(?:2(?:[.)、\s-]|$)|預約\s*\/\s*更改(?:[:：\s-]|$)|预约\s*\/\s*更改(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$)|更改預約(?:[:：\s-]|$)|更改(?:[:：\s-]|$)|改期(?:[:：\s-]|$)|取消預約(?:[:：\s-]|$)|取消(?:[:：\s-]|$))/u
+        : /^(?:預約\s*\/\s*更改(?:[:：\s-]|$)|预约\s*\/\s*更改(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$)|更改預約(?:[:：\s-]|$)|更改(?:[:：\s-]|$)|改期(?:[:：\s-]|$)|取消預約(?:[:：\s-]|$)|取消(?:[:：\s-]|$))/u,
     },
     {
       kind: 'human',
