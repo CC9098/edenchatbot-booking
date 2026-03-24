@@ -46,6 +46,18 @@ type BookingFormValues = {
 };
 
 type BookingFormErrors = Partial<Record<keyof BookingFormValues, string>>;
+type ClinicAvailabilityState = 'available' | 'unavailable' | 'unknown';
+type MonthClinicAvailability = Record<
+  string,
+  Partial<Record<ClinicId, ClinicAvailabilityState>>
+>;
+type AvailabilityRequestResult = {
+  slots: string[];
+  isClosedDay: boolean;
+  status: ClinicAvailabilityState;
+  errorMessage?: string;
+  calendarUnavailable?: boolean;
+};
 
 type BookingTabFlowProps = {
   doctors: BookableDoctorSchedule[];
@@ -103,6 +115,38 @@ const REFERRAL_SOURCE_LABELS: Record<string, string> = {
   walk_in: '路過',
   other: '其他',
 };
+
+const CLINIC_AVAILABILITY_STYLES: Record<
+  ClinicId,
+  {
+    dotClassName: string;
+    badgeClassName: string;
+    selectedButtonClassName: string;
+  }
+> = {
+  central: {
+    dotClassName: 'bg-sky-500',
+    badgeClassName: 'border-sky-200 bg-sky-50 text-sky-800',
+    selectedButtonClassName: 'border-sky-300 bg-sky-50 text-sky-900',
+  },
+  jordan: {
+    dotClassName: 'bg-emerald-500',
+    badgeClassName: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    selectedButtonClassName: 'border-emerald-300 bg-emerald-50 text-emerald-900',
+  },
+  tsuenwan: {
+    dotClassName: 'bg-amber-500',
+    badgeClassName: 'border-amber-200 bg-amber-50 text-amber-800',
+    selectedButtonClassName: 'border-amber-300 bg-amber-50 text-amber-900',
+  },
+  online: {
+    dotClassName: 'bg-rose-500',
+    badgeClassName: 'border-rose-200 bg-rose-50 text-rose-800',
+    selectedButtonClassName: 'border-rose-300 bg-rose-50 text-rose-900',
+  },
+};
+
+const UNAVAILABLE_DOT_CLASS_NAME = 'bg-slate-300';
 
 const INITIAL_FORM_VALUES: BookingFormValues = {
   firstName: '',
@@ -169,6 +213,77 @@ function formatDateForDisplay(dateIso: string): string {
     day: 'numeric',
     weekday: 'long',
   }).format(date);
+}
+
+function formatShortDate(dateIso: string): string {
+  if (!dateIso) return '';
+
+  const date = new Date(`${dateIso}T00:00:00+08:00`);
+  if (Number.isNaN(date.getTime())) return dateIso;
+
+  return new Intl.DateTimeFormat('zh-HK', {
+    timeZone: HONG_KONG_TIMEZONE,
+    month: 'numeric',
+    day: 'numeric',
+  }).format(date);
+}
+
+async function requestAvailabilityForDoctor(
+  targetDoctorId: DoctorId,
+  targetClinicId: ClinicId,
+  dateIso: string
+): Promise<AvailabilityRequestResult> {
+  try {
+    const response = await fetch('/api/availability', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        doctorId: targetDoctorId,
+        clinicId: targetClinicId,
+        date: dateIso,
+        durationMinutes: SLOT_INTERVAL_MINUTES,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      if (data?.errorCode === 'CALENDAR_UNAVAILABLE') {
+        return {
+          slots: [],
+          isClosedDay: false,
+          status: 'unknown',
+          calendarUnavailable: true,
+          errorMessage: '暫時未能連接預約日曆，請稍後再試或在聊天頁由姑娘協助安排。',
+        };
+      }
+
+      return {
+        slots: [],
+        isClosedDay: false,
+        status: 'unknown',
+        errorMessage: data?.error || '暫時未能讀取可預約時段，請稍後再試。',
+      };
+    }
+
+    const slots = Array.isArray(data?.slots) ? data.slots : [];
+    const isClosedDay = Boolean(data?.isClosed || data?.isHoliday);
+
+    return {
+      slots,
+      isClosedDay,
+      status: !isClosedDay && slots.length > 0 ? 'available' : 'unavailable',
+    };
+  } catch {
+    return {
+      slots: [],
+      isClosedDay: false,
+      status: 'unknown',
+      errorMessage: '載入時段失敗，請稍後再試。',
+    };
+  }
 }
 
 function padTwo(value: number): string {
@@ -347,7 +462,9 @@ export function BookingTabFlow({
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotError, setSlotError] = useState('');
   const [calendarMonthKey, setCalendarMonthKey] = useState(() => toMonthKeyInHongKong(new Date()));
-  const [bookableDatesInMonth, setBookableDatesInMonth] = useState<Record<string, boolean>>({});
+  const [monthClinicAvailability, setMonthClinicAvailability] = useState<MonthClinicAvailability>(
+    {}
+  );
   const [bookableDatesLoading, setBookableDatesLoading] = useState(false);
   const [bookableDatesError, setBookableDatesError] = useState('');
 
@@ -384,6 +501,14 @@ export function BookingTabFlow({
     () => clinicOptions.find((clinic) => clinic.clinicId === clinicId),
     [clinicId, clinicOptions]
   );
+  const scannableClinics = selectedDoctor?.clinics ?? [];
+  const visibleClinics = useMemo(
+    () =>
+      clinicId
+        ? scannableClinics.filter((clinic) => clinic.clinicId === clinicId)
+        : scannableClinics,
+    [clinicId, scannableClinics]
+  );
   const pageTitle = '預約服務';
   const pageSubtitle = isWhatsappFlow
     ? '成功預約後，診所會透過 WhatsApp 發送確認訊息到你提供的電話。'
@@ -400,8 +525,8 @@ export function BookingTabFlow({
   const successQuote = '「每一次回來，身體都記得。」';
   const referenceLabel = '預約編號';
 
-  const canContinueSetup = Boolean(doctorId && clinicId && visitType);
-  const canContinueTimeslot = Boolean(selectedDate && selectedTime);
+  const canContinueSetup = Boolean(doctorId && visitType);
+  const canContinueTimeslot = Boolean(selectedDate && selectedTime && clinicId);
   const previousMonthKey = shiftMonthKey(calendarMonthKey, -1);
   const nextMonthKey = shiftMonthKey(calendarMonthKey, 1);
   const canGoToPreviousMonth = monthHasSelectableDate(previousMonthKey, minDate, maxDate);
@@ -409,6 +534,19 @@ export function BookingTabFlow({
   const hasAutofilledContact = Boolean(
     initialContact?.displayName || initialContact?.email || initialContact?.phone
   );
+
+  function getClinicsForFilter(filterClinicId: ClinicId | '' = clinicId) {
+    if (!filterClinicId) return scannableClinics;
+    return scannableClinics.filter((clinic) => clinic.clinicId === filterClinicId);
+  }
+
+  function isDateFullyUnavailable(dateIso: string, filterClinicId: ClinicId | '' = clinicId) {
+    const clinics = getClinicsForFilter(filterClinicId);
+    if (clinics.length === 0) return false;
+
+    const dateAvailability = monthClinicAvailability[dateIso] ?? {};
+    return clinics.every((clinic) => dateAvailability[clinic.clinicId] === 'unavailable');
+  }
 
   useEffect(() => {
     if (!doctorId) {
@@ -450,17 +588,123 @@ export function BookingTabFlow({
       if (day < 1 || day > daysInMonth) return null;
 
       const dateIso = isoDateFromMonthDay(calendarMonthKey, day);
+      const dateAvailability = monthClinicAvailability[dateIso] ?? {};
+      const availableClinicIds = visibleClinics
+        .filter((clinic) => dateAvailability[clinic.clinicId] === 'available')
+        .map((clinic) => clinic.clinicId);
+      const hasUnknownAvailability = visibleClinics.some((clinic) => {
+        const state = dateAvailability[clinic.clinicId];
+        return typeof state === 'undefined' || state === 'unknown';
+      });
+      const isUnavailable =
+        visibleClinics.length > 0 && availableClinicIds.length === 0 && !hasUnknownAvailability;
+      const availableClinicNames = visibleClinics
+        .filter((clinic) => availableClinicIds.includes(clinic.clinicId))
+        .map((clinic) => clinic.clinicNameZh);
+
       return {
         dateIso,
         day,
         isSelectable: dateIso >= minDate && dateIso <= maxDate,
-        hasAvailability: bookableDatesInMonth[dateIso] === true,
+        availableClinicIds,
+        isUnavailable,
+        availabilityLabel:
+          availableClinicNames.length > 0
+            ? `${availableClinicNames.join('、')}有位`
+            : isUnavailable
+              ? clinicId
+                ? `${visibleClinics[0]?.clinicNameZh || '所選診所'}暫滿`
+                : '所有診所暫滿'
+              : '正在掃描 availability',
       };
     });
-  }, [bookableDatesInMonth, calendarMonthKey, maxDate, minDate]);
+  }, [calendarMonthKey, clinicId, maxDate, minDate, monthClinicAvailability, visibleClinics]);
+
+  const clinicMonthlySummaries = useMemo<
+    Partial<Record<ClinicId, { label: string; tone: 'available' | 'unavailable' | 'loading' | 'unknown' }>>
+  >(() => {
+    const summaries: Partial<
+      Record<ClinicId, { label: string; tone: 'available' | 'unavailable' | 'loading' | 'unknown' }>
+    > = {};
+    const daysInMonth = getDaysInMonth(calendarMonthKey);
+
+    for (const clinic of scannableClinics) {
+      let firstAvailableDate = '';
+      let hasUnavailableDate = false;
+      let hasUnknownDate = false;
+
+      for (let day = 1; day <= daysInMonth; day += 1) {
+        const dateIso = isoDateFromMonthDay(calendarMonthKey, day);
+        if (dateIso < minDate || dateIso > maxDate) continue;
+
+        const state = monthClinicAvailability[dateIso]?.[clinic.clinicId];
+        if (state === 'available') {
+          firstAvailableDate = dateIso;
+          break;
+        }
+
+        if (state === 'unavailable') {
+          hasUnavailableDate = true;
+          continue;
+        }
+
+        hasUnknownDate = true;
+      }
+
+      if (firstAvailableDate) {
+        summaries[clinic.clinicId] = {
+          label: `本月最早 ${formatShortDate(firstAvailableDate)} 可約`,
+          tone: 'available',
+        };
+        continue;
+      }
+
+      if (bookableDatesLoading) {
+        summaries[clinic.clinicId] = {
+          label: '正在掃描本月 availability',
+          tone: 'loading',
+        };
+        continue;
+      }
+
+      if (!hasUnknownDate && hasUnavailableDate) {
+        summaries[clinic.clinicId] = {
+          label: '本月暫滿',
+          tone: 'unavailable',
+        };
+        continue;
+      }
+
+      summaries[clinic.clinicId] = {
+        label: '稍後更新',
+        tone: 'unknown',
+      };
+    }
+
+    return summaries;
+  }, [bookableDatesLoading, calendarMonthKey, maxDate, minDate, monthClinicAvailability, scannableClinics]);
+
+  const selectedDateAllAvailableClinics = useMemo(() => {
+    if (!selectedDate) return [];
+
+    const dateAvailability = monthClinicAvailability[selectedDate] ?? {};
+    return scannableClinics.filter((clinic) => dateAvailability[clinic.clinicId] === 'available');
+  }, [monthClinicAvailability, scannableClinics, selectedDate]);
+
+  const selectedDateVisibleAvailableClinics = useMemo(() => {
+    if (!selectedDate) return [];
+
+    const dateAvailability = monthClinicAvailability[selectedDate] ?? {};
+    return visibleClinics.filter((clinic) => dateAvailability[clinic.clinicId] === 'available');
+  }, [monthClinicAvailability, selectedDate, visibleClinics]);
 
   useEffect(() => {
-    if (step !== 'timeslot' || !doctorId || !clinicId) return;
+    if (!doctorId || scannableClinics.length === 0) {
+      setMonthClinicAvailability({});
+      setBookableDatesLoading(false);
+      setBookableDatesError('');
+      return;
+    }
 
     const daysInMonth = getDaysInMonth(calendarMonthKey);
     const datesToScan: string[] = [];
@@ -472,7 +716,7 @@ export function BookingTabFlow({
       }
     }
 
-    setBookableDatesInMonth({});
+    setMonthClinicAvailability({});
     setBookableDatesError('');
 
     if (datesToScan.length === 0) {
@@ -484,45 +728,35 @@ export function BookingTabFlow({
     setBookableDatesLoading(true);
 
     const scanBookableDates = async () => {
-      const dateQueue = [...datesToScan];
-      const nextBookableDates: Record<string, boolean> = {};
-      let hasCalendarUnavailable = false;
-      const workerCount = Math.min(4, dateQueue.length);
+      const queue = datesToScan.flatMap((dateIso) =>
+        scannableClinics.map((clinic) => ({
+          dateIso,
+          clinicId: clinic.clinicId,
+        }))
+      );
+      const nextAvailability: MonthClinicAvailability = {};
+      let hasPartialRead = false;
+      const workerCount = Math.min(6, queue.length);
 
       await Promise.all(
         Array.from({ length: workerCount }, async () => {
-          while (dateQueue.length > 0 && !isCancelled) {
-            const dateIso = dateQueue.shift();
-            if (!dateIso) break;
+          while (queue.length > 0 && !isCancelled) {
+            const nextJob = queue.shift();
+            if (!nextJob) break;
 
-            try {
-              const response = await fetch('/api/availability', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  doctorId,
-                  clinicId,
-                  date: dateIso,
-                  durationMinutes: SLOT_INTERVAL_MINUTES,
-                }),
-              });
+            const result = await requestAvailabilityForDoctor(
+              doctorId,
+              nextJob.clinicId,
+              nextJob.dateIso
+            );
 
-              const data = await response.json();
-              if (!response.ok) {
-                if (data?.errorCode === 'CALENDAR_UNAVAILABLE') {
-                  hasCalendarUnavailable = true;
-                }
-                nextBookableDates[dateIso] = false;
-                continue;
-              }
+            nextAvailability[nextJob.dateIso] = {
+              ...(nextAvailability[nextJob.dateIso] ?? {}),
+              [nextJob.clinicId]: result.status,
+            };
 
-              const slots = Array.isArray(data?.slots) ? data.slots : [];
-              const isClosedDay = Boolean(data?.isClosed || data?.isHoliday);
-              nextBookableDates[dateIso] = !isClosedDay && slots.length > 0;
-            } catch {
-              nextBookableDates[dateIso] = false;
+            if (result.status === 'unknown' || result.calendarUnavailable) {
+              hasPartialRead = true;
             }
           }
         })
@@ -530,11 +764,11 @@ export function BookingTabFlow({
 
       if (isCancelled) return;
 
-      setBookableDatesInMonth(nextBookableDates);
+      setMonthClinicAvailability(nextAvailability);
       setBookableDatesLoading(false);
       setBookableDatesError(
-        hasCalendarUnavailable
-          ? '暫時未能完整讀取預約日曆，綠點可能未完全顯示。'
+        hasPartialRead
+          ? '暫時未能完整讀取預約日曆，彩色燈號可能未完全顯示。'
           : ''
       );
     };
@@ -544,18 +778,28 @@ export function BookingTabFlow({
     return () => {
       isCancelled = true;
     };
-  }, [calendarMonthKey, clinicId, doctorId, maxDate, minDate, step]);
+  }, [calendarMonthKey, doctorId, maxDate, minDate, scannableClinics]);
 
-  function resetSlotState() {
-    setSelectedDate('');
+  function clearSelectedTimeslot(keepDate = false) {
+    if (!keepDate) {
+      setSelectedDate('');
+    }
     setSelectedTime('');
     setAvailableSlots([]);
     setSlotsLoading(false);
     setSlotError('');
+  }
+
+  function resetAvailabilityOverview() {
     setCalendarMonthKey(toMonthKeyInHongKong(new Date()));
-    setBookableDatesInMonth({});
+    setMonthClinicAvailability({});
     setBookableDatesLoading(false);
     setBookableDatesError('');
+  }
+
+  function resetSlotState() {
+    clearSelectedTimeslot();
+    resetAvailabilityOverview();
   }
 
   function resetSubmissionState() {
@@ -575,10 +819,28 @@ export function BookingTabFlow({
   }
 
   function handleClinicChange(nextClinicId: string) {
-    setClinicId(nextClinicId as ClinicId);
-    setStep('setup');
-    resetSlotState();
+    const nextFilter = nextClinicId as ClinicId | '';
+    setClinicId(nextFilter);
     resetSubmissionState();
+
+    if (step === 'timeslot') {
+      clearSelectedTimeslot(true);
+
+      if (!selectedDate) return;
+
+      if (nextFilter) {
+        void fetchAvailability(selectedDate, nextFilter);
+        return;
+      }
+
+      if (isDateFullyUnavailable(selectedDate, '')) {
+        setSlotError('所選日期所有診所暫無可預約時段。');
+      }
+      return;
+    }
+
+    setStep('setup');
+    clearSelectedTimeslot();
   }
 
   function handleVisitTypeChange(nextVisitType: VisitType) {
@@ -588,69 +850,60 @@ export function BookingTabFlow({
     setSubmitError('');
   }
 
-  async function fetchAvailability(dateIso: string) {
-    if (!doctorId || !clinicId) return;
+  async function fetchAvailability(dateIso: string, targetClinicId?: ClinicId) {
+    if (!doctorId || !targetClinicId) return;
 
     setSlotsLoading(true);
     setSlotError('');
     setAvailableSlots([]);
     setSelectedTime('');
 
-    try {
-      const response = await fetch('/api/availability', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          doctorId,
-          clinicId,
-          date: dateIso,
-          durationMinutes: SLOT_INTERVAL_MINUTES,
-        }),
-      });
+    const result = await requestAvailabilityForDoctor(doctorId, targetClinicId, dateIso);
 
-      const data = await response.json();
+    setMonthClinicAvailability((prev) => ({
+      ...prev,
+      [dateIso]: {
+        ...(prev[dateIso] ?? {}),
+        [targetClinicId]: result.status,
+      },
+    }));
 
-      if (!response.ok) {
-        if (data?.errorCode === 'CALENDAR_UNAVAILABLE') {
-          setSlotError('暫時未能連接預約日曆，請稍後再試或在聊天頁由姑娘協助安排。');
-          return;
-        }
-
-        setSlotError(data?.error || '暫時未能讀取可預約時段，請稍後再試。');
-        return;
-      }
-
-      const slots = Array.isArray(data?.slots) ? data.slots : [];
-      const isClosedDay = Boolean(data?.isClosed || data?.isHoliday);
-      const hasBookableSlots = !isClosedDay && slots.length > 0;
-
-      setAvailableSlots(slots);
-      setBookableDatesInMonth((prev) => ({
-        ...prev,
-        [dateIso]: hasBookableSlots,
-      }));
-
-      if (isClosedDay) {
-        setSlotError('當日休診或公眾假期，請選擇其他日期。');
-        return;
-      }
-
-      if (slots.length === 0) {
-        setSlotError('當日暫無可預約時段。');
-      }
-    } catch {
-      setSlotError('載入時段失敗，請稍後再試。');
-    } finally {
+    if (result.status === 'unknown') {
+      setSlotError(
+        result.errorMessage || '暫時未能讀取可預約時段，請稍後再試。'
+      );
       setSlotsLoading(false);
+      return;
     }
+
+    setAvailableSlots(result.slots);
+
+    if (result.isClosedDay) {
+      setSlotError('當日休診或公眾假期，請選擇其他日期。');
+      setSlotsLoading(false);
+      return;
+    }
+
+    if (result.slots.length === 0) {
+      setSlotError('當日暫無可預約時段。');
+    }
+
+    setSlotsLoading(false);
   }
 
   function handleDateChange(dateIso: string) {
     setSelectedDate(dateIso);
     setCalendarMonthKey(toMonthKeyFromIsoDate(dateIso));
-    void fetchAvailability(dateIso);
+    clearSelectedTimeslot(true);
+
+    if (clinicId) {
+      void fetchAvailability(dateIso, clinicId);
+      return;
+    }
+
+    if (isDateFullyUnavailable(dateIso, '')) {
+      setSlotError('所選日期所有診所暫無可預約時段。');
+    }
   }
 
   function updateFormField<Key extends keyof BookingFormValues>(
@@ -898,20 +1151,23 @@ export function BookingTabFlow({
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-semibold text-slate-700">選擇診所</span>
+              <span className="text-sm font-semibold text-slate-700">選擇診所（可選）</span>
               <select
                 value={clinicId}
                 onChange={(event) => handleClinicChange(event.target.value)}
                 disabled={!doctorId}
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100"
               >
-                <option value="">{doctorId ? '請選擇診所' : '請先選擇醫師'}</option>
+                <option value="">{doctorId ? '比較全部診所（不篩選）' : '請先選擇醫師'}</option>
                 {clinicOptions.map((clinic) => (
                   <option key={clinic.clinicId} value={clinic.clinicId}>
                     {clinic.clinicNameZh} ({clinic.clinicNameEn})
                   </option>
                 ))}
               </select>
+              <p className="text-xs leading-relaxed text-slate-500">
+                可先留空，下一步會用彩色燈號直接比較各診所邊日有位。
+              </p>
             </label>
           </div>
 
@@ -928,7 +1184,7 @@ export function BookingTabFlow({
                       {selectedDoctor.doctorNameZh}
                     </h2>
                     <p className="mt-1 text-sm leading-relaxed text-slate-600">
-                      揀好醫師後可即時睇到固定應診時間，實際可預約日期會喺下一步顯示。
+                      可先睇固定應診時間，再去下一步用彩色燈號比較各診所邊日有位。
                     </p>
                   </div>
                 </div>
@@ -942,8 +1198,8 @@ export function BookingTabFlow({
                   </p>
                   <p className="mt-1 text-slate-500">
                     {selectedClinic
-                      ? `${selectedClinic.clinicNameZh} 已預選，可直接去下一步揀日期。`
-                      : '請再選擇診所，之後即可查看固定應診時間。'}
+                      ? `${selectedClinic.clinicNameZh} 已套用篩選，日曆只會顯示該診所燈號。`
+                      : '未鎖定診所，下一步可直接比較全部診所日期。'}
                   </p>
                 </div>
               </div>
@@ -959,6 +1215,24 @@ export function BookingTabFlow({
                 {selectedDoctor.clinics.map((clinic) => {
                   const scheduleLines = formatScheduleLines(clinic.schedule);
                   const isChosenClinic = clinic.clinicId === clinicId;
+                  const clinicStyle = CLINIC_AVAILABILITY_STYLES[clinic.clinicId];
+                  const clinicSummary = clinicMonthlySummaries[clinic.clinicId];
+                  const summaryClassName =
+                    clinicSummary?.tone === 'available'
+                      ? clinicStyle.badgeClassName
+                      : clinicSummary?.tone === 'unavailable'
+                        ? 'border-slate-200 bg-slate-100 text-slate-600'
+                        : clinicSummary?.tone === 'loading'
+                          ? 'border-slate-200 bg-white text-slate-600'
+                          : 'border-amber-200 bg-amber-50 text-amber-800';
+                  const summaryDotClassName =
+                    clinicSummary?.tone === 'available'
+                      ? clinicStyle.dotClassName
+                      : clinicSummary?.tone === 'unavailable'
+                        ? UNAVAILABLE_DOT_CLASS_NAME
+                        : clinicSummary?.tone === 'loading'
+                          ? 'bg-slate-300'
+                          : 'bg-amber-400';
 
                   return (
                     <div
@@ -978,11 +1252,19 @@ export function BookingTabFlow({
                             </span>
                           </p>
                         </div>
-                        {isChosenClinic && (
-                          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                            已選診所
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <span
+                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${summaryClassName}`}
+                          >
+                            <span className={`h-2 w-2 rounded-full ${summaryDotClassName}`} />
+                            {clinicSummary?.label || '稍後更新'}
                           </span>
-                        )}
+                          {isChosenClinic && (
+                            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                              已選診所
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="mt-3 grid gap-2">
@@ -1053,10 +1335,25 @@ export function BookingTabFlow({
 
           <DoctorBookingSummary
             doctor={selectedDoctor}
-            clinicNameZh={selectedClinic?.clinicNameZh}
+            clinicNameZh={selectedClinic?.clinicNameZh || '比較全部診所'}
             eyebrow="已選醫師"
-            details={[VISIT_TYPE_LABELS[visitType], '揀好日期後即可查看可預約時段。']}
+            details={[
+              VISIT_TYPE_LABELS[visitType],
+              selectedClinic
+                ? '日曆只顯示所選診所燈號。'
+                : '日曆會同時顯示各診所燈號，方便直接比較日期。',
+            ]}
           />
+
+          {clinicId ? (
+            <button
+              type="button"
+              onClick={() => handleClinicChange('')}
+              className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+            >
+              改為比較全部診所
+            </button>
+          ) : null}
 
           <div className="space-y-3">
             <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -1110,42 +1407,65 @@ export function BookingTabFlow({
                       type="button"
                       onClick={() => handleDateChange(cell.dateIso)}
                       disabled={!cell.isSelectable}
-                      aria-label={`${cell.dateIso}${cell.hasAvailability ? '，可預約' : ''}`}
+                      aria-label={`${cell.dateIso}，${cell.availabilityLabel}`}
                       className={`h-12 rounded-lg border text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
                         !cell.isSelectable
                           ? 'cursor-not-allowed border-transparent text-slate-300'
                           : isSelected
                             ? 'border-primary bg-primary text-white'
-                            : cell.hasAvailability
-                              ? 'border-emerald-300 bg-emerald-50 text-slate-900 hover:bg-emerald-100'
-                              : 'border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50'
+                            : cell.availableClinicIds.length > 0
+                              ? 'border-slate-200 bg-white text-slate-900 hover:border-primary/40 hover:bg-primary-light/20'
+                              : cell.isUnavailable
+                                ? 'border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300'
+                                : 'border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-50'
                       }`}
                     >
                       <span>{cell.day}</span>
-                      <span
-                        className={`mx-auto mt-1 block h-1.5 w-1.5 rounded-full ${
-                          isSelected
-                            ? 'bg-white/90'
-                            : cell.hasAvailability
-                              ? 'bg-emerald-500'
-                              : 'bg-transparent'
-                        }`}
-                      />
+                      <span className="mt-1 flex min-h-[8px] items-center justify-center gap-1">
+                        {isSelected ? (
+                          <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
+                        ) : cell.availableClinicIds.length > 0 ? (
+                          cell.availableClinicIds.map((availableClinicId) => (
+                            <span
+                              key={`${cell.dateIso}-${availableClinicId}`}
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                CLINIC_AVAILABILITY_STYLES[availableClinicId].dotClassName
+                              }`}
+                            />
+                          ))
+                        ) : cell.isUnavailable ? (
+                          <span className={`h-1.5 w-1.5 rounded-full ${UNAVAILABLE_DOT_CLASS_NAME}`} />
+                        ) : (
+                          <span className="h-1.5 w-1.5 rounded-full bg-transparent" />
+                        )}
+                      </span>
                     </button>
                   );
                 })}
               </div>
 
-              <div className="mt-3 flex items-center gap-2 text-xs text-slate-600">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span>綠點代表該日目前有可預約時段</span>
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                {(clinicId ? visibleClinics : scannableClinics).map((clinic) => (
+                  <span key={`legend-${clinic.clinicId}`} className="inline-flex items-center gap-2">
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        CLINIC_AVAILABILITY_STYLES[clinic.clinicId].dotClassName
+                      }`}
+                    />
+                    <span>{clinic.clinicNameZh}有位</span>
+                  </span>
+                ))}
+                <span className="inline-flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${UNAVAILABLE_DOT_CLASS_NAME}`} />
+                  <span>{clinicId ? '所選診所暫滿' : '全部診所暫滿'}</span>
+                </span>
               </div>
             </div>
 
             {bookableDatesLoading ? (
               <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                正在掃描本月可預約日子...
+                正在掃描本月各診所可預約日子...
               </div>
             ) : null}
 
@@ -1156,9 +1476,52 @@ export function BookingTabFlow({
             ) : null}
 
             {selectedDate ? (
-              <p className="text-sm text-slate-600">
-                已選日期：<span className="font-semibold text-slate-900">{formatDateForDisplay(selectedDate)}</span>
-              </p>
+              <div className="space-y-2">
+                <p className="text-sm text-slate-600">
+                  已選日期：<span className="font-semibold text-slate-900">{formatDateForDisplay(selectedDate)}</span>
+                </p>
+                {!clinicId && selectedDateAllAvailableClinics.length > 0 ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                    <p className="text-sm font-semibold text-slate-700">此日可預約診所</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {selectedDateAllAvailableClinics.map((clinic) => (
+                        <button
+                          key={`selected-date-${clinic.clinicId}`}
+                          type="button"
+                          onClick={() => handleClinicChange(clinic.clinicId)}
+                          className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition hover:shadow-sm ${
+                            CLINIC_AVAILABILITY_STYLES[clinic.clinicId].selectedButtonClassName
+                          }`}
+                        >
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              CLINIC_AVAILABILITY_STYLES[clinic.clinicId].dotClassName
+                            }`}
+                          />
+                          {clinic.clinicNameZh}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-xs text-slate-500">
+                      先揀診所，再顯示當日可預約時段。
+                    </p>
+                  </div>
+                ) : null}
+                {clinicId &&
+                selectedDateVisibleAvailableClinics.length === 0 &&
+                selectedDateAllAvailableClinics.length > 0 ? (
+                  <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                    此日 {selectedClinic?.clinicNameZh} 暫滿，但其他診所仍有位。
+                    <button
+                      type="button"
+                      onClick={() => handleClinicChange('')}
+                      className="ml-2 font-semibold underline underline-offset-2"
+                    >
+                      改為比較全部診所
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <p className="text-sm text-slate-500">請先在日曆選擇日期，再選擇時段。</p>
             )}
@@ -1177,6 +1540,12 @@ export function BookingTabFlow({
             {!slotsLoading && slotError ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 {slotError}
+              </div>
+            ) : null}
+
+            {!slotsLoading && !slotError && selectedDate && !clinicId ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                請先選擇當日有位的診所，再查看可預約時段。
               </div>
             ) : null}
 
