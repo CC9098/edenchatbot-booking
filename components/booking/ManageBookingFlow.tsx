@@ -51,6 +51,7 @@ type ActionResult = {
 
 type ManageBookingFlowProps = {
   action: ManageAction;
+  manageAccessToken?: string | null;
 };
 
 const HK_DATE_LABEL = new Intl.DateTimeFormat('zh-HK', {
@@ -160,6 +161,7 @@ function BookingSummaryCard({
           </p>
           <h3 className="mt-2 text-lg font-semibold text-slate-900">{booking.doctorNameZh}</h3>
           <p className="mt-1 text-sm text-slate-600">{booking.clinicNameZh}</p>
+          <p className="mt-1 text-sm font-medium text-slate-700">病人：{booking.patientName}</p>
         </div>
         <span
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -188,7 +190,7 @@ function BookingSummaryCard({
   );
 }
 
-export function ManageBookingFlow({ action }: ManageBookingFlowProps) {
+export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFlowProps) {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [maskedPhone, setMaskedPhone] = useState('');
@@ -197,6 +199,8 @@ export function ManageBookingFlow({ action }: ManageBookingFlowProps) {
   const [actionLoading, setActionLoading] = useState(false);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [requestSucceeded, setRequestSucceeded] = useState(false);
+  const [tokenVerified, setTokenVerified] = useState(false);
+  const [tokenVerifying, setTokenVerifying] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success' | 'info'; text: string } | null>(null);
   const [bookings, setBookings] = useState<VerifiedBooking[]>([]);
   const [selectedBookingId, setSelectedBookingId] = useState('');
@@ -213,6 +217,53 @@ export function ManageBookingFlow({ action }: ManageBookingFlowProps) {
   useEffect(() => {
     setDateChoices(buildUpcomingDateChoices());
   }, []);
+
+  // Auto-verify manage access token from WhatsApp link (zero-OTP path)
+  useEffect(() => {
+    if (!manageAccessToken) return;
+
+    let cancelled = false;
+    setTokenVerifying(true);
+    setFeedback(null);
+
+    (async () => {
+      try {
+        const response = await fetch('/api/widget-booking/verify-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: manageAccessToken }),
+        });
+        const data = await response.json();
+
+        if (cancelled) return;
+
+        if (!response.ok) {
+          setFeedback({ type: 'error', text: data.error || '管理連結已失效，請使用電話驗證。' });
+          return;
+        }
+
+        const nextBookings = Array.isArray(data.bookings) ? (data.bookings as VerifiedBooking[]) : [];
+        setBookings(nextBookings);
+        setSelectedBookingId(nextBookings.length === 1 ? nextBookings[0].bookingId : '');
+        setMaskedPhone(data.maskedPhone || '');
+        setTokenVerified(true);
+        setRequestSucceeded(true);
+        setFeedback({ type: 'success', text: data.message || '已驗證，請繼續管理你的預約。' });
+      } catch {
+        if (!cancelled) {
+          setFeedback({ type: 'error', text: '驗證管理連結時發生錯誤，請使用電話驗證。' });
+        }
+      } finally {
+        if (!cancelled) {
+          setTokenVerifying(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [manageAccessToken]);
 
   useEffect(() => {
     setSelectedDate('');
@@ -408,7 +459,11 @@ export function ManageBookingFlow({ action }: ManageBookingFlowProps) {
             <div>
               <h2 className="text-2xl font-semibold text-slate-900 sm:text-3xl">{getActionLabel(action)}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-base">
-                {getActionDescription(action)}
+                {tokenVerified
+                  ? '已通過連結驗證，請選擇要處理的預約。'
+                  : tokenVerifying
+                    ? '正在驗證管理連結⋯'
+                    : getActionDescription(action)}
               </p>
             </div>
           </div>
@@ -423,11 +478,18 @@ export function ManageBookingFlow({ action }: ManageBookingFlowProps) {
         </div>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          {[
-            { index: '1', title: '驗證電話', active: true },
-            { index: '2', title: '選擇預約', active: requestSucceeded || bookings.length > 0 },
-            { index: '3', title: getActionLabel(action), active: Boolean(selectedBookingId) },
-          ].map((step) => (
+          {(tokenVerified
+            ? [
+                { index: '1', title: '已驗證', active: true },
+                { index: '2', title: '選擇預約', active: bookings.length > 0 },
+                { index: '3', title: getActionLabel(action), active: Boolean(selectedBookingId) },
+              ]
+            : [
+                { index: '1', title: '驗證電話', active: true },
+                { index: '2', title: '選擇預約', active: requestSucceeded || bookings.length > 0 },
+                { index: '3', title: getActionLabel(action), active: Boolean(selectedBookingId) },
+              ]
+          ).map((step) => (
             <div
               key={step.index}
               className={`rounded-2xl border px-4 py-4 ${
@@ -443,7 +505,15 @@ export function ManageBookingFlow({ action }: ManageBookingFlowProps) {
 
       {feedback ? <FeedbackBanner type={feedback.type} text={feedback.text} /> : null}
 
-      <section className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
+      {tokenVerifying ? (
+        <div className="flex items-center justify-center gap-3 rounded-[28px] border border-primary/10 bg-white/90 p-10 shadow-sm">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <span className="text-base text-slate-600">正在驗證管理連結⋯</span>
+        </div>
+      ) : null}
+
+      <section className={`grid gap-6 ${tokenVerified ? '' : 'lg:grid-cols-[0.92fr_1.08fr]'}`} style={tokenVerifying ? { display: 'none' } : undefined}>
+        {!tokenVerified ? (
         <div className="space-y-6">
           <div className="rounded-[28px] border border-primary/10 bg-white/90 p-6 shadow-sm">
             <div className="flex items-center gap-3">
@@ -534,6 +604,7 @@ export function ManageBookingFlow({ action }: ManageBookingFlowProps) {
             </p>
           </div>
         </div>
+        ) : null}
 
         <div className="space-y-6">
           <div className="rounded-[28px] border border-primary/10 bg-white/90 p-6 shadow-sm">

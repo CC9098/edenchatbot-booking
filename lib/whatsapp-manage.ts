@@ -22,7 +22,7 @@ export function buildWhatsappManageVerificationText(
   return [
     "醫天圓中醫診所預約管理驗證",
     "",
-    `你好 ${input.patientName}，`,
+    "你好，",
     `你的預約管理驗證碼是：${input.code}`,
     `此驗證碼會在 ${expiryMinutes} 分鐘後失效。`,
     "",
