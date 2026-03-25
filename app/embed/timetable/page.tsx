@@ -187,79 +187,73 @@ function ClinicCard({ card }: { card: TimetableClinicCard }) {
         </div>
       </div>
 
-      {/* Mobile layout — one card per day, vertical stack */}
-      <div className="md:hidden space-y-3">
-        {DAY_COLUMNS.map((column) => (
-          <div key={`mob-${card.clinicId}-${column.day}`} className="overflow-hidden rounded-[20px]">
+      {/* Mobile: compact 7-day grid — surname only + icon */}
+      <div className="md:hidden">
+        <div className="grid grid-cols-[44px_repeat(7,minmax(0,1fr))] gap-1">
+          <div />
+          {DAY_COLUMNS.map((col) => (
             <div
-              className="px-4 py-2 text-center text-lg font-bold tracking-[0.06em] text-white"
+              key={`mc-${card.clinicId}-${col.day}-hd`}
+              className="rounded-full py-1 text-center text-[11px] font-bold text-white"
               style={{ background: theme.dayPill }}
             >
-              {column.label}
+              {col.label.slice(2)}
             </div>
+          ))}
 
-            {card.rows.map((row) => {
-              const entries = row.cells[column.day];
-              const rowTimeLabel = row.id === 'morning' ? morningLabel : afternoonLabel;
-
-              return (
+          {card.rows.map((row) => {
+            const rowTimeLabel = row.id === 'morning' ? morningLabel : afternoonLabel;
+            const [startTime, endTime] = (rowTimeLabel || '').split('-');
+            return (
+              <div key={`mc-${card.clinicId}-${row.id}`} className="contents">
                 <div
-                  key={`mob-${card.clinicId}-${column.day}-${row.id}`}
-                  className="flex items-stretch gap-2 p-2"
-                  style={{ background: entries.length > 0 ? theme.panelBg : theme.emptyCellBg }}
+                  className="flex flex-col items-center justify-center rounded-[10px] p-1 text-center text-white"
+                  style={{ background: theme.sessionBg }}
                 >
-                  <div
-                    className="flex w-[72px] shrink-0 flex-col items-center justify-center rounded-[14px] px-2 py-3 text-center text-white"
-                    style={{ background: theme.sessionBg }}
-                  >
-                    <p className="text-lg font-bold tracking-[0.1em]">{row.label}</p>
-                    <p className="mt-1 text-[11px] font-semibold leading-tight">
-                      {rowTimeLabel || '最新時間'}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-1 flex-wrap items-center justify-center gap-2 py-1">
-                    {entries.length === 0 ? null : entries.map((entry) => {
-                      const doctorName = splitDoctorName(entry.shortNameZh);
-                      const isException = rowTimeLabel && entry.timeLabel !== rowTimeLabel;
-                      const doctorTone = getDoctorTone(entry.doctorId);
-                      const doctorLabel = `${entry.shortNameZh}${card.clinicNameZh}預約`;
-
-                      return (
-                        <a
-                          key={`mob-${card.clinicId}-${row.id}-${column.day}-${entry.doctorId}`}
-                          href={entry.bookingUrl || buildBookingUrl({ doctorId: entry.doctorId, clinicId: card.clinicId })}
-                          target="_top"
-                          rel="noreferrer"
-                          aria-label={doctorLabel}
-                          title={doctorLabel}
-                          className="group flex min-h-[96px] min-w-[72px] cursor-pointer flex-col items-center justify-center rounded-[16px] px-2 py-2 text-center transition duration-200 hover:bg-white/65"
-                        >
-                          <div className="text-4xl font-black leading-none" style={{ color: doctorTone }}>
-                            {doctorName.surname}
-                          </div>
-                          <div className="mt-1 text-[1.6rem] font-bold leading-none tracking-[0.04em]" style={{ color: doctorTone }}>
-                            {doctorName.given}{isException ? '*' : ''}
-                          </div>
-                          <span
-                            className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] transition group-hover:bg-white"
-                            style={{ borderColor: `${doctorTone}33`, color: doctorTone }}
-                          >
-                            預約
-                            <ExternalLink className="h-3 w-3" />
-                          </span>
-                          {isException ? (
-                            <div className="mt-1 text-[10px] font-semibold text-slate-500">{entry.timeLabel}</div>
-                          ) : null}
-                        </a>
-                      );
-                    })}
-                  </div>
+                  <span className="text-[11px] font-bold leading-none">{row.label}</span>
+                  {startTime ? (
+                    <span className="mt-0.5 text-[8px] leading-none opacity-90">{startTime}</span>
+                  ) : null}
+                  {endTime ? (
+                    <span className="text-[8px] leading-none opacity-90">-{endTime}</span>
+                  ) : null}
                 </div>
-              );
-            })}
-          </div>
-        ))}
+
+                {DAY_COLUMNS.map((col) => {
+                  const entries = row.cells[col.day];
+                  return (
+                    <div
+                      key={`mc-${card.clinicId}-${row.id}-${col.day}`}
+                      className="flex flex-col divide-y divide-white/20 overflow-hidden rounded-[10px]"
+                      style={{ background: entries.length > 0 ? theme.panelBg : theme.emptyCellBg }}
+                    >
+                      {entries.map((entry) => {
+                        const tone = getDoctorTone(entry.doctorId);
+                        return (
+                          <a
+                            key={`mc-${card.clinicId}-${row.id}-${col.day}-${entry.doctorId}`}
+                            href={entry.bookingUrl || buildBookingUrl({ doctorId: entry.doctorId, clinicId: card.clinicId })}
+                            target="_top"
+                            rel="noreferrer"
+                            aria-label={`${entry.shortNameZh}${card.clinicNameZh}預約`}
+                            title={`${entry.shortNameZh}${card.clinicNameZh}預約`}
+                            className="flex flex-1 flex-col items-center justify-center py-2 transition hover:bg-white/50"
+                            style={{ minHeight: '52px' }}
+                          >
+                            <span className="text-xl font-black leading-none" style={{ color: tone }}>
+                              {entry.shortNameZh.charAt(0)}
+                            </span>
+                            <ExternalLink className="mt-1 h-2.5 w-2.5" style={{ color: tone }} />
+                          </a>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Desktop layout — horizontal grid */}
