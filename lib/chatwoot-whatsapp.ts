@@ -90,7 +90,11 @@ interface ChatwootMessagePayload {
     category: string;
     language: string;
     processed_params: {
-      body: Record<string, string>;
+      body?: Record<string, string>;
+      buttons?: Array<{
+        type: 'url' | 'copy_code';
+        parameter: string;
+      }>;
     };
   };
 }
@@ -141,6 +145,8 @@ type TemplateConfig = {
   category: string;
   language: string;
 };
+
+type TemplateProcessedParams = NonNullable<ChatwootMessagePayload['template_params']>['processed_params'];
 
 class ChatwootWhatsappClient {
   constructor(
@@ -626,23 +632,24 @@ async function sendMessageWithTemplateFallback(
   bodyParams: Record<string, string>,
 ) {
   let lastError: unknown = null;
+  const processedParamCandidates = buildTemplateProcessedParamCandidates(bodyParams);
 
   for (const templateConfig of templateConfigs) {
-    try {
-      await client.createMessage(accountId, conversationId, {
-        content,
-        template_params: {
-          name: templateConfig.name,
-          category: templateConfig.category,
-          language: templateConfig.language,
-          processed_params: {
-            body: bodyParams,
+    for (const processedParams of processedParamCandidates) {
+      try {
+        await client.createMessage(accountId, conversationId, {
+          content,
+          template_params: {
+            name: templateConfig.name,
+            category: templateConfig.category,
+            language: templateConfig.language,
+            processed_params: processedParams,
           },
-        },
-      });
-      return;
-    } catch (error) {
-      lastError = error;
+        });
+        return;
+      } catch (error) {
+        lastError = error;
+      }
     }
   }
 
@@ -653,6 +660,78 @@ async function sendMessageWithTemplateFallback(
   await client.createMessage(accountId, conversationId, {
     content,
   });
+}
+
+function toNumericBodyParams(bodyParams: Record<string, string>): Record<string, string> {
+  const entries = Object.entries(bodyParams).filter(([, value]) => value);
+  return Object.fromEntries(entries.map(([_, value], index) => [String(index + 1), value]));
+}
+
+function buildTemplateProcessedParamCandidates(
+  bodyParams: Record<string, string>,
+): TemplateProcessedParams[] {
+  const entries = Object.entries(bodyParams).filter(([, value]) => value);
+  const normalizedBody = Object.fromEntries(entries);
+  const candidates: TemplateProcessedParams[] = [];
+  const seen = new Set<string>();
+
+  const pushCandidate = (candidate: TemplateProcessedParams) => {
+    const key = JSON.stringify(candidate);
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push(candidate);
+  };
+
+  if (Object.keys(normalizedBody).length > 0) {
+    pushCandidate({ body: normalizedBody });
+    pushCandidate({ body: toNumericBodyParams(normalizedBody) });
+  }
+
+  const manageUrl = normalizedBody.manage_url?.trim();
+  if (manageUrl) {
+    const { manage_url: _manageUrl, ...bodyWithoutManageUrl } = normalizedBody;
+
+    if (Object.keys(bodyWithoutManageUrl).length > 0) {
+      pushCandidate({
+        body: bodyWithoutManageUrl,
+        buttons: [{ type: 'url', parameter: manageUrl }],
+      });
+      pushCandidate({
+        body: toNumericBodyParams(bodyWithoutManageUrl),
+        buttons: [{ type: 'url', parameter: manageUrl }],
+      });
+    } else {
+      pushCandidate({
+        buttons: [{ type: 'url', parameter: manageUrl }],
+      });
+    }
+  }
+
+  const verificationCode = normalizedBody.verification_code?.trim();
+  if (verificationCode) {
+    const { verification_code: _verificationCode, ...bodyWithoutVerificationCode } = normalizedBody;
+
+    if (Object.keys(bodyWithoutVerificationCode).length > 0) {
+      pushCandidate({
+        body: bodyWithoutVerificationCode,
+        buttons: [{ type: 'copy_code', parameter: verificationCode }],
+      });
+      pushCandidate({
+        body: toNumericBodyParams(bodyWithoutVerificationCode),
+        buttons: [{ type: 'copy_code', parameter: verificationCode }],
+      });
+    } else {
+      pushCandidate({
+        buttons: [{ type: 'copy_code', parameter: verificationCode }],
+      });
+    }
+  }
+
+  if (candidates.length === 0) {
+    pushCandidate({ body: {} });
+  }
+
+  return candidates;
 }
 
 async function sendBookingWhatsappNotification(
