@@ -438,7 +438,6 @@ export default async function TimetableEmbedPage({
                 立即預約
                 <ExternalLink className="h-4 w-4" />
               </a>
-              <span>WordPress 可直接 iframe 呢個頁面，姑娘改 Supabase 就會即時更新。</span>
             </div>
           </section>
         ) : null}
