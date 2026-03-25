@@ -153,17 +153,17 @@ function ClinicCard({ card }: { card: TimetableClinicCard }) {
   const hasException = rowHasTimeException(card, 'morning') || rowHasTimeException(card, 'afternoon');
 
   return (
-    <section className="rounded-[30px] px-1 py-2">
+    <section className="overflow-hidden rounded-[30px] px-1 py-2">
       <div className="mb-5 flex items-center pl-2 sm:pl-6">
         <div
-          className="relative z-0 px-5 py-2 text-lg font-bold tracking-[0.04em] text-white shadow-[0_10px_0_rgba(0,0,0,0.22),0_20px_26px_-20px_rgba(0,0,0,0.68)]"
+          className="relative z-0 shrink-0 px-5 py-2 text-lg font-bold tracking-[0.04em] text-white shadow-[0_10px_0_rgba(0,0,0,0.22),0_20px_26px_-20px_rgba(0,0,0,0.68)]"
           style={{ background: theme.ribbon }}
         >
           {versionLabel}
         </div>
 
         <div
-          className="relative z-10 -ml-3 -skew-x-12 px-7 py-3 text-white shadow-[0_12px_0_rgba(0,0,0,0.2),0_22px_26px_-20px_rgba(0,0,0,0.68)]"
+          className="relative z-10 -ml-3 shrink-0 -skew-x-12 px-7 py-3 text-white shadow-[0_12px_0_rgba(0,0,0,0.2),0_22px_26px_-20px_rgba(0,0,0,0.68)]"
           style={{ background: theme.ribbonTag }}
         >
           <span className="block skew-x-12 text-4xl font-black tracking-[0.08em]">
@@ -171,7 +171,7 @@ function ClinicCard({ card }: { card: TimetableClinicCard }) {
           </span>
         </div>
 
-        <div className="-ml-3 flex min-w-0 flex-1 items-stretch">
+        <div className="-ml-3 hidden min-w-0 flex-1 items-stretch sm:flex">
           <div
             className="-skew-x-12 px-8 py-3 text-white shadow-[0_10px_0_rgba(0,0,0,0.2),0_20px_26px_-20px_rgba(0,0,0,0.68)]"
             style={{ background: theme.ribbon }}
@@ -264,17 +264,18 @@ function ClinicCard({ card }: { card: TimetableClinicCard }) {
 
       {/* Desktop layout — horizontal grid */}
       <div className="hidden md:block overflow-x-auto">
-        <div className="min-w-[980px]">
-          <div className="grid grid-cols-[150px_repeat(7,minmax(0,1fr))] gap-2">
+        <div className="min-w-[720px] lg:min-w-[980px]">
+          <div className="grid grid-cols-[100px_repeat(7,minmax(0,1fr))] gap-1.5 lg:grid-cols-[150px_repeat(7,minmax(0,1fr))] lg:gap-2">
             <div />
 
             {DAY_COLUMNS.map((column) => (
               <div
                 key={`${card.clinicId}-${column.day}-day`}
-                className="rounded-full px-3 py-2 text-center text-xl font-bold tracking-[0.06em] text-white"
+                className="rounded-full px-1 py-2 text-center text-sm font-bold tracking-[0.04em] text-white sm:px-3 sm:text-xl sm:tracking-[0.06em]"
                 style={{ background: theme.dayPill }}
               >
-                {column.label}
+                <span className="sm:hidden">{column.short}</span>
+                <span className="hidden sm:inline">{column.label}</span>
               </div>
             ))}
 
@@ -287,11 +288,11 @@ function ClinicCard({ card }: { card: TimetableClinicCard }) {
                   className="contents"
                 >
                   <div
-                    className="flex min-h-[162px] flex-col items-center justify-center rounded-[22px] px-3 py-4 text-center text-white"
+                    className="flex min-h-[120px] flex-col items-center justify-center rounded-[16px] px-2 py-3 text-center text-white sm:min-h-[162px] sm:rounded-[22px] sm:px-3 sm:py-4"
                     style={{ background: theme.sessionBg }}
                   >
-                    <p className="text-4xl font-bold tracking-[0.12em]">{row.label}</p>
-                    <p className="mt-3 text-2xl font-semibold tracking-[0.04em]">
+                    <p className="text-2xl font-bold tracking-[0.08em] sm:text-4xl sm:tracking-[0.12em]">{row.label}</p>
+                    <p className="mt-1 text-sm font-semibold tracking-[0.02em] sm:mt-3 sm:text-2xl sm:tracking-[0.04em]">
                       {rowTimeLabel || '最新時間'}
                     </p>
                   </div>
@@ -302,11 +303,11 @@ function ClinicCard({ card }: { card: TimetableClinicCard }) {
                     return (
                       <div
                         key={`${card.clinicId}-${row.id}-${column.day}`}
-                        className="flex min-h-[162px] items-center justify-center rounded-[22px] p-3"
+                        className="flex min-h-[120px] items-center justify-center rounded-[16px] p-1.5 sm:min-h-[162px] sm:rounded-[22px] sm:p-3"
                         style={{ background: entries.length > 0 ? theme.panelBg : theme.emptyCellBg }}
                       >
                         {entries.length === 0 ? null : (
-                          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
+                          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 sm:gap-x-4 sm:gap-y-3">
                             {entries.map((entry) => {
                               const doctorName = splitDoctorName(entry.shortNameZh);
                               const isException = rowTimeLabel && entry.timeLabel !== rowTimeLabel;
@@ -321,30 +322,30 @@ function ClinicCard({ card }: { card: TimetableClinicCard }) {
                                   rel="noreferrer"
                                   aria-label={doctorLabel}
                                   title={doctorLabel}
-                                  className="group flex min-h-[112px] min-w-[86px] cursor-pointer flex-col items-center justify-center rounded-[20px] px-3 py-3 text-center transition duration-200 hover:-translate-y-0.5 hover:bg-white/65 hover:shadow-[0_14px_30px_-24px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                                  className="group flex min-h-[80px] min-w-[56px] cursor-pointer flex-col items-center justify-center rounded-[14px] px-1.5 py-2 text-center transition duration-200 hover:-translate-y-0.5 hover:bg-white/65 hover:shadow-[0_14px_30px_-24px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:min-h-[112px] sm:min-w-[86px] sm:rounded-[20px] sm:px-3 sm:py-3"
                                 >
                                   <div
-                                    className="text-5xl font-black leading-none"
+                                    className="text-3xl font-black leading-none sm:text-5xl"
                                     style={{ color: doctorTone }}
                                   >
                                     {doctorName.surname}
                                   </div>
                                   <div
-                                    className="mt-1 text-[2rem] font-bold leading-none tracking-[0.04em]"
+                                    className="mt-0.5 text-xl font-bold leading-none tracking-[0.02em] sm:mt-1 sm:text-[2rem] sm:tracking-[0.04em]"
                                     style={{ color: doctorTone }}
                                   >
                                     {doctorName.given}
                                     {isException ? '*' : ''}
                                   </div>
                                   <span
-                                    className="mt-2 inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] transition group-hover:bg-white"
+                                    className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] transition group-hover:bg-white sm:mt-2 sm:px-2 sm:py-1 sm:text-[10px] sm:tracking-[0.16em]"
                                     style={{ borderColor: `${doctorTone}33`, color: doctorTone }}
                                   >
                                     預約
-                                    <ExternalLink className="h-3 w-3" />
+                                    <ExternalLink className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                                   </span>
                                   {isException ? (
-                                    <div className="mt-2 text-[11px] font-semibold tracking-[0.08em] text-slate-500">
+                                    <div className="mt-1 text-[9px] font-semibold tracking-[0.06em] text-slate-500 sm:mt-2 sm:text-[11px] sm:tracking-[0.08em]">
                                       {entry.timeLabel}
                                     </div>
                                   ) : null}
