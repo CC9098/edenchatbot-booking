@@ -10,8 +10,6 @@ import {
   Clock,
   Loader2,
   MessageCircle,
-  Phone,
-  ShieldCheck,
   Ticket,
 } from 'lucide-react';
 
@@ -63,20 +61,6 @@ const HK_DATE_LABEL = new Intl.DateTimeFormat('zh-HK', {
 
 function getActionLabel(action: ManageAction) {
   return action === 'reschedule' ? '更改預約' : '取消預約';
-}
-
-function getActionBadgeLabel(action: ManageAction) {
-  return action === 'reschedule' ? '自助改期' : '自助取消';
-}
-
-function getActionHeading(action: ManageAction) {
-  return action === 'reschedule' ? '電話驗證後即可更改預約' : '電話驗證後即可取消預約';
-}
-
-function getActionDescription(action: ManageAction) {
-  return action === 'reschedule'
-    ? '先驗證身份，再選擇原有預約與新時段，整個改期流程會留在同一頁完成。'
-    : '先驗證身份，再選擇要取消的預約並確認一次，不會混入其他多餘步驟。';
 }
 
 function buildUpcomingDateChoices() {
@@ -458,68 +442,41 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <div className="rounded-[28px] border border-primary/10 bg-white/90 p-5 shadow-[0_24px_60px_rgba(53,96,32,0.08)] sm:p-6 lg:p-7">
-        <div className="flex flex-col gap-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-3">
-              <div className="inline-flex items-center rounded-full border border-primary/10 bg-primary-light px-3 py-1 text-xs font-semibold tracking-[0.2em] text-primary">
-                {getActionBadgeLabel(action)}
-              </div>
-              <div className="space-y-2">
-                <h2 className="max-w-2xl text-2xl font-semibold leading-tight text-slate-900 sm:text-3xl">
-                  {tokenVerified
-                    ? '已驗證，請選擇要處理的預約'
-                    : tokenVerifying
-                      ? '正在驗證管理連結⋯'
-                      : getActionHeading(action)}
-                </h2>
-                <p className="max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-base">
-                  {tokenVerified
-                    ? '身份已確認，接下來只需要選擇預約並完成操作。'
-                    : tokenVerifying
-                      ? '請稍候，系統正在檢查你從 WhatsApp 進入的管理連結。'
-                      : getActionDescription(action)}
-                </p>
-              </div>
-            </div>
+      <div className="rounded-[24px] border border-primary/10 bg-white/90 p-4 shadow-[0_20px_50px_rgba(53,96,32,0.07)] sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">{getActionLabel(action)}</h2>
+          <Link
+            href="/manage-booking"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/15 bg-white px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary-light"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            返回管理
+          </Link>
+        </div>
 
-            <Link
-              href="/manage-booking"
-              className="inline-flex min-h-11 items-center gap-2 self-start rounded-full border border-primary/15 bg-white px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary-light"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              返回預約管理
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="mt-4 flex flex-wrap gap-2">
             {(tokenVerified
               ? [
                   { index: '1', title: '已驗證', active: true },
-                  { index: '2', title: '選擇預約', active: bookings.length > 0 },
-                  { index: '3', title: getActionLabel(action), active: Boolean(selectedBookingId) },
+                  { index: '2', title: '預約', active: bookings.length > 0 },
+                  { index: '3', title: action === 'reschedule' ? '改期' : '取消', active: Boolean(selectedBookingId) },
                 ]
               : [
-                  { index: '1', title: '驗證電話', active: true },
-                  { index: '2', title: '選擇預約', active: requestSucceeded || bookings.length > 0 },
-                  { index: '3', title: getActionLabel(action), active: Boolean(selectedBookingId) },
+                  { index: '1', title: '驗證', active: true },
+                  { index: '2', title: '預約', active: requestSucceeded || bookings.length > 0 },
+                  { index: '3', title: action === 'reschedule' ? '改期' : '取消', active: Boolean(selectedBookingId) },
                 ]
             ).map((step) => (
               <div
                 key={step.index}
-                className={`rounded-2xl border px-3 py-3 sm:px-4 sm:py-4 ${
-                  step.active ? 'border-primary/15 bg-primary-light' : 'border-slate-200 bg-slate-50'
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm ${
+                  step.active ? 'border-primary/15 bg-primary-light text-primary' : 'border-slate-200 bg-slate-50 text-slate-500'
                 }`}
               >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/70">
-                  Step {step.index}
-                </p>
-                <p className="mt-2 text-[13px] font-medium leading-tight text-slate-800 sm:text-sm">
-                  {step.title}
-                </p>
+                <span className="text-xs font-semibold">{step.index}</span>
+                <span className="font-medium">{step.title}</span>
               </div>
             ))}
-          </div>
         </div>
       </div>
 
@@ -537,26 +494,11 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
         style={tokenVerifying ? { display: 'none' } : undefined}
       >
         {!tokenVerified ? (
-          <div className="rounded-[28px] border border-primary/10 bg-white/90 p-5 shadow-sm sm:p-6">
-            <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-light text-primary">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">驗證身份</h3>
-                <p className="mt-1 text-sm leading-relaxed text-slate-500">
-                  用預約時的 WhatsApp 電話收取 6 位數驗證碼，之後就可以查看可處理預約。
-                </p>
-              </div>
-            </div>
+          <div className="rounded-[24px] border border-primary/10 bg-white/90 p-4 shadow-sm sm:p-5">
+            <h3 className="text-lg font-semibold text-slate-900">驗證</h3>
 
-            <div className="mt-5 space-y-6">
+            <div className="mt-4 space-y-5">
               <form className="space-y-4" onSubmit={handleRequestCode}>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">步驟 1</p>
-                  <p className="mt-1 text-base font-semibold text-slate-900">輸入 WhatsApp 電話號碼</p>
-                </div>
-
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-slate-700" htmlFor="manage-booking-phone">
                     WhatsApp 電話號碼
@@ -582,21 +524,11 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
                 </button>
               </form>
 
-              <div className="border-t border-slate-200 pt-6">
+              <div className="border-t border-slate-200 pt-5">
                 <form className="space-y-4" onSubmit={handleVerifyCode}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">步驟 2</p>
-                      <p className="mt-1 text-base font-semibold text-slate-900">輸入 6 位數驗證碼</p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {maskedPhone ? `驗證碼已送往 ${maskedPhone}` : '先發送驗證碼，再於此輸入。'}
-                      </p>
-                    </div>
-                    {maskedPhone ? (
-                      <span className="rounded-full bg-primary-light px-3 py-1 text-xs font-semibold text-primary">
-                        已發送
-                      </span>
-                    ) : null}
+                  <div className="flex items-center justify-between gap-3">
+                    <h4 className="text-base font-semibold text-slate-900">驗證碼</h4>
+                    <span className="text-xs text-slate-500">{maskedPhone || '先發送驗證碼'}</span>
                   </div>
 
                   <div className="space-y-2">
@@ -635,30 +567,19 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
                   </div>
                 </form>
               </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-xs leading-relaxed text-slate-500">
-                如距離應診時間少於 1 小時，系統會直接引導你聯絡姑娘。
-              </div>
             </div>
           </div>
         ) : null}
 
         <div className="space-y-5 sm:space-y-6">
-          <div className="rounded-[28px] border border-primary/10 bg-white/90 p-5 shadow-sm sm:p-6">
-            <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-light text-primary">
-                <Calendar className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">選擇預約</h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  {bookings.length > 0
-                    ? `已找到 ${bookings.length} 個未來預約，請選擇要${getActionLabel(action)}的項目。`
-                    : tokenVerified
-                      ? '暫時未有可處理的未來預約。'
-                      : '完成驗證後，這裡會顯示你的預約卡片。'}
-                </p>
-              </div>
+          <div className="rounded-[24px] border border-primary/10 bg-white/90 p-4 shadow-sm sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold text-slate-900">預約</h3>
+              {bookings.length > 0 ? (
+                <span className="rounded-full bg-primary-light px-3 py-1 text-xs font-semibold text-primary">
+                  {bookings.length} 筆
+                </span>
+              ) : null}
             </div>
 
             {bookings.length > 0 ? (
@@ -674,7 +595,7 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
               </div>
             ) : (
               <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm leading-relaxed text-slate-500">
-                驗證成功後，系統會把你的未來預約整理成卡片顯示在這裡。
+                {tokenVerified ? '暫時沒有可處理預約。' : '完成驗證後顯示在這裡。'}
               </div>
             )}
           </div>
@@ -703,9 +624,8 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
 
           {selectedBooking && selectedBooking.canSelfManage && action === 'reschedule' && !result ? (
             <div className="space-y-5 sm:space-y-6">
-              <div className="rounded-[28px] border border-primary/10 bg-white/90 p-5 shadow-sm sm:p-6">
-                <h3 className="text-lg font-semibold text-slate-900">選擇新日期</h3>
-                <p className="mt-2 text-sm text-slate-500">先揀日期，再查看可更改的時段。</p>
+              <div className="rounded-[24px] border border-primary/10 bg-white/90 p-4 shadow-sm sm:p-5">
+                <h3 className="text-lg font-semibold text-slate-900">新日期</h3>
                 <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-3">
                   {dateChoices.map((dateOption) => (
                     <button
@@ -728,15 +648,10 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-primary/10 bg-white/90 p-5 shadow-sm sm:p-6">
+              <div className="rounded-[24px] border border-primary/10 bg-white/90 p-4 shadow-sm sm:p-5">
                 <div className="flex items-center gap-3">
                   <Clock className="h-5 w-5 text-primary" />
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">選擇新時段</h3>
-                    <p className="text-sm text-slate-500">
-                      {selectedDate ? `查看 ${selectedDate} 可更改的時段。` : '先選擇日期，再查看可用時段。'}
-                    </p>
-                  </div>
+                  <h3 className="text-lg font-semibold text-slate-900">新時段</h3>
                 </div>
 
                 {slotsLoading ? (
@@ -771,8 +686,8 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
                 )}
               </div>
 
-              <div className="rounded-[28px] border border-primary/10 bg-white/90 p-5 shadow-sm sm:p-6">
-                <h3 className="text-lg font-semibold text-slate-900">確認更改</h3>
+              <div className="rounded-[24px] border border-primary/10 bg-white/90 p-4 shadow-sm sm:p-5">
+                <h3 className="text-lg font-semibold text-slate-900">確認</h3>
                 <div className="mt-5 grid gap-4 lg:grid-cols-2">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">目前預約</p>

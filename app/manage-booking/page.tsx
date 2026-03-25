@@ -187,36 +187,13 @@ export default function ManageBookingPage({
           </div>
         </div>
 
-        <section className="mt-6 rounded-[32px] border border-primary/10 bg-white/88 p-5 shadow-[0_24px_70px_rgba(53,96,32,0.07)] backdrop-blur sm:p-7 lg:p-10">
-          <div className="flex flex-col gap-8">
-            {action || token ? (
-              <div className="space-y-4 sm:space-y-5">
-                <div className="inline-flex items-center rounded-full border border-primary/10 bg-primary-light px-4 py-1.5 text-sm font-semibold tracking-[0.18em] text-primary">
-                  {hero.eyebrow}
-                </div>
-                <div className="space-y-3">
-                  <h1 className="max-w-4xl text-[2.2rem] font-semibold leading-[0.95] tracking-[-0.04em] text-primary sm:text-5xl lg:text-6xl">
-                    {hero.title}
-                  </h1>
-                  <p className="max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base lg:text-lg">
-                    {hero.description}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {hero.bullets.map((item) => (
-                    <div
-                      key={item}
-                      className="rounded-full border border-primary/10 bg-[linear-gradient(180deg,rgba(246,251,243,0.95),rgba(255,255,255,0.96))] px-4 py-2 text-sm text-slate-600"
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
-                <p className="text-sm leading-relaxed text-slate-500">
-                  登入不是必需；如果系統判定要人工處理，頁面會直接提供 WhatsApp 聯絡按鈕。
-                </p>
-              </div>
-            ) : (
+        {action || token ? (
+          <div className="mt-6">
+            <ManageBookingFlow action={action ?? 'reschedule'} manageAccessToken={token} />
+          </div>
+        ) : (
+          <section className="mt-6 rounded-[32px] border border-primary/10 bg-white/88 p-5 shadow-[0_24px_70px_rgba(53,96,32,0.07)] backdrop-blur sm:p-7 lg:p-10">
+            <div className="flex flex-col gap-8">
               <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_340px]">
                 <div className="space-y-4 sm:space-y-5">
                   <div className="inline-flex items-center rounded-full border border-primary/10 bg-primary-light px-4 py-1.5 text-sm font-semibold tracking-[0.18em] text-primary">
@@ -256,11 +233,7 @@ export default function ManageBookingPage({
                   </div>
                 </div>
               </div>
-            )}
 
-            {action || token ? (
-              <ManageBookingFlow action={action ?? 'reschedule'} manageAccessToken={token} />
-            ) : (
               <div className="space-y-5">
                 <div className="grid gap-4 lg:grid-cols-3">
                   <ActionLinkCard
@@ -331,9 +304,9 @@ export default function ManageBookingPage({
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-        </section>
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );
