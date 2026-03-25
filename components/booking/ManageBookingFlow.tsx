@@ -6,7 +6,6 @@ import {
   AlertCircle,
   Calendar,
   CheckCircle2,
-  ChevronLeft,
   Clock,
   Loader2,
   MessageCircle,
@@ -138,7 +137,7 @@ function BookingSummaryCard({
       type="button"
       onClick={onSelect}
       disabled={disabled}
-      className={`w-full rounded-[24px] border p-4 text-left transition sm:p-5 ${
+      className={`w-full overflow-hidden rounded-[24px] border p-4 text-left transition sm:p-5 ${
         disabled
           ? 'cursor-not-allowed border-amber-200 bg-amber-50/90 text-amber-900'
           : selected
@@ -147,12 +146,12 @@ function BookingSummaryCard({
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/60">
             {visitTypeLabel(booking.visitType)}
           </p>
           <h3 className="mt-2 text-base font-semibold text-slate-900 sm:text-lg">{booking.doctorNameZh}</h3>
-          <p className="mt-1 text-sm text-slate-600">{booking.clinicNameZh}</p>
+          <p className="mt-1 truncate text-sm text-slate-600">{booking.clinicNameZh}</p>
           <p className="mt-1 text-sm font-medium text-slate-700">病人：{booking.patientName}</p>
         </div>
         <span
@@ -169,7 +168,7 @@ function BookingSummaryCard({
           <Calendar className="h-4 w-4 text-primary" />
           <span>{formatBookingDateTime(booking.appointmentDate, booking.appointmentTime)}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <Ticket className="h-4 w-4 text-primary" />
           <span className="truncate">預約編號：{booking.bookingId}</span>
         </div>
@@ -441,191 +440,168 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
   }
 
   return (
-    <div className="space-y-5 sm:space-y-6">
-      <div className="rounded-[24px] border border-primary/10 bg-white/90 p-4 shadow-[0_20px_50px_rgba(53,96,32,0.07)] sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">{getActionLabel(action)}</h2>
-          <Link
-            href="/manage-booking"
-            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/15 bg-white px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary-light"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            返回管理
-          </Link>
+    <div className="patient-card mx-auto max-w-5xl overflow-hidden p-5 sm:p-6 lg:p-8">
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-primary sm:text-[30px]">
+            {getActionLabel(action)}
+          </h1>
+          <div className="rounded-2xl border border-primary/15 bg-primary-light/40 p-3 text-xs font-medium text-primary sm:text-sm">
+            步驟：
+            {tokenVerified ? ' 1. 已驗證' : ' 1. 驗證電話'}
+            {bookings.length > 0 || requestSucceeded ? '  2. 選擇預約' : '  2. 預約卡片'}
+            {action === 'reschedule' ? '  3. 更改預約' : '  3. 取消預約'}
+          </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-            {(tokenVerified
-              ? [
-                  { index: '1', title: '已驗證', active: true },
-                  { index: '2', title: '預約', active: bookings.length > 0 },
-                  { index: '3', title: action === 'reschedule' ? '改期' : '取消', active: Boolean(selectedBookingId) },
-                ]
-              : [
-                  { index: '1', title: '驗證', active: true },
-                  { index: '2', title: '預約', active: requestSucceeded || bookings.length > 0 },
-                  { index: '3', title: action === 'reschedule' ? '改期' : '取消', active: Boolean(selectedBookingId) },
-                ]
-            ).map((step) => (
-              <div
-                key={step.index}
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm ${
-                  step.active ? 'border-primary/15 bg-primary-light text-primary' : 'border-slate-200 bg-slate-50 text-slate-500'
-                }`}
-              >
-                <span className="text-xs font-semibold">{step.index}</span>
-                <span className="font-medium">{step.title}</span>
-              </div>
-            ))}
-        </div>
-      </div>
+        {feedback ? <FeedbackBanner type={feedback.type} text={feedback.text} /> : null}
 
-      {feedback ? <FeedbackBanner type={feedback.type} text={feedback.text} /> : null}
-
-      {tokenVerifying ? (
-        <div className="flex items-center justify-center gap-3 rounded-[28px] border border-primary/10 bg-white/90 p-8 shadow-sm sm:p-10">
-          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-          <span className="text-base text-slate-600">正在驗證管理連結⋯</span>
-        </div>
-      ) : null}
-
-      <section
-        className={`grid gap-5 sm:gap-6 ${tokenVerified ? '' : 'xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]'}`}
-        style={tokenVerifying ? { display: 'none' } : undefined}
-      >
-        {!tokenVerified ? (
-          <div className="rounded-[24px] border border-primary/10 bg-white/90 p-4 shadow-sm sm:p-5">
-            <h3 className="text-lg font-semibold text-slate-900">驗證</h3>
-
-            <div className="mt-4 space-y-5">
-              <form className="space-y-4" onSubmit={handleRequestCode}>
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-slate-700" htmlFor="manage-booking-phone">
-                    WhatsApp 電話號碼
-                  </label>
-                  <input
-                    id="manage-booking-phone"
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    placeholder="例如 9123 4567 / +852 9123 4567"
-                    className="min-h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base text-slate-900 outline-none transition focus:border-primary focus:bg-white"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={requestingCode}
-                  className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {requestingCode ? <Loader2 className="h-4 w-4 animate-spin" /> : '發送驗證碼'}
-                </button>
-              </form>
-
-              <div className="border-t border-slate-200 pt-5">
-                <form className="space-y-4" onSubmit={handleVerifyCode}>
-                  <div className="flex items-center justify-between gap-3">
-                    <h4 className="text-base font-semibold text-slate-900">驗證碼</h4>
-                    <span className="text-xs text-slate-500">{maskedPhone || '先發送驗證碼'}</span>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-700" htmlFor="manage-booking-code">
-                      驗證碼
-                    </label>
-                    <input
-                      id="manage-booking-code"
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      maxLength={6}
-                      value={code}
-                      onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="輸入 6 位數驗證碼"
-                      className="min-h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base tracking-[0.3em] text-slate-900 outline-none transition focus:border-primary focus:bg-white"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <button
-                      type="submit"
-                      disabled={!requestSucceeded || verifyingCode}
-                      className="inline-flex min-h-11 flex-1 items-center justify-center rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {verifyingCode ? <Loader2 className="h-4 w-4 animate-spin" /> : '驗證並查看預約'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void requestCode()}
-                      disabled={requestingCode}
-                      className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-primary/15 bg-white px-4 py-3 text-sm font-medium text-primary transition hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      重新發送
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
+        {tokenVerifying ? (
+          <div className="flex items-center justify-center gap-3 rounded-[24px] border border-primary/10 bg-white p-8 shadow-sm sm:p-10">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span className="text-base text-slate-600">正在驗證管理連結⋯</span>
           </div>
         ) : null}
 
-        <div className="space-y-5 sm:space-y-6">
-          <div className="rounded-[24px] border border-primary/10 bg-white/90 p-4 shadow-sm sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-lg font-semibold text-slate-900">預約</h3>
-              {bookings.length > 0 ? (
-                <span className="rounded-full bg-primary-light px-3 py-1 text-xs font-semibold text-primary">
-                  {bookings.length} 筆
-                </span>
-              ) : null}
-            </div>
+        <section
+          className={`grid gap-5 sm:gap-6 ${tokenVerified ? '' : 'xl:grid-cols-[340px_minmax(0,1fr)]'}`}
+          style={tokenVerifying ? { display: 'none' } : undefined}
+        >
+          {!tokenVerified ? (
+            <div className="min-w-0 rounded-[24px] border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
+              <h2 className="text-lg font-semibold text-slate-900">驗證身份</h2>
 
-            {bookings.length > 0 ? (
-              <div className="mt-5 space-y-4">
-                {bookings.map((booking) => (
-                  <BookingSummaryCard
-                    key={booking.bookingId}
-                    booking={booking}
-                    selected={selectedBookingId === booking.bookingId}
-                    onSelect={() => setSelectedBookingId(booking.bookingId)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm leading-relaxed text-slate-500">
-                {tokenVerified ? '暫時沒有可處理預約。' : '完成驗證後顯示在這裡。'}
-              </div>
-            )}
-          </div>
+              <div className="mt-4 space-y-5">
+                <form className="space-y-4" onSubmit={handleRequestCode}>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-slate-700" htmlFor="manage-booking-phone">
+                      WhatsApp 電話號碼
+                    </label>
+                    <input
+                      id="manage-booking-phone"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      value={phone}
+                      onChange={(event) => setPhone(event.target.value)}
+                      placeholder="例如 9123 4567 / +852 9123 4567"
+                      className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base text-slate-900 outline-none transition focus:border-primary"
+                    />
+                  </div>
 
-          {selectedBooking && !selectedBooking.canSelfManage ? (
-            <div className="rounded-[28px] border border-amber-200 bg-amber-50/80 p-5 shadow-sm sm:p-6">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="mt-0.5 h-5 w-5 text-amber-700" />
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold text-amber-900">此預約需由姑娘協助</h3>
-                  <p className="text-sm leading-relaxed text-amber-800">{selectedBooking.message}</p>
-                  {selectedBooking.clinicWhatsappUrl ? (
-                    <a
-                      href={selectedBooking.clinicWhatsappUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover sm:w-auto"
-                    >
-                      WhatsApp 聯絡姑娘
-                    </a>
-                  ) : null}
+                  <button
+                    type="submit"
+                    disabled={requestingCode}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {requestingCode ? <Loader2 className="h-4 w-4 animate-spin" /> : '發送驗證碼'}
+                  </button>
+                </form>
+
+                <div className="border-t border-slate-200 pt-5">
+                  <form className="space-y-4" onSubmit={handleVerifyCode}>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-base font-semibold text-slate-900">驗證碼</h3>
+                      <span className="truncate text-xs text-slate-500">{maskedPhone || '先發送驗證碼'}</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-slate-700" htmlFor="manage-booking-code">
+                        驗證碼
+                      </label>
+                      <input
+                        id="manage-booking-code"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        value={code}
+                        onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="輸入 6 位數驗證碼"
+                        className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base tracking-[0.3em] text-slate-900 outline-none transition focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <button
+                        type="submit"
+                        disabled={!requestSucceeded || verifyingCode}
+                        className="inline-flex min-h-11 flex-1 items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {verifyingCode ? <Loader2 className="h-4 w-4 animate-spin" /> : '驗證並查看預約'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void requestCode()}
+                        disabled={requestingCode}
+                        className="inline-flex min-h-11 items-center justify-center rounded-[18px] border border-primary/20 bg-white px-4 py-3 text-sm font-semibold text-primary transition hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        重新發送
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
             </div>
           ) : null}
 
-          {selectedBooking && selectedBooking.canSelfManage && action === 'reschedule' && !result ? (
-            <div className="space-y-5 sm:space-y-6">
-              <div className="rounded-[24px] border border-primary/10 bg-white/90 p-4 shadow-sm sm:p-5">
-                <h3 className="text-lg font-semibold text-slate-900">新日期</h3>
+          <div className="min-w-0 space-y-5 sm:space-y-6">
+            <div className="min-w-0 rounded-[24px] border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-slate-900">選擇預約</h2>
+                {bookings.length > 0 ? (
+                  <span className="rounded-full bg-primary-light px-3 py-1 text-xs font-semibold text-primary">
+                    {bookings.length} 筆
+                  </span>
+                ) : null}
+              </div>
+
+              {bookings.length > 0 ? (
+                <div className="mt-5 space-y-4">
+                  {bookings.map((booking) => (
+                    <BookingSummaryCard
+                      key={booking.bookingId}
+                      booking={booking}
+                      selected={selectedBookingId === booking.bookingId}
+                      onSelect={() => setSelectedBookingId(booking.bookingId)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm leading-relaxed text-slate-500">
+                  {tokenVerified ? '暫時沒有可處理預約。' : '完成驗證後顯示在這裡。'}
+                </div>
+              )}
+            </div>
+
+            {selectedBooking && !selectedBooking.canSelfManage ? (
+              <div className="rounded-[24px] border border-amber-200 bg-amber-50/80 p-5 shadow-sm sm:p-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="mt-0.5 h-5 w-5 text-amber-700" />
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold text-amber-900">此預約需由姑娘協助</h3>
+                    <p className="text-sm leading-relaxed text-amber-800">{selectedBooking.message}</p>
+                    {selectedBooking.clinicWhatsappUrl ? (
+                      <a
+                        href={selectedBooking.clinicWhatsappUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-h-11 w-full items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover sm:w-auto"
+                      >
+                        WhatsApp 聯絡姑娘
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              null
+            )}
+
+            {selectedBooking && selectedBooking.canSelfManage && action === 'reschedule' && !result ? (
+              <div className="space-y-5 sm:space-y-6">
+                <div className="rounded-[24px] border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
+                  <h3 className="text-lg font-semibold text-slate-900">新日期</h3>
                 <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-3">
                   {dateChoices.map((dateOption) => (
                     <button
@@ -648,7 +624,7 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-primary/10 bg-white/90 p-4 shadow-sm sm:p-5">
+              <div className="rounded-[24px] border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
                 <div className="flex items-center gap-3">
                   <Clock className="h-5 w-5 text-primary" />
                   <h3 className="text-lg font-semibold text-slate-900">新時段</h3>
@@ -686,7 +662,7 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
                 )}
               </div>
 
-              <div className="rounded-[24px] border border-primary/10 bg-white/90 p-4 shadow-sm sm:p-5">
+              <div className="rounded-[24px] border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
                 <h3 className="text-lg font-semibold text-slate-900">確認</h3>
                 <div className="mt-5 grid gap-4 lg:grid-cols-2">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -716,99 +692,100 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
                   {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '確認更改預約'}
                 </button>
               </div>
-            </div>
-          ) : null}
-
-          {selectedBooking && selectedBooking.canSelfManage && action === 'cancel' && !result ? (
-            <div className="rounded-[28px] border border-red-200 bg-white/90 p-5 shadow-sm sm:p-6">
-              <h3 className="text-lg font-semibold text-slate-900">確認取消預約</h3>
-              <div className="mt-5 rounded-2xl border border-red-100 bg-red-50/80 p-5">
-                <p className="text-base font-semibold text-slate-900">{selectedBooking.doctorNameZh}</p>
-                <p className="mt-1 text-sm text-slate-500">{selectedBooking.clinicNameZh}</p>
-                <p className="mt-3 text-sm text-slate-700">
-                  {formatBookingDateTime(selectedBooking.appointmentDate, selectedBooking.appointmentTime)}
-                </p>
-                <p className="mt-4 text-sm leading-relaxed text-red-700">
-                  取消後，此預約時段會立即釋出。如需重新安排，需要重新預約。
-                </p>
               </div>
+            ) : null}
 
-              <button
-                type="button"
-                onClick={() => void handleConfirmAction()}
-                disabled={actionLoading}
-                className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '確認取消預約'}
-              </button>
-            </div>
-          ) : null}
-
-          {result ? (
-            <div className="rounded-[28px] border border-emerald-200 bg-emerald-50/80 p-5 shadow-sm sm:p-6">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-6 w-6 text-emerald-600" />
-                <div className="space-y-3">
-                  <h3 className="text-xl font-semibold text-emerald-900">
-                    {action === 'reschedule' ? '已成功更改預約' : '已成功取消預約'}
-                  </h3>
-                  <p className="text-sm leading-relaxed text-emerald-800">{result.message}</p>
-                  <div className="rounded-2xl border border-emerald-200 bg-white/70 p-4 text-sm text-slate-700">
-                    <p className="font-semibold text-slate-900">{result.booking.doctorNameZh}</p>
-                    <p className="mt-1">{result.booking.clinicNameZh}</p>
-                    {action === 'reschedule' ? (
-                      <p className="mt-3">
-                        新時間：{formatBookingDateTime(result.booking.appointmentDate, result.booking.appointmentTime)}
-                      </p>
-                    ) : (
-                      <p className="mt-3">
-                        已取消時間：{formatBookingDateTime(selectedBooking!.appointmentDate, selectedBooking!.appointmentTime)}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <Link
-                      href="/booking-whatsapp"
-                      className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
-                    >
-                      重新預約
-                    </Link>
-                    <Link
-                      href="/manage-booking"
-                      className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-primary/15 bg-white px-4 py-3 text-sm font-medium text-primary transition hover:bg-primary-light"
-                    >
-                      返回預約管理
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {supportWhatsappUrl ? (
-            <div className="rounded-[28px] border border-primary/10 bg-white/90 p-5 shadow-sm sm:p-6">
-              <div className="flex items-start gap-3">
-                <MessageCircle className="mt-0.5 h-5 w-5 text-primary" />
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold text-slate-900">需要人工協助？</h3>
-                  <p className="text-sm leading-relaxed text-slate-600">
-                    如果目前未能自助處理，你可以直接 WhatsApp 聯絡姑娘跟進。
+            {selectedBooking && selectedBooking.canSelfManage && action === 'cancel' && !result ? (
+              <div className="rounded-[24px] border border-red-200 bg-white p-5 shadow-sm sm:p-6">
+                <h3 className="text-lg font-semibold text-slate-900">確認取消預約</h3>
+                <div className="mt-5 rounded-2xl border border-red-100 bg-red-50/80 p-5">
+                  <p className="text-base font-semibold text-slate-900">{selectedBooking.doctorNameZh}</p>
+                  <p className="mt-1 text-sm text-slate-500">{selectedBooking.clinicNameZh}</p>
+                  <p className="mt-3 text-sm text-slate-700">
+                    {formatBookingDateTime(selectedBooking.appointmentDate, selectedBooking.appointmentTime)}
                   </p>
-                  <a
-                    href={supportWhatsappUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover sm:w-auto"
-                  >
-                    WhatsApp 聯絡姑娘
-                  </a>
+                  <p className="mt-4 text-sm leading-relaxed text-red-700">
+                    取消後，此預約時段會立即釋出。如需重新安排，需要重新預約。
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void handleConfirmAction()}
+                  disabled={actionLoading}
+                  className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-[18px] bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '確認取消預約'}
+                </button>
+              </div>
+            ) : null}
+
+            {result ? (
+              <div className="rounded-[24px] border border-emerald-200 bg-emerald-50/80 p-5 shadow-sm sm:p-6">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-0.5 h-6 w-6 text-emerald-600" />
+                  <div className="space-y-3">
+                    <h3 className="text-xl font-semibold text-emerald-900">
+                      {action === 'reschedule' ? '已成功更改預約' : '已成功取消預約'}
+                    </h3>
+                    <p className="text-sm leading-relaxed text-emerald-800">{result.message}</p>
+                    <div className="rounded-2xl border border-emerald-200 bg-white/70 p-4 text-sm text-slate-700">
+                      <p className="font-semibold text-slate-900">{result.booking.doctorNameZh}</p>
+                      <p className="mt-1">{result.booking.clinicNameZh}</p>
+                      {action === 'reschedule' ? (
+                        <p className="mt-3">
+                          新時間：{formatBookingDateTime(result.booking.appointmentDate, result.booking.appointmentTime)}
+                        </p>
+                      ) : (
+                        <p className="mt-3">
+                          已取消時間：{formatBookingDateTime(selectedBooking!.appointmentDate, selectedBooking!.appointmentTime)}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <Link
+                        href="/booking-whatsapp"
+                        className="inline-flex min-h-11 items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
+                      >
+                        重新預約
+                      </Link>
+                      <Link
+                        href="/manage-booking"
+                        className="inline-flex min-h-11 items-center justify-center rounded-[18px] border border-primary/20 bg-white px-4 py-3 text-sm font-semibold text-primary transition hover:bg-primary-light"
+                      >
+                        返回預約管理
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : null}
-        </div>
-      </section>
+            ) : null}
+
+            {supportWhatsappUrl ? (
+              <div className="rounded-[24px] border border-primary/10 bg-white p-5 shadow-sm sm:p-6">
+                <div className="flex items-start gap-3">
+                  <MessageCircle className="mt-0.5 h-5 w-5 text-primary" />
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold text-slate-900">需要人工協助？</h3>
+                    <p className="text-sm leading-relaxed text-slate-600">
+                      如果目前未能自助處理，你可以直接 WhatsApp 聯絡姑娘跟進。
+                    </p>
+                    <a
+                      href={supportWhatsappUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover sm:w-auto"
+                    >
+                      WhatsApp 聯絡姑娘
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

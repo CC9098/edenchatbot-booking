@@ -84,10 +84,10 @@ function ActionNavLink({
   return (
     <Link
       href={href}
-      className={`inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-medium transition ${
+      className={`inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold transition ${
         active
-          ? 'border-primary bg-primary text-white shadow-[0_14px_28px_rgba(53,96,32,0.18)]'
-          : 'border-primary/15 bg-white/85 text-primary hover:bg-primary-light'
+          ? 'border-primary bg-primary text-white'
+          : 'border-primary/20 bg-white text-primary hover:bg-primary-light'
       }`}
     >
       {label}
@@ -148,157 +148,143 @@ export default function ManageBookingPage({
   const hero = getHeroCopy(action);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(57,96,34,0.08),_transparent_34%),linear-gradient(180deg,_#f7f4ec_0%,_#eef5eb_46%,_#fbfcf8_100%)] text-slate-800">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -left-12 top-20 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute bottom-8 right-0 h-72 w-72 rounded-full bg-emerald-100/70 blur-3xl" />
-      </div>
-
-      <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 sm:pt-8 lg:px-8">
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
+    <main className="patient-pane overflow-x-hidden text-slate-800">
+      <div className="mx-auto max-w-5xl space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/"
-              className="inline-flex min-h-11 items-center rounded-full border border-primary/10 bg-white/80 px-4 py-2 text-sm font-medium text-slate-600 transition hover:text-primary"
+              className="inline-flex min-h-11 items-center rounded-full border border-primary/20 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:text-primary"
             >
               返回首頁
             </Link>
-
-            <Link
-              href="/login"
-              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/15 bg-white/85 px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary-light"
-            >
-              <LogIn className="h-4 w-4" />
-              會員登入
-            </Link>
+            {ACTION_LINKS.map((item) => (
+              <ActionNavLink
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                active={action === item.action}
+              />
+            ))}
           </div>
 
-          <div className="-mx-1 overflow-x-auto px-1 pb-1">
-            <div className="flex min-w-max gap-2">
-              {ACTION_LINKS.map((item) => (
-                <ActionNavLink
-                  key={item.href}
-                  href={item.href}
-                  label={item.label}
-                  active={action === item.action}
-                />
-              ))}
-            </div>
-          </div>
+          <Link
+            href="/login"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/20 bg-white px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary-light"
+          >
+            <LogIn className="h-4 w-4" />
+            會員登入
+          </Link>
         </div>
 
         {action || token ? (
-          <div className="mt-6">
-            <ManageBookingFlow action={action ?? 'reschedule'} manageAccessToken={token} />
-          </div>
+          <ManageBookingFlow action={action ?? 'reschedule'} manageAccessToken={token} />
         ) : (
-          <section className="mt-6 rounded-[32px] border border-primary/10 bg-white/88 p-5 shadow-[0_24px_70px_rgba(53,96,32,0.07)] backdrop-blur sm:p-7 lg:p-10">
-            <div className="flex flex-col gap-8">
-              <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_340px]">
-                <div className="space-y-4 sm:space-y-5">
-                  <div className="inline-flex items-center rounded-full border border-primary/10 bg-primary-light px-4 py-1.5 text-sm font-semibold tracking-[0.18em] text-primary">
-                    {hero.eyebrow}
+          <section className="patient-card space-y-8 p-5 sm:p-7 lg:p-8">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_340px]">
+              <div className="space-y-4 sm:space-y-5">
+                <div className="inline-flex items-center rounded-full border border-primary/10 bg-primary-light px-4 py-1.5 text-sm font-semibold tracking-[0.18em] text-primary">
+                  {hero.eyebrow}
+                </div>
+                <div className="space-y-3">
+                  <h1 className="max-w-4xl text-[2.2rem] font-semibold leading-[0.95] tracking-[-0.04em] text-primary sm:text-5xl lg:text-6xl">
+                    {hero.title}
+                  </h1>
+                  <p className="max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base lg:text-lg">
+                    {hero.description}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-primary/10 bg-[linear-gradient(180deg,rgba(246,251,243,0.96),rgba(255,255,255,0.96))] p-5 sm:p-6">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-light text-primary">
+                    <ShieldCheck className="h-5 w-5" />
                   </div>
                   <div className="space-y-3">
-                    <h1 className="max-w-4xl text-[2.2rem] font-semibold leading-[0.95] tracking-[-0.04em] text-primary sm:text-5xl lg:text-6xl">
-                      {hero.title}
-                    </h1>
-                    <p className="max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base lg:text-lg">
-                      {hero.description}
+                    <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">流程只保留必要步驟</h2>
+                    <div className="space-y-2">
+                      {hero.bullets.map((item) => (
+                        <div
+                          key={item}
+                          className="rounded-2xl border border-primary/10 bg-white/85 px-4 py-3 text-sm leading-relaxed text-slate-600"
+                        >
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-sm leading-relaxed text-slate-500">
+                      病人不需要先登入會員，先處理當前任務即可。
                     </p>
                   </div>
                 </div>
+              </div>
+            </div>
 
-                <div className="rounded-[28px] border border-primary/10 bg-[linear-gradient(180deg,rgba(246,251,243,0.96),rgba(255,255,255,0.96))] p-5 sm:p-6">
+            <div className="space-y-5">
+              <div className="grid gap-4 lg:grid-cols-3">
+                <ActionLinkCard
+                  href="/booking-whatsapp"
+                  eyebrow="新預約"
+                  title="新預約"
+                  description="選擇醫師、診所與時段，直接完成 WhatsApp 預約。"
+                  icon={<CalendarPlus2 className="h-5 w-5" />}
+                  subtle
+                />
+                <ActionLinkCard
+                  href="/manage-booking?action=reschedule"
+                  eyebrow="改期"
+                  title="更改預約"
+                  description="驗證電話後直接揀新日期與時段，不再跳去另一段對話。"
+                  icon={<RefreshCcw className="h-5 w-5" />}
+                />
+                <ActionLinkCard
+                  href="/manage-booking?action=cancel"
+                  eyebrow="取消"
+                  title="取消預約"
+                  description="先確認身份，再核對時間與地點，最後一按完成取消。"
+                  icon={<CircleSlash className="h-5 w-5" />}
+                />
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-[28px] border border-primary/10 bg-[linear-gradient(180deg,rgba(246,251,243,0.95),rgba(255,255,255,0.96))] p-5 sm:p-6">
                   <div className="flex items-start gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-light text-primary">
                       <ShieldCheck className="h-5 w-5" />
                     </div>
                     <div className="space-y-3">
-                      <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">流程只保留必要步驟</h2>
-                      <div className="space-y-2">
-                        {hero.bullets.map((item) => (
-                          <div
-                            key={item}
-                            className="rounded-2xl border border-primary/10 bg-white/85 px-4 py-3 text-sm leading-relaxed text-slate-600"
-                          >
-                            {item}
+                      <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">病人會經過 3 步</h2>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        {[
+                          { step: '1', title: '輸入電話', text: '填寫預約時使用的 WhatsApp 電話。' },
+                          { step: '2', title: '驗證身份', text: '輸入 6 位數驗證碼，查看預約卡片。' },
+                          { step: '3', title: '完成操作', text: '揀選預約後即完成更改或取消。' },
+                        ].map((item) => (
+                          <div key={item.step} className="rounded-2xl border border-primary/10 bg-white/85 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
+                              Step {item.step}
+                            </p>
+                            <p className="mt-2 text-sm font-semibold text-slate-900">{item.title}</p>
+                            <p className="mt-2 text-sm leading-relaxed text-slate-600">{item.text}</p>
                           </div>
                         ))}
                       </div>
-                      <p className="text-sm leading-relaxed text-slate-500">
-                        病人不需要先登入會員，先處理當前任務即可。
-                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="space-y-5">
-                <div className="grid gap-4 lg:grid-cols-3">
-                  <ActionLinkCard
-                    href="/booking-whatsapp"
-                    eyebrow="新預約"
-                    title="新預約"
-                    description="選擇醫師、診所與時段，直接完成 WhatsApp 預約。"
-                    icon={<CalendarPlus2 className="h-5 w-5" />}
-                    subtle
-                  />
-                  <ActionLinkCard
-                    href="/manage-booking?action=reschedule"
-                    eyebrow="改期"
-                    title="更改預約"
-                    description="驗證電話後直接揀新日期與時段，不再跳去另一段對話。"
-                    icon={<RefreshCcw className="h-5 w-5" />}
-                  />
-                  <ActionLinkCard
-                    href="/manage-booking?action=cancel"
-                    eyebrow="取消"
-                    title="取消預約"
-                    description="先確認身份，再核對時間與地點，最後一按完成取消。"
-                    icon={<CircleSlash className="h-5 w-5" />}
-                  />
-                </div>
-
-                <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-                  <div className="rounded-[28px] border border-primary/10 bg-[linear-gradient(180deg,rgba(246,251,243,0.95),rgba(255,255,255,0.96))] p-5 sm:p-6">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-light text-primary">
-                        <ShieldCheck className="h-5 w-5" />
-                      </div>
-                      <div className="space-y-3">
-                        <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">病人會經過 3 步</h2>
-                        <div className="grid gap-3 sm:grid-cols-3">
-                          {[
-                            { step: '1', title: '輸入電話', text: '填寫預約時使用的 WhatsApp 電話。' },
-                            { step: '2', title: '驗證身份', text: '輸入 6 位數驗證碼，查看預約卡片。' },
-                            { step: '3', title: '完成操作', text: '揀選預約後即完成更改或取消。' },
-                          ].map((item) => (
-                            <div key={item.step} className="rounded-2xl border border-primary/10 bg-white/85 p-4">
-                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
-                                Step {item.step}
-                              </p>
-                              <p className="mt-2 text-sm font-semibold text-slate-900">{item.title}</p>
-                              <p className="mt-2 text-sm leading-relaxed text-slate-600">{item.text}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                <div className="rounded-[28px] border border-primary/10 bg-white/90 p-5 sm:p-6">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-light text-primary">
+                      <MessageCircle className="h-5 w-5" />
                     </div>
-                  </div>
-
-                  <div className="rounded-[28px] border border-primary/10 bg-white/90 p-5 sm:p-6">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-light text-primary">
-                        <MessageCircle className="h-5 w-5" />
-                      </div>
-                      <div className="space-y-3">
-                        <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">使用原則</h2>
-                        <div className="space-y-2 text-sm leading-relaxed text-slate-600">
-                          <p>新預約、更改、取消會分頁處理，避免病人同時面對太多選項。</p>
-                          <p>距離應診時間少於 1 小時時，系統會直接改為人工協助。</p>
-                          <p>管理預約本身不需要先登入，登入只屬額外功能。</p>
-                        </div>
+                    <div className="space-y-3">
+                      <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">使用原則</h2>
+                      <div className="space-y-2 text-sm leading-relaxed text-slate-600">
+                        <p>新預約、更改、取消會分頁處理，避免病人同時面對太多選項。</p>
+                        <p>距離應診時間少於 1 小時時，系統會直接改為人工協助。</p>
+                        <p>管理預約本身不需要先登入，登入只屬額外功能。</p>
                       </div>
                     </div>
                   </div>
