@@ -20,6 +20,7 @@ export default async function BookingEmbedPage({
         doctors={doctors}
         initialSelection={initialSelection}
         embedMode
+        flowVariant="whatsapp"
       />
     </main>
   );

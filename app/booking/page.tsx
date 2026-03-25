@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "預約服務 | 醫天圓",
-  description: "在 Eden 內直接完成預約，不需跳出 App。",
+  description: "成功預約後，診所會透過 WhatsApp 發送確認訊息。",
 };
 
 async function getInitialBookingContact() {
@@ -73,6 +73,7 @@ export default async function BookingPage({
           doctors={doctors}
           initialContact={initialContact}
           initialSelection={initialSelection}
+          flowVariant="whatsapp"
         />
       </div>
     </main>
