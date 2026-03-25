@@ -443,6 +443,32 @@ function getRowPhoneDigits(row: Pick<WidgetBookingRow, "phone" | "phone_digits">
   return row.phone_digits || normalizePhoneForSearch(row.phone);
 }
 
+function getPhoneDigitVariants(phone: string): string[] {
+  const digits = normalizePhoneForSearch(phone);
+  if (!digits) {
+    return [];
+  }
+
+  const variants = new Set<string>([digits]);
+
+  if (digits.startsWith("852") && digits.length === 11) {
+    variants.add(digits.slice(3));
+  }
+
+  if (digits.length === 8) {
+    variants.add(`852${digits}`);
+  }
+
+  return [...variants];
+}
+
+function phoneDigitsMatch(left: string, right: string): boolean {
+  const leftVariants = getPhoneDigitVariants(left);
+  const rightVariants = new Set(getPhoneDigitVariants(right));
+
+  return leftVariants.some((variant) => rightVariants.has(variant));
+}
+
 function toWidgetBookingSummary(row: WidgetBookingRow): WidgetBookingSummary {
   return {
     bookingId: row.google_event_id || row.id,
@@ -516,13 +542,15 @@ async function listMatchingBookingRowsByPhone(phone: string): Promise<WidgetBook
     return [];
   }
 
+  const phoneVariants = getPhoneDigitVariants(phoneDigits);
+
   const supabase = createServiceClient();
   const today = getTodayInHongKongDate();
 
   const directResult = await supabase
     .from("booking_intake")
     .select(BOOKING_SELECT_FIELDS)
-    .eq("phone_digits", phoneDigits)
+    .in("phone_digits", phoneVariants)
     .in("status", ["pending", "confirmed"])
     .gte("appointment_date", today)
     .order("appointment_date", { ascending: true })
@@ -556,7 +584,7 @@ async function listMatchingBookingRowsByPhone(phone: string): Promise<WidgetBook
   return Array.isArray(fallbackResult.data)
     ? (fallbackResult.data as unknown[])
         .filter(isWidgetBookingRow)
-        .filter((row) => getRowPhoneDigits(row) === phoneDigits)
+        .filter((row) => phoneDigitsMatch(getRowPhoneDigits(row), phoneDigits))
     : [];
 }
 
@@ -582,7 +610,7 @@ async function invalidateExistingPhoneVerifications(phoneDigits: string) {
       consumed_at: now,
       updated_at: now,
     })
-    .eq("phone_digits", phoneDigits)
+    .in("phone_digits", getPhoneDigitVariants(phoneDigits))
     .eq("purpose", "manage_booking")
     .is("consumed_at", null);
 
@@ -596,18 +624,18 @@ async function getLatestActiveVerification(phoneDigits: string): Promise<WidgetV
   const { data, error } = await supabase
     .from("widget_booking_verifications")
     .select("id, phone_digits, code_hash, attempt_count, max_attempts, expires_at, consumed_at")
-    .eq("phone_digits", phoneDigits)
+    .in("phone_digits", getPhoneDigitVariants(phoneDigits))
     .eq("purpose", "manage_booking")
     .is("consumed_at", null)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return isWidgetVerificationRow(data) ? data : null;
+  const firstRow = Array.isArray(data) ? data[0] : null;
+  return isWidgetVerificationRow(firstRow) ? firstRow : null;
 }
 
 async function markVerificationConsumed(id: string) {
@@ -681,7 +709,7 @@ async function getBookingRowByManageToken(
     return { success: false, error: "找不到對應預約，請重新驗證。" };
   }
 
-  if (getRowPhoneDigits(data) !== tokenResult.payload.phoneDigits) {
+  if (!phoneDigitsMatch(getRowPhoneDigits(data), tokenResult.payload.phoneDigits)) {
     return { success: false, error: "驗證資料不符，請重新驗證。" };
   }
 
@@ -706,21 +734,22 @@ export async function requestWidgetBookingVerificationCode(
     }
 
     const primaryRow = rows[0];
+    const verificationPhoneDigits = getRowPhoneDigits(primaryRow);
     const verificationId = randomUUID();
     const verificationCode = String(randomInt(0, 1000000)).padStart(6, "0");
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.now() + getWidgetOtpTtlMs()).toISOString();
 
-    await invalidateExistingPhoneVerifications(phoneDigits);
+    await invalidateExistingPhoneVerifications(verificationPhoneDigits);
 
     const supabase = createServiceClient();
     const { error: insertError } = await supabase
       .from("widget_booking_verifications")
       .insert({
         id: verificationId,
-        phone_digits: phoneDigits,
+        phone_digits: verificationPhoneDigits,
         purpose: "manage_booking",
-        code_hash: hashOtpCode(verificationId, phoneDigits, verificationCode),
+        code_hash: hashOtpCode(verificationId, verificationPhoneDigits, verificationCode),
         attempt_count: 0,
         max_attempts: OTP_MAX_ATTEMPTS,
         delivery_channel: "whatsapp",
@@ -756,8 +785,8 @@ export async function requestWidgetBookingVerificationCode(
 
     return {
       success: true,
-      message: `驗證碼已發送到 ${maskPhoneForDisplay(phoneDigits)} 的 WhatsApp。`,
-      maskedPhone: maskPhoneForDisplay(phoneDigits),
+      message: `驗證碼已發送到 ${maskPhoneForDisplay(verificationPhoneDigits)} 的 WhatsApp。`,
+      maskedPhone: maskPhoneForDisplay(verificationPhoneDigits),
     };
   } catch (error) {
     return {
@@ -786,7 +815,8 @@ export async function requestWidgetBookingManageLink(params: {
     }
 
     const primaryRow = rows[0];
-    const manageAccessToken = createManageAccessToken(phoneDigits, {
+    const accessPhoneDigits = getRowPhoneDigits(primaryRow);
+    const manageAccessToken = createManageAccessToken(accessPhoneDigits, {
       ttlMs: getWidgetOtpTtlMs(),
     });
     const manageUrl = buildManageBookingUrl({
@@ -812,8 +842,8 @@ export async function requestWidgetBookingManageLink(params: {
 
     return {
       success: true,
-      message: `登入連結已發送到 ${maskPhoneForDisplay(phoneDigits)} 的 WhatsApp。`,
-      maskedPhone: maskPhoneForDisplay(phoneDigits),
+      message: `登入連結已發送到 ${maskPhoneForDisplay(accessPhoneDigits)} 的 WhatsApp。`,
+      maskedPhone: maskPhoneForDisplay(accessPhoneDigits),
     };
   } catch (error) {
     return {
@@ -849,7 +879,7 @@ export async function verifyWidgetBookingVerificationCode(params: {
       return { success: false, error: "驗證碼已過期，請重新索取。" };
     }
 
-    const expected = Buffer.from(hashOtpCode(verification.id, phoneDigits, code), "utf8");
+    const expected = Buffer.from(hashOtpCode(verification.id, verification.phone_digits, code), "utf8");
     const actual = Buffer.from(verification.code_hash, "utf8");
     const isMatch = expected.length === actual.length && timingSafeEqual(expected, actual);
 
@@ -859,7 +889,7 @@ export async function verifyWidgetBookingVerificationCode(params: {
 
     await markVerificationConsumed(verification.id);
 
-    const rows = await listMatchingBookingRowsByPhone(phoneDigits);
+    const rows = await listMatchingBookingRowsByPhone(verification.phone_digits);
     if (rows.length === 0) {
       return {
         success: false,
@@ -875,7 +905,7 @@ export async function verifyWidgetBookingVerificationCode(params: {
         bookings.length === 1
           ? "已完成驗證，請繼續管理你的預約。"
           : `已完成驗證，找到 ${bookings.length} 個可管理預約。`,
-      maskedPhone: maskPhoneForDisplay(phoneDigits),
+      maskedPhone: maskPhoneForDisplay(verification.phone_digits),
       bookings,
     };
   } catch (error) {
