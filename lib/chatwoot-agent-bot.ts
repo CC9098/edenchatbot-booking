@@ -314,9 +314,7 @@ function extractPhoneLikeRecord(value: unknown): string | null {
   const row = value as Record<string, unknown>;
   return (
     extractString(row.phone_number) ||
-    extractString(row.phoneNumber) ||
-    extractString(row.identifier) ||
-    extractString(row.source_id)
+    extractString(row.phoneNumber)
   );
 }
 
@@ -365,7 +363,7 @@ async function resolveChatwootContactPhone(
   try {
     const response = await client.getContact(accountId, options.contactId);
     const payload = response.payload;
-    const resolvedPhone = payload?.phone_number || payload?.identifier || null;
+    const resolvedPhone = payload?.phone_number || null;
     return hasUsablePhoneDigits(resolvedPhone) ? resolvedPhone : null;
   } catch (error) {
     console.warn('[chatwoot-agent-bot] Failed to resolve contact phone:', error);
