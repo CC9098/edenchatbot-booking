@@ -5,14 +5,13 @@ import {
   ArrowRight,
   CalendarPlus2,
   CircleSlash,
-  LogIn,
   MessageCircle,
   RefreshCcw,
   ShieldCheck,
 } from 'lucide-react';
 
 import { ManageBookingFlow } from '@/components/booking/ManageBookingFlow';
-import { buildManageBookingUrl } from '@/lib/public-url';
+import { PublicBookingTabs } from '@/components/booking/PublicBookingTabs';
 
 export const metadata: Metadata = {
   title: '預約管理 | 醫天圓',
@@ -26,22 +25,6 @@ function parseManageAction(value: string | string[] | undefined) {
   }
 
   return null;
-}
-
-function getActionLinks(token: string | null) {
-  return [
-    { href: buildManageBookingUrl({ token: token || undefined }), label: '預約管理', action: null },
-    {
-      href: buildManageBookingUrl({ action: 'reschedule', token: token || undefined }),
-      label: '更改預約',
-      action: 'reschedule' as const,
-    },
-    {
-      href: buildManageBookingUrl({ action: 'cancel', token: token || undefined }),
-      label: '取消預約',
-      action: 'cancel' as const,
-    },
-  ];
 }
 
 function getHeroCopy(action: 'reschedule' | 'cancel' | null) {
@@ -81,29 +64,6 @@ function getHeroCopy(action: 'reschedule' | 'cancel' | null) {
       '登入不是必要步驟',
     ],
   };
-}
-
-function ActionNavLink({
-  href,
-  label,
-  active,
-}: {
-  href: string;
-  label: string;
-  active: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold transition ${
-        active
-          ? 'border-primary bg-primary text-white'
-          : 'border-primary/20 bg-white text-primary hover:bg-primary-light'
-      }`}
-    >
-      {label}
-    </Link>
-  );
 }
 
 function ActionLinkCard({
@@ -157,37 +117,11 @@ export default function ManageBookingPage({
   const action = parseManageAction(searchParams?.action);
   const token = parseToken(searchParams?.token);
   const hero = getHeroCopy(action);
-  const actionLinks = getActionLinks(token);
 
   return (
     <main className="patient-pane overflow-x-hidden text-slate-800">
       <div className="mx-auto max-w-5xl space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/"
-              className="inline-flex min-h-11 items-center rounded-full border border-primary/20 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:text-primary"
-            >
-              返回首頁
-            </Link>
-            {actionLinks.map((item) => (
-              <ActionNavLink
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                active={action === item.action}
-              />
-            ))}
-          </div>
-
-          <Link
-            href="/login"
-            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-primary/20 bg-white px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary-light"
-          >
-            <LogIn className="h-4 w-4" />
-            會員登入
-          </Link>
-        </div>
+        <PublicBookingTabs current={action ?? 'manage'} manageToken={token} />
 
         {action || token ? (
           <ManageBookingFlow action={action} manageAccessToken={token} />

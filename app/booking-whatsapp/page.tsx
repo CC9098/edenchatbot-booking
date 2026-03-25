@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { BookingTabFlow } from "@/components/booking/BookingTabFlow";
+import { PublicBookingTabs } from "@/components/booking/PublicBookingTabs";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getPublicBookableScheduleData } from "@/lib/bookable-schedule-data-server";
 import { parseBookingInitialSelection } from "@/lib/booking-search-params";
@@ -66,13 +67,16 @@ export default async function BookingWhatsappPage({
   const initialSelection = parseBookingInitialSelection(searchParams);
 
   return (
-    <main className="patient-pane text-slate-800">
-      <BookingTabFlow
-        doctors={doctors}
-        initialContact={initialContact}
-        initialSelection={initialSelection}
-        flowVariant="whatsapp"
-      />
+    <main className="patient-pane overflow-x-hidden text-slate-800">
+      <div className="mx-auto max-w-5xl space-y-4">
+        <PublicBookingTabs current="booking" />
+        <BookingTabFlow
+          doctors={doctors}
+          initialContact={initialContact}
+          initialSelection={initialSelection}
+          flowVariant="whatsapp"
+        />
+      </div>
     </main>
   );
 }
