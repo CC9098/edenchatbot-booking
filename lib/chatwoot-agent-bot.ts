@@ -1,6 +1,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { LegacyChatMessage } from '@/lib/legacy-chat-response';
+import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import { buildManageBookingUrl, buildPublicUrl } from '@/lib/public-url';
+import { createManageAccessToken } from '@/lib/widget-booking-management';
 import { DEFAULT_WIDGET_CHATBOT_SETTINGS } from '@/lib/widget-chatbot-settings';
 import {
   getClinicAddressLines,
@@ -77,6 +79,8 @@ export interface ChatwootIncomingEvent {
   conversationId: number;
   messageId: number;
   content: string;
+  contactId: number | null;
+  contactPhone: string | null;
 }
 
 interface ChatwootMessage {
@@ -92,6 +96,16 @@ interface ChatwootConversationDetails {
   id: number;
   custom_attributes?: Record<string, unknown> | null;
   messages?: ChatwootMessage[];
+}
+
+interface ChatwootContactPayload {
+  id?: number;
+  phone_number?: string | null;
+  identifier?: string | null;
+}
+
+interface ChatwootContactResponse {
+  payload?: ChatwootContactPayload | null;
 }
 
 export interface ChatwootSelectItem {
@@ -141,6 +155,13 @@ export class ChatwootClient {
   getConversationDetails(accountId: number, conversationId: number) {
     return this.request<ChatwootConversationDetails>(
       `/api/v1/accounts/${accountId}/conversations/${conversationId}`,
+      { method: 'GET' },
+    );
+  }
+
+  getContact(accountId: number, contactId: number) {
+    return this.request<ChatwootContactResponse>(
+      `/api/v1/accounts/${accountId}/contacts/${contactId}`,
       { method: 'GET' },
     );
   }
@@ -236,6 +257,7 @@ export function extractIncomingChatwootEvent(payload: unknown): ChatwootIncoming
   const senderType = sender && typeof sender === 'object'
     ? ((sender as Record<string, unknown>).type ?? (sender as Record<string, unknown>).sender_type)
     : null;
+  const contact = row.contact;
   const conversation = row.conversation;
   const account = row.account;
   const messageId = typeof row.id === 'number' ? row.id : Number(row.id);
@@ -244,6 +266,9 @@ export function extractIncomingChatwootEvent(payload: unknown): ChatwootIncoming
     : NaN;
   const conversationId = conversation && typeof conversation === 'object'
     ? Number((conversation as Record<string, unknown>).id)
+    : NaN;
+  const contactId = contact && typeof contact === 'object'
+    ? Number((contact as Record<string, unknown>).id)
     : NaN;
 
   const isIncoming =
@@ -272,7 +297,80 @@ export function extractIncomingChatwootEvent(payload: unknown): ChatwootIncoming
     conversationId,
     messageId,
     content,
+    contactId: Number.isFinite(contactId) ? contactId : null,
+    contactPhone: extractChatwootPhoneCandidate(row),
   };
+}
+
+function extractString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized || null;
+}
+
+function extractPhoneLikeRecord(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const row = value as Record<string, unknown>;
+  return (
+    extractString(row.phone_number) ||
+    extractString(row.phoneNumber) ||
+    extractString(row.identifier) ||
+    extractString(row.source_id)
+  );
+}
+
+function extractChatwootPhoneCandidate(payload: Record<string, unknown>): string | null {
+  const senderPhone = extractPhoneLikeRecord(payload.sender);
+  if (senderPhone) return senderPhone;
+
+  const contactPhone = extractPhoneLikeRecord(payload.contact);
+  if (contactPhone) return contactPhone;
+
+  const conversation = payload.conversation;
+  if (!conversation || typeof conversation !== 'object') {
+    return null;
+  }
+
+  const conversationRow = conversation as Record<string, unknown>;
+  const contactInboxPhone = extractPhoneLikeRecord(conversationRow.contact_inbox);
+  if (contactInboxPhone) return contactInboxPhone;
+
+  const meta = conversationRow.meta;
+  if (!meta || typeof meta !== 'object') {
+    return null;
+  }
+
+  const senderMetaPhone = extractPhoneLikeRecord((meta as Record<string, unknown>).sender);
+  return senderMetaPhone;
+}
+
+function hasUsablePhoneDigits(value: string | null | undefined): boolean {
+  return normalizePhoneForSearch(value).length >= 8;
+}
+
+async function resolveChatwootContactPhone(
+  client: ChatwootClient,
+  accountId: number,
+  options: { contactId: number | null; contactPhone: string | null },
+): Promise<string | null> {
+  if (hasUsablePhoneDigits(options.contactPhone)) {
+    return options.contactPhone;
+  }
+
+  if (!options.contactId) {
+    return null;
+  }
+
+  try {
+    const response = await client.getContact(accountId, options.contactId);
+    const payload = response.payload;
+    const resolvedPhone = payload?.phone_number || payload?.identifier || null;
+    return hasUsablePhoneDigits(resolvedPhone) ? resolvedPhone : null;
+  } catch (error) {
+    console.warn('[chatwoot-agent-bot] Failed to resolve contact phone:', error);
+    return null;
+  }
 }
 
 export function getFlowState(customAttributes: Record<string, unknown> | null | undefined): ChatwootFlowState {
@@ -312,7 +410,32 @@ export function mergeFlowAttributes(
   };
 }
 
-export async function buildChatwootBookingDoctorReply(): Promise<string> {
+export async function buildChatwootBookingDoctorReply(options: {
+  client: ChatwootClient;
+  accountId: number;
+  contactId: number | null;
+  contactPhone: string | null;
+}): Promise<string> {
+  const resolvedPhone = await resolveChatwootContactPhone(options.client, options.accountId, {
+    contactId: options.contactId,
+    contactPhone: options.contactPhone,
+  });
+  const phoneDigits = normalizePhoneForSearch(resolvedPhone);
+  if (phoneDigits.length >= 8) {
+    const manageUrl = buildManageBookingUrl({
+      token: createManageAccessToken(phoneDigits),
+    });
+
+    return [
+      '收到，你可以直接打開以下專屬預約管理連結：',
+      '',
+      `管理預約：${manageUrl}`,
+      '',
+      '進入後可以查看、更改或取消預約。',
+      '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
+    ].join('\n');
+  }
+
   const genericBookingUrl = buildPublicUrl('/booking-whatsapp');
   const manageRescheduleUrl = buildManageBookingUrl({ action: 'reschedule' });
   const manageCancelUrl = buildManageBookingUrl({ action: 'cancel' });

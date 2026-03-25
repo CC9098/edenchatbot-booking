@@ -110,7 +110,12 @@ export async function POST(request: NextRequest) {
       reply = CHATWOOT_HUMAN_ACK;
     } else if (rootSelection?.kind === 'booking') {
       nextState = 'menu';
-      reply = await buildChatwootBookingDoctorReply();
+      reply = await buildChatwootBookingDoctorReply({
+        client,
+        accountId: event.accountId,
+        contactId: event.contactId,
+        contactPhone: event.contactPhone,
+      });
     } else if (rootSelection?.kind === 'general') {
       nextState = 'general_menu';
       reply = GENERAL_MENU_REPLY;
