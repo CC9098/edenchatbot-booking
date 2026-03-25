@@ -145,6 +145,7 @@ export function buildBookingUrl(options?: {
 export function buildManageBookingUrl(options?: {
   embed?: boolean;
   action?: "reschedule" | "cancel";
+  token?: string;
 }): string {
   const pathname = options?.embed ? "/embed" : "/manage-booking";
   const params = new URLSearchParams();
@@ -155,6 +156,10 @@ export function buildManageBookingUrl(options?: {
 
   if (options?.action) {
     params.set("action", options.action);
+  }
+
+  if (options?.token) {
+    params.set("token", options.token);
   }
 
   const query = params.toString();

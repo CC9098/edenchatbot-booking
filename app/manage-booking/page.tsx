@@ -12,10 +12,11 @@ import {
 } from 'lucide-react';
 
 import { ManageBookingFlow } from '@/components/booking/ManageBookingFlow';
+import { buildManageBookingUrl } from '@/lib/public-url';
 
 export const metadata: Metadata = {
   title: '預約管理 | 醫天圓',
-  description: '透過 WhatsApp 驗證碼，以清晰卡片方式更改或取消現有預約。',
+  description: '透過 WhatsApp 登入連結，以清晰卡片方式更改或取消現有預約。',
 };
 
 function parseManageAction(value: string | string[] | undefined) {
@@ -27,18 +28,28 @@ function parseManageAction(value: string | string[] | undefined) {
   return null;
 }
 
-const ACTION_LINKS = [
-  { href: '/manage-booking', label: '預約管理', action: null },
-  { href: '/manage-booking?action=reschedule', label: '更改預約', action: 'reschedule' as const },
-  { href: '/manage-booking?action=cancel', label: '取消預約', action: 'cancel' as const },
-];
+function getActionLinks(token: string | null) {
+  return [
+    { href: buildManageBookingUrl({ token: token || undefined }), label: '預約管理', action: null },
+    {
+      href: buildManageBookingUrl({ action: 'reschedule', token: token || undefined }),
+      label: '更改預約',
+      action: 'reschedule' as const,
+    },
+    {
+      href: buildManageBookingUrl({ action: 'cancel', token: token || undefined }),
+      label: '取消預約',
+      action: 'cancel' as const,
+    },
+  ];
+}
 
 function getHeroCopy(action: 'reschedule' | 'cancel' | null) {
   if (action === 'reschedule') {
     return {
       eyebrow: '自助改期',
-      title: '電話驗證後，直接改期',
-      description: '用預約時的 WhatsApp 電話驗證身份，揀選要處理的預約，再換到新日期與時段。',
+      title: '打開連結後，直接改期',
+      description: '輸入預約時的 WhatsApp 電話後收取登入連結，打開即進入改期流程，揀選要處理的預約，再換到新日期與時段。',
       bullets: [
         '只顯示可自助處理的未來預約',
         '改期流程集中在同一頁完成',
@@ -50,8 +61,8 @@ function getHeroCopy(action: 'reschedule' | 'cancel' | null) {
   if (action === 'cancel') {
     return {
       eyebrow: '自助取消',
-      title: '確認身份後，一頁取消預約',
-      description: '輸入驗證碼後直接查看未來預約，只保留必要資訊，確認一次即可完成取消。',
+      title: '打開連結後，一頁取消預約',
+      description: '輸入預約時的 WhatsApp 電話後收取登入連結，打開即查看未來預約，只保留必要資訊，確認一次即可完成取消。',
       bullets: [
         '只顯示未來可處理的預約',
         '取消前會先再確認一次時間',
@@ -63,10 +74,10 @@ function getHeroCopy(action: 'reschedule' | 'cancel' | null) {
   return {
     eyebrow: '預約管理中心',
     title: '管理預約，不用再兜圈',
-    description: '新預約、更改、取消分開處理，每次只做一件事，病人進入後可以更快完成操作。',
+    description: '新預約、更改、取消分開處理，每次只做一件事；收到 WhatsApp 連結後，打開即可直接管理預約。',
     bullets: [
       '手機版單欄優先，重點先出現',
-      '電話驗證後才顯示預約卡片',
+      '打開登入連結後才顯示預約卡片',
       '登入不是必要步驟',
     ],
   };
@@ -146,6 +157,7 @@ export default function ManageBookingPage({
   const action = parseManageAction(searchParams?.action);
   const token = parseToken(searchParams?.token);
   const hero = getHeroCopy(action);
+  const actionLinks = getActionLinks(token);
 
   return (
     <main className="patient-pane overflow-x-hidden text-slate-800">
@@ -158,7 +170,7 @@ export default function ManageBookingPage({
             >
               返回首頁
             </Link>
-            {ACTION_LINKS.map((item) => (
+            {actionLinks.map((item) => (
               <ActionNavLink
                 key={item.href}
                 href={item.href}
@@ -178,7 +190,7 @@ export default function ManageBookingPage({
         </div>
 
         {action || token ? (
-          <ManageBookingFlow action={action ?? 'reschedule'} manageAccessToken={token} />
+          <ManageBookingFlow action={action} manageAccessToken={token} />
         ) : (
           <section className="patient-card space-y-8 p-5 sm:p-7 lg:p-8">
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_340px]">

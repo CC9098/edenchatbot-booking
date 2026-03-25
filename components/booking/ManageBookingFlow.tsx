@@ -47,7 +47,7 @@ type ActionResult = {
 };
 
 type ManageBookingFlowProps = {
-  action: ManageAction;
+  action: ManageAction | null;
   manageAccessToken?: string | null;
 };
 
@@ -58,7 +58,8 @@ const HK_DATE_LABEL = new Intl.DateTimeFormat('zh-HK', {
   weekday: 'short',
 });
 
-function getActionLabel(action: ManageAction) {
+function getActionLabel(action: ManageAction | null) {
+  if (!action) return '管理預約';
   return action === 'reschedule' ? '更改預約' : '取消預約';
 }
 
@@ -183,10 +184,8 @@ function BookingSummaryCard({
 
 export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFlowProps) {
   const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
   const [maskedPhone, setMaskedPhone] = useState('');
-  const [requestingCode, setRequestingCode] = useState(false);
-  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [requestingLink, setRequestingLink] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [requestSucceeded, setRequestSucceeded] = useState(false);
@@ -264,13 +263,13 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
     setResult(null);
   }, [selectedBookingId, action]);
 
-  async function requestCode() {
+  async function requestMagicLink() {
     if (!phone.trim()) {
       setFeedback({ type: 'error', text: '請輸入預約時使用的 WhatsApp 電話號碼。' });
       return;
     }
 
-    setRequestingCode(true);
+    setRequestingLink(true);
     setRequestSucceeded(false);
     setFeedback(null);
     setSupportWhatsappUrl(null);
@@ -280,71 +279,32 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
     setResult(null);
 
     try {
-      const response = await fetch('/api/widget-booking/request-code', {
+      const response = await fetch('/api/widget-booking/request-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ phone, action: action || undefined }),
       });
       const data = await response.json();
 
       if (!response.ok) {
-        setFeedback({ type: 'error', text: data.error || '暫時未能發送驗證碼。' });
+        setFeedback({ type: 'error', text: data.error || '暫時未能發送登入連結。' });
         setSupportWhatsappUrl(data.clinicWhatsappUrl || null);
         return;
       }
 
       setMaskedPhone(data.maskedPhone || '');
       setRequestSucceeded(true);
-      setFeedback({ type: 'success', text: data.message || '驗證碼已發送。' });
-      setCode('');
+      setFeedback({ type: 'success', text: data.message || '登入連結已發送。' });
     } catch {
-      setFeedback({ type: 'error', text: '發送驗證碼時發生錯誤，請稍後再試。' });
+      setFeedback({ type: 'error', text: '發送登入連結時發生錯誤，請稍後再試。' });
     } finally {
-      setRequestingCode(false);
+      setRequestingLink(false);
     }
   }
 
-  async function handleRequestCode(event: FormEvent<HTMLFormElement>) {
+  async function handleRequestLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await requestCode();
-  }
-
-  async function handleVerifyCode(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!code.trim()) {
-      setFeedback({ type: 'error', text: '請輸入 6 位數驗證碼。' });
-      return;
-    }
-
-    setVerifyingCode(true);
-    setFeedback(null);
-    setSupportWhatsappUrl(null);
-
-    try {
-      const response = await fetch('/api/widget-booking/verify-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, code }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        setFeedback({ type: 'error', text: data.error || '驗證碼不正確，請重新輸入。' });
-        setSupportWhatsappUrl(data.clinicWhatsappUrl || null);
-        return;
-      }
-
-      const nextBookings = Array.isArray(data.bookings) ? (data.bookings as VerifiedBooking[]) : [];
-      setBookings(nextBookings);
-      setSelectedBookingId(nextBookings.length === 1 ? nextBookings[0].bookingId : '');
-      setFeedback({ type: 'success', text: data.message || '已完成驗證。' });
-      setMaskedPhone(data.maskedPhone || '');
-      setSupportWhatsappUrl(null);
-    } catch {
-      setFeedback({ type: 'error', text: '驗證時發生錯誤，請稍後再試。' });
-    } finally {
-      setVerifyingCode(false);
-    }
+    await requestMagicLink();
   }
 
   async function loadSlots(date: string) {
@@ -439,6 +399,14 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
     }
   }
 
+  function buildActionHref(nextAction: ManageAction) {
+    const params = new URLSearchParams({ action: nextAction });
+    if (manageAccessToken) {
+      params.set('token', manageAccessToken);
+    }
+    return `/manage-booking?${params.toString()}`;
+  }
+
   return (
     <div className="patient-card mx-auto max-w-5xl overflow-hidden p-5 sm:p-6 lg:p-8">
       <div className="space-y-6">
@@ -450,7 +418,7 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
             步驟：
             {tokenVerified ? ' 1. 已驗證' : ' 1. 驗證電話'}
             {bookings.length > 0 || requestSucceeded ? '  2. 選擇預約' : '  2. 預約卡片'}
-            {action === 'reschedule' ? '  3. 更改預約' : '  3. 取消預約'}
+            {!action ? '  3. 選擇操作' : action === 'reschedule' ? '  3. 更改預約' : '  3. 取消預約'}
           </div>
         </div>
 
@@ -469,10 +437,14 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
         >
           {!tokenVerified ? (
             <div className="min-w-0 rounded-[24px] border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
-              <h2 className="text-lg font-semibold text-slate-900">驗證身份</h2>
+              <h2 className="text-lg font-semibold text-slate-900">WhatsApp 登入連結</h2>
 
               <div className="mt-4 space-y-5">
-                <form className="space-y-4" onSubmit={handleRequestCode}>
+                <p className="text-sm leading-relaxed text-slate-600">
+                  輸入預約時使用的 WhatsApp 電話號碼，我們會把登入連結發送到你的 WhatsApp。
+                </p>
+
+                <form className="space-y-4" onSubmit={handleRequestLink}>
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-slate-700" htmlFor="manage-booking-phone">
                       WhatsApp 電話號碼
@@ -491,55 +463,17 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
 
                   <button
                     type="submit"
-                    disabled={requestingCode}
+                    disabled={requestingLink}
                     className="inline-flex min-h-11 w-full items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {requestingCode ? <Loader2 className="h-4 w-4 animate-spin" /> : '發送驗證碼'}
+                    {requestingLink ? <Loader2 className="h-4 w-4 animate-spin" /> : requestSucceeded ? '重新發送登入連結' : '發送登入連結'}
                   </button>
                 </form>
 
-                <div className="border-t border-slate-200 pt-5">
-                  <form className="space-y-4" onSubmit={handleVerifyCode}>
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-base font-semibold text-slate-900">驗證碼</h3>
-                      <span className="truncate text-xs text-slate-500">{maskedPhone || '先發送驗證碼'}</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-slate-700" htmlFor="manage-booking-code">
-                        驗證碼
-                      </label>
-                      <input
-                        id="manage-booking-code"
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        maxLength={6}
-                        value={code}
-                        onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="輸入 6 位數驗證碼"
-                        className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base tracking-[0.3em] text-slate-900 outline-none transition focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-3 sm:flex-row">
-                      <button
-                        type="submit"
-                        disabled={!requestSucceeded || verifyingCode}
-                        className="inline-flex min-h-11 flex-1 items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {verifyingCode ? <Loader2 className="h-4 w-4 animate-spin" /> : '驗證並查看預約'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void requestCode()}
-                        disabled={requestingCode}
-                        className="inline-flex min-h-11 items-center justify-center rounded-[18px] border border-primary/20 bg-white px-4 py-3 text-sm font-semibold text-primary transition hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        重新發送
-                      </button>
-                    </div>
-                  </form>
+                <div className="rounded-2xl border border-primary/10 bg-primary-light/35 p-4 text-sm leading-relaxed text-slate-600">
+                  {requestSucceeded
+                    ? `登入連結已送往 ${maskedPhone || '你的 WhatsApp'}。請返回 WhatsApp 打開連結，系統會直接帶你回到這頁。`
+                    : '你不需要再抄寫驗證碼；只要在 WhatsApp 打開登入連結即可。'}
                 </div>
               </div>
             </div>
@@ -569,10 +503,37 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
                 </div>
               ) : (
                 <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm leading-relaxed text-slate-500">
-                  {tokenVerified ? '暫時沒有可處理預約。' : '完成驗證後顯示在這裡。'}
+                  {tokenVerified
+                    ? '暫時沒有可處理預約。'
+                    : requestSucceeded
+                      ? '登入連結已發出，請返回 WhatsApp 打開後再回來。'
+                      : '完成驗證後顯示在這裡。'}
                 </div>
               )}
             </div>
+
+            {selectedBooking && selectedBooking.canSelfManage && !action && !result ? (
+              <div className="rounded-[24px] border border-primary/10 bg-white p-5 shadow-sm sm:p-6">
+                <h3 className="text-lg font-semibold text-slate-900">選擇要處理的操作</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                  你已經完成驗證。先選擇預約，再決定要更改時間或取消預約。
+                </p>
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                  <Link
+                    href={buildActionHref('reschedule')}
+                    className="inline-flex min-h-11 flex-1 items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
+                  >
+                    更改預約
+                  </Link>
+                  <Link
+                    href={buildActionHref('cancel')}
+                    className="inline-flex min-h-11 flex-1 items-center justify-center rounded-[18px] border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                  >
+                    取消預約
+                  </Link>
+                </div>
+              </div>
+            ) : null}
 
             {selectedBooking && !selectedBooking.canSelfManage ? (
               <div className="rounded-[24px] border border-amber-200 bg-amber-50/80 p-5 shadow-sm sm:p-6">
@@ -602,96 +563,96 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
               <div className="space-y-5 sm:space-y-6">
                 <div className="rounded-[24px] border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
                   <h3 className="text-lg font-semibold text-slate-900">新日期</h3>
-                <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-3">
-                  {dateChoices.map((dateOption) => (
-                    <button
-                      key={dateOption.dateStr}
-                      type="button"
-                      onClick={() => void loadSlots(dateOption.dateStr)}
-                      className={`rounded-2xl border px-4 py-4 text-left transition ${
-                        selectedDate === dateOption.dateStr
-                          ? 'border-primary bg-primary-light'
-                          : 'border-slate-200 bg-slate-50 hover:border-primary/30 hover:bg-white'
-                      }`}
-                    >
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/60">
-                        星期{dateOption.shortDay}
-                      </p>
-                      <p className="mt-2 text-base font-semibold text-slate-900">{dateOption.compact}</p>
-                      <p className="mt-1 text-sm text-slate-500">{dateOption.label}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-[24px] border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
-                <div className="flex items-center gap-3">
-                  <Clock className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-semibold text-slate-900">新時段</h3>
-                </div>
-
-                {slotsLoading ? (
-                  <div className="mt-6 flex justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  </div>
-                ) : slotError ? (
-                  <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                    {slotError}
-                  </div>
-                ) : availableSlots.length > 0 ? (
-                  <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {availableSlots.map((time) => (
+                  <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-3">
+                    {dateChoices.map((dateOption) => (
                       <button
-                        key={time}
+                        key={dateOption.dateStr}
                         type="button"
-                        onClick={() => setSelectedTime(time)}
-                        className={`min-h-11 rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                          selectedTime === time
-                            ? 'border-primary bg-primary text-white'
-                            : 'border-primary/15 bg-primary-light text-primary hover:bg-white'
+                        onClick={() => void loadSlots(dateOption.dateStr)}
+                        className={`rounded-2xl border px-4 py-4 text-left transition ${
+                          selectedDate === dateOption.dateStr
+                            ? 'border-primary bg-primary-light'
+                            : 'border-slate-200 bg-slate-50 hover:border-primary/30 hover:bg-white'
                         }`}
                       >
-                        {time}
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/60">
+                          星期{dateOption.shortDay}
+                        </p>
+                        <p className="mt-2 text-base font-semibold text-slate-900">{dateOption.compact}</p>
+                        <p className="mt-1 text-sm text-slate-500">{dateOption.label}</p>
                       </button>
                     ))}
                   </div>
-                ) : (
-                  <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm text-slate-500">
-                    選擇日期後，這裡會顯示可更改的時段。
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-[24px] border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
-                <h3 className="text-lg font-semibold text-slate-900">確認</h3>
-                <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">目前預約</p>
-                    <p className="mt-3 text-base font-semibold text-slate-900">{selectedBooking.doctorNameZh}</p>
-                    <p className="mt-1 text-sm text-slate-500">{selectedBooking.clinicNameZh}</p>
-                    <p className="mt-3 text-sm text-slate-700">
-                      {formatBookingDateTime(selectedBooking.appointmentDate, selectedBooking.appointmentTime)}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-primary/15 bg-primary-light p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">新預約</p>
-                    <p className="mt-3 text-base font-semibold text-slate-900">{selectedBooking.doctorNameZh}</p>
-                    <p className="mt-1 text-sm text-slate-500">{selectedBooking.clinicNameZh}</p>
-                    <p className="mt-3 text-sm text-slate-700">
-                      {selectedDate && selectedTime ? formatBookingDateTime(selectedDate, selectedTime) : '請先選擇日期和時段'}
-                    </p>
-                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => void handleConfirmAction()}
-                  disabled={actionLoading || !selectedDate || !selectedTime}
-                  className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '確認更改預約'}
-                </button>
-              </div>
+                <div className="rounded-[24px] border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-semibold text-slate-900">新時段</h3>
+                  </div>
+
+                  {slotsLoading ? (
+                    <div className="mt-6 flex justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : slotError ? (
+                    <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      {slotError}
+                    </div>
+                  ) : availableSlots.length > 0 ? (
+                    <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {availableSlots.map((time) => (
+                        <button
+                          key={time}
+                          type="button"
+                          onClick={() => setSelectedTime(time)}
+                          className={`min-h-11 rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                            selectedTime === time
+                              ? 'border-primary bg-primary text-white'
+                              : 'border-primary/15 bg-primary-light text-primary hover:bg-white'
+                          }`}
+                        >
+                          {time}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm text-slate-500">
+                      選擇日期後，這裡會顯示可更改的時段。
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-[24px] border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
+                  <h3 className="text-lg font-semibold text-slate-900">確認</h3>
+                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">目前預約</p>
+                      <p className="mt-3 text-base font-semibold text-slate-900">{selectedBooking.doctorNameZh}</p>
+                      <p className="mt-1 text-sm text-slate-500">{selectedBooking.clinicNameZh}</p>
+                      <p className="mt-3 text-sm text-slate-700">
+                        {formatBookingDateTime(selectedBooking.appointmentDate, selectedBooking.appointmentTime)}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-primary/15 bg-primary-light p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">新預約</p>
+                      <p className="mt-3 text-base font-semibold text-slate-900">{selectedBooking.doctorNameZh}</p>
+                      <p className="mt-1 text-sm text-slate-500">{selectedBooking.clinicNameZh}</p>
+                      <p className="mt-3 text-sm text-slate-700">
+                        {selectedDate && selectedTime ? formatBookingDateTime(selectedDate, selectedTime) : '請先選擇日期和時段'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleConfirmAction()}
+                    disabled={actionLoading || !selectedDate || !selectedTime}
+                    className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '確認更改預約'}
+                  </button>
+                </div>
               </div>
             ) : null}
 

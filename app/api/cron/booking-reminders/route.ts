@@ -3,10 +3,12 @@ import { formatInTimeZone } from 'date-fns-tz';
 
 import { listEventsInRange, patchEventPrivateMetadata } from '@/lib/google-calendar';
 import { sendBookingReminderWhatsapp } from '@/lib/chatwoot-whatsapp';
+import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import { sendBookingReminderEmail } from '@/lib/gmail';
 import { getActiveCalendarIds } from '@/lib/doctor-schedule-store';
 import { CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
 import { getClinicWhatsappPhone } from '@/lib/whatsapp-booking';
+import { createManageAccessToken } from '@/lib/widget-booking-management';
 import { type BookingVisitType } from '@/lib/booking-intake-storage';
 
 export const runtime = 'nodejs';
@@ -201,6 +203,9 @@ export async function GET(request: NextRequest) {
         if (!payload.patientPhone) {
           summary.whatsappSkippedInvalid += 1;
         } else {
+          const phoneDigits = normalizePhoneForSearch(payload.patientPhone);
+          const manageAccessToken = phoneDigits ? createManageAccessToken(phoneDigits) : undefined;
+
           const whatsappResult = await sendBookingReminderWhatsapp({
             bookingId: payload.eventId,
             patientName: payload.patientName,
@@ -212,6 +217,7 @@ export async function GET(request: NextRequest) {
             appointmentTime: payload.time,
             visitType: payload.visitType,
             clinicWhatsappPhone: payload.clinicId ? getClinicWhatsappPhone(payload.clinicId) : null,
+            manageAccessToken,
           });
 
           if (!whatsappResult.success) {

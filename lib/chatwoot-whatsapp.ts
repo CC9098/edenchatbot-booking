@@ -1,17 +1,26 @@
 import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import {
+  buildWhatsappManageAccessTemplateBodyParams,
+  buildWhatsappManageAccessText,
   buildWhatsappManageVerificationTemplateBodyParams,
   buildWhatsappManageVerificationText,
+  type BookingManageWhatsappAccessInput,
 } from '@/lib/whatsapp-manage';
 import {
+  buildWhatsappCancellationTemplateBodyParams,
+  buildWhatsappCancellationText,
   buildWhatsappConfirmationText,
   buildWhatsappReminderTemplateBodyParams,
   buildWhatsappReminderText,
+  buildWhatsappRescheduleTemplateBodyParams,
+  buildWhatsappRescheduleText,
   buildWhatsappTemplateBodyParams,
   normalizeWhatsappPhoneNumber,
   normalizeWhatsappSourceId,
+  type BookingWhatsappCancellationInput,
   type BookingWhatsappConfirmationInput,
   type BookingWhatsappReminderInput,
+  type BookingWhatsappRescheduleInput,
 } from '@/lib/whatsapp-booking';
 
 interface ChatwootProfile {
@@ -90,12 +99,14 @@ interface BookingWhatsappNotificationInput extends BookingWhatsappConfirmationIn
   phone: string;
   email: string;
   clinicWhatsappPhone?: string | null;
+  manageAccessToken?: string;
 }
 
 interface BookingWhatsappReminderNotificationInput extends BookingWhatsappReminderInput {
   phone: string;
   email: string;
   clinicWhatsappPhone?: string | null;
+  manageAccessToken?: string;
 }
 
 interface BookingManageWhatsappOtpInput {
@@ -104,6 +115,12 @@ interface BookingManageWhatsappOtpInput {
   email: string;
   code: string;
   expiryMinutes?: number;
+  clinicWhatsappPhone?: string | null;
+}
+
+interface BookingManageWhatsappAccessNotificationInput extends BookingManageWhatsappAccessInput {
+  phone: string;
+  email: string;
   clinicWhatsappPhone?: string | null;
 }
 
@@ -476,6 +493,26 @@ function getReminderTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
   });
 }
 
+function getCancellationTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
+  return getNamedTemplateConfigs(inbox, {
+    configuredName: process.env.CHATWOOT_WHATSAPP_CANCEL_TEMPLATE_NAME,
+    configuredLanguage: process.env.CHATWOOT_WHATSAPP_CANCEL_TEMPLATE_LANGUAGE,
+    configuredCategory: process.env.CHATWOOT_WHATSAPP_CANCEL_TEMPLATE_CATEGORY,
+    fallbackNames: ['booking_cancelled'],
+    defaultCategory: 'UTILITY',
+  });
+}
+
+function getRescheduleTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
+  return getNamedTemplateConfigs(inbox, {
+    configuredName: process.env.CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_NAME,
+    configuredLanguage: process.env.CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_LANGUAGE,
+    configuredCategory: process.env.CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_CATEGORY,
+    fallbackNames: ['booking_rescheduled'],
+    defaultCategory: 'UTILITY',
+  });
+}
+
 function getOtpTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
   const configuredName = (process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_NAME || '').trim();
   const configuredLanguage = (process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_LANGUAGE || 'zh_HK').trim();
@@ -512,6 +549,16 @@ function getOtpTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
       language: configuredLanguage,
     },
   ];
+}
+
+function getManageLinkTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
+  return getNamedTemplateConfigs(inbox, {
+    configuredName: process.env.CHATWOOT_WHATSAPP_MANAGE_LINK_TEMPLATE_NAME || process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_NAME,
+    configuredLanguage: process.env.CHATWOOT_WHATSAPP_MANAGE_LINK_TEMPLATE_LANGUAGE || process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_LANGUAGE,
+    configuredCategory: process.env.CHATWOOT_WHATSAPP_MANAGE_LINK_TEMPLATE_CATEGORY || process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_CATEGORY,
+    fallbackNames: ['booking_manage_link'],
+    defaultCategory: 'UTILITY',
+  });
 }
 
 function getNamedTemplateConfigs(
@@ -839,6 +886,68 @@ export async function sendBookingManageOtpWhatsapp(
       whatsappSent: true,
       conversationId,
     };
+  } catch (error) {
+    return {
+      success: false,
+      whatsappSent: false,
+      error: getSafeErrorMessage(error),
+    };
+  }
+}
+
+export async function sendBookingManageAccessWhatsapp(
+  input: BookingManageWhatsappAccessNotificationInput,
+): Promise<SendWhatsappBookingConfirmationResult> {
+  try {
+    return await sendBookingWhatsappNotification(input, {
+      buildContent: () => buildWhatsappManageAccessText(input),
+      buildBodyParams: () => buildWhatsappManageAccessTemplateBodyParams(input),
+      getTemplateConfigs: getManageLinkTemplateConfigs,
+    });
+  } catch (error) {
+    return {
+      success: false,
+      whatsappSent: false,
+      error: getSafeErrorMessage(error),
+    };
+  }
+}
+
+export async function sendBookingCancellationWhatsapp(
+  input: BookingWhatsappCancellationInput & {
+    phone: string;
+    email: string;
+    clinicWhatsappPhone?: string | null;
+  },
+): Promise<SendWhatsappBookingConfirmationResult> {
+  try {
+    return await sendBookingWhatsappNotification(input, {
+      buildContent: () => buildWhatsappCancellationText(input),
+      buildBodyParams: () => buildWhatsappCancellationTemplateBodyParams(input),
+      getTemplateConfigs: getCancellationTemplateConfigs,
+    });
+  } catch (error) {
+    return {
+      success: false,
+      whatsappSent: false,
+      error: getSafeErrorMessage(error),
+    };
+  }
+}
+
+export async function sendBookingRescheduleWhatsapp(
+  input: BookingWhatsappRescheduleInput & {
+    phone: string;
+    email: string;
+    clinicWhatsappPhone?: string | null;
+  },
+): Promise<SendWhatsappBookingConfirmationResult> {
+  try {
+    return await sendBookingWhatsappNotification(input, {
+      buildContent: () => buildWhatsappRescheduleText(input),
+      buildBodyParams: () => buildWhatsappRescheduleTemplateBodyParams(input),
+      getTemplateConfigs: getRescheduleTemplateConfigs,
+    });
   } catch (error) {
     return {
       success: false,

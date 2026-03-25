@@ -14,12 +14,14 @@ import {
   type BookingVisitType,
 } from '@/lib/booking-intake-storage';
 import { sendBookingConfirmationWhatsapp } from '@/lib/chatwoot-whatsapp';
+import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import { createBooking, getFreeBusy } from '@/lib/google-calendar';
 import { syncPatientProfileContact } from '@/lib/profile-contact-sync';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { getClinicWhatsappPhone } from '@/lib/whatsapp-booking';
 import { resolveOnlineSourceMappingForSlot } from '@/lib/virtual-online-booking';
+import { createManageAccessToken } from '@/lib/widget-booking-management';
 import { bookingSchema } from '@/shared/types';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
@@ -232,6 +234,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Generate a manage access token so the patient can manage bookings
+    // directly from the WhatsApp confirmation link without OTP
+    const phoneDigits = normalizePhoneForSearch(bookingData.phone);
+    const manageAccessToken = phoneDigits ? createManageAccessToken(phoneDigits) : undefined;
+
     const whatsappResult = await sendBookingConfirmationWhatsapp({
       bookingId: calResult.eventId,
       patientName: bookingData.patientName,
@@ -243,6 +250,7 @@ export async function POST(request: NextRequest) {
       appointmentTime: bookingData.time,
       visitType: bookingData.visitType as BookingVisitType,
       clinicWhatsappPhone: getClinicWhatsappPhone(notificationClinicId),
+      manageAccessToken,
     });
 
     if (!whatsappResult.success) {

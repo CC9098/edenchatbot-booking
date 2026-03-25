@@ -70,8 +70,12 @@ export function getClinicWhatsappPhone(clinicId: string): string | null {
 }
 
 export function buildWhatsappConfirmationText(
-  input: BookingWhatsappConfirmationInput,
+  input: BookingWhatsappConfirmationInput & { manageAccessToken?: string },
 ): string {
+  const manageUrl = input.manageAccessToken
+    ? buildManageBookingUrl({ token: input.manageAccessToken })
+    : buildManageBookingUrl();
+
   return [
     '醫天圓中醫診所預約確認',
     '',
@@ -83,14 +87,18 @@ export function buildWhatsappConfirmationText(
     `診症類型：${VISIT_TYPE_LABELS[input.visitType]}`,
     `預約編號：${input.bookingId}`,
     '',
-    `管理預約：${buildManageBookingUrl()}`,
-    '如需更改或取消，可打開以上連結，以 WhatsApp 驗證碼登入管理預約。',
+    `管理預約（更改 / 取消）：`,
+    manageUrl,
   ].join('\n');
 }
 
 export function buildWhatsappTemplateBodyParams(
-  input: BookingWhatsappConfirmationInput,
+  input: BookingWhatsappConfirmationInput & { manageAccessToken?: string },
 ): Record<string, string> {
+  const manageUrl = input.manageAccessToken
+    ? buildManageBookingUrl({ token: input.manageAccessToken })
+    : buildManageBookingUrl();
+
   return {
     patient_name: input.patientName,
     doctor_name: input.doctorNameZh,
@@ -98,13 +106,17 @@ export function buildWhatsappTemplateBodyParams(
     appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
     visit_type: VISIT_TYPE_LABELS[input.visitType],
     booking_id: input.bookingId,
-    manage_url: buildManageBookingUrl(),
+    manage_url: manageUrl,
   };
 }
 
 export function buildWhatsappReminderText(
-  input: BookingWhatsappReminderInput,
+  input: BookingWhatsappReminderInput & { manageAccessToken?: string },
 ): string {
+  const manageUrl = input.manageAccessToken
+    ? buildManageBookingUrl({ token: input.manageAccessToken })
+    : buildManageBookingUrl();
+
   return [
     '醫天圓中醫診所預約提醒',
     '',
@@ -117,20 +129,112 @@ export function buildWhatsappReminderText(
     `診症類型：${VISIT_TYPE_LABELS[input.visitType]}`,
     `預約編號：${input.bookingId}`,
     '',
-    `管理預約：${buildManageBookingUrl()}`,
-    '如需更改或取消，可打開以上連結，以 WhatsApp 驗證碼登入管理預約。',
+    `管理預約（更改 / 取消）：`,
+    manageUrl,
   ].join('\n');
 }
 
 export function buildWhatsappReminderTemplateBodyParams(
-  input: BookingWhatsappReminderInput,
+  input: BookingWhatsappReminderInput & { manageAccessToken?: string },
 ): Record<string, string> {
+  const manageUrl = input.manageAccessToken
+    ? buildManageBookingUrl({ token: input.manageAccessToken })
+    : buildManageBookingUrl();
+
   return {
     patient_name: input.patientName,
     doctor_name: input.doctorNameZh,
     clinic_name: input.clinicNameZh,
     appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
     visit_type: VISIT_TYPE_LABELS[input.visitType],
+    booking_id: input.bookingId,
+    manage_url: manageUrl,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Cancel / Reschedule notification messages
+// ---------------------------------------------------------------------------
+
+export interface BookingWhatsappCancellationInput {
+  bookingId: string;
+  patientName: string;
+  doctorNameZh: string;
+  clinicNameZh: string;
+  appointmentDate: string;
+  appointmentTime: string;
+}
+
+export function buildWhatsappCancellationText(
+  input: BookingWhatsappCancellationInput,
+): string {
+  return [
+    '醫天圓中醫診所預約取消確認',
+    '',
+    `你好 ${input.patientName}，`,
+    '你的以下預約已成功取消：',
+    `醫師：${input.doctorNameZh}`,
+    `診所：${input.clinicNameZh}`,
+    `原定日期：${formatDateForWhatsapp(input.appointmentDate)}`,
+    `原定時間：${input.appointmentTime}`,
+    `預約編號：${input.bookingId}`,
+    '',
+    '如需重新預約，歡迎隨時使用以下連結：',
+    buildManageBookingUrl(),
+  ].join('\n');
+}
+
+export function buildWhatsappCancellationTemplateBodyParams(
+  input: BookingWhatsappCancellationInput,
+): Record<string, string> {
+  return {
+    patient_name: input.patientName,
+    doctor_name: input.doctorNameZh,
+    clinic_name: input.clinicNameZh,
+    appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
+    booking_id: input.bookingId,
+    manage_url: buildManageBookingUrl(),
+  };
+}
+
+export interface BookingWhatsappRescheduleInput {
+  bookingId: string;
+  patientName: string;
+  doctorNameZh: string;
+  clinicNameZh: string;
+  oldDate: string;
+  oldTime: string;
+  newDate: string;
+  newTime: string;
+}
+
+export function buildWhatsappRescheduleText(
+  input: BookingWhatsappRescheduleInput,
+): string {
+  return [
+    '醫天圓中醫診所預約更改確認',
+    '',
+    `你好 ${input.patientName}，`,
+    '你的預約已成功更改：',
+    `醫師：${input.doctorNameZh}`,
+    `診所：${input.clinicNameZh}`,
+    `原定時間：${formatDateForWhatsapp(input.oldDate)} ${input.oldTime}`,
+    `新時間：${formatDateForWhatsapp(input.newDate)} ${input.newTime}`,
+    `預約編號：${input.bookingId}`,
+    '',
+    `管理預約：${buildManageBookingUrl()}`,
+  ].join('\n');
+}
+
+export function buildWhatsappRescheduleTemplateBodyParams(
+  input: BookingWhatsappRescheduleInput,
+): Record<string, string> {
+  return {
+    patient_name: input.patientName,
+    doctor_name: input.doctorNameZh,
+    clinic_name: input.clinicNameZh,
+    old_appointment_datetime: `${formatDateForWhatsapp(input.oldDate)} ${input.oldTime}`,
+    new_appointment_datetime: `${formatDateForWhatsapp(input.newDate)} ${input.newTime}`,
     booking_id: input.bookingId,
     manage_url: buildManageBookingUrl(),
   };

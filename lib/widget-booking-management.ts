@@ -4,7 +4,12 @@ import { createHmac, randomInt, randomUUID, timingSafeEqual } from "crypto";
 
 import { fromZonedTime } from "date-fns-tz";
 
-import { sendBookingManageOtpWhatsapp } from "@/lib/chatwoot-whatsapp";
+import {
+  sendBookingManageAccessWhatsapp,
+  sendBookingCancellationWhatsapp,
+  sendBookingManageOtpWhatsapp,
+  sendBookingRescheduleWhatsapp,
+} from "@/lib/chatwoot-whatsapp";
 import { normalizePhoneForSearch } from "@/lib/contact-utils";
 import { isSlotAvailableUtc } from "@/lib/booking-helpers";
 import {
@@ -17,6 +22,7 @@ import {
   moveEventToCalendar,
   updateEvent,
 } from "@/lib/google-calendar";
+import { buildManageBookingUrl } from "@/lib/public-url";
 import { createServiceClient } from "@/lib/supabase";
 import { resolveOnlineSourceMappingForSlot } from "@/lib/virtual-online-booking";
 import { getClinicWhatsappPhone } from "@/lib/whatsapp-booking";
@@ -24,6 +30,7 @@ import { CLINIC_BY_ID, isClinicId } from "@/shared/clinic-data";
 
 const HONG_KONG_TIMEZONE = "Asia/Hong_Kong";
 const MANAGE_TOKEN_TTL_MS = 1000 * 60 * 15;
+const MANAGE_ACCESS_TOKEN_TTL_MS = 1000 * 60 * 60 * 72; // 72 hours
 const OTP_MAX_ATTEMPTS = 5;
 const SELF_SERVICE_CUTOFF_MS = 1000 * 60 * 60;
 const STATIC_WIDGET_MANAGE_SECRET = "eden-widget-booking-manage-sign";
@@ -51,6 +58,8 @@ type WidgetBookingRow = {
   visit_type: "first" | "followup";
 };
 
+type WidgetManageAction = "reschedule" | "cancel";
+
 type WidgetVerificationRow = {
   id: string;
   phone_digits: string;
@@ -64,6 +73,13 @@ type WidgetVerificationRow = {
 type ManageTokenPayload = {
   intakeId: string;
   bookingId: string;
+  phoneDigits: string;
+  expiresAtMs: number;
+};
+
+/** Phone-level access token — lets the holder skip OTP and manage all bookings for that phone. */
+type ManageAccessTokenPayload = {
+  type: "access";
   phoneDigits: string;
   expiresAtMs: number;
 };
@@ -260,6 +276,93 @@ function verifyManageToken(token: string) {
   }
 
   return { success: true as const, payload: parsed };
+}
+
+// ---------------------------------------------------------------------------
+// Phone-level manage access token (for zero-OTP entry from WhatsApp links)
+// ---------------------------------------------------------------------------
+
+export function createManageAccessToken(
+  phoneDigits: string,
+  options?: { ttlMs?: number },
+): string {
+  const payload: ManageAccessTokenPayload = {
+    type: "access",
+    phoneDigits,
+    expiresAtMs: Date.now() + (options?.ttlMs && options.ttlMs > 0 ? options.ttlMs : MANAGE_ACCESS_TOKEN_TTL_MS),
+  };
+  const encodedPayload = toBase64Url(JSON.stringify(payload));
+  const signature = signManagePayload(encodedPayload);
+  return `${encodedPayload}.${signature}`;
+}
+
+function verifyManageAccessToken(token: string): {
+  success: true;
+  phoneDigits: string;
+} | {
+  success: false;
+  error: string;
+} {
+  const [encodedPayload, signatureRaw] = token.split(".");
+  if (!encodedPayload || !signatureRaw) {
+    return { success: false, error: "管理連結無效，請重新驗證。" };
+  }
+
+  const expected = signManagePayload(encodedPayload);
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const actualBuffer = Buffer.from(signatureRaw, "utf8");
+  if (expectedBuffer.length !== actualBuffer.length || !timingSafeEqual(expectedBuffer, actualBuffer)) {
+    return { success: false, error: "管理連結無效，請重新驗證。" };
+  }
+
+  let parsed: ManageAccessTokenPayload;
+  try {
+    parsed = JSON.parse(fromBase64Url(encodedPayload)) as ManageAccessTokenPayload;
+  } catch {
+    return { success: false, error: "管理連結無效，請重新驗證。" };
+  }
+
+  if (parsed?.type !== "access" || !parsed?.phoneDigits) {
+    return { success: false, error: "管理連結無效，請重新驗證。" };
+  }
+
+  if (!Number.isFinite(parsed.expiresAtMs) || parsed.expiresAtMs <= Date.now()) {
+    return { success: false, error: "管理連結已過期，請重新驗證。" };
+  }
+
+  return { success: true, phoneDigits: parsed.phoneDigits };
+}
+
+/**
+ * Verify a manage access token from a WhatsApp link and return bookings.
+ * This allows the user to skip OTP entirely.
+ */
+export async function verifyManageAccessTokenAndListBookings(
+  token: string,
+): Promise<WidgetBookingVerifyCodeResult> {
+  const result = verifyManageAccessToken(token);
+  if (!result.success) {
+    return { success: false, error: result.error };
+  }
+
+  const rows = await listMatchingBookingRowsByPhone(result.phoneDigits);
+  if (rows.length === 0) {
+    return {
+      success: false,
+      error: "這個電話號碼目前沒有可管理的未來預約。",
+    };
+  }
+
+  const bookings = rows.map(toManagedBooking);
+  return {
+    success: true,
+    message:
+      bookings.length === 1
+        ? "已驗證，請繼續管理你的預約。"
+        : `已驗證，找到 ${bookings.length} 個可管理預約。`,
+    maskedPhone: maskPhoneForDisplay(result.phoneDigits),
+    bookings,
+  };
 }
 
 function isWidgetBookingRow(value: unknown): value is WidgetBookingRow {
@@ -664,6 +767,62 @@ export async function requestWidgetBookingVerificationCode(
   }
 }
 
+export async function requestWidgetBookingManageLink(params: {
+  phone: string;
+  action?: WidgetManageAction | null;
+}): Promise<WidgetBookingRequestCodeResult> {
+  try {
+    const phoneDigits = normalizePhoneForSearch(params.phone);
+    if (!phoneDigits) {
+      return { success: false, error: "請輸入有效的 WhatsApp 電話號碼。" };
+    }
+
+    const rows = await listMatchingBookingRowsByPhone(phoneDigits);
+    if (rows.length === 0) {
+      return {
+        success: false,
+        error: "這個電話號碼暫時找不到可管理的未來預約。",
+      };
+    }
+
+    const primaryRow = rows[0];
+    const manageAccessToken = createManageAccessToken(phoneDigits, {
+      ttlMs: getWidgetOtpTtlMs(),
+    });
+    const manageUrl = buildManageBookingUrl({
+      action: params.action || undefined,
+      token: manageAccessToken,
+    });
+
+    const whatsappResult = await sendBookingManageAccessWhatsapp({
+      patientName: primaryRow.patient_name,
+      phone: primaryRow.phone,
+      email: getWhatsappContactEmail(primaryRow),
+      manageUrl,
+      clinicWhatsappPhone: getClinicWhatsappPhone(primaryRow.clinic_id),
+    });
+
+    if (!whatsappResult.success) {
+      return {
+        success: false,
+        error: "登入連結暫時未能送出，請稍後再試或直接 WhatsApp 聯絡姑娘。",
+        clinicWhatsappUrl: getClinicWhatsappUrl(primaryRow.clinic_id),
+      };
+    }
+
+    return {
+      success: true,
+      message: `登入連結已發送到 ${maskPhoneForDisplay(phoneDigits)} 的 WhatsApp。`,
+      maskedPhone: maskPhoneForDisplay(phoneDigits),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "發送登入連結時發生錯誤。",
+    };
+  }
+}
+
 export async function verifyWidgetBookingVerificationCode(params: {
   phone: string;
   code: string;
@@ -800,6 +959,21 @@ export async function cancelWidgetBooking(
   if (!intakeSync.success) {
     console.warn(`[widget-booking-management] cancel sync warning: ${intakeSync.error}`);
   }
+
+  // Fire-and-forget WhatsApp cancellation notification
+  sendBookingCancellationWhatsapp({
+    bookingId: row.google_event_id || row.id,
+    patientName: row.patient_name,
+    doctorNameZh: row.doctor_name_zh,
+    clinicNameZh: row.clinic_name_zh,
+    appointmentDate: row.appointment_date,
+    appointmentTime: row.appointment_time,
+    phone: row.phone,
+    email: row.email,
+    clinicWhatsappPhone: getClinicWhatsappPhone(row.clinic_id),
+  }).catch((error) => {
+    console.warn(`[widget-booking-management] cancel WhatsApp notification failed: ${error}`);
+  });
 
   return {
     success: true,
@@ -954,6 +1128,23 @@ export async function rescheduleWidgetBooking(params: {
   if (!intakeSync.success) {
     console.warn(`[widget-booking-management] reschedule sync warning: ${intakeSync.error}`);
   }
+
+  // Fire-and-forget WhatsApp reschedule notification
+  sendBookingRescheduleWhatsapp({
+    bookingId: nextEventId || row.id,
+    patientName: row.patient_name,
+    doctorNameZh: row.doctor_name_zh,
+    clinicNameZh: row.clinic_name_zh,
+    oldDate: row.appointment_date,
+    oldTime: row.appointment_time,
+    newDate: params.date,
+    newTime: params.time,
+    phone: row.phone,
+    email: row.email,
+    clinicWhatsappPhone: getClinicWhatsappPhone(row.clinic_id),
+  }).catch((error) => {
+    console.warn(`[widget-booking-management] reschedule WhatsApp notification failed: ${error}`);
+  });
 
   return {
     success: true,
