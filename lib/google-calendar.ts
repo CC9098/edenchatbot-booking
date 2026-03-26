@@ -5,6 +5,59 @@ import { getGoogleAuthClient } from './google-auth';
 import { getSafeErrorMessage } from './error-sanitizer';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
+const DEFAULT_BOOKING_COLOR_ID = '2';
+const DOCTOR_EVENT_COLOR_ID_BY_ID: Record<string, string> = {
+  chan: '2',
+  lee: '5',
+  hon: '6',
+  chau: '9',
+  cheung: '10',
+  leung: '11',
+};
+
+function buildBookingEventSummary(details: {
+  doctorNameZh: string;
+  clinicNameZh: string;
+  patientName: string;
+}): string {
+  return `${details.doctorNameZh}｜${details.clinicNameZh} - ${details.patientName}`;
+}
+
+function getBookingEventColorId(doctorId?: string): string {
+  if (!doctorId) return DEFAULT_BOOKING_COLOR_ID;
+  return DOCTOR_EVENT_COLOR_ID_BY_ID[doctorId] || DEFAULT_BOOKING_COLOR_ID;
+}
+
+function buildBookingEventPrivateMetadata(details: {
+  doctorId?: string;
+  doctorName?: string;
+  doctorNameZh: string;
+  clinicId?: string;
+  clinicName?: string;
+  clinicNameZh: string;
+}): Record<string, string> | undefined {
+  const entries: Array<[string, string]> = [];
+
+  for (const [key, value] of Object.entries({
+    doctorId: details.doctorId,
+    doctorName: details.doctorName,
+    doctorNameZh: details.doctorNameZh,
+    clinicId: details.clinicId,
+    clinicName: details.clinicName,
+    clinicNameZh: details.clinicNameZh,
+  })) {
+    if (typeof value !== 'string') continue;
+    const normalized = value.trim();
+    if (!normalized) continue;
+    entries.push([key, normalized]);
+  }
+
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  return Object.fromEntries(entries);
+}
 
 // WARNING: Never cache this client.
 // Access tokens expire, so a new client must be created each time.
@@ -51,8 +104,10 @@ export async function getFreeBusy(calendarId: string, date: Date): Promise<{ sta
 export async function createBooking(
   calendarId: string,
   details: {
+    doctorId?: string;
     doctorName: string;
     doctorNameZh: string;
+    clinicId?: string;
     clinicName: string;
     clinicNameZh: string;
     startTime: Date;
@@ -65,9 +120,10 @@ export async function createBooking(
 ): Promise<{ success: boolean; eventId?: string; error?: string }> {
   try {
     const calendar = await getUncachableGoogleCalendarClient();
+    const privateMetadata = buildBookingEventPrivateMetadata(details);
 
     const event = {
-      summary: `${details.clinicNameZh} - ${details.patientName}`,
+      summary: buildBookingEventSummary(details),
       description: [
         `Patient / 病人: ${details.patientName}`,
         `Phone / 電話: ${details.phone}`,
@@ -84,7 +140,12 @@ export async function createBooking(
         dateTime: details.endTime.toISOString(),
         timeZone: 'Asia/Hong_Kong',
       },
-      colorId: '2', // Sage green color in Google Calendar
+      colorId: getBookingEventColorId(details.doctorId),
+      extendedProperties: privateMetadata
+        ? {
+            private: privateMetadata,
+          }
+        : undefined,
     };
 
     const response = await calendar.events.insert({

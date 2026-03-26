@@ -1096,8 +1096,10 @@ export async function createConversationalBooking(
 
     // Create booking in Google Calendar
     const result = await createBooking(mapping.calendarId, {
+      doctorId: doctor.id,
       doctorName: doctor.nameEn,
       doctorNameZh: doctor.nameZh,
+      clinicId: clinic.id,
       clinicName: clinic.nameEn,
       clinicNameZh: clinic.nameZh,
       startTime: startDate,

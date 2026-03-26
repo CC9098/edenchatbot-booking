@@ -254,8 +254,10 @@ export async function POST(request: NextRequest) {
 
                                 // Create Google Calendar Event
                                 const calResult = await createBooking(calendarId, {
+                                                doctorId: bookingData.doctorId,
                                                 doctorName: bookingData.doctorName,
                                                 doctorNameZh: bookingData.doctorNameZh,
+                                                clinicId: bookingData.clinicId,
                                                 clinicName: bookingData.clinicName,
                                                 clinicNameZh: bookingData.clinicNameZh,
                                                 startTime: startDate,
