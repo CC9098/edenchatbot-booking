@@ -199,6 +199,8 @@ export async function markBookingIntakeRescheduledByEvent(params: {
   durationMinutes: number;
   nextGoogleEventId?: string;
   nextCalendarId?: string;
+  nextClinicId?: string;
+  nextClinicNameZh?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = createServiceClient();
@@ -235,6 +237,8 @@ export async function markBookingIntakeRescheduledByEvent(params: {
           ? { google_event_id: params.nextGoogleEventId }
           : {}),
         ...(params.nextCalendarId ? { calendar_id: params.nextCalendarId } : {}),
+        ...(params.nextClinicId ? { clinic_id: params.nextClinicId } : {}),
+        ...(params.nextClinicNameZh ? { clinic_name_zh: params.nextClinicNameZh } : {}),
         updated_at: now,
       })
       .eq("google_event_id", params.googleEventId);

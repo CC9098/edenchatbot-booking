@@ -9,6 +9,7 @@ const rescheduleSchema = z.object({
   manageToken: z.string().trim().min(1, "缺少管理憑證"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "日期格式需為 YYYY-MM-DD"),
   time: z.string().regex(/^\d{2}:\d{2}$/, "時間格式需為 HH:mm"),
+  clinicId: z.string().trim().min(1, "缺少診所").optional(),
 });
 
 export async function POST(request: NextRequest) {

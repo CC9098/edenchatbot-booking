@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { CLINIC_BY_ID, isClinicId, type ClinicId } from '@/shared/clinic-data';
+import type { BookableDoctorSchedule } from '@/shared/bookable-schedule-data';
 
 type ManageAction = 'reschedule' | 'cancel';
 
@@ -70,29 +71,35 @@ const UNAVAILABLE_DOT_CLASS_NAME = 'bg-slate-300';
 const DEFAULT_CLINIC_AVAILABILITY_STYLE = {
   dotClassName: 'bg-primary',
   badgeClassName: 'border-primary/15 bg-primary-light text-primary',
+  selectedButtonClassName: 'border-primary/25 bg-primary-light text-primary',
 };
 const CLINIC_AVAILABILITY_STYLES: Record<
   ClinicId,
   {
     dotClassName: string;
     badgeClassName: string;
+    selectedButtonClassName: string;
   }
 > = {
   central: {
     dotClassName: 'bg-sky-500',
     badgeClassName: 'border-sky-200 bg-sky-50 text-sky-800',
+    selectedButtonClassName: 'border-sky-300 bg-sky-50 text-sky-900',
   },
   jordan: {
     dotClassName: 'bg-emerald-500',
     badgeClassName: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    selectedButtonClassName: 'border-emerald-300 bg-emerald-50 text-emerald-900',
   },
   tsuenwan: {
     dotClassName: 'bg-amber-500',
     badgeClassName: 'border-amber-200 bg-amber-50 text-amber-800',
+    selectedButtonClassName: 'border-amber-300 bg-amber-50 text-amber-900',
   },
   online: {
     dotClassName: 'bg-rose-500',
     badgeClassName: 'border-rose-200 bg-rose-50 text-rose-800',
+    selectedButtonClassName: 'border-rose-300 bg-rose-50 text-rose-900',
   },
 };
 
@@ -223,6 +230,7 @@ function getClinicAvailabilityStyle(clinicId: string) {
 
 async function requestAvailabilityForBooking(
   booking: Pick<VerifiedBooking, 'doctorId' | 'clinicId' | 'durationMinutes'>,
+  clinicId: string,
   date: string,
 ): Promise<AvailabilityRequestResult> {
   try {
@@ -231,7 +239,7 @@ async function requestAvailabilityForBooking(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         doctorId: booking.doctorId,
-        clinicId: booking.clinicId,
+        clinicId,
         date,
         durationMinutes: booking.durationMinutes,
       }),
@@ -377,7 +385,9 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
   const [tokenVerifying, setTokenVerifying] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success' | 'info'; text: string } | null>(null);
   const [bookings, setBookings] = useState<VerifiedBooking[]>([]);
+  const [doctorSchedules, setDoctorSchedules] = useState<BookableDoctorSchedule[]>([]);
   const [selectedBookingId, setSelectedBookingId] = useState('');
+  const [rescheduleClinicId, setRescheduleClinicId] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
@@ -397,9 +407,17 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
   const nextMonthKey = shiftMonthKey(calendarMonthKey, 1);
   const canGoToPreviousMonth = monthHasSelectableDate(previousMonthKey, minDate, maxDate);
   const canGoToNextMonth = monthHasSelectableDate(nextMonthKey, minDate, maxDate);
-  const selectedClinicStyle = getClinicAvailabilityStyle(selectedBooking?.clinicId || '');
+  const selectedDoctorSchedule = useMemo(
+    () => doctorSchedules.find((doctor) => doctor.doctorId === selectedBooking?.doctorId) || null,
+    [doctorSchedules, selectedBooking?.doctorId],
+  );
+  const doctorClinicOptions = selectedDoctorSchedule?.clinics || [];
+  const activeRescheduleClinicId = rescheduleClinicId || selectedBooking?.clinicId || '';
+  const selectedClinicStyle = getClinicAvailabilityStyle(activeRescheduleClinicId);
   const selectedClinicProfile =
-    selectedBooking && isClinicId(selectedBooking.clinicId) ? CLINIC_BY_ID[selectedBooking.clinicId] : null;
+    activeRescheduleClinicId && isClinicId(activeRescheduleClinicId)
+      ? CLINIC_BY_ID[activeRescheduleClinicId]
+      : null;
   const calendarCells = Array.from(
     {
       length:
@@ -428,13 +446,38 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
         availability,
         availabilityLabel:
           availability === 'available'
-            ? `${selectedBooking?.clinicNameZh || '診所'}有位`
+            ? `${selectedClinicProfile?.nameZh || selectedBooking?.clinicNameZh || '診所'}有位`
             : availability === 'unavailable'
-              ? `${selectedBooking?.clinicNameZh || '診所'}暫滿`
+              ? `${selectedClinicProfile?.nameZh || selectedBooking?.clinicNameZh || '診所'}暫滿`
               : '正在掃描 availability',
       };
     },
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDoctorSchedules = async () => {
+      try {
+        const response = await fetch('/api/public/bookable-schedules');
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (cancelled || !Array.isArray(data?.doctors)) return;
+        setDoctorSchedules(data.doctors as BookableDoctorSchedule[]);
+      } catch {
+        if (!cancelled) {
+          setDoctorSchedules([]);
+        }
+      }
+    };
+
+    void loadDoctorSchedules();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Auto-verify manage access token from WhatsApp link (zero-OTP path)
   useEffect(() => {
@@ -484,6 +527,7 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
   }, [manageAccessToken]);
 
   useEffect(() => {
+    setRescheduleClinicId(selectedBooking?.clinicId || '');
     setSelectedDate('');
     setSelectedTime('');
     setAvailableSlots([]);
@@ -536,7 +580,11 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
             const nextDate = queue.shift();
             if (!nextDate) break;
 
-            const result = await requestAvailabilityForBooking(selectedBooking, nextDate);
+            const result = await requestAvailabilityForBooking(
+              selectedBooking,
+              activeRescheduleClinicId || selectedBooking.clinicId,
+              nextDate,
+            );
             nextAvailability[nextDate] = result.status;
 
             if (result.status === 'unknown' || result.calendarUnavailable) {
@@ -560,7 +608,7 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
     return () => {
       cancelled = true;
     };
-  }, [action, calendarMonthKey, maxDate, minDate, selectedBooking]);
+  }, [action, activeRescheduleClinicId, calendarMonthKey, maxDate, minDate, selectedBooking]);
 
   async function requestMagicLink() {
     if (!phone.trim()) {
@@ -606,8 +654,12 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
     await requestMagicLink();
   }
 
-  async function loadSlots(date: string) {
+  async function loadSlots(date: string, clinicId: string = activeRescheduleClinicId || selectedBooking?.clinicId || '') {
     if (!selectedBooking) return;
+    if (!clinicId) {
+      setSlotError('請先選擇想改去的診所。');
+      return;
+    }
 
     setSelectedDate(date);
     setSelectedTime('');
@@ -617,7 +669,7 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
     setFeedback(null);
 
     try {
-      const result = await requestAvailabilityForBooking(selectedBooking, date);
+      const result = await requestAvailabilityForBooking(selectedBooking, clinicId, date);
       setMonthAvailability((previous) => ({
         ...previous,
         [date]: result.status,
@@ -646,6 +698,20 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
     }
   }
 
+  function handleRescheduleClinicChange(nextClinicId: string) {
+    setRescheduleClinicId(nextClinicId);
+    setSelectedTime('');
+    setAvailableSlots([]);
+    setSlotError('');
+    setResult(null);
+
+    if (!selectedDate) {
+      return;
+    }
+
+    void loadSlots(selectedDate, nextClinicId);
+  }
+
   async function handleConfirmAction() {
     if (!selectedBooking?.manageToken) {
       setFeedback({ type: 'error', text: '管理憑證已失效，請重新驗證。' });
@@ -659,7 +725,7 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
 
     setActionLoading(true);
     setFeedback(null);
-    setSupportWhatsappUrl(selectedBooking.clinicWhatsappUrl || null);
+    setSupportWhatsappUrl(selectedClinicProfile?.whatsappUrl || selectedBooking.clinicWhatsappUrl || null);
 
     try {
       const response = await fetch(
@@ -669,7 +735,12 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
             action === 'reschedule'
-              ? { manageToken: selectedBooking.manageToken, date: selectedDate, time: selectedTime }
+              ? {
+                  manageToken: selectedBooking.manageToken,
+                  clinicId: activeRescheduleClinicId || selectedBooking.clinicId,
+                  date: selectedDate,
+                  time: selectedTime,
+                }
               : { manageToken: selectedBooking.manageToken },
           ),
         },
@@ -855,6 +926,46 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
             {selectedBooking && selectedBooking.canSelfManage && action === 'reschedule' && !result ? (
               <div className="space-y-5 sm:space-y-6">
                 <div className="rounded-[24px] border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-semibold text-slate-900">新診所</h3>
+                    <p className="text-sm leading-relaxed text-slate-500">
+                      你可以保留原本診所，亦可以改去同一醫師其他應診地點。
+                    </p>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {doctorClinicOptions.length > 0 ? doctorClinicOptions.map((clinic) => {
+                      const clinicStyle = getClinicAvailabilityStyle(clinic.clinicId);
+                      const isSelectedClinic = clinic.clinicId === activeRescheduleClinicId;
+
+                      return (
+                        <button
+                          key={`reschedule-clinic-${clinic.clinicId}`}
+                          type="button"
+                          onClick={() => handleRescheduleClinicChange(clinic.clinicId)}
+                          className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                            isSelectedClinic
+                              ? clinicStyle.selectedButtonClassName
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-primary/30'
+                          }`}
+                        >
+                          <span className={`h-2 w-2 rounded-full ${clinicStyle.dotClassName}`} />
+                          {clinic.clinicNameZh}
+                          {clinic.clinicId === selectedBooking.clinicId ? (
+                            <span className="text-[11px] font-medium text-slate-500">原預約</span>
+                          ) : null}
+                        </button>
+                      );
+                    }) : (
+                      <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
+                        <span className={`h-2 w-2 rounded-full ${selectedClinicStyle.dotClassName}`} />
+                        {selectedBooking.clinicNameZh}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
                   <div className="flex items-start gap-3">
                     <CalendarDays className="mt-0.5 h-5 w-5 text-primary" />
                     <div className="space-y-1">
@@ -974,7 +1085,7 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
                         className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${selectedClinicStyle.badgeClassName}`}
                       >
                         <span className={`h-2 w-2 rounded-full ${selectedClinicStyle.dotClassName}`} />
-                        {selectedBooking.clinicNameZh}
+                        {selectedClinicProfile?.nameZh || selectedBooking.clinicNameZh}
                       </span>
                     </div>
                   ) : (
@@ -1015,7 +1126,7 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
                     </div>
                   ) : (
                     <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm text-slate-500">
-                      選擇日期後，這裡會顯示可更改的時段。
+                      選擇診所及日期後，這裡會顯示可更改的時段。
                     </div>
                   )}
                 </div>
@@ -1034,7 +1145,9 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
                     <div className="rounded-2xl border border-primary/15 bg-primary-light p-4">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">新預約</p>
                       <p className="mt-3 text-base font-semibold text-slate-900">{selectedBooking.doctorNameZh}</p>
-                      <p className="mt-1 text-sm text-slate-500">{selectedBooking.clinicNameZh}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {selectedClinicProfile?.nameZh || selectedBooking.clinicNameZh}
+                      </p>
                       <p className="mt-3 text-sm text-slate-700">
                         {selectedDate && selectedTime ? formatBookingDateTime(selectedDate, selectedTime) : '請先選擇日期和時段'}
                       </p>

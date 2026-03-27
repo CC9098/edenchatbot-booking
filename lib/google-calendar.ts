@@ -59,6 +59,97 @@ function buildBookingEventPrivateMetadata(details: {
   return Object.fromEntries(entries);
 }
 
+function parseBookingEventLineValue(description: string, label: string): string {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = description.match(new RegExp(`${escaped}\\s*:\\s*(.+)`));
+  return match?.[1]?.trim() || '';
+}
+
+function buildBookingEventUpdatePayload(
+  existingEvent: any,
+  metadata: {
+    doctorId?: string;
+    doctorName?: string;
+    doctorNameZh?: string;
+    clinicId?: string;
+    clinicName?: string;
+    clinicNameZh?: string;
+  }
+) {
+  const description = typeof existingEvent?.description === 'string' ? existingEvent.description : '';
+  const summary = typeof existingEvent?.summary === 'string' ? existingEvent.summary : '';
+  const existingPrivate = existingEvent?.extendedProperties?.private || {};
+
+  const doctorMatch = description.match(/Doctor \/ 醫師:\s*(.+?)\s*\((.+?)\)/);
+  const clinicMatch = description.match(/Clinic \/ 診所:\s*(.+?)\s*\((.+?)\)/);
+  const notesMarker = '\nNotes / 備註:\n';
+  const notesIndex = description.indexOf(notesMarker);
+
+  const patientName =
+    parseBookingEventLineValue(description, 'Patient / 病人') ||
+    summary.split(' - ').slice(1).join(' - ').trim();
+  const phone = parseBookingEventLineValue(description, 'Phone / 電話');
+  const email = parseBookingEventLineValue(description, 'Email / 電郵');
+  const notes = notesIndex >= 0 ? description.slice(notesIndex + notesMarker.length).trim() : '';
+
+  const doctorNameZh =
+    metadata.doctorNameZh?.trim() ||
+    existingPrivate.doctorNameZh ||
+    doctorMatch?.[1]?.trim() ||
+    '';
+  const doctorName =
+    metadata.doctorName?.trim() ||
+    existingPrivate.doctorName ||
+    doctorMatch?.[2]?.trim() ||
+    doctorNameZh;
+  const clinicNameZh =
+    metadata.clinicNameZh?.trim() ||
+    existingPrivate.clinicNameZh ||
+    clinicMatch?.[1]?.trim() ||
+    '';
+  const clinicName =
+    metadata.clinicName?.trim() ||
+    existingPrivate.clinicName ||
+    clinicMatch?.[2]?.trim() ||
+    clinicNameZh;
+  const doctorId =
+    metadata.doctorId?.trim() ||
+    existingPrivate.doctorId ||
+    undefined;
+  const clinicId =
+    metadata.clinicId?.trim() ||
+    existingPrivate.clinicId ||
+    undefined;
+
+  const nextDescription = [
+    patientName ? `Patient / 病人: ${patientName}` : '',
+    phone ? `Phone / 電話: ${phone}` : '',
+    email ? `Email / 電郵: ${email}` : '',
+    doctorNameZh ? `Doctor / 醫師: ${doctorNameZh} (${doctorName || doctorNameZh})` : '',
+    clinicNameZh ? `Clinic / 診所: ${clinicNameZh} (${clinicName || clinicNameZh})` : '',
+    notes ? `\nNotes / 備註:\n${notes}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return {
+    summary:
+      patientName && doctorNameZh && clinicNameZh
+        ? buildBookingEventSummary({ doctorNameZh, clinicNameZh, patientName })
+        : summary,
+    description: nextDescription || description,
+    colorId: getBookingEventColorId(doctorId),
+    privateMetadata: buildBookingEventPrivateMetadata({
+      doctorId,
+      doctorName,
+      doctorNameZh,
+      clinicId,
+      clinicName,
+      clinicNameZh,
+    }),
+  };
+}
+
 // WARNING: Never cache this client.
 // Access tokens expire, so a new client must be created each time.
 // Always call this function again to get a fresh client.
@@ -249,6 +340,15 @@ export async function updateEvent(
   details: {
     startTime: Date;
     endTime: Date;
+    privateMetadata?: Record<string, string>;
+    bookingMetadata?: {
+      doctorId?: string;
+      doctorName?: string;
+      doctorNameZh?: string;
+      clinicId?: string;
+      clinicName?: string;
+      clinicNameZh?: string;
+    };
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -259,10 +359,26 @@ export async function updateEvent(
       calendarId: calendarId,
       eventId: eventId,
     });
+    const bookingUpdate = details.bookingMetadata
+      ? buildBookingEventUpdatePayload(existingEvent.data, details.bookingMetadata)
+      : null;
+    const existingPrivate = existingEvent.data.extendedProperties?.private || {};
+    const mergedPrivate = {
+      ...existingPrivate,
+      ...(bookingUpdate?.privateMetadata || {}),
+      ...(details.privateMetadata || {}),
+    };
 
     // Update only the time fields
     const updatedEvent = {
       ...existingEvent.data,
+      ...(bookingUpdate
+        ? {
+            summary: bookingUpdate.summary,
+            description: bookingUpdate.description,
+            colorId: bookingUpdate.colorId,
+          }
+        : {}),
       start: {
         dateTime: details.startTime.toISOString(),
         timeZone: 'Asia/Hong_Kong',
@@ -271,6 +387,12 @@ export async function updateEvent(
         dateTime: details.endTime.toISOString(),
         timeZone: 'Asia/Hong_Kong',
       },
+      extendedProperties:
+        Object.keys(mergedPrivate).length > 0
+          ? {
+              private: mergedPrivate,
+            }
+          : undefined,
     };
 
     await calendar.events.update({
@@ -297,6 +419,14 @@ export async function moveEventToCalendar(
     startTime: Date;
     endTime: Date;
     privateMetadata?: Record<string, string>;
+    bookingMetadata?: {
+      doctorId?: string;
+      doctorName?: string;
+      doctorNameZh?: string;
+      clinicId?: string;
+      clinicName?: string;
+      clinicNameZh?: string;
+    };
   }
 ): Promise<{ success: boolean; eventId?: string; error?: string }> {
   try {
@@ -305,19 +435,23 @@ export async function moveEventToCalendar(
       calendarId: sourceCalendarId,
       eventId,
     });
+    const bookingUpdate = details.bookingMetadata
+      ? buildBookingEventUpdatePayload(existingEvent.data, details.bookingMetadata)
+      : null;
 
     const existingPrivate = existingEvent.data.extendedProperties?.private || {};
     const mergedPrivate = {
       ...existingPrivate,
+      ...(bookingUpdate?.privateMetadata || {}),
       ...(details.privateMetadata || {}),
     };
 
     const insertResponse = await calendar.events.insert({
       calendarId: targetCalendarId,
       requestBody: {
-        summary: existingEvent.data.summary || '',
-        description: existingEvent.data.description || '',
-        colorId: existingEvent.data.colorId || undefined,
+        summary: bookingUpdate?.summary || existingEvent.data.summary || '',
+        description: bookingUpdate?.description || existingEvent.data.description || '',
+        colorId: bookingUpdate?.colorId || existingEvent.data.colorId || undefined,
         start: {
           dateTime: details.startTime.toISOString(),
           timeZone: 'Asia/Hong_Kong',

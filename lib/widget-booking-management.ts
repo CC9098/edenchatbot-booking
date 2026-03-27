@@ -16,6 +16,7 @@ import {
   markBookingIntakeCancelledByEvent,
   markBookingIntakeRescheduledByEvent,
 } from "@/lib/booking-intake-storage";
+import { getMappingWithFallback } from "@/lib/storage-helpers";
 import {
   deleteEvent,
   getFreeBusy,
@@ -1025,6 +1026,7 @@ export async function rescheduleWidgetBooking(params: {
   manageToken: string;
   date: string;
   time: string;
+  clinicId?: string;
 }): Promise<WidgetBookingActionResult> {
   const rowResult = await getBookingRowByManageToken(params.manageToken);
   if (!rowResult.success) {
@@ -1032,13 +1034,16 @@ export async function rescheduleWidgetBooking(params: {
   }
 
   const { row } = rowResult;
-  const clinicWhatsappUrl = getClinicWhatsappUrl(row.clinic_id);
+  const effectiveClinicId = params.clinicId || row.clinic_id;
+  const targetClinicProfile = CLINIC_BY_ID[effectiveClinicId as keyof typeof CLINIC_BY_ID];
+  const targetClinicWhatsappUrl = getClinicWhatsappUrl(effectiveClinicId);
+  const targetClinicNameZh = targetClinicProfile?.nameZh || row.clinic_name_zh;
   const blockedMessage = getSelfManageBlockMessage(row);
   if (blockedMessage) {
     return {
       success: false,
       error: blockedMessage,
-      clinicWhatsappUrl,
+      clinicWhatsappUrl: targetClinicWhatsappUrl,
     };
   }
 
@@ -1046,7 +1051,7 @@ export async function rescheduleWidgetBooking(params: {
     return {
       success: false,
       error: "這個預約暫時未能自助改期，請直接 WhatsApp 聯絡姑娘。",
-      clinicWhatsappUrl,
+      clinicWhatsappUrl: targetClinicWhatsappUrl,
     };
   }
 
@@ -1060,7 +1065,15 @@ export async function rescheduleWidgetBooking(params: {
   const endDate = new Date(startDate.getTime() + row.duration_minutes * 60000);
 
   const sameAsCurrentSlot =
-    row.appointment_date === params.date && row.appointment_time === params.time;
+    row.appointment_date === params.date &&
+    row.appointment_time === params.time &&
+    effectiveClinicId === row.clinic_id;
+  const bookingMetadataOverrides = {
+    doctorId: row.doctor_id,
+    clinicId: effectiveClinicId,
+    clinicName: targetClinicProfile?.nameEn,
+    clinicNameZh: targetClinicNameZh,
+  };
 
   let nextEventId = row.google_event_id;
   let nextCalendarId = row.calendar_id;
@@ -1068,7 +1081,7 @@ export async function rescheduleWidgetBooking(params: {
     | { success: true; eventId?: string }
     | { success: false; error?: string };
 
-  if (row.clinic_id === "online") {
+  if (effectiveClinicId === "online") {
     const resolvedOnlineMapping = await resolveOnlineSourceMappingForSlot({
       doctorId: row.doctor_id,
       requestedDate: params.date,
@@ -1081,7 +1094,7 @@ export async function rescheduleWidgetBooking(params: {
       return {
         success: false,
         error: "暫時未能讀取預約日曆，請稍後再試或直接 WhatsApp 聯絡姑娘。",
-        clinicWhatsappUrl,
+        clinicWhatsappUrl: targetClinicWhatsappUrl,
       };
     }
 
@@ -1097,11 +1110,13 @@ export async function rescheduleWidgetBooking(params: {
       result = await updateEvent(row.calendar_id, row.google_event_id, {
         startTime: startDate,
         endTime: endDate,
+        bookingMetadata: bookingMetadataOverrides,
       });
     } else {
       result = await moveEventToCalendar(row.calendar_id, targetCalendarId, row.google_event_id, {
         startTime: startDate,
         endTime: endDate,
+        bookingMetadata: bookingMetadataOverrides,
       });
       if (result.success) {
         nextEventId = result.eventId || row.google_event_id;
@@ -1109,13 +1124,25 @@ export async function rescheduleWidgetBooking(params: {
       }
     }
   } else {
-    if (!sameAsCurrentSlot) {
+    const mapping = await getMappingWithFallback(row.doctor_id, effectiveClinicId);
+    if (!mapping || !mapping.isActive) {
+      return {
+        success: false,
+        error: "所選診所暫時未有此醫師應診，請選擇其他診所或聯絡姑娘。",
+        clinicWhatsappUrl: targetClinicWhatsappUrl,
+      };
+    }
+
+    const targetCalendarId = mapping.calendarId;
+    const shouldRecheckAvailability = targetCalendarId !== row.calendar_id || !sameAsCurrentSlot;
+
+    if (shouldRecheckAvailability) {
       try {
         const requestedDayUtc = fromZonedTime(
           `${params.date}T00:00:00`,
           HONG_KONG_TIMEZONE,
         );
-        const busySlots = await getFreeBusy(row.calendar_id, requestedDayUtc);
+        const busySlots = await getFreeBusy(targetCalendarId, requestedDayUtc);
         const isStillAvailable = isSlotAvailableUtc(startDate, endDate, busySlots);
         if (!isStillAvailable) {
           return {
@@ -1127,22 +1154,35 @@ export async function rescheduleWidgetBooking(params: {
         return {
           success: false,
           error: "暫時未能讀取預約日曆，請稍後再試或直接 WhatsApp 聯絡姑娘。",
-          clinicWhatsappUrl,
+          clinicWhatsappUrl: targetClinicWhatsappUrl,
         };
       }
     }
 
-    result = await updateEvent(row.calendar_id, row.google_event_id, {
-      startTime: startDate,
-      endTime: endDate,
-    });
+    if (targetCalendarId === row.calendar_id) {
+      result = await updateEvent(row.calendar_id, row.google_event_id, {
+        startTime: startDate,
+        endTime: endDate,
+        bookingMetadata: bookingMetadataOverrides,
+      });
+    } else {
+      result = await moveEventToCalendar(row.calendar_id, targetCalendarId, row.google_event_id, {
+        startTime: startDate,
+        endTime: endDate,
+        bookingMetadata: bookingMetadataOverrides,
+      });
+      if (result.success) {
+        nextEventId = result.eventId || row.google_event_id;
+        nextCalendarId = targetCalendarId;
+      }
+    }
   }
 
   if (!result.success) {
     return {
       success: false,
       error: result.error || "改期失敗，請稍後再試。",
-      clinicWhatsappUrl,
+      clinicWhatsappUrl: targetClinicWhatsappUrl,
     };
   }
 
@@ -1154,6 +1194,10 @@ export async function rescheduleWidgetBooking(params: {
     durationMinutes: row.duration_minutes,
     nextGoogleEventId: nextEventId !== row.google_event_id ? nextEventId : undefined,
     nextCalendarId: nextCalendarId !== row.calendar_id ? nextCalendarId : undefined,
+    nextClinicId:
+      effectiveClinicId !== row.clinic_id ? effectiveClinicId : undefined,
+    nextClinicNameZh:
+      effectiveClinicId !== row.clinic_id ? targetClinicNameZh : undefined,
   });
   if (!intakeSync.success) {
     console.warn(`[widget-booking-management] reschedule sync warning: ${intakeSync.error}`);
@@ -1164,14 +1208,14 @@ export async function rescheduleWidgetBooking(params: {
     bookingId: nextEventId || row.id,
     patientName: row.patient_name,
     doctorNameZh: row.doctor_name_zh,
-    clinicNameZh: row.clinic_name_zh,
+    clinicNameZh: targetClinicNameZh,
     oldDate: row.appointment_date,
     oldTime: row.appointment_time,
     newDate: params.date,
     newTime: params.time,
     phone: row.phone,
     email: row.email,
-    clinicWhatsappPhone: getClinicWhatsappPhone(row.clinic_id),
+    clinicWhatsappPhone: getClinicWhatsappPhone(effectiveClinicId),
   }).catch((error) => {
     console.warn(`[widget-booking-management] reschedule WhatsApp notification failed: ${error}`);
   });
@@ -1182,11 +1226,11 @@ export async function rescheduleWidgetBooking(params: {
       bookingId: nextEventId,
       doctorId: row.doctor_id,
       doctorNameZh: row.doctor_name_zh,
-      clinicId: row.clinic_id,
-      clinicNameZh: row.clinic_name_zh,
+      clinicId: effectiveClinicId,
+      clinicNameZh: targetClinicNameZh,
       appointmentDate: params.date,
       appointmentTime: params.time,
-      clinicWhatsappUrl,
+      clinicWhatsappUrl: targetClinicWhatsappUrl,
     },
     message: "預約已更改成功。",
   };

@@ -5,6 +5,12 @@ import { useSearchParams } from 'next/navigation';
 import { Loader2, AlertCircle, CheckCircle2, Calendar, Clock, ChevronRight, ChevronLeft } from 'lucide-react';
 import { CLINIC_ID_BY_NAME_ZH, DOCTOR_ID_BY_NAME_ZH } from '@/shared/clinic-data';
 
+type DoctorClinicOption = {
+                clinicId: string;
+                clinicNameZh: string;
+                clinicNameEn: string;
+};
+
 const DAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
 const DISPLAY_TIMEZONE = 'Asia/Hong_Kong';
 const HK_DATE_FORMATTER = new Intl.DateTimeFormat('zh-HK', {
@@ -33,6 +39,8 @@ function RescheduleBookingContent() {
                 const [step, setStep] = useState<'summary' | 'date' | 'time' | 'confirm' | 'success'>('summary');
                 const [doctor, setDoctor] = useState<{ id: string, nameZh: string } | null>(null);
                 const [clinic, setClinic] = useState<{ id: string, nameZh: string } | null>(null);
+                const [clinicOptions, setClinicOptions] = useState<DoctorClinicOption[]>([]);
+                const [selectedClinicId, setSelectedClinicId] = useState('');
 
                 const [selectedDate, setSelectedDate] = useState<string>('');
                 const [selectedTime, setSelectedTime] = useState<string>('');
@@ -105,8 +113,51 @@ function RescheduleBookingContent() {
                                 fetchBooking();
                 }, [eventId, calendarId]);
 
+                useEffect(() => {
+                                const doctorId = doctor?.id;
+                                if (!doctorId) {
+                                                setClinicOptions([]);
+                                                return;
+                                }
+
+                                let cancelled = false;
+
+                                async function fetchDoctorClinics() {
+                                                try {
+                                                                const res = await fetch('/api/public/bookable-schedules');
+                                                                if (!res.ok) return;
+
+                                                                const data = await res.json();
+                                                                const doctors = Array.isArray(data?.doctors) ? data.doctors : [];
+                                                                const matchedDoctor = doctors.find((entry: any) => entry?.doctorId === doctorId);
+                                                                const nextClinics = Array.isArray(matchedDoctor?.clinics) ? matchedDoctor.clinics : [];
+
+                                                                if (cancelled) return;
+                                                                setClinicOptions(nextClinics);
+
+                                                                const hasCurrentClinic = nextClinics.some((entry: DoctorClinicOption) => entry.clinicId === selectedClinicId);
+                                                                if (!hasCurrentClinic && clinic?.id) {
+                                                                                setSelectedClinicId(clinic.id);
+                                                                }
+                                                } catch (err) {
+                                                                if (!cancelled) {
+                                                                                setClinicOptions([]);
+                                                                }
+                                                }
+                                }
+
+                                fetchDoctorClinics();
+
+                                return () => {
+                                                cancelled = true;
+                                };
+                }, [doctor?.id, clinic?.id, selectedClinicId]);
+
+                const targetClinic = clinicOptions.find((entry) => entry.clinicId === selectedClinicId)
+                                || (clinic ? { clinicId: clinic.id, clinicNameZh: clinic.nameZh, clinicNameEn: clinic.nameZh } : null);
+
                 const fetchSlots = async (dateStr: string) => {
-                                if (!doctor || !clinic) return;
+                                if (!doctor || !targetClinic) return;
                                 setCheckingSlots(true);
                                 setSlotError('');
                                 setAvailableSlots([]);
@@ -117,7 +168,7 @@ function RescheduleBookingContent() {
                                                                 headers: { 'Content-Type': 'application/json' },
                                                                 body: JSON.stringify({
                                                                                 doctorId: doctor.id,
-                                                                                clinicId: clinic.id,
+                                                                                clinicId: targetClinic.clinicId,
                                                                                 date: dateStr,
                                                                                 durationMinutes: 15
                                                                 })
@@ -139,6 +190,17 @@ function RescheduleBookingContent() {
                                 }
                 };
 
+                const handleClinicChange = (clinicId: string) => {
+                                setSelectedClinicId(clinicId);
+                                setSelectedDate('');
+                                setSelectedTime('');
+                                setAvailableSlots([]);
+                                setSlotError('');
+                                if (step === 'time' || step === 'confirm') {
+                                                setStep('date');
+                                }
+                };
+
                 const handleDateSelect = (dateStr: string) => {
                                 setSelectedDate(dateStr);
                                 setSelectedTime('');
@@ -147,7 +209,7 @@ function RescheduleBookingContent() {
                 };
 
                 const handleRescheduleConfirm = async () => {
-                                if (!doctor || !clinic) return;
+                                if (!doctor || !targetClinic) return;
                                 setSubmitting(true);
                                 try {
                                                 const res = await fetch('/api/booking', {
@@ -157,7 +219,7 @@ function RescheduleBookingContent() {
                                                                                 eventId,
                                                                                 calendarId,
                                                                                 doctorId: doctor.id,
-                                                                                clinicId: clinic.id,
+                                                                                clinicId: targetClinic.clinicId,
                                                                                 date: selectedDate,
                                                                                 time: selectedTime,
                                                                                 durationMinutes: 15
@@ -202,6 +264,7 @@ function RescheduleBookingContent() {
                                                                 <h2 className="mb-2 text-2xl font-bold text-green-800">改期成功！</h2>
                                                                 <p className="text-green-700">你的預約已更新。</p>
                                                                 <div className="mt-6 rounded-lg bg-white/60 p-4 text-left text-sm text-green-900">
+                                                                                <p><strong>新診所：</strong> {targetClinic?.clinicNameZh || clinic?.nameZh || '--'}</p>
                                                                                 <p><strong>新預約時間：</strong> {selectedDate} {selectedTime}</p>
                                                                 </div>
                                                                 <p className="mt-6 text-sm text-primary">你將於稍後收到確認電郵。</p>
@@ -248,6 +311,27 @@ function RescheduleBookingContent() {
                                                                                                 </div>
                                                                                 </div>
 
+                                                                                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                                                                                                <h3 className="mb-3 text-sm font-semibold text-slate-500">想改去邊間診所？</h3>
+                                                                                                <div className="flex flex-wrap gap-2">
+                                                                                                                {(clinicOptions.length > 0 ? clinicOptions : targetClinic ? [targetClinic] : []).map((entry) => (
+                                                                                                                                <button
+                                                                                                                                                key={entry.clinicId}
+                                                                                                                                                type="button"
+                                                                                                                                                onClick={() => handleClinicChange(entry.clinicId)}
+                                                                                                                                                className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                                                                                                                                                                selectedClinicId === entry.clinicId
+                                                                                                                                                                                ? 'border-primary bg-primary-light text-primary'
+                                                                                                                                                                                : 'border-slate-200 bg-white text-slate-700 hover:border-primary/30'
+                                                                                                                                                }`}
+                                                                                                                                >
+                                                                                                                                                {entry.clinicNameZh}
+                                                                                                                                                {entry.clinicId === clinic?.id ? '（原預約）' : ''}
+                                                                                                                                </button>
+                                                                                                                ))}
+                                                                                                </div>
+                                                                                </div>
+
                                                                                 <button
                                                                                                 onClick={() => setStep('date')}
                                                                                                 className="flex w-full items-center justify-center rounded-[18px] bg-primary px-4 py-3 font-semibold text-white transition hover:bg-primary-hover"
@@ -263,6 +347,7 @@ function RescheduleBookingContent() {
                                                                                                 <ChevronLeft className="mr-1 h-4 w-4" /> 返回
                                                                                 </button>
                                                                                 <h3 className="mb-4 text-lg font-semibold text-slate-800">選擇日期</h3>
+                                                                                <p className="mb-4 text-sm text-slate-500">已選新診所：{targetClinic?.clinicNameZh || clinic?.nameZh || '--'}</p>
                                                                                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                                                                                                 {dates.map((d) => (
                                                                                                                 <button
@@ -284,6 +369,7 @@ function RescheduleBookingContent() {
                                                                                                 <ChevronLeft className="mr-1 h-4 w-4" /> 返回日期列表
                                                                                 </button>
                                                                                 <h3 className="mb-4 text-lg font-semibold text-slate-800">選擇 {selectedDate} 的時段</h3>
+                                                                                <p className="mb-4 text-sm text-slate-500">新診所：{targetClinic?.clinicNameZh || clinic?.nameZh || '--'}</p>
 
                                                                                 {checkingSlots ? (
                                                                                                 <div className="flex justify-center py-8">
@@ -337,9 +423,10 @@ function RescheduleBookingContent() {
 
                                                                                                 <div className="rounded-2xl border border-green-200 bg-primary-light p-4 shadow-sm">
                                                                                                                 <p className="mb-1 text-xs font-bold text-primary">新預約</p>
+                                                                                                                <p className="mb-2 text-sm font-semibold text-green-800">{targetClinic?.clinicNameZh || clinic?.nameZh || '--'}</p>
                                                                                                                 <div className="flex items-center gap-2 text-lg font-bold text-green-800">
-                                                                                                                                <Calendar className="h-5 w-5" />
-                                                                                                                                <span>{selectedDate}</span>
+                                                                                                                               <Calendar className="h-5 w-5" />
+                                                                                                                               <span>{selectedDate}</span>
                                                                                                                                 <Clock className="h-5 w-5" />
                                                                                                                                 <span>{selectedTime}</span>
                                                                                                                 </div>

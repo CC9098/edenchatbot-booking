@@ -220,14 +220,14 @@ test.describe("booking regression - /api/booking, /cancel, /reschedule", () => {
     await page.getByRole("button", { name: "選擇新時段" }).click();
     await expect(page.getByRole("heading", { name: "選擇日期" })).toBeVisible();
 
-    const dateGrid = page.locator("h3:has-text('選擇日期') + div");
+    const firstDateButton = page.getByRole("button").filter({ hasText: /\d+\/\d+/ }).first();
     const [slotsResponse] = await Promise.all([
       page.waitForResponse(
         (res) =>
           res.url().includes("/api/availability") &&
           res.request().method() === "POST"
       ),
-      dateGrid.locator("button").first().click(),
+      firstDateButton.click(),
     ]);
     expect(slotsResponse.ok()).toBeTruthy();
     const slotsBody = (await slotsResponse.json()) as { slots?: string[] };
@@ -247,6 +247,95 @@ test.describe("booking regression - /api/booking, /cancel, /reschedule", () => {
     expect(patchBody.success).toBeTruthy();
 
     await expect(page.getByText("改期成功！")).toBeVisible();
+  });
+
+  test("reschedule page - can switch clinic before submitting", async ({
+    page,
+  }) => {
+    await page.route(
+      `**/api/booking?eventId=${MOCK_EVENT_ID}&calendarId=${MOCK_CALENDAR_ID}`,
+      async (route, request) => {
+        if (request.method() === "GET") {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(MOCK_BOOKING_EVENT),
+          });
+          return;
+        }
+        await route.fallback();
+      }
+    );
+
+    await page.route("**/api/public/bookable-schedules", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          doctors: [
+            {
+              doctorId: "chan",
+              doctorNameZh: "陳家富醫師",
+              doctorNameEn: "Dr. Chan",
+              summary: "",
+              clinics: [
+                { clinicId: "central", clinicNameZh: "中環", clinicNameEn: "Central", schedule: {}, summary: "" },
+                { clinicId: "jordan", clinicNameZh: "佐敦", clinicNameEn: "Jordan", schedule: {}, summary: "" },
+                { clinicId: "tsuenwan", clinicNameZh: "荃灣", clinicNameEn: "Tsuen Wan", schedule: {}, summary: "" },
+              ],
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.route("**/api/availability", async (route, request) => {
+      const body = request.postDataJSON() as { clinicId?: string };
+      expect(body.clinicId).toBe("central");
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          slots: ["12:00"],
+        }),
+      });
+    });
+
+    await page.route("**/api/booking", async (route, request) => {
+      if (request.method() !== "PATCH") {
+        await route.fallback();
+        return;
+      }
+
+      const body = request.postDataJSON() as {
+        clinicId?: string;
+        time?: string;
+      };
+      expect(body.clinicId).toBe("central");
+      expect(body.time).toBe("12:00");
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ success: true }),
+      });
+    });
+
+    await page.goto(
+      `/reschedule?eventId=${MOCK_EVENT_ID}&calendarId=${MOCK_CALENDAR_ID}`
+    );
+
+    await page.getByRole("button", { name: "中環" }).click();
+    await page.getByRole("button", { name: "選擇新時段" }).click();
+
+    await page.getByRole("button").filter({ hasText: /\d+\/\d+/ }).first().click();
+    await page.getByRole("button", { name: "12:00" }).click();
+    await page.getByRole("button", { name: "確認更改" }).click();
+
+    await expect(page.getByText("新診所：")).toBeVisible();
+    await expect(page.getByText("中環")).toBeVisible();
   });
 
   test("reschedule page - failure path handles invalid link and API 400", async ({
@@ -298,8 +387,7 @@ test.describe("booking regression - /api/booking, /cancel, /reschedule", () => {
       `/reschedule?eventId=${MOCK_EVENT_ID}&calendarId=${MOCK_CALENDAR_ID}`
     );
     await page.getByRole("button", { name: "選擇新時段" }).click();
-    const dateGrid = page.locator("h3:has-text('選擇日期') + div");
-    await dateGrid.locator("button").first().click();
+    await page.getByRole("button").filter({ hasText: /\d+\/\d+/ }).first().click();
     await page.getByRole("button", { name: "11:00" }).click();
 
     const failPatchPromise = page.waitForResponse(

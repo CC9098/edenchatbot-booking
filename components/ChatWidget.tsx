@@ -676,6 +676,41 @@ export function ChatWidget({
     const clinic = doctor?.clinics.find((entry) => entry.clinicId === clinicId);
     if (!clinic) return;
 
+    if (booking.mode === 'reschedule') {
+      const dateOptions = buildDateOptionsForClinic(booking.doctorNameZh, clinic.clinicId, 0);
+
+      setBooking(prev => ({
+        ...prev,
+        step: 'date',
+        clinicId: clinic.clinicId,
+        clinicNameZh: clinic.clinicNameZh,
+        clinicName: clinic.clinicNameEn,
+      }));
+
+      if (!dateOptions) {
+        addBotMessage('抱歉，找不到此醫師在該診所的排班。');
+        setOptions([returnMainOption]);
+        return;
+      }
+
+      if (dateOptions.length === 0) {
+        addBotMessage(`抱歉，${booking.doctorNameZh}在${formatClinicLabel(clinic.clinicNameZh)}未來兩星期內暫無可改期日子。`);
+        setOptions([
+          { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' },
+          returnMainOption,
+        ]);
+        return;
+      }
+
+      addBotMessage(`好的，改去${formatClinicLabel(clinic.clinicNameZh)}。請選擇新的日期：`);
+      setOptions([
+        ...dateOptions,
+        { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' },
+        returnMainOption,
+      ]);
+      return;
+    }
+
     setBooking(prev => ({
       ...prev,
       step: 'visitType',
@@ -788,17 +823,14 @@ export function ChatWidget({
       return;
     }
 
-    const dateOptions = buildDateOptionsForClinic(
-      selectedBooking.doctorNameZh,
-      selectedBooking.clinicId,
-      0,
-    );
+    const doctor = selectedBooking.doctorNameZh ? bookableDoctorByName.get(selectedBooking.doctorNameZh) : undefined;
+    const clinicOptions = doctor?.clinics ?? [];
 
-    setBooking({ ...nextBooking, step: 'date' });
+    setBooking({ ...nextBooking, step: 'clinic' });
 
-    if (!dateOptions || dateOptions.length === 0) {
+    if (clinicOptions.length === 0) {
       showManageBlockedMessage(
-        '暫時未能提供可改期日期，請直接 WhatsApp 聯絡姑娘。',
+        '暫時未能提供可改期診所，請直接 WhatsApp 聯絡姑娘。',
         selectedBooking.clinicWhatsappUrl,
       );
       return;
@@ -808,12 +840,17 @@ export function ChatWidget({
       '已找到你的預約：',
       '',
       `預約編號：${selectedBooking.bookingId}`,
+      `醫師：${selectedBooking.doctorNameZh}`,
+      `目前診所：${selectedBooking.clinicNameZh}`,
       `目前時間：${selectedBooking.appointmentDate} ${selectedBooking.appointmentTime}`,
       '',
-      '請選擇新的日期：',
+      '請選擇想改去的診所：',
     ].join('\n')}`);
     setOptions([
-      ...dateOptions,
+      ...clinicOptions.map((clinic) => ({
+        label: clinic.clinicNameZh,
+        value: `booking_clinic-${clinic.clinicId}` as OptionKey,
+      })),
       { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' },
       returnMainOption,
     ]);
@@ -1103,6 +1140,7 @@ export function ChatWidget({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             manageToken: booking.manageToken,
+            clinicId: booking.clinicId,
             date: booking.date,
             time: booking.time,
           }),
@@ -1545,19 +1583,34 @@ export function ChatWidget({
       addBotMessage('請重新選擇新的日期：');
       setOptions([...(dateOptions || []), { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' }, returnMainOption]);
     } else if (s === 'clinic') {
-      // Back to doctor selection
-      addBotMessage(widgetSettings.flows.booking.prompt);
-      setBooking(prev => ({ ...prev, step: 'doctor' }));
-      setOptions([...buildDoctorOptions(), returnMainOption]);
-    } else if (s === 'visitType') {
-      handleBookingDoctorSelect(booking.doctorNameZh!);
-    } else if (s === 'date') {
       if (booking.mode === 'reschedule') {
         if ((booking.manageBookings?.length || 0) > 1) {
           showManageSelectionOptions(booking.manageBookings || [], activeManageMode);
         } else {
           startManagePhoneFlow(activeManageMode);
         }
+      } else {
+        // Back to doctor selection
+        addBotMessage(widgetSettings.flows.booking.prompt);
+        setBooking(prev => ({ ...prev, step: 'doctor' }));
+        setOptions([...buildDoctorOptions(), returnMainOption]);
+      }
+    } else if (s === 'visitType') {
+      handleBookingDoctorSelect(booking.doctorNameZh!);
+    } else if (s === 'date') {
+      if (booking.mode === 'reschedule') {
+        const doctor = booking.doctorNameZh ? bookableDoctorByName.get(booking.doctorNameZh) : undefined;
+        const clinicOpts: Option[] = (doctor?.clinics || []).map((clinic) => ({
+          label: clinic.clinicNameZh,
+          value: `booking_clinic-${clinic.clinicId}` as OptionKey,
+        }));
+        setBooking(prev => ({ ...prev, step: 'clinic' }));
+        addBotMessage('請重新選擇想改去的診所：');
+        setOptions([
+          ...clinicOpts,
+          { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' },
+          returnMainOption,
+        ]);
       } else {
         handleBookingClinicSelect(booking.clinicId!);
       }

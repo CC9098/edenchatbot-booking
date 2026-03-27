@@ -6,7 +6,7 @@ import { createBooking, getFreeBusy, getEvent, deleteEvent, moveEventToCalendar,
 import { sendBookingCancellationEmail, sendBookingConfirmationEmail } from '@/lib/gmail';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { bookingSchema } from '@/shared/types';
-import { CLINIC_ID_BY_NAME_ZH, DOCTOR_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
+import { CLINIC_BY_ID, CLINIC_ID_BY_NAME_ZH, DOCTOR_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
 import { isSlotAvailableUtc } from '@/lib/booking-helpers';
 import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import { getCurrentUser } from '@/lib/auth-helpers';
@@ -98,15 +98,34 @@ function buildRescheduleEmailPayload(
                 date: string,
                 time: string,
                 eventId: string,
-                calendarId: string
+                calendarId: string,
+                overrides?: {
+                                clinicId?: string;
+                                clinicName?: string;
+                                clinicNameZh?: string;
+                                doctorName?: string;
+                                doctorNameZh?: string;
+                }
 ) {
                 const metadata = extractBookingEmailMetadata(event);
                 if (!metadata) {
                                 return null;
                 }
 
+                const clinicNameZh = overrides?.clinicNameZh || metadata.clinicNameZh;
+                const clinicName = overrides?.clinicName || metadata.clinicName;
+                const doctorNameZh = overrides?.doctorNameZh || metadata.doctorNameZh;
+                const doctorName = overrides?.doctorName || metadata.doctorName;
+                const clinicId = overrides?.clinicId || CLINIC_ID_BY_NAME_ZH[clinicNameZh];
+                const clinicAddress = clinicId ? getClinicAddress(clinicId) : '';
+
                 return {
                                 ...metadata,
+                                doctorNameZh,
+                                doctorName,
+                                clinicNameZh,
+                                clinicName,
+                                clinicAddress,
                                 date,
                                 time,
                                 eventId,
@@ -397,6 +416,7 @@ export async function PATCH(request: NextRequest) {
                                 if (existingEventResult.success && existingEventResult.event) {
                                                 existingEvent = existingEventResult.event;
                                 }
+                                const existingEmailMetadata = existingEvent ? extractBookingEmailMetadata(existingEvent) : null;
 
                                 // Calculate start and end times
                                 const startDate = fromZonedTime(
@@ -413,6 +433,27 @@ export async function PATCH(request: NextRequest) {
                                 const existingIdentity = existingEvent ? extractBookingIdentity(existingEvent) : null;
                                 const effectiveDoctorId = doctorId || existingIdentity?.doctorId;
                                 const effectiveClinicId = clinicId || existingIdentity?.clinicId;
+                                const targetClinicProfile = effectiveClinicId
+                                                ? CLINIC_BY_ID[effectiveClinicId as keyof typeof CLINIC_BY_ID]
+                                                : undefined;
+                                const bookingMetadataOverrides = effectiveClinicId
+                                                ? {
+                                                                doctorId: effectiveDoctorId,
+                                                                clinicId: effectiveClinicId,
+                                                                clinicName: targetClinicProfile?.nameEn,
+                                                                clinicNameZh: targetClinicProfile?.nameZh,
+                                                }
+                                                : undefined;
+                                const existingStartDateTime =
+                                                typeof existingEvent?.start?.dateTime === 'string'
+                                                                ? existingEvent.start.dateTime
+                                                                : typeof existingEvent?.start?.date === 'string'
+                                                                                ? `${existingEvent.start.date}T00:00:00+08:00`
+                                                                                : null;
+                                const sameAsCurrentSlot = existingStartDateTime
+                                                ? formatInTimeZone(new Date(existingStartDateTime), HONG_KONG_TIMEZONE, 'yyyy-MM-dd') === date
+                                                                && formatInTimeZone(new Date(existingStartDateTime), HONG_KONG_TIMEZONE, 'HH:mm') === time
+                                                : false;
 
                                 let nextEventId = eventId;
                                 let nextCalendarId = calendarId;
@@ -451,11 +492,64 @@ export async function PATCH(request: NextRequest) {
                                                                 result = await updateEvent(calendarId, eventId, {
                                                                                 startTime: startDate,
                                                                                 endTime: endDate,
+                                                                                bookingMetadata: bookingMetadataOverrides,
                                                                 });
                                                 } else {
                                                                 result = await moveEventToCalendar(calendarId, targetCalendarId, eventId, {
                                                                                 startTime: startDate,
                                                                                 endTime: endDate,
+                                                                                bookingMetadata: bookingMetadataOverrides,
+                                                                });
+                                                                if (result.success) {
+                                                                                nextEventId = result.eventId || eventId;
+                                                                                nextCalendarId = targetCalendarId;
+                                                                }
+                                                }
+                                } else if (effectiveDoctorId && effectiveClinicId) {
+                                                const mapping = await getMappingWithFallback(effectiveDoctorId, effectiveClinicId);
+                                                if (!mapping || !mapping.isActive) {
+                                                                return NextResponse.json({ error: 'Doctor schedule not found' }, { status: 404 });
+                                                }
+
+                                                const targetCalendarId = mapping.calendarId;
+                                                const shouldRecheckAvailability = targetCalendarId !== calendarId || !sameAsCurrentSlot;
+
+                                                if (shouldRecheckAvailability) {
+                                                                try {
+                                                                                const requestedDayUtc = fromZonedTime(`${date}T00:00:00`, HONG_KONG_TIMEZONE);
+                                                                                const busySlots = await getFreeBusy(targetCalendarId, requestedDayUtc);
+                                                                                const isStillAvailable = isSlotAvailableUtc(startDate, endDate, busySlots);
+                                                                                if (!isStillAvailable) {
+                                                                                                return NextResponse.json(
+                                                                                                                { error: 'This time slot has just been booked. Please pick another time.' },
+                                                                                                                { status: 409 }
+                                                                                                );
+                                                                                }
+                                                                } catch (calError) {
+                                                                                console.error(
+                                                                                                `Calendar availability re-check failed: ${getSafeErrorMessage(calError)}`
+                                                                                );
+                                                                                return NextResponse.json(
+                                                                                                {
+                                                                                                                error: '暫時未能讀取預約日曆，請稍後再試或聯絡診所。',
+                                                                                                                errorCode: 'CALENDAR_UNAVAILABLE',
+                                                                                                },
+                                                                                                { status: 503 }
+                                                                                );
+                                                                }
+                                                }
+
+                                                if (targetCalendarId === calendarId) {
+                                                                result = await updateEvent(calendarId, eventId, {
+                                                                                startTime: startDate,
+                                                                                endTime: endDate,
+                                                                                bookingMetadata: bookingMetadataOverrides,
+                                                                });
+                                                } else {
+                                                                result = await moveEventToCalendar(calendarId, targetCalendarId, eventId, {
+                                                                                startTime: startDate,
+                                                                                endTime: endDate,
+                                                                                bookingMetadata: bookingMetadataOverrides,
                                                                 });
                                                                 if (result.success) {
                                                                                 nextEventId = result.eventId || eventId;
@@ -466,6 +560,7 @@ export async function PATCH(request: NextRequest) {
                                                 result = await updateEvent(calendarId, eventId, {
                                                                 startTime: startDate,
                                                                 endTime: endDate,
+                                                                bookingMetadata: bookingMetadataOverrides,
                                                 });
                                 }
 
@@ -481,6 +576,14 @@ export async function PATCH(request: NextRequest) {
                                                 durationMinutes,
                                                 nextGoogleEventId: nextEventId !== eventId ? nextEventId : undefined,
                                                 nextCalendarId: nextCalendarId !== calendarId ? nextCalendarId : undefined,
+                                                nextClinicId:
+                                                                effectiveClinicId && effectiveClinicId !== existingIdentity?.clinicId
+                                                                                ? effectiveClinicId
+                                                                                : undefined,
+                                                nextClinicNameZh:
+                                                                targetClinicProfile?.nameZh && effectiveClinicId !== existingIdentity?.clinicId
+                                                                                ? targetClinicProfile.nameZh
+                                                                                : undefined,
                                 });
                                 if (!intakeRescheduleSync.success) {
                                                 console.warn(`booking_intake reschedule sync warning: ${intakeRescheduleSync.error}`);
@@ -493,7 +596,14 @@ export async function PATCH(request: NextRequest) {
                                                                 date,
                                                                 time,
                                                                 nextEventId,
-                                                                nextCalendarId
+                                                                nextCalendarId,
+                                                                {
+                                                                                clinicId: effectiveClinicId,
+                                                                                clinicName: targetClinicProfile?.nameEn,
+                                                                                clinicNameZh: targetClinicProfile?.nameZh,
+                                                                                doctorName: existingEmailMetadata?.doctorName,
+                                                                                doctorNameZh: existingEmailMetadata?.doctorNameZh,
+                                                                }
                                                 );
                                                 if (payload) {
                                                                 try {
