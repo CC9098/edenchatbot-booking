@@ -83,6 +83,16 @@ interface ChatwootCreateConversationResponse {
   id?: number;
 }
 
+interface ChatwootMessage {
+  id?: number;
+  status?: string | null;
+  content?: string | null;
+}
+
+interface ChatwootMessageListResponse {
+  payload?: ChatwootMessage[];
+}
+
 interface ChatwootMessagePayload {
   content: string;
   template_params?: {
@@ -147,6 +157,10 @@ type TemplateConfig = {
 };
 
 type TemplateProcessedParams = NonNullable<ChatwootMessagePayload['template_params']>['processed_params'];
+
+const CHATWOOT_DELIVERY_TERMINAL_STATUSES = new Set(['failed', 'delivered', 'read']);
+const CHATWOOT_DELIVERY_POLL_ATTEMPTS = 4;
+const CHATWOOT_DELIVERY_POLL_INTERVAL_MS = 1000;
 
 class ChatwootWhatsappClient {
   constructor(
@@ -262,7 +276,7 @@ class ChatwootWhatsappClient {
   }
 
   createMessage(accountId: number, conversationId: number, payload: ChatwootMessagePayload) {
-    return this.request(
+    return this.request<ChatwootMessage>(
       `/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`,
       {
         method: 'POST',
@@ -273,6 +287,20 @@ class ChatwootWhatsappClient {
           ...(payload.template_params ? { template_params: payload.template_params } : {}),
         }),
       },
+    );
+  }
+
+  listMessages(accountId: number, conversationId: number) {
+    return this.request<ChatwootMessageListResponse>(
+      `/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`,
+      { method: 'GET' },
+    );
+  }
+
+  deleteMessage(accountId: number, conversationId: number, messageId: number) {
+    return this.request(
+      `/api/v1/accounts/${accountId}/conversations/${conversationId}/messages/${messageId}`,
+      { method: 'DELETE' },
     );
   }
 }
@@ -637,7 +665,7 @@ async function sendMessageWithTemplateFallback(
   for (const templateConfig of templateConfigs) {
     for (const processedParams of processedParamCandidates) {
       try {
-        await client.createMessage(accountId, conversationId, {
+        const message = await client.createMessage(accountId, conversationId, {
           content,
           template_params: {
             name: templateConfig.name,
@@ -646,6 +674,24 @@ async function sendMessageWithTemplateFallback(
             processed_params: processedParams,
           },
         });
+
+        const deliveryStatus = await waitForMessageDeliveryStatus(
+          client,
+          accountId,
+          conversationId,
+          message,
+        );
+
+        if (deliveryStatus.status === 'failed') {
+          if (message.id) {
+            await client.deleteMessage(accountId, conversationId, message.id).catch(() => undefined);
+          }
+
+          const detail = buildTemplateFailureDetail(templateConfig, processedParams, deliveryStatus.message);
+          lastError = new Error(detail);
+          continue;
+        }
+
         return;
       } catch (error) {
         lastError = error;
@@ -682,28 +728,21 @@ function buildTemplateProcessedParamCandidates(
     candidates.push(candidate);
   };
 
-  if (Object.keys(normalizedBody).length > 0) {
-    pushCandidate({ body: normalizedBody });
-    pushCandidate({ body: toNumericBodyParams(normalizedBody) });
-  }
-
   const manageUrl = normalizedBody.manage_url?.trim();
   if (manageUrl) {
     const { manage_url: _manageUrl, ...bodyWithoutManageUrl } = normalizedBody;
 
-    if (Object.keys(bodyWithoutManageUrl).length > 0) {
-      pushCandidate({
-        body: bodyWithoutManageUrl,
-        buttons: [{ type: 'url', parameter: manageUrl }],
-      });
-      pushCandidate({
-        body: toNumericBodyParams(bodyWithoutManageUrl),
-        buttons: [{ type: 'url', parameter: manageUrl }],
-      });
-    } else {
-      pushCandidate({
-        buttons: [{ type: 'url', parameter: manageUrl }],
-      });
+    const bodyCandidates = Object.keys(bodyWithoutManageUrl).length > 0
+      ? [bodyWithoutManageUrl, toNumericBodyParams(bodyWithoutManageUrl)]
+      : [null];
+
+    for (const bodyCandidate of bodyCandidates) {
+      for (const manageButtonParameter of extractManageButtonParameters(manageUrl)) {
+        pushCandidate({
+          ...(bodyCandidate ? { body: bodyCandidate } : {}),
+          buttons: [{ type: 'url', parameter: manageButtonParameter }],
+        });
+      }
     }
   }
 
@@ -727,11 +766,101 @@ function buildTemplateProcessedParamCandidates(
     }
   }
 
+  if (Object.keys(normalizedBody).length > 0) {
+    pushCandidate({ body: normalizedBody });
+    pushCandidate({ body: toNumericBodyParams(normalizedBody) });
+  }
+
   if (candidates.length === 0) {
     pushCandidate({ body: {} });
   }
 
   return candidates;
+}
+
+function extractManageButtonParameters(manageUrl: string): string[] {
+  const normalizedUrl = manageUrl.trim();
+  if (!normalizedUrl) return [];
+
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+  const pushCandidate = (value: string | null | undefined) => {
+    const normalizedValue = value?.trim();
+    if (!normalizedValue || seen.has(normalizedValue)) return;
+    seen.add(normalizedValue);
+    candidates.push(normalizedValue);
+  };
+
+  try {
+    const parsedUrl = new URL(normalizedUrl);
+    const token = parsedUrl.searchParams.get('token');
+    const pathWithQuery = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+
+    pushCandidate(token);
+    pushCandidate(pathWithQuery === '/' ? '' : pathWithQuery);
+  } catch {
+    // Preserve the original value below when the URL is not parseable.
+  }
+
+  pushCandidate(normalizedUrl);
+  return candidates;
+}
+
+async function waitForMessageDeliveryStatus(
+  client: ChatwootWhatsappClient,
+  accountId: number,
+  conversationId: number,
+  createdMessage: ChatwootMessage | undefined,
+): Promise<{ status: string | null; message: ChatwootMessage | undefined }> {
+  if (!createdMessage?.id) {
+    return {
+      status: normalizeMessageStatus(createdMessage?.status),
+      message: createdMessage,
+    };
+  }
+
+  let latestMessage: ChatwootMessage | undefined = createdMessage;
+
+  for (let attempt = 0; attempt < CHATWOOT_DELIVERY_POLL_ATTEMPTS; attempt += 1) {
+    const messagesResponse = await client.listMessages(accountId, conversationId).catch(() => null);
+    const matchedMessage = (messagesResponse?.payload || []).find((message) => message.id === createdMessage.id);
+
+    if (matchedMessage) {
+      latestMessage = matchedMessage;
+    }
+
+    const status = normalizeMessageStatus(latestMessage?.status);
+    if (status && CHATWOOT_DELIVERY_TERMINAL_STATUSES.has(status)) {
+      return { status, message: latestMessage };
+    }
+
+    if (attempt < CHATWOOT_DELIVERY_POLL_ATTEMPTS - 1) {
+      await sleep(CHATWOOT_DELIVERY_POLL_INTERVAL_MS);
+    }
+  }
+
+  return {
+    status: normalizeMessageStatus(latestMessage?.status),
+    message: latestMessage,
+  };
+}
+
+function normalizeMessageStatus(status: string | null | undefined): string | null {
+  const normalized = status?.trim().toLowerCase();
+  return normalized || null;
+}
+
+function buildTemplateFailureDetail(
+  templateConfig: TemplateConfig,
+  processedParams: TemplateProcessedParams,
+  message: ChatwootMessage | undefined,
+): string {
+  const status = normalizeMessageStatus(message?.status) || 'unknown';
+  return `[Chatwoot] WhatsApp template delivery failed for ${templateConfig.name} (${templateConfig.language}, status=${status}) with params ${JSON.stringify(processedParams)}`;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function sendBookingWhatsappNotification(
