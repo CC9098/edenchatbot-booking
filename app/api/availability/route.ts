@@ -8,6 +8,7 @@ import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import {
                 getApplicableHolidaysForDate,
                 getScheduleForDayFromWeekly,
+                isSlotAfterClinicLastBookingCutoffUtc,
                 isSlotAvailableUtc,
                 isSlotBlockedByHolidaysUtc,
 } from '@/lib/booking-helpers';
@@ -126,6 +127,11 @@ export async function POST(request: NextRequest) {
                                                                 while (currentSlot < endData) {
                                                                                 // If booking for today, skip past times
                                                                                 if (isToday && currentSlot < bookingCutoffUtc) {
+                                                                                                currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
+                                                                                                continue;
+                                                                                }
+
+                                                                                if (isSlotAfterClinicLastBookingCutoffUtc(currentSlot, clinicId)) {
                                                                                                 currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
                                                                                                 continue;
                                                                                 }

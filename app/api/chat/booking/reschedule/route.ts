@@ -5,7 +5,10 @@ import { getFreeBusy, getEvent, moveEventToCalendar, updateEvent } from "@/lib/g
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { markBookingIntakeRescheduledByEvent } from "@/lib/booking-intake-storage";
 import { getSafeErrorMessage } from "@/lib/error-sanitizer";
-import { isSlotAvailableUtc } from "@/lib/booking-helpers";
+import {
+  isSlotAfterClinicLastBookingCutoffUtc,
+  isSlotAvailableUtc,
+} from "@/lib/booking-helpers";
 import { getMappingWithFallback } from "@/lib/storage-helpers";
 import { resolveOnlineSourceMappingForSlot } from "@/lib/virtual-online-booking";
 import { CLINIC_BY_ID, CLINIC_ID_BY_NAME_ZH, DOCTOR_ID_BY_NAME_ZH } from "@/shared/clinic-data";
@@ -98,6 +101,13 @@ export async function POST(request: NextRequest) {
       ? formatInTimeZone(new Date(existingStartDateTime), HONG_KONG_TIMEZONE, "yyyy-MM-dd") === date &&
         formatInTimeZone(new Date(existingStartDateTime), HONG_KONG_TIMEZONE, "HH:mm") === time
       : false;
+
+    if (!sameAsCurrentSlot && effectiveClinicId !== "online" && isSlotAfterClinicLastBookingCutoffUtc(startDate, effectiveClinicId)) {
+      return NextResponse.json(
+        { error: "已超過此分店最後預約時間，請選擇較早時段。" },
+        { status: 409 }
+      );
+    }
 
     let nextEventId = eventId;
     let nextCalendarId = calendarId;

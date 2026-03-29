@@ -7,7 +7,10 @@ import { sendBookingCancellationEmail, sendBookingConfirmationEmail } from '@/li
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { bookingSchema } from '@/shared/types';
 import { CLINIC_BY_ID, CLINIC_ID_BY_NAME_ZH, DOCTOR_ID_BY_NAME_ZH, getClinicAddress, getDoctorBookingSlotMinutes } from '@/shared/clinic-data';
-import { isSlotAvailableUtc } from '@/lib/booking-helpers';
+import {
+                isSlotAfterClinicLastBookingCutoffUtc,
+                isSlotAvailableUtc,
+} from '@/lib/booking-helpers';
 import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { syncPatientProfileContact } from '@/lib/profile-contact-sync';
@@ -244,6 +247,13 @@ export async function POST(request: NextRequest) {
                                                 return NextResponse.json({ error: 'Invalid date/time' }, { status: 400 });
                                 }
 
+                                if (bookingData.clinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, bookingData.clinicId)) {
+                                                return NextResponse.json(
+                                                                { error: '已超過此分店最後預約時間，請選擇較早時段。' },
+                                                                { status: 409 }
+                                                );
+                                }
+
                                 const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
 
                                 // Re-check Google Calendar right before creating the event
@@ -455,6 +465,13 @@ export async function PATCH(request: NextRequest) {
                                                 ? formatInTimeZone(new Date(existingStartDateTime), HONG_KONG_TIMEZONE, 'yyyy-MM-dd') === date
                                                                 && formatInTimeZone(new Date(existingStartDateTime), HONG_KONG_TIMEZONE, 'HH:mm') === time
                                                 : false;
+
+                                if (!sameAsCurrentSlot && effectiveClinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, effectiveClinicId)) {
+                                                return NextResponse.json(
+                                                                { error: '已超過此分店最後預約時間，請選擇較早時段。' },
+                                                                { status: 409 }
+                                                );
+                                }
 
                                 let nextEventId = eventId;
                                 let nextCalendarId = calendarId;

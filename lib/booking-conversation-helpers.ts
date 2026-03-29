@@ -34,6 +34,7 @@ import {
   type BookingReceiptType,
   type BookingVisitType,
 } from './booking-intake-storage';
+import { isSlotAfterClinicLastBookingCutoffUtc } from './booking-helpers';
 import { getSafeErrorMessage } from './error-sanitizer';
 import { syncPatientProfileContact } from './profile-contact-sync';
 
@@ -916,6 +917,15 @@ export async function getAvailableTimeSlots(
 
         // Check if this slot is available
         const slotStart = fromZonedTime(`${date}T${timeStr}:00`, HONG_KONG_TIMEZONE);
+        if (isSlotAfterClinicLastBookingCutoffUtc(slotStart, clinicId)) {
+          currentMinute += slotMinutes;
+          if (currentMinute >= 60) {
+            currentMinute -= 60;
+            currentHour += 1;
+          }
+          continue;
+        }
+
         const slotEnd = new Date(slotStart.getTime() + slotMinutes * 60000);
         const rangeEnd = fromZonedTime(`${date}T${range.end}:00`, HONG_KONG_TIMEZONE);
         if (slotEnd > rangeEnd) {
@@ -1033,6 +1043,13 @@ export async function createConversationalBooking(
 
     if (isNaN(startDate.getTime())) {
       return { success: false, error: "無效的日期或時間" };
+    }
+
+    if (clinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, clinicId)) {
+      return {
+        success: false,
+        error: '已超過此分店最後預約時間，請選擇較早時段。',
+      };
     }
 
     const endDate = new Date(

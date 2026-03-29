@@ -7,7 +7,10 @@ import {
 } from "@/lib/google-calendar";
 import { sendBookingConfirmationEmail } from "@/lib/gmail";
 import { getMappingWithFallback } from "@/lib/storage-helpers";
-import { isSlotAvailableUtc } from "@/lib/booking-helpers";
+import {
+  isSlotAfterClinicLastBookingCutoffUtc,
+  isSlotAvailableUtc,
+} from "@/lib/booking-helpers";
 import { getClinicAddress } from "@/shared/clinic-data";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { createServiceClient } from "@/lib/supabase";
@@ -117,6 +120,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    if (bookingData.clinicId !== "online" && isSlotAfterClinicLastBookingCutoffUtc(startDate, bookingData.clinicId)) {
+      return NextResponse.json(
+        { error: "已超過此分店最後預約時間，請選擇較早時段。" },
+        { status: 409 }
+      );
+    }
+
     const endDate = new Date(
       startDate.getTime() + durationMinutes * 60000
     );

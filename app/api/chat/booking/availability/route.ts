@@ -6,6 +6,7 @@ import { getFreeBusy } from "@/lib/google-calendar";
 import {
   getApplicableHolidaysForDate,
   getScheduleForDayFromWeekly,
+  isSlotAfterClinicLastBookingCutoffUtc,
   isSlotAvailableUtc,
   isSlotBlockedByHolidaysUtc,
 } from "@/lib/booking-helpers";
@@ -186,6 +187,11 @@ export async function POST(request: NextRequest) {
 
       while (currentSlot < endData) {
         if (isToday && currentSlot < bookingCutoffUtc) {
+          currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
+          continue;
+        }
+
+        if (isSlotAfterClinicLastBookingCutoffUtc(currentSlot, clinicId)) {
           currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
           continue;
         }

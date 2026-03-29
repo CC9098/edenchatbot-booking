@@ -11,7 +11,10 @@ import {
   sendBookingRescheduleWhatsapp,
 } from "@/lib/chatwoot-whatsapp";
 import { normalizePhoneForSearch } from "@/lib/contact-utils";
-import { isSlotAvailableUtc } from "@/lib/booking-helpers";
+import {
+  isSlotAfterClinicLastBookingCutoffUtc,
+  isSlotAvailableUtc,
+} from "@/lib/booking-helpers";
 import {
   markBookingIntakeCancelledByEvent,
   markBookingIntakeRescheduledByEvent,
@@ -1068,6 +1071,14 @@ export async function rescheduleWidgetBooking(params: {
     row.appointment_date === params.date &&
     row.appointment_time === params.time &&
     effectiveClinicId === row.clinic_id;
+  if (!sameAsCurrentSlot && effectiveClinicId !== "online" && isSlotAfterClinicLastBookingCutoffUtc(startDate, effectiveClinicId)) {
+    return {
+      success: false,
+      error: "已超過此分店最後預約時間，請選擇較早時段。",
+      clinicWhatsappUrl: targetClinicWhatsappUrl,
+    };
+  }
+
   const bookingMetadataOverrides = {
     doctorId: row.doctor_id,
     clinicId: effectiveClinicId,

@@ -1,9 +1,19 @@
 import { formatInTimeZone } from 'date-fns-tz';
 import { WeeklySchedule, TimeRange } from '../shared/schedule-config';
 import { type Holiday } from '../shared/schema';
+import { PHYSICAL_CLINIC_IDS, type PhysicalClinicId } from '../shared/clinic-data';
 import { storage } from './storage';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
+const AFTERNOON_SESSION_START_MINUTES = 15 * 60;
+const CLINIC_LAST_BOOKING_CUTOFFS: Record<
+  PhysicalClinicId,
+  { lunch: string; evening: string }
+> = {
+  central: { lunch: '13:15', evening: '18:45' },
+  jordan: { lunch: '13:15', evening: '18:45' },
+  tsuenwan: { lunch: '13:15', evening: '18:15' },
+};
 
 // Helper: Get schedule for a specific day from weekly schedule
 export function getScheduleForDayFromWeekly(schedule: WeeklySchedule | undefined | null, dayOfWeek: number): TimeRange[] | null {
@@ -38,6 +48,24 @@ function toMinutes(time: string): number | null {
   return hour * 60 + minute;
 }
 
+function isPhysicalClinicId(clinicId: string): clinicId is PhysicalClinicId {
+  return PHYSICAL_CLINIC_IDS.includes(clinicId as PhysicalClinicId);
+}
+
+function getClinicLastBookingCutoffTime(
+  clinicId: string,
+  slotStartMinutes: number
+): string | null {
+  if (!isPhysicalClinicId(clinicId)) {
+    return null;
+  }
+
+  const cutoffs = CLINIC_LAST_BOOKING_CUTOFFS[clinicId];
+  return slotStartMinutes < AFTERNOON_SESSION_START_MINUTES
+    ? cutoffs.lunch
+    : cutoffs.evening;
+}
+
 function getHolidayMinutes(holiday: Holiday): { start: number; end: number } | null {
   if (!holiday.startTime || !holiday.endTime) return null;
   const start = toMinutes(String(holiday.startTime));
@@ -65,6 +93,31 @@ function getSlotMinutesInHongKong(slotStartUtc: Date, slotEndUtc: Date): { start
   if (start === null || end === null) return null;
   if (start >= end) return null;
   return { start, end };
+}
+
+export function isSlotAfterClinicLastBookingCutoffUtc(
+  slotStartUtc: Date,
+  clinicId?: string | null
+): boolean {
+  if (!clinicId) return false;
+
+  const slotStartLabel = formatInTimeZone(slotStartUtc, HONG_KONG_TIMEZONE, 'HH:mm');
+  const slotStartMinutes = toMinutes(slotStartLabel);
+  if (slotStartMinutes === null) {
+    return false;
+  }
+
+  const cutoffTime = getClinicLastBookingCutoffTime(clinicId, slotStartMinutes);
+  if (!cutoffTime) {
+    return false;
+  }
+
+  const cutoffMinutes = toMinutes(cutoffTime);
+  if (cutoffMinutes === null) {
+    return false;
+  }
+
+  return slotStartMinutes > cutoffMinutes;
 }
 
 // Helper: Check if a date is blocked by all-day holidays
