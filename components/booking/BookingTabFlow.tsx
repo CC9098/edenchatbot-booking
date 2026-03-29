@@ -477,7 +477,6 @@ export function BookingTabFlow({
   const [submitError, setSubmitError] = useState('');
   const [bookingId, setBookingId] = useState('');
   const [whatsappSent, setWhatsappSent] = useState<boolean | null>(null);
-  const [whatsappNotice, setWhatsappNotice] = useState('');
 
   const minDate = getTodayIsoInHongKong();
   const maxDate = getMaxDateIsoInHongKong(MAX_BOOKING_WINDOW_DAYS);
@@ -807,7 +806,6 @@ export function BookingTabFlow({
     setIsSubmitting(false);
     setBookingId('');
     setWhatsappSent(null);
-    setWhatsappNotice('');
   }
 
   function handleDoctorChange(nextDoctorId: string) {
@@ -1076,7 +1074,6 @@ export function BookingTabFlow({
       if (isWhatsappFlow) {
         setBookingId(data.bookingId || '');
         setWhatsappSent(data.whatsappSent === true);
-        setWhatsappNotice(typeof data.whatsappError === 'string' ? data.whatsappError : '');
       } else {
         setBookingId(data.bookingId || '');
       }
@@ -1838,9 +1835,6 @@ export function BookingTabFlow({
               <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 已完成預約，但 WhatsApp 確認訊息暫時未能自動發送。診所會另行跟進。
               </p>
-            ) : null}
-            {isWhatsappFlow && whatsappSent === false && whatsappNotice ? (
-              <p className="text-xs text-slate-400">{whatsappNotice}</p>
             ) : null}
             <p
               className="mt-4 text-[14px] leading-[1.8] text-slate-400"

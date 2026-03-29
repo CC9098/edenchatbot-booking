@@ -267,7 +267,6 @@ export async function POST(request: NextRequest) {
       intakeId: intakeId || '',
       intakeSaved: intakeResult.success,
       whatsappSent: whatsappResult.success,
-      whatsappError: whatsappResult.success ? undefined : whatsappResult.error,
       whatsappConversationId: whatsappResult.conversationId,
     });
   } catch (error) {

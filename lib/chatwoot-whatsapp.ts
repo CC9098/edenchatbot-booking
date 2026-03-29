@@ -608,6 +608,7 @@ function getNamedTemplateConfigs(
   const configuredName = (options.configuredName || '').trim();
   const configuredLanguage = (options.configuredLanguage || '').trim();
   const category = (options.configuredCategory || options.defaultCategory).trim();
+  const preferredLanguages = buildPreferredTemplateLanguages(configuredLanguage);
 
   const templateNames = Array.from(
     new Set([configuredName, ...options.fallbackNames].filter(Boolean)),
@@ -619,36 +620,38 @@ function getNamedTemplateConfigs(
     return String(template.status || '').toLowerCase() === 'approved';
   });
 
-  const preferredSyncedTemplates = syncedTemplates
-    .filter((template) => {
-      if (!configuredLanguage) return true;
-      return template.language === configuredLanguage;
-    })
+  const preferredSyncedTemplates = [...syncedTemplates]
     .sort((left, right) => {
-      if (left.language === configuredLanguage) return -1;
-      if (right.language === configuredLanguage) return 1;
-      return 0;
+      return rankTemplateLanguage(left.language || '', preferredLanguages)
+        - rankTemplateLanguage(right.language || '', preferredLanguages);
     });
 
   if (preferredSyncedTemplates.length > 0) {
     return preferredSyncedTemplates.map((template) => ({
       name: template.name || configuredName || options.fallbackNames[0] || '',
       category: (template.category || category).trim(),
-      language: (template.language || configuredLanguage || 'en').trim(),
+      language: (template.language || preferredLanguages[0] || 'zh_HK').trim(),
     })).filter((template) => Boolean(template.name));
   }
 
-  const languages = Array.from(
-    new Set([configuredLanguage, 'en_US', 'en', 'zh_HK'].filter(Boolean)),
-  );
-
   return templateNames.flatMap((name) =>
-    languages.map((language) => ({
+    preferredLanguages.map((language) => ({
       name,
       category,
       language,
     })),
   );
+}
+
+function buildPreferredTemplateLanguages(configuredLanguage: string): string[] {
+  return Array.from(
+    new Set([configuredLanguage, 'zh_HK', 'en_US', 'en'].filter(Boolean)),
+  );
+}
+
+function rankTemplateLanguage(language: string, preferredLanguages: string[]): number {
+  const index = preferredLanguages.indexOf(language);
+  return index === -1 ? preferredLanguages.length : index;
 }
 
 async function sendMessageWithTemplateFallback(
