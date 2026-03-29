@@ -359,6 +359,13 @@ function findExistingConversation(
   return preferredConversation || sameInboxConversations[0];
 }
 
+function isActiveConversation(conversation: ChatwootConversation | null | undefined): boolean {
+  if (!conversation?.id) return false;
+
+  const status = String(conversation.status || '').trim().toLowerCase();
+  return status !== 'resolved';
+}
+
 async function resolveAccountId(
   client: ChatwootWhatsappClient,
   configuredAccountId: number | null,
@@ -942,6 +949,24 @@ async function sendBookingWhatsappNotification(
   const content = options.buildContent();
   const templateConfigs = options.getTemplateConfigs(inbox);
   const bodyParams = options.buildBodyParams();
+
+  if (isActiveConversation(existingConversation)) {
+    try {
+      await client.createMessage(accountId, conversationId, {
+        content,
+      });
+
+      return {
+        success: true,
+        whatsappSent: true,
+        conversationId,
+      };
+    } catch (error) {
+      console.warn(
+        `[chatwoot-whatsapp] Active conversation text send failed, falling back to template: ${getSafeErrorMessage(error)}`,
+      );
+    }
+  }
 
   if (templateConfigs.length > 0) {
     await sendMessageWithTemplateFallback(
