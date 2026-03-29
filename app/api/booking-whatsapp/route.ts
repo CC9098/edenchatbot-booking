@@ -18,6 +18,7 @@ import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import { createBooking, getFreeBusy } from '@/lib/google-calendar';
 import { syncPatientProfileContact } from '@/lib/profile-contact-sync';
+import { getDoctorBookingSlotMinutes } from '@/shared/clinic-data';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { getClinicWhatsappPhone } from '@/lib/whatsapp-booking';
 import { resolveOnlineSourceMappingForSlot } from '@/lib/virtual-online-booking';
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     const bookingData = parsed.data;
+    const durationMinutes = getDoctorBookingSlotMinutes(bookingData.doctorId);
 
     let calendarId = '';
     let notificationClinicId = bookingData.clinicId;
@@ -79,7 +81,7 @@ export async function POST(request: NextRequest) {
         doctorId: bookingData.doctorId,
         requestedDate: bookingData.date,
         time: bookingData.time,
-        durationMinutes: bookingData.durationMinutes,
+        durationMinutes,
       });
 
       if (resolvedOnlineMapping.errorCode === 'CALENDAR_UNAVAILABLE') {
@@ -121,7 +123,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid date/time' }, { status: 400 });
     }
 
-    const endDate = new Date(startDate.getTime() + bookingData.durationMinutes * 60000);
+    const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
 
     try {
       const requestedDayUtc = fromZonedTime(
@@ -159,7 +161,7 @@ export async function POST(request: NextRequest) {
       clinicNameZh: bookingData.clinicNameZh,
       appointmentDate: bookingData.date,
       appointmentTime: bookingData.time,
-      durationMinutes: bookingData.durationMinutes,
+      durationMinutes,
       patientName: bookingData.patientName,
       phone: bookingData.phone,
       email: bookingData.email,
@@ -176,6 +178,7 @@ export async function POST(request: NextRequest) {
       notes: normalizeOptionalString(bookingData.notes),
       bookingPayload: {
         ...bookingData,
+        durationMinutes,
         channel: 'whatsapp_confirmation',
         notificationClinicId,
       },

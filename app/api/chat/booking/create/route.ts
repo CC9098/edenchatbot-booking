@@ -14,6 +14,7 @@ import { createServiceClient } from "@/lib/supabase";
 import { getSafeErrorMessage } from "@/lib/error-sanitizer";
 import { syncPatientProfileContact } from "@/lib/profile-contact-sync";
 import { resolveOnlineSourceMappingForSlot } from "@/lib/virtual-online-booking";
+import { getDoctorBookingSlotMinutes } from "@/shared/clinic-data";
 
 // ── Whitelist schema ────────────────────────────────────────────────
 const bridgeBookingSchema = z
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     const bookingData = parsed.data;
+    const durationMinutes = getDoctorBookingSlotMinutes(bookingData.doctorId);
 
     // Resolve calendar ID
     let calendarId = "";
@@ -63,7 +65,7 @@ export async function POST(request: NextRequest) {
         doctorId: bookingData.doctorId,
         requestedDate: bookingData.date,
         time: bookingData.time,
-        durationMinutes: bookingData.durationMinutes,
+        durationMinutes,
       });
 
       if (resolvedOnlineMapping.errorCode === "CALENDAR_UNAVAILABLE") {
@@ -116,7 +118,7 @@ export async function POST(request: NextRequest) {
       );
     }
     const endDate = new Date(
-      startDate.getTime() + bookingData.durationMinutes * 60000
+      startDate.getTime() + durationMinutes * 60000
     );
 
     // Double-check availability to prevent race conditions

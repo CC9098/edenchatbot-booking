@@ -6,7 +6,7 @@ import { createBooking, getFreeBusy, getEvent, deleteEvent, moveEventToCalendar,
 import { sendBookingCancellationEmail, sendBookingConfirmationEmail } from '@/lib/gmail';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { bookingSchema } from '@/shared/types';
-import { CLINIC_BY_ID, CLINIC_ID_BY_NAME_ZH, DOCTOR_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
+import { CLINIC_BY_ID, CLINIC_ID_BY_NAME_ZH, DOCTOR_ID_BY_NAME_ZH, getClinicAddress, getDoctorBookingSlotMinutes } from '@/shared/clinic-data';
 import { isSlotAvailableUtc } from '@/lib/booking-helpers';
 import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import { getCurrentUser } from '@/lib/auth-helpers';
@@ -188,6 +188,7 @@ export async function POST(request: NextRequest) {
                                                 );
                                 }
                                 const bookingData = parsed.data;
+                                const durationMinutes = getDoctorBookingSlotMinutes(bookingData.doctorId);
 
                                 // Get Calendar ID
                                 // Note: We duplicate getMappingWithFallback here to avoid circular imports if extracted incorrectly,
@@ -200,7 +201,7 @@ export async function POST(request: NextRequest) {
                                                                 doctorId: bookingData.doctorId,
                                                                 requestedDate: bookingData.date,
                                                                 time: bookingData.time,
-                                                                durationMinutes: bookingData.durationMinutes,
+                                                                durationMinutes,
                                                 });
 
                                                 if (resolvedOnlineMapping.errorCode === 'CALENDAR_UNAVAILABLE') {
@@ -243,7 +244,7 @@ export async function POST(request: NextRequest) {
                                                 return NextResponse.json({ error: 'Invalid date/time' }, { status: 400 });
                                 }
 
-                                const endDate = new Date(startDate.getTime() + bookingData.durationMinutes * 60000);
+                                const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
 
                                 // Re-check Google Calendar right before creating the event
                                 // to prevent race conditions / double booking.

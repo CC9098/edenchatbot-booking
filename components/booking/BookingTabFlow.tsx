@@ -76,7 +76,7 @@ type BookingTabFlowProps = {
 };
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
-const SLOT_INTERVAL_MINUTES = 15;
+const DEFAULT_SLOT_DURATION_MINUTES = 15;
 const MAX_BOOKING_WINDOW_DAYS = 90;
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const;
 const WEEKDAY_LABELS_ZH = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'] as const;
@@ -231,7 +231,8 @@ function formatShortDate(dateIso: string): string {
 async function requestAvailabilityForDoctor(
   targetDoctorId: DoctorId,
   targetClinicId: ClinicId,
-  dateIso: string
+  dateIso: string,
+  durationMinutes: number
 ): Promise<AvailabilityRequestResult> {
   try {
     const response = await fetch('/api/availability', {
@@ -243,7 +244,7 @@ async function requestAvailabilityForDoctor(
         doctorId: targetDoctorId,
         clinicId: targetClinicId,
         date: dateIso,
-        durationMinutes: SLOT_INTERVAL_MINUTES,
+        durationMinutes,
       }),
     });
 
@@ -284,6 +285,14 @@ async function requestAvailabilityForDoctor(
       errorMessage: '載入時段失敗，請稍後再試。',
     };
   }
+}
+
+function getSlotDurationLabel(durationMinutes: number): string {
+  return `每個時段 ${durationMinutes} 分鐘`;
+}
+
+function compactDetails(details: Array<string | null | undefined | false>): string[] {
+  return details.filter((detail): detail is string => Boolean(detail));
 }
 
 function padTwo(value: number): string {
@@ -500,6 +509,7 @@ export function BookingTabFlow({
     () => clinicOptions.find((clinic) => clinic.clinicId === clinicId),
     [clinicId, clinicOptions]
   );
+  const selectedDoctorSlotMinutes = selectedDoctor?.bookingSlotMinutes ?? DEFAULT_SLOT_DURATION_MINUTES;
   const scannableClinics = selectedDoctor?.clinics ?? [];
   const visibleClinics = useMemo(
     () =>
@@ -746,7 +756,8 @@ export function BookingTabFlow({
             const result = await requestAvailabilityForDoctor(
               doctorId,
               nextJob.clinicId,
-              nextJob.dateIso
+              nextJob.dateIso,
+              selectedDoctorSlotMinutes
             );
 
             nextAvailability[nextJob.dateIso] = {
@@ -777,7 +788,7 @@ export function BookingTabFlow({
     return () => {
       isCancelled = true;
     };
-  }, [calendarMonthKey, doctorId, maxDate, minDate, scannableClinics]);
+  }, [calendarMonthKey, doctorId, maxDate, minDate, scannableClinics, selectedDoctorSlotMinutes]);
 
   function clearSelectedTimeslot(keepDate = false) {
     if (!keepDate) {
@@ -856,7 +867,12 @@ export function BookingTabFlow({
     setAvailableSlots([]);
     setSelectedTime('');
 
-    const result = await requestAvailabilityForDoctor(doctorId, targetClinicId, dateIso);
+    const result = await requestAvailabilityForDoctor(
+      doctorId,
+      targetClinicId,
+      dateIso,
+      selectedDoctorSlotMinutes
+    );
 
     setMonthClinicAvailability((prev) => ({
       ...prev,
@@ -1032,7 +1048,7 @@ export function BookingTabFlow({
       clinicNameZh: selectedClinic.clinicNameZh,
       date: selectedDate,
       time: selectedTime,
-      durationMinutes: SLOT_INTERVAL_MINUTES,
+      durationMinutes: selectedDoctorSlotMinutes,
       patientName: `${formValues.lastName.trim()} ${formValues.firstName.trim()}`.trim(),
       phone: normalizePhoneForStorage(formValues.phone),
       email: formValues.email.trim().toLowerCase(),
@@ -1183,6 +1199,14 @@ export function BookingTabFlow({
                     <p className="mt-1 text-sm leading-relaxed text-slate-600">
                       可先睇固定應診時間，再去下一步用彩色燈號比較各診所邊日有位。
                     </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
+                        治療項目：{selectedDoctor.bookingTreatmentLabel}
+                      </span>
+                      <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
+                        {getSlotDurationLabel(selectedDoctor.bookingSlotMinutes)}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -1334,12 +1358,13 @@ export function BookingTabFlow({
             doctor={selectedDoctor}
             clinicNameZh={selectedClinic?.clinicNameZh || '比較全部診所'}
             eyebrow="已選醫師"
-            details={[
-              VISIT_TYPE_LABELS[visitType],
+            details={compactDetails([
+              selectedDoctor ? `治療項目：${selectedDoctor.bookingTreatmentLabel}` : null,
+              `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`,
               selectedClinic
                 ? '日曆只顯示所選診所燈號。'
                 : '日曆會同時顯示各診所燈號，方便直接比較日期。',
-            ]}
+            ])}
           />
 
           {clinicId ? (
@@ -1526,6 +1551,11 @@ export function BookingTabFlow({
 
           <div className="space-y-2">
             <p className="text-sm font-semibold text-slate-700">可預約時段</p>
+            <p className="text-xs text-slate-500">
+              {selectedDoctor
+                ? `已按 ${selectedDoctor.doctorNameZh} 設定顯示 ${getSlotDurationLabel(selectedDoctorSlotMinutes)}。`
+                : `已按醫師設定顯示 ${getSlotDurationLabel(selectedDoctorSlotMinutes)}。`}
+            </p>
 
             {slotsLoading ? (
               <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -1591,10 +1621,11 @@ export function BookingTabFlow({
             doctor={selectedDoctor}
             clinicNameZh={selectedClinic?.clinicNameZh}
             eyebrow="預約摘要"
-            details={[
+            details={compactDetails([
               `${formatDateForDisplay(selectedDate)} ${selectedTime}`,
-              VISIT_TYPE_LABELS[visitType],
-            ]}
+              selectedDoctor ? `治療項目：${selectedDoctor.bookingTreatmentLabel}` : null,
+              `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`,
+            ])}
           />
 
           <form className="space-y-5" onSubmit={handleSubmit}>

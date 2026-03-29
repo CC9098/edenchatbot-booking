@@ -11,6 +11,7 @@ import {
                 isSlotAvailableUtc,
                 isSlotBlockedByHolidaysUtc,
 } from '@/lib/booking-helpers';
+import { getDoctorBookingSlotMinutes } from '@/shared/clinic-data';
 import { type Holiday } from '@/shared/schema';
 import { getVirtualOnlineAvailability } from '@/lib/virtual-online-booking';
 
@@ -28,7 +29,9 @@ const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 export async function POST(request: NextRequest) {
                 try {
                                 const body = await request.json();
-                                const { doctorId, clinicId, date, durationMinutes } = availabilitySchema.parse(body);
+                                const { doctorId, clinicId, date } = availabilitySchema.parse(body);
+                                const durationMinutes = getDoctorBookingSlotMinutes(doctorId);
+                                const slotIntervalMinutes = durationMinutes;
                                 const requestedDate = date.slice(0, 10);
                                 if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
                                                 return NextResponse.json({ error: 'Invalid date format. Use YYYY-MM-DD' }, { status: 400 });
@@ -123,7 +126,7 @@ export async function POST(request: NextRequest) {
                                                                 while (currentSlot < endData) {
                                                                                 // If booking for today, skip past times
                                                                                 if (isToday && currentSlot < bookingCutoffUtc) {
-                                                                                                currentSlot = new Date(currentSlot.getTime() + 15 * 60 * 1000); // Increment by 15 mins
+                                                                                                currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
                                                                                                 continue;
                                                                                 }
 
@@ -141,7 +144,7 @@ export async function POST(request: NextRequest) {
                                                                                                 availableSlots.push(slotStr);
                                                                                 }
 
-                                                                                currentSlot = new Date(currentSlot.getTime() + 15 * 60 * 1000); // Increment by 15 mins
+                                                                                currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
                                                                 }
                                                 }
 

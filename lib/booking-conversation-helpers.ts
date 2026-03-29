@@ -16,6 +16,7 @@ import {
   DOCTORS,
   CLINICS,
   getClinicAddress,
+  getDoctorBookingSlotMinutes,
 } from '@/shared/clinic-data';
 import { getActiveCalendarIds, getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
 import { getFreeBusy } from './google-calendar';
@@ -37,7 +38,6 @@ import { getSafeErrorMessage } from './error-sanitizer';
 import { syncPatientProfileContact } from './profile-contact-sync';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
-const DEFAULT_DURATION_MINUTES = 15;
 const MAX_LIST_BOOKINGS_LIMIT = 10;
 const DEFAULT_LIST_BOOKINGS_LIMIT = 5;
 const DEFAULT_RECENT_BOOKINGS_LIMIT = 3;
@@ -868,6 +868,7 @@ export async function getAvailableTimeSlots(
     if (!mapping) {
       return { success: false, error: `${resolvedDoctorNameZh} 在 ${resolvedClinicNameZh} 沒有可預約時段` };
     }
+    const slotMinutes = getDoctorBookingSlotMinutes(mapping.doctorId);
 
     // Parse date and get day of week
     const requestDate = new Date(date);
@@ -915,7 +916,11 @@ export async function getAvailableTimeSlots(
 
         // Check if this slot is available
         const slotStart = fromZonedTime(`${date}T${timeStr}:00`, HONG_KONG_TIMEZONE);
-        const slotEnd = new Date(slotStart.getTime() + DEFAULT_DURATION_MINUTES * 60000);
+        const slotEnd = new Date(slotStart.getTime() + slotMinutes * 60000);
+        const rangeEnd = fromZonedTime(`${date}T${range.end}:00`, HONG_KONG_TIMEZONE);
+        if (slotEnd > rangeEnd) {
+          break;
+        }
 
         const isAvailable = !busySlots.some(busy => {
           return (
@@ -930,8 +935,7 @@ export async function getAvailableTimeSlots(
           available: isAvailable,
         });
 
-        // Increment by 15 minutes
-        currentMinute += 15;
+        currentMinute += slotMinutes;
         if (currentMinute >= 60) {
           currentMinute -= 60;
           currentHour += 1;
@@ -996,6 +1000,7 @@ export async function createConversationalBooking(
     if (!doctor) {
       return { success: false, error: `找不到醫師：${bookingData.doctorNameZh}` };
     }
+    const slotMinutes = getDoctorBookingSlotMinutes(doctor.id);
 
     // Validate clinic
     const clinicId = CLINIC_ID_BY_NAME_ZH[normalizedBookingData.clinicNameZh];
@@ -1031,7 +1036,7 @@ export async function createConversationalBooking(
     }
 
     const endDate = new Date(
-      startDate.getTime() + DEFAULT_DURATION_MINUTES * 60000
+      startDate.getTime() + slotMinutes * 60000
     );
 
     // Re-check availability to prevent race conditions
@@ -1069,7 +1074,7 @@ export async function createConversationalBooking(
       clinicNameZh: clinic.nameZh,
       appointmentDate: normalizedBookingData.date,
       appointmentTime: normalizedBookingData.time,
-      durationMinutes: DEFAULT_DURATION_MINUTES,
+      durationMinutes: slotMinutes,
       patientName: normalizedBookingData.patientName,
       phone: normalizedBookingData.phone,
       email: normalizedBookingData.email,

@@ -16,6 +16,8 @@ export type BookableDoctorSchedule = {
   avatarSrc?: string;
   avatarObjectPosition?: string;
   scheduleNote?: string;
+  bookingTreatmentLabel: string;
+  bookingSlotMinutes: number;
   summary: string;
   clinics: BookableClinicSchedule[];
 };

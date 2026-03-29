@@ -10,6 +10,7 @@ import {
   isSlotBlockedByHolidaysUtc,
 } from "@/lib/booking-helpers";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { getDoctorBookingSlotMinutes } from "@/shared/clinic-data";
 import { type Holiday } from "@/shared/schema";
 import { getSafeErrorMessage } from "@/lib/error-sanitizer";
 import { getVirtualOnlineAvailability } from "@/lib/virtual-online-booking";
@@ -45,7 +46,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { doctorId, clinicId, date, durationMinutes } = parsed.data;
+    const { doctorId, clinicId, date } = parsed.data;
+    const durationMinutes = getDoctorBookingSlotMinutes(doctorId);
+    const slotIntervalMinutes = durationMinutes;
 
     // Validate date format
     const requestedDate = date.slice(0, 10);
@@ -183,7 +186,7 @@ export async function POST(request: NextRequest) {
 
       while (currentSlot < endData) {
         if (isToday && currentSlot < bookingCutoffUtc) {
-          currentSlot = new Date(currentSlot.getTime() + 15 * 60 * 1000);
+          currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
           continue;
         }
 
@@ -208,7 +211,7 @@ export async function POST(request: NextRequest) {
           availableSlots.push(slotStr);
         }
 
-        currentSlot = new Date(currentSlot.getTime() + 15 * 60 * 1000);
+        currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
       }
     }
 
