@@ -1219,7 +1219,7 @@ export function BookingTabFlow({
 
       {step === 'setup' && (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-4">
             <label className="space-y-2">
               <span className="text-sm font-semibold text-slate-700">選擇醫師</span>
               <select
@@ -1234,26 +1234,6 @@ export function BookingTabFlow({
                   </option>
                 ))}
               </select>
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-semibold text-slate-700">快速篩選診所（可選）</span>
-              <select
-                value={clinicId}
-                onChange={(event) => handleClinicChange(event.target.value)}
-                disabled={!doctorId}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100"
-              >
-                <option value="">{doctorId ? '比較全部診所（不篩選）' : '請先選擇醫師'}</option>
-                {clinicOptions.map((clinic) => (
-                  <option key={clinic.clinicId} value={clinic.clinicId}>
-                    {clinic.clinicNameZh} ({clinic.clinicNameEn})
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs leading-relaxed text-slate-500">
-                可先留空比較全部診所；下方診所卡亦可直接點按套用篩選。
-              </p>
             </label>
           </div>
 
@@ -1381,7 +1361,7 @@ export function BookingTabFlow({
                 })}
               </div>
               <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                可直接點按上方診所卡套用篩選；如已選中，再按一次即可改回比較全部診所。
+                點按診所卡即可套用篩選；如已選中，再按一次即可改回比較全部診所。
               </p>
             </section>
           )}
