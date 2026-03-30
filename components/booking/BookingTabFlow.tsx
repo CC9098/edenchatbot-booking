@@ -21,6 +21,8 @@ import {
 import {
   BOOKING_PICKUP_LABELS,
   getBookingPickupOptions,
+  isClinicPickupBookingPickup,
+  isShippingBookingPickup,
   type BookingPickupType,
 } from '@/shared/booking-pickup';
 import type { BookableDoctorSchedule } from '@/shared/bookable-schedule-data';
@@ -40,6 +42,8 @@ type BookingFormValues = {
   email: string;
   needReceipt: ReceiptType;
   medicationPickup: BookingPickupType;
+  shippingAddressDetails: string;
+  clinicPickupRemarks: string;
   idCard: string;
   dateOfBirth: string;
   gender: GenderType;
@@ -152,6 +156,8 @@ const INITIAL_FORM_VALUES: BookingFormValues = {
   email: '',
   needReceipt: 'no',
   medicationPickup: 'none',
+  shippingAddressDetails: '',
+  clinicPickupRemarks: '',
   idCard: '',
   dateOfBirth: '',
   gender: '',
@@ -510,6 +516,11 @@ export function BookingTabFlow({
     () => getBookingPickupOptions(clinicId),
     [clinicId]
   );
+  const isOnlineConsultation = clinicId === 'online';
+  const needsShippingAddressDetails =
+    isOnlineConsultation && isShippingBookingPickup(formValues.medicationPickup);
+  const needsClinicPickupRemarks =
+    isOnlineConsultation && isClinicPickupBookingPickup(formValues.medicationPickup);
   const selectedDoctorSlotMinutes = selectedDoctor?.bookingSlotMinutes ?? DEFAULT_SLOT_DURATION_MINUTES;
   const scannableClinics = useMemo(
     () => selectedDoctor?.clinics ?? [],
@@ -974,6 +985,14 @@ export function BookingTabFlow({
       nextErrors.email = '請輸入有效電郵地址';
     }
 
+    if (isOnlineConsultation && isShippingBookingPickup(values.medicationPickup) && !values.shippingAddressDetails.trim()) {
+      nextErrors.shippingAddressDetails = '請填寫寄送地址或順豐站／智能櫃資料';
+    }
+
+    if (isOnlineConsultation && isClinicPickupBookingPickup(values.medicationPickup) && !values.clinicPickupRemarks.trim()) {
+      nextErrors.clinicPickupRemarks = '請填寫取藥時間或其他備註';
+    }
+
     if (visitType === 'first') {
       if (values.idCard.trim().length < 5) {
         nextErrors.idCard = '首診需要身份證資料';
@@ -1008,26 +1027,34 @@ export function BookingTabFlow({
   }
 
   function buildBookingNotes(values: BookingFormValues): string {
-    if (visitType === 'first') {
-      return [
-        '[首診]',
-        `身份證號碼: ${values.idCard.trim() || '未提供'}`,
-        `出生日期: ${values.dateOfBirth.trim() || '未提供'}`,
-        `性別: ${values.gender ? GENDER_LABELS[values.gender] : '未提供'}`,
-        `過敏史: ${values.allergies.trim() || '沒有'}`,
-        `正服用藥物／保健品: ${values.medications.trim() || '沒有'}`,
-        `主要症狀: ${values.symptoms.trim() || '未提供'}`,
-        `得知來源: ${REFERRAL_SOURCE_LABELS[values.referralSource.trim()] || '未提供'}`,
-        `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
-        `取藥方法: ${BOOKING_PICKUP_LABELS[values.medicationPickup]}`,
-      ].join(' | ');
+    const notes = visitType === 'first'
+      ? [
+          '[首診]',
+          `身份證號碼: ${values.idCard.trim() || '未提供'}`,
+          `出生日期: ${values.dateOfBirth.trim() || '未提供'}`,
+          `性別: ${values.gender ? GENDER_LABELS[values.gender] : '未提供'}`,
+          `過敏史: ${values.allergies.trim() || '沒有'}`,
+          `正服用藥物／保健品: ${values.medications.trim() || '沒有'}`,
+          `主要症狀: ${values.symptoms.trim() || '未提供'}`,
+          `得知來源: ${REFERRAL_SOURCE_LABELS[values.referralSource.trim()] || '未提供'}`,
+          `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
+          `取藥方法: ${BOOKING_PICKUP_LABELS[values.medicationPickup]}`,
+        ]
+      : [
+          '[覆診]',
+          `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
+          `取藥方法: ${BOOKING_PICKUP_LABELS[values.medicationPickup]}`,
+        ];
+
+    if (isOnlineConsultation && isShippingBookingPickup(values.medicationPickup)) {
+      notes.push(`寄送地址／順豐站點: ${values.shippingAddressDetails.trim() || '未提供'}`);
     }
 
-    return [
-      '[覆診]',
-      `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
-      `取藥方法: ${BOOKING_PICKUP_LABELS[values.medicationPickup]}`,
-    ].join(' | ');
+    if (isOnlineConsultation && isClinicPickupBookingPickup(values.medicationPickup)) {
+      notes.push(`診所取藥時間／其他備註: ${values.clinicPickupRemarks.trim() || '未提供'}`);
+    }
+
+    return notes.join(' | ');
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -1737,6 +1764,40 @@ export function BookingTabFlow({
                 </select>
               </label>
             </div>
+
+            {needsShippingAddressDetails ? (
+              <label className="space-y-1.5">
+                <span className="text-sm font-semibold text-slate-700">
+                  如選擇送遞，請填寫中文寄送地址／順豐站點或智能櫃代碼
+                </span>
+                <input
+                  value={formValues.shippingAddressDetails}
+                  onChange={(event) => updateFormField('shippingAddressDetails', event.target.value)}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
+                  placeholder="例如：九龍尖沙咀廣東道 88 號 xx 大廈 xx 室／順豐站代碼"
+                />
+                {formErrors.shippingAddressDetails ? (
+                  <p className="text-xs text-red-600">{formErrors.shippingAddressDetails}</p>
+                ) : null}
+              </label>
+            ) : null}
+
+            {needsClinicPickupRemarks ? (
+              <label className="space-y-1.5">
+                <span className="text-sm font-semibold text-slate-700">
+                  若於診所取藥，請填寫取藥時間／其他備註
+                </span>
+                <textarea
+                  value={formValues.clinicPickupRemarks}
+                  onChange={(event) => updateFormField('clinicPickupRemarks', event.target.value)}
+                  className="min-h-24 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
+                  placeholder="例如：星期二 4pm 後可到中環診所取藥"
+                />
+                {formErrors.clinicPickupRemarks ? (
+                  <p className="text-xs text-red-600">{formErrors.clinicPickupRemarks}</p>
+                ) : null}
+              </label>
+            ) : null}
 
             {visitType === 'first' ? (
               <div className="space-y-4 rounded-2xl border border-red-100 bg-red-50/70 p-4">
