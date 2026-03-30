@@ -994,20 +994,21 @@ export async function cancelWidgetBooking(
     console.warn(`[widget-booking-management] cancel sync warning: ${intakeSync.error}`);
   }
 
-  // Fire-and-forget WhatsApp cancellation notification
-  sendBookingCancellationWhatsapp({
-    bookingId: row.google_event_id || row.id,
-    patientName: row.patient_name,
-    doctorNameZh: row.doctor_name_zh,
-    clinicNameZh: row.clinic_name_zh,
-    appointmentDate: row.appointment_date,
-    appointmentTime: row.appointment_time,
-    phone: row.phone,
-    email: row.email,
-    clinicWhatsappPhone: getClinicWhatsappPhone(row.clinic_id),
-  }).catch((error) => {
+  try {
+    await sendBookingCancellationWhatsapp({
+      bookingId: row.google_event_id || row.id,
+      patientName: row.patient_name,
+      doctorNameZh: row.doctor_name_zh,
+      clinicNameZh: row.clinic_name_zh,
+      appointmentDate: row.appointment_date,
+      appointmentTime: row.appointment_time,
+      phone: row.phone,
+      email: row.email,
+      clinicWhatsappPhone: getClinicWhatsappPhone(row.clinic_id),
+    });
+  } catch (error) {
     console.warn(`[widget-booking-management] cancel WhatsApp notification failed: ${error}`);
-  });
+  }
 
   return {
     success: true,
@@ -1214,22 +1215,23 @@ export async function rescheduleWidgetBooking(params: {
     console.warn(`[widget-booking-management] reschedule sync warning: ${intakeSync.error}`);
   }
 
-  // Fire-and-forget WhatsApp reschedule notification
-  sendBookingRescheduleWhatsapp({
-    bookingId: nextEventId || row.id,
-    patientName: row.patient_name,
-    doctorNameZh: row.doctor_name_zh,
-    clinicNameZh: targetClinicNameZh,
-    oldDate: row.appointment_date,
-    oldTime: row.appointment_time,
-    newDate: params.date,
-    newTime: params.time,
-    phone: row.phone,
-    email: row.email,
-    clinicWhatsappPhone: getClinicWhatsappPhone(effectiveClinicId),
-  }).catch((error) => {
+  try {
+    await sendBookingRescheduleWhatsapp({
+      bookingId: nextEventId || row.id,
+      patientName: row.patient_name,
+      doctorNameZh: row.doctor_name_zh,
+      clinicNameZh: targetClinicNameZh,
+      oldDate: row.appointment_date,
+      oldTime: row.appointment_time,
+      newDate: params.date,
+      newTime: params.time,
+      phone: row.phone,
+      email: row.email,
+      clinicWhatsappPhone: getClinicWhatsappPhone(effectiveClinicId),
+    });
+  } catch (error) {
     console.warn(`[widget-booking-management] reschedule WhatsApp notification failed: ${error}`);
-  });
+  }
 
   return {
     success: true,

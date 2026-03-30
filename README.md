@@ -33,6 +33,18 @@ Booking system backend and frontend for Eden TCM Clinic (醫天圓).
 | `CHATWOOT_WHATSAPP_REMINDER_TEMPLATE_NAME` | Optional. Approved WhatsApp template name used for 24-hour reminder messages |
 | `CHATWOOT_WHATSAPP_REMINDER_TEMPLATE_LANGUAGE` | Optional. 24-hour reminder template language, defaults to `zh_HK` |
 | `CHATWOOT_WHATSAPP_REMINDER_TEMPLATE_CATEGORY` | Optional. 24-hour reminder template category, defaults to `UTILITY` |
+| `CHATWOOT_WHATSAPP_OTP_TEMPLATE_NAME` | Optional. Approved WhatsApp template name used for booking-management OTP verification codes |
+| `CHATWOOT_WHATSAPP_OTP_TEMPLATE_LANGUAGE` | Optional. OTP template language, defaults to `zh_HK` |
+| `CHATWOOT_WHATSAPP_OTP_TEMPLATE_CATEGORY` | Optional. OTP template category, defaults to `UTILITY` |
+| `CHATWOOT_WHATSAPP_MANAGE_LINK_TEMPLATE_NAME` | Optional. Approved WhatsApp template name used for booking-management magic links |
+| `CHATWOOT_WHATSAPP_MANAGE_LINK_TEMPLATE_LANGUAGE` | Optional. Manage-link template language, defaults to `zh_HK` |
+| `CHATWOOT_WHATSAPP_MANAGE_LINK_TEMPLATE_CATEGORY` | Optional. Manage-link template category, defaults to `UTILITY` |
+| `CHATWOOT_WHATSAPP_CANCEL_TEMPLATE_NAME` | Optional. Approved WhatsApp template name used for cancellation messages. Can temporarily point to existing Meta template `appointment_cancel` |
+| `CHATWOOT_WHATSAPP_CANCEL_TEMPLATE_LANGUAGE` | Optional. Cancellation template language, defaults to `zh_HK` |
+| `CHATWOOT_WHATSAPP_CANCEL_TEMPLATE_CATEGORY` | Optional. Cancellation template category, defaults to `UTILITY` |
+| `CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_NAME` | Optional. Approved WhatsApp template name used for reschedule messages |
+| `CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_LANGUAGE` | Optional. Reschedule template language, defaults to `zh_HK` |
+| `CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_CATEGORY` | Optional. Reschedule template category, defaults to `UTILITY` |
 | `CHATWOOT_WEBHOOK_SECRET` | Optional but recommended. Validates the Agent Bot webhook signature |
 
 ### URL Resolution Logic

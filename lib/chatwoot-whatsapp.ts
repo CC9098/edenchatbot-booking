@@ -539,7 +539,7 @@ function getCancellationTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] 
     configuredName: process.env.CHATWOOT_WHATSAPP_CANCEL_TEMPLATE_NAME,
     configuredLanguage: process.env.CHATWOOT_WHATSAPP_CANCEL_TEMPLATE_LANGUAGE,
     configuredCategory: process.env.CHATWOOT_WHATSAPP_CANCEL_TEMPLATE_CATEGORY,
-    fallbackNames: ['booking_cancelled'],
+    fallbackNames: ['booking_cancelled', 'appointment_cancel'],
     defaultCategory: 'UTILITY',
   });
 }
