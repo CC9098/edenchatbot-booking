@@ -18,6 +18,7 @@ import {
   normalizePhoneForSearch,
   normalizePhoneForStorage,
 } from '@/lib/contact-utils';
+import { getMonthlyUnavailableSummaryLabel } from '@/lib/booking-availability-labels';
 import {
   BOOKING_PICKUP_LABELS,
   getBookingPickupOptions,
@@ -494,6 +495,7 @@ export function BookingTabFlow({
 
   const minDate = getTodayIsoInHongKong();
   const maxDate = getMaxDateIsoInHongKong(MAX_BOOKING_WINDOW_DAYS);
+  const currentMonthKey = toMonthKeyFromIsoDate(minDate);
 
   const doctorOptions = useMemo(
     () => doctors,
@@ -695,7 +697,10 @@ export function BookingTabFlow({
 
       if (!hasUnknownDate && hasUnavailableDate) {
         summaries[clinic.clinicId] = {
-          label: '本月暫滿',
+          label: getMonthlyUnavailableSummaryLabel({
+            calendarMonthKey,
+            currentMonthKey,
+          }),
           tone: 'unavailable',
         };
         continue;
@@ -708,7 +713,15 @@ export function BookingTabFlow({
     }
 
     return summaries;
-  }, [bookableDatesLoading, calendarMonthKey, maxDate, minDate, monthClinicAvailability, scannableClinics]);
+  }, [
+    bookableDatesLoading,
+    calendarMonthKey,
+    currentMonthKey,
+    maxDate,
+    minDate,
+    monthClinicAvailability,
+    scannableClinics,
+  ]);
 
   const selectedDateAllAvailableClinics = useMemo(() => {
     if (!selectedDate) return [];
@@ -1361,7 +1374,7 @@ export function BookingTabFlow({
                 })}
               </div>
               <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                點按診所卡即可套用篩選；如已選中，再按一次即可改回比較全部診所。
+                點按診所卡即可套用篩選；如顯示「本月餘下日子暫滿」，可到下一步按右箭嘴查看下月。
               </p>
             </section>
           )}
