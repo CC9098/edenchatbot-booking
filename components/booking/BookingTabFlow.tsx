@@ -1237,7 +1237,7 @@ export function BookingTabFlow({
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-semibold text-slate-700">選擇診所（可選）</span>
+              <span className="text-sm font-semibold text-slate-700">快速篩選診所（可選）</span>
               <select
                 value={clinicId}
                 onChange={(event) => handleClinicChange(event.target.value)}
@@ -1252,7 +1252,7 @@ export function BookingTabFlow({
                 ))}
               </select>
               <p className="text-xs leading-relaxed text-slate-500">
-                可先留空，下一步會用彩色燈號直接比較各診所邊日有位。
+                可先留空比較全部診所；下方診所卡亦可直接點按套用篩選。
               </p>
             </label>
           </div>
@@ -1329,12 +1329,20 @@ export function BookingTabFlow({
                           : 'bg-amber-400';
 
                   return (
-                    <div
+                    <button
                       key={clinic.clinicId}
-                      className={`rounded-2xl border px-4 py-4 transition ${
+                      type="button"
+                      onClick={() => handleClinicChange(isChosenClinic ? '' : clinic.clinicId)}
+                      aria-pressed={isChosenClinic}
+                      aria-label={
+                        isChosenClinic
+                          ? `${clinic.clinicNameZh} 已選取，再按一次取消篩選`
+                          : `選擇 ${clinic.clinicNameZh}`
+                      }
+                      className={`w-full rounded-2xl border px-4 py-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
                         isChosenClinic
                           ? 'border-primary/40 bg-white shadow-[0_12px_30px_rgba(31,95,63,0.08)]'
-                          : 'border-white/80 bg-white/80'
+                          : 'border-white/80 bg-white/80 hover:border-primary/30 hover:bg-white hover:shadow-[0_12px_30px_rgba(31,95,63,0.05)]'
                       }`}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1368,10 +1376,13 @@ export function BookingTabFlow({
                           </p>
                         ))}
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
+              <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                可直接點按上方診所卡套用篩選；如已選中，再按一次即可改回比較全部診所。
+              </p>
             </section>
           )}
 
