@@ -233,8 +233,8 @@ export function buildWhatsappRescheduleTemplateBodyParams(
     patient_name: input.patientName,
     doctor_name: input.doctorNameZh,
     clinic_name: input.clinicNameZh,
-    old_appointment_datetime: `${formatDateForWhatsapp(input.oldDate)} ${input.oldTime}`,
-    new_appointment_datetime: `${formatDateForWhatsapp(input.newDate)} ${input.newTime}`,
+    old_datetime: `${formatDateForWhatsapp(input.oldDate)} ${input.oldTime}`,
+    new_datetime: `${formatDateForWhatsapp(input.newDate)} ${input.newTime}`,
     booking_id: input.bookingId,
     manage_url: buildManageBookingUrl(),
   };
