@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   CalendarDays,
@@ -34,6 +34,7 @@ type FlowVariant = 'booking' | 'whatsapp';
 type VisitType = 'first' | 'followup';
 type ReceiptType = 'no' | 'yes_insurance' | 'yes_not_insurance';
 type GenderType = '' | 'male' | 'female' | 'other';
+type BookingPickupSelection = '' | BookingPickupType;
 
 type BookingFormValues = {
   firstName: string;
@@ -41,7 +42,7 @@ type BookingFormValues = {
   phone: string;
   email: string;
   needReceipt: ReceiptType;
-  medicationPickup: BookingPickupType;
+  medicationPickup: BookingPickupSelection;
   shippingAddressDetails: string;
   clinicPickupRemarks: string;
   idCard: string;
@@ -155,7 +156,7 @@ const INITIAL_FORM_VALUES: BookingFormValues = {
   phone: '',
   email: '',
   needReceipt: 'no',
-  medicationPickup: 'none',
+  medicationPickup: '',
   shippingAddressDetails: '',
   clinicPickupRemarks: '',
   idCard: '',
@@ -484,6 +485,7 @@ export function BookingTabFlow({
     buildInitialFormValues(initialContact)
   );
   const [formErrors, setFormErrors] = useState<BookingFormErrors>({});
+  const previousClinicIdRef = useRef<ClinicId | ''>(initialSelection?.clinicId ?? '');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -810,13 +812,31 @@ export function BookingTabFlow({
       (option) => option.value === formValues.medicationPickup
     );
 
-    if (isCurrentPickupAvailable) return;
+    if (isCurrentPickupAvailable || formValues.medicationPickup === '') return;
 
     setFormValues((prev) => ({
       ...prev,
-      medicationPickup: 'none',
+      medicationPickup: isOnlineConsultation ? '' : 'none',
     }));
-  }, [formValues.medicationPickup, pickupOptions]);
+  }, [formValues.medicationPickup, isOnlineConsultation, pickupOptions]);
+
+  useEffect(() => {
+    if (previousClinicIdRef.current === clinicId) return;
+
+    setFormValues((prev) => ({
+      ...prev,
+      medicationPickup: clinicId === 'online' ? '' : 'none',
+      shippingAddressDetails: '',
+      clinicPickupRemarks: '',
+    }));
+    setFormErrors((prev) => ({
+      ...prev,
+      medicationPickup: undefined,
+      shippingAddressDetails: undefined,
+      clinicPickupRemarks: undefined,
+    }));
+    previousClinicIdRef.current = clinicId;
+  }, [clinicId]);
 
   function clearSelectedTimeslot(keepDate = false) {
     if (!keepDate) {
@@ -985,6 +1005,10 @@ export function BookingTabFlow({
       nextErrors.email = '請輸入有效電郵地址';
     }
 
+    if (isOnlineConsultation && !values.medicationPickup) {
+      nextErrors.medicationPickup = '請選擇取藥方法';
+    }
+
     if (isOnlineConsultation && isShippingBookingPickup(values.medicationPickup) && !values.shippingAddressDetails.trim()) {
       nextErrors.shippingAddressDetails = '請填寫寄送地址或順豐站／智能櫃資料';
     }
@@ -1038,13 +1062,15 @@ export function BookingTabFlow({
           `主要症狀: ${values.symptoms.trim() || '未提供'}`,
           `得知來源: ${REFERRAL_SOURCE_LABELS[values.referralSource.trim()] || '未提供'}`,
           `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
-          `取藥方法: ${BOOKING_PICKUP_LABELS[values.medicationPickup]}`,
         ]
       : [
           '[覆診]',
           `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
-          `取藥方法: ${BOOKING_PICKUP_LABELS[values.medicationPickup]}`,
         ];
+
+    if (isOnlineConsultation && values.medicationPickup) {
+      notes.push(`取藥方法: ${BOOKING_PICKUP_LABELS[values.medicationPickup]}`);
+    }
 
     if (isOnlineConsultation && isShippingBookingPickup(values.medicationPickup)) {
       notes.push(`寄送地址／順豐站點: ${values.shippingAddressDetails.trim() || '未提供'}`);
@@ -1098,13 +1124,16 @@ export function BookingTabFlow({
       email: formValues.email.trim().toLowerCase(),
       notes: buildBookingNotes(formValues),
     };
+    const medicationPickup = isOnlineConsultation
+      ? (formValues.medicationPickup as BookingPickupType)
+      : 'none';
     const submitEndpoint = isWhatsappFlow ? '/api/booking-whatsapp' : '/api/booking';
     const requestBody = isWhatsappFlow
       ? {
           ...payload,
           visitType,
           needReceipt: formValues.needReceipt,
-          medicationPickup: formValues.medicationPickup,
+          medicationPickup,
           idCard: formValues.idCard.trim(),
           dateOfBirth: formValues.dateOfBirth.trim(),
           gender: formValues.gender || undefined,
@@ -1746,24 +1775,30 @@ export function BookingTabFlow({
                   <option value="yes_not_insurance">需要，非保險用途</option>
                 </select>
               </label>
+            </div>
 
+            {isOnlineConsultation ? (
               <label className="space-y-1.5">
                 <span className="text-sm font-semibold text-slate-700">取藥方法 *</span>
                 <select
                   value={formValues.medicationPickup}
                   onChange={(event) =>
-                    updateFormField('medicationPickup', event.target.value as BookingPickupType)
+                    updateFormField('medicationPickup', event.target.value as BookingPickupSelection)
                   }
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
                 >
+                  <option value="">請選擇</option>
                   {pickupOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
                   ))}
                 </select>
+                {formErrors.medicationPickup ? (
+                  <p className="text-xs text-red-600">{formErrors.medicationPickup}</p>
+                ) : null}
               </label>
-            </div>
+            ) : null}
 
             {needsShippingAddressDetails ? (
               <label className="space-y-1.5">
