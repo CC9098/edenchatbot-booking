@@ -18,6 +18,11 @@ import {
   normalizePhoneForSearch,
   normalizePhoneForStorage,
 } from '@/lib/contact-utils';
+import {
+  BOOKING_PICKUP_LABELS,
+  getBookingPickupOptions,
+  type BookingPickupType,
+} from '@/shared/booking-pickup';
 import type { BookableDoctorSchedule } from '@/shared/bookable-schedule-data';
 import { type ClinicId, type DoctorId } from '@/shared/clinic-data';
 import type { TimeRange, WeeklySchedule } from '@/shared/schedule-config';
@@ -26,7 +31,6 @@ type BookingStep = 'setup' | 'timeslot' | 'details' | 'success';
 type FlowVariant = 'booking' | 'whatsapp';
 type VisitType = 'first' | 'followup';
 type ReceiptType = 'no' | 'yes_insurance' | 'yes_not_insurance';
-type PickupType = 'none' | 'lalamove' | 'sfexpress' | 'clinic_pickup';
 type GenderType = '' | 'male' | 'female' | 'other';
 
 type BookingFormValues = {
@@ -35,7 +39,7 @@ type BookingFormValues = {
   phone: string;
   email: string;
   needReceipt: ReceiptType;
-  medicationPickup: PickupType;
+  medicationPickup: BookingPickupType;
   idCard: string;
   dateOfBirth: string;
   gender: GenderType;
@@ -80,13 +84,6 @@ const DEFAULT_SLOT_DURATION_MINUTES = 15;
 const MAX_BOOKING_WINDOW_DAYS = 90;
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const;
 const WEEKDAY_LABELS_ZH = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'] as const;
-
-const PICKUP_LABELS: Record<PickupType, string> = {
-  none: '不需要',
-  lalamove: '即日配送（Lalamove）',
-  sfexpress: '順豐速運',
-  clinic_pickup: '診所自取',
-};
 
 const VISIT_TYPE_LABELS: Record<VisitType, string> = {
   first: '首診',
@@ -509,8 +506,15 @@ export function BookingTabFlow({
     () => clinicOptions.find((clinic) => clinic.clinicId === clinicId),
     [clinicId, clinicOptions]
   );
+  const pickupOptions = useMemo(
+    () => getBookingPickupOptions(clinicId),
+    [clinicId]
+  );
   const selectedDoctorSlotMinutes = selectedDoctor?.bookingSlotMinutes ?? DEFAULT_SLOT_DURATION_MINUTES;
-  const scannableClinics = selectedDoctor?.clinics ?? [];
+  const scannableClinics = useMemo(
+    () => selectedDoctor?.clinics ?? [],
+    [selectedDoctor]
+  );
   const visibleClinics = useMemo(
     () =>
       clinicId
@@ -790,6 +794,19 @@ export function BookingTabFlow({
     };
   }, [calendarMonthKey, doctorId, maxDate, minDate, scannableClinics, selectedDoctorSlotMinutes]);
 
+  useEffect(() => {
+    const isCurrentPickupAvailable = pickupOptions.some(
+      (option) => option.value === formValues.medicationPickup
+    );
+
+    if (isCurrentPickupAvailable) return;
+
+    setFormValues((prev) => ({
+      ...prev,
+      medicationPickup: 'none',
+    }));
+  }, [formValues.medicationPickup, pickupOptions]);
+
   function clearSelectedTimeslot(keepDate = false) {
     if (!keepDate) {
       setSelectedDate('');
@@ -1002,14 +1019,14 @@ export function BookingTabFlow({
         `主要症狀: ${values.symptoms.trim() || '未提供'}`,
         `得知來源: ${REFERRAL_SOURCE_LABELS[values.referralSource.trim()] || '未提供'}`,
         `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
-        `取藥方法: ${PICKUP_LABELS[values.medicationPickup]}`,
+        `取藥方法: ${BOOKING_PICKUP_LABELS[values.medicationPickup]}`,
       ].join(' | ');
     }
 
     return [
       '[覆診]',
       `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
-      `取藥方法: ${PICKUP_LABELS[values.medicationPickup]}`,
+      `取藥方法: ${BOOKING_PICKUP_LABELS[values.medicationPickup]}`,
     ].join(' | ');
   }
 
@@ -1708,14 +1725,15 @@ export function BookingTabFlow({
                 <select
                   value={formValues.medicationPickup}
                   onChange={(event) =>
-                    updateFormField('medicationPickup', event.target.value as PickupType)
+                    updateFormField('medicationPickup', event.target.value as BookingPickupType)
                   }
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
                 >
-                  <option value="none">不需要</option>
-                  <option value="lalamove">即日配送（Lalamove）</option>
-                  <option value="sfexpress">順豐速運</option>
-                  <option value="clinic_pickup">診所自取</option>
+                  {pickupOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>

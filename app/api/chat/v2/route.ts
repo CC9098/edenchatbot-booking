@@ -1817,7 +1817,7 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
    - **姓名、電話：一定要問**
    - **首診/覆診：一定要問**（visitType = first 或 followup）
    - **收據需求：一定要問**（needReceipt = no / yes_insurance / yes_not_insurance）
-   - **取藥方法：一定要問**（medicationPickup = none / lalamove / sfexpress / clinic_pickup）
+   - **取藥方法：一定要問**（medicationPickup = none / lalamove / sfexpress / clinic_pickup；如網上應診可用 overseas_shipping / central_pickup / jordan_pickup / tsuenwan_pickup）
    - **Email：睇用戶係咪已登入**
      - 如果【用戶登入資料】有提供 email → **直接用，唔好再問**
      - 如果冇【用戶登入資料】→ **一定要問**用戶提供 email
@@ -1827,7 +1827,7 @@ const FALLBACK_MODE_PROMPTS: Record<ChatMode, string> = {
    - call create_booking 時，enum 欄位必須用以下代碼：
      - visitType: first / followup
      - needReceipt: no / yes_insurance / yes_not_insurance
-     - medicationPickup: none / lalamove / sfexpress / clinic_pickup
+     - medicationPickup: none / lalamove / sfexpress / clinic_pickup / overseas_shipping / central_pickup / jordan_pickup / tsuenwan_pickup
      - gender: male / female / other
 
 **預約流程（每一步都要做）：**
@@ -2546,7 +2546,7 @@ const BOOKING_FUNCTIONS: FunctionDeclaration[] = [
         },
         medicationPickup: {
           type: SchemaType.STRING,
-          description: '取藥方法：none / lalamove / sfexpress / clinic_pickup',
+          description: '取藥方法：none / lalamove / sfexpress / clinic_pickup / overseas_shipping / central_pickup / jordan_pickup / tsuenwan_pickup',
         },
         idCard: {
           type: SchemaType.STRING,

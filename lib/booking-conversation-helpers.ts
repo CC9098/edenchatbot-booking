@@ -18,6 +18,10 @@ import {
   getClinicAddress,
   getDoctorBookingSlotMinutes,
 } from '@/shared/clinic-data';
+import {
+  ALL_BOOKING_PICKUP_VALUES,
+  BOOKING_PICKUP_LABELS,
+} from '@/shared/booking-pickup';
 import { getActiveCalendarIds, getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
 import { getFreeBusy } from './google-calendar';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
@@ -52,13 +56,6 @@ const RECEIPT_LABELS: Record<BookingReceiptType, string> = {
   yes_not_insurance: '是，但非保險',
 };
 
-const PICKUP_LABELS: Record<BookingPickupType, string> = {
-  none: '不需要',
-  lalamove: 'Lalamove',
-  sfexpress: '順豐 SF Express',
-  clinic_pickup: '診所自取',
-};
-
 const GENDER_LABELS: Record<BookingGender, string> = {
   male: '男 Male',
   female: '女 Female',
@@ -84,7 +81,7 @@ const conversationalBookingSchema = z
     needReceipt: z.enum(['no', 'yes_insurance', 'yes_not_insurance'], {
       errorMap: () => ({ message: '請先選擇收據需求' }),
     }),
-    medicationPickup: z.enum(['none', 'lalamove', 'sfexpress', 'clinic_pickup'], {
+    medicationPickup: z.enum(ALL_BOOKING_PICKUP_VALUES, {
       errorMap: () => ({ message: '請先選擇取藥方法' }),
     }),
     idCard: z.string().trim().optional(),
@@ -222,7 +219,7 @@ function buildStructuredBookingNotes(request: BookingRequest): string {
   const base = [
     request.visitType === 'first' ? '[首診]' : '[覆診]',
     `Receipt: ${RECEIPT_LABELS[request.needReceipt]}`,
-    `取藥方法: ${PICKUP_LABELS[request.medicationPickup]}`,
+    `取藥方法: ${BOOKING_PICKUP_LABELS[request.medicationPickup]}`,
   ];
 
   if (request.visitType === 'first') {

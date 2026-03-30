@@ -1,13 +1,10 @@
 import { createServiceClient } from "@/lib/supabase";
 import { normalizePhoneForSearch } from "@/lib/contact-utils";
+import type { BookingPickupType } from "@/shared/booking-pickup";
+export type { BookingPickupType } from "@/shared/booking-pickup";
 
 export type BookingVisitType = "first" | "followup";
 export type BookingReceiptType = "no" | "yes_insurance" | "yes_not_insurance";
-export type BookingPickupType =
-  | "none"
-  | "lalamove"
-  | "sfexpress"
-  | "clinic_pickup";
 export type BookingGender = "male" | "female" | "other";
 export type BookingIntakeStatus = "pending" | "confirmed" | "cancelled" | "failed";
 

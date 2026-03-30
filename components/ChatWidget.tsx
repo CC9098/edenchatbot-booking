@@ -21,6 +21,7 @@ import { DAY_NAMES, PRIMARY, TEXT_INPUT_STEPS } from '@/components/chat/constant
 import { useChatState } from '@/components/chat/hooks/useChatState';
 import { type BookingState, type BookingStep, type ConsultationFormData, type ManageBookingOption, type Option, type OptionKey } from '@/components/chat/types';
 import { buildBookingUrl } from '@/lib/public-url';
+import { BOOKING_PICKUP_LABELS, getBookingPickupOptions } from '@/shared/booking-pickup';
 import {
   buildConsultationFormFlow,
   buildWidgetGreetingMessage,
@@ -1177,7 +1178,10 @@ export function ChatWidget({
       return;
     }
 
-    const pickupLabel = PICKUP_LABELS[booking.medicationPickup || ''] || booking.medicationPickup || '';
+    const pickupLabel =
+      (booking.medicationPickup
+        ? BOOKING_PICKUP_LABELS[booking.medicationPickup as keyof typeof BOOKING_PICKUP_LABELS]
+        : '') || booking.medicationPickup || '';
     const notes = booking.isFirstVisit
       ? `[首診] ID: ${booking.idCard || 'N/A'} | DOB: ${booking.dob || 'N/A'} | Gender: ${booking.gender || 'N/A'} | Allergies: ${booking.allergies || 'None'} | Medications: ${booking.medications || 'None'} | Symptoms: ${booking.symptoms || 'N/A'} | Referral: ${booking.referralSource || 'N/A'} | Receipt: ${booking.needReceipt} | 取藥方法: ${pickupLabel}`
       : `[覆診] Receipt: ${booking.needReceipt} | 取藥方法: ${pickupLabel}`;
@@ -1257,13 +1261,6 @@ export function ChatWidget({
     'yes_not_insurance': '是，但非保險',
   };
 
-  const PICKUP_LABELS: Record<string, string> = {
-    'none': '不需要',
-    'lalamove': 'Lalamove',
-    'sfexpress': '順豐 SF Express',
-    'clinic_pickup': '診所自取',
-  };
-
   const GENDER_LABELS: Record<string, string> = {
     'male': '男 Male',
     'female': '女 Female',
@@ -1281,6 +1278,14 @@ export function ChatWidget({
     'other': '其他',
   };
 
+  const buildBookingPickupOptions = () => ([
+    ...getBookingPickupOptions(booking.clinicId).map((option) => ({
+      label: option.label,
+      value: `booking_pickup-${option.value}` as OptionKey,
+    })),
+    ...bookingBackCancelOptions,
+  ]);
+
   const showBookingSummary = () => {
     const d = new Date(booking.date!);
     const dayName = DAY_NAMES[d.getDay()];
@@ -1295,7 +1300,11 @@ export function ChatWidget({
       `📞 電話：${booking.phone}\n` +
       `📧 電郵：${booking.email}\n` +
       `🧾 收據：${RECEIPT_LABELS[booking.needReceipt || ''] || booking.needReceipt}\n` +
-      `💊 取藥方法：${PICKUP_LABELS[booking.medicationPickup || ''] || booking.medicationPickup}\n`;
+      `💊 取藥方法：${
+        (booking.medicationPickup
+          ? BOOKING_PICKUP_LABELS[booking.medicationPickup as keyof typeof BOOKING_PICKUP_LABELS]
+          : '') || booking.medicationPickup
+      }\n`;
 
     if (booking.isFirstVisit) {
       summary +=
@@ -1512,13 +1521,7 @@ export function ChatWidget({
   const handleBookingReceiptSelect = (value: string) => {
     setBooking(prev => ({ ...prev, step: 'medicationPickup', needReceipt: value }));
     addBotMessage('請選擇取藥方法：');
-    setOptions([
-      { label: '不需要', value: 'booking_pickup-none' },
-      { label: 'Lalamove', value: 'booking_pickup-lalamove' },
-      { label: '順豐 SF Express', value: 'booking_pickup-sfexpress' },
-      { label: '診所自取', value: 'booking_pickup-clinic_pickup' },
-      ...bookingBackCancelOptions,
-    ]);
+    setOptions(buildBookingPickupOptions());
   };
 
   // Handle medication pickup selection
@@ -1653,13 +1656,7 @@ export function ChatWidget({
     } else if (s === 'idCard') {
       setBooking(prev => ({ ...prev, step: 'medicationPickup' }));
       addBotMessage('請選擇取藥方法：');
-      setOptions([
-        { label: '不需要', value: 'booking_pickup-none' },
-        { label: 'Lalamove', value: 'booking_pickup-lalamove' },
-        { label: '順豐 SF Express', value: 'booking_pickup-sfexpress' },
-        { label: '診所自取', value: 'booking_pickup-clinic_pickup' },
-        ...bookingBackCancelOptions,
-      ]);
+      setOptions(buildBookingPickupOptions());
     } else if (s === 'dob') {
       setBooking(prev => ({ ...prev, step: 'idCard' }));
       addBotMessage('請輸入身份證號碼（例如：A123456(7)）：');
@@ -1707,13 +1704,7 @@ export function ChatWidget({
       } else {
         setBooking(prev => ({ ...prev, step: 'medicationPickup' }));
         addBotMessage('請選擇取藥方法：');
-        setOptions([
-          { label: '不需要', value: 'booking_pickup-none' },
-          { label: 'Lalamove', value: 'booking_pickup-lalamove' },
-          { label: '順豐 SF Express', value: 'booking_pickup-sfexpress' },
-          { label: '診所自取', value: 'booking_pickup-clinic_pickup' },
-          ...bookingBackCancelOptions,
-        ]);
+        setOptions(buildBookingPickupOptions());
       }
     }
   };

@@ -22,6 +22,7 @@ import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import { createBooking, getFreeBusy } from '@/lib/google-calendar';
 import { syncPatientProfileContact } from '@/lib/profile-contact-sync';
 import { getDoctorBookingSlotMinutes } from '@/shared/clinic-data';
+import { ALL_BOOKING_PICKUP_VALUES } from '@/shared/booking-pickup';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { getClinicWhatsappPhone } from '@/lib/whatsapp-booking';
 import { resolveOnlineSourceMappingForSlot } from '@/lib/virtual-online-booking';
@@ -34,7 +35,7 @@ const whatsappBookingSchema = bookingSchema
   .extend({
     visitType: z.enum(['first', 'followup']),
     needReceipt: z.enum(['no', 'yes_insurance', 'yes_not_insurance']),
-    medicationPickup: z.enum(['none', 'lalamove', 'sfexpress', 'clinic_pickup']),
+    medicationPickup: z.enum(ALL_BOOKING_PICKUP_VALUES),
     idCard: z.string().optional(),
     dateOfBirth: z.string().optional(),
     gender: z.enum(['male', 'female', 'other']).optional(),
