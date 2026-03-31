@@ -453,6 +453,143 @@ test('sendBookingConfirmationWhatsapp prefers zh_HK templates when no explicit l
   }
 });
 
+test('sendBookingConfirmationWhatsapp falls back to active conversation text when template send fails', async () => {
+  const originalFetch = global.fetch;
+  const originalEnv = {
+    CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
+    CHATWOOT_API_ACCESS_TOKEN: process.env.CHATWOOT_API_ACCESS_TOKEN,
+    CHATWOOT_ACCOUNT_ID: process.env.CHATWOOT_ACCOUNT_ID,
+    CHATWOOT_WHATSAPP_INBOX_ID: process.env.CHATWOOT_WHATSAPP_INBOX_ID,
+    CHATWOOT_WHATSAPP_TEMPLATE_NAME: process.env.CHATWOOT_WHATSAPP_TEMPLATE_NAME,
+    CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE: process.env.CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE,
+    CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY: process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY,
+  };
+
+  const sentMessagePayloads: Array<Record<string, any>> = [];
+
+  process.env.CHATWOOT_BASE_URL = 'https://chatwoot.example';
+  process.env.CHATWOOT_API_ACCESS_TOKEN = 'test-token';
+  process.env.CHATWOOT_ACCOUNT_ID = '';
+  process.env.CHATWOOT_WHATSAPP_INBOX_ID = '';
+  process.env.CHATWOOT_WHATSAPP_TEMPLATE_NAME = 'booking_confirm';
+  process.env.CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE = 'zh_HK';
+  process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY = 'UTILITY';
+
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const parsedUrl = new URL(requestUrl);
+    const method = init?.method || 'GET';
+    const path = `${parsedUrl.pathname}${parsedUrl.search}`;
+
+    if (method === 'GET' && path === '/api/v1/profile') {
+      return jsonResponse({ account_id: 1 });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/inboxes') {
+      return jsonResponse({
+        payload: [{
+          id: 7,
+          channel_type: 'Channel::Whatsapp',
+          phone_number: '+85267333801',
+          message_templates: [{
+            name: 'booking_confirm',
+            language: 'zh_HK',
+            status: 'approved',
+            category: 'UTILITY',
+          }],
+        }],
+      });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/inboxes/7/sync_templates') {
+      return jsonResponse({ message: 'ok' });
+    }
+
+    if (method === 'GET' && path.startsWith('/api/v1/accounts/1/contacts/search?')) {
+      return jsonResponse({
+        payload: [{
+          id: 99,
+          phone_number: '+85296563420',
+          email: 'edenethel333@gmail.com',
+        }],
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/99/contactable_inboxes') {
+      return jsonResponse({
+        payload: [{
+          source_id: '85296563420',
+          inbox: { id: 7 },
+        }],
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/99/conversations') {
+      return jsonResponse({
+        payload: [{
+          id: 42,
+          inbox_id: 7,
+          status: 'open',
+        }],
+      });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/conversations/42/messages') {
+      const payload = JSON.parse(String(init?.body || '{}'));
+      sentMessagePayloads.push(payload);
+
+      if (payload.template_params) {
+        return new Response('template not found', {
+          status: 404,
+          statusText: 'Not Found',
+          headers: {
+            'Content-Type': 'text/plain',
+          },
+        });
+      }
+
+      return jsonResponse({
+        id: 302,
+        status: 'sent',
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${method} ${path}`);
+  }) as typeof global.fetch;
+
+  try {
+    const result = await sendBookingConfirmationWhatsapp({
+      bookingId: 'booking-template-failure-fallback',
+      patientName: 'Tin CHUNG WAI',
+      phone: '96563420',
+      email: 'edenethel333@gmail.com',
+      doctorNameZh: '梁仲威醫師',
+      clinicNameZh: '中環',
+      appointmentDate: '2026-04-02',
+      appointmentTime: '15:30',
+      visitType: 'followup',
+      manageAccessToken: 'abc123',
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.whatsappSent, true);
+    assert.equal(result.conversationId, 42);
+    assert.equal(sentMessagePayloads.some((payload) => payload.template_params?.name === 'booking_confirm'), true);
+    assert.equal(sentMessagePayloads.at(-1)?.template_params, undefined);
+    assert.equal(typeof sentMessagePayloads.at(-1)?.content, 'string');
+  } finally {
+    global.fetch = originalFetch;
+
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (typeof value === 'undefined') {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});
+
 test('sendBookingCancellationWhatsapp falls back to appointment_cancel when booking_cancelled is unavailable', async () => {
   const originalFetch = global.fetch;
   const originalEnv = {

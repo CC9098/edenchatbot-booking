@@ -952,14 +952,28 @@ async function sendBookingWhatsappNotification(
   const bodyParams = options.buildBodyParams();
 
   if (options.preferTemplateIfAvailable && templateConfigs.length > 0) {
-    await sendMessageWithTemplateFallback(
-      client,
-      accountId,
-      conversationId,
-      content,
-      templateConfigs,
-      bodyParams,
-    );
+    try {
+      await sendMessageWithTemplateFallback(
+        client,
+        accountId,
+        conversationId,
+        content,
+        templateConfigs,
+        bodyParams,
+      );
+    } catch (error) {
+      if (!isActiveConversation(existingConversation)) {
+        throw error;
+      }
+
+      console.warn(
+        `[chatwoot-whatsapp] Preferred template send failed, retrying as active conversation text: ${getSafeErrorMessage(error)}`,
+      );
+
+      await client.createMessage(accountId, conversationId, {
+        content,
+      });
+    }
 
     return {
       success: true,
