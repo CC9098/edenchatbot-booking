@@ -995,7 +995,7 @@ export async function cancelWidgetBooking(
   }
 
   try {
-    await sendBookingCancellationWhatsapp({
+    const whatsappResult = await sendBookingCancellationWhatsapp({
       bookingId: row.google_event_id || row.id,
       patientName: row.patient_name,
       doctorNameZh: row.doctor_name_zh,
@@ -1006,6 +1006,9 @@ export async function cancelWidgetBooking(
       email: row.email,
       clinicWhatsappPhone: getClinicWhatsappPhone(row.clinic_id),
     });
+    if (!whatsappResult.success) {
+      console.warn(`[widget-booking-management] cancel WhatsApp notification failed: ${whatsappResult.error || 'Unknown error'}`);
+    }
   } catch (error) {
     console.warn(`[widget-booking-management] cancel WhatsApp notification failed: ${error}`);
   }
@@ -1216,7 +1219,7 @@ export async function rescheduleWidgetBooking(params: {
   }
 
   try {
-    await sendBookingRescheduleWhatsapp({
+    const whatsappResult = await sendBookingRescheduleWhatsapp({
       bookingId: nextEventId || row.id,
       patientName: row.patient_name,
       doctorNameZh: row.doctor_name_zh,
@@ -1229,6 +1232,9 @@ export async function rescheduleWidgetBooking(params: {
       email: row.email,
       clinicWhatsappPhone: getClinicWhatsappPhone(effectiveClinicId),
     });
+    if (!whatsappResult.success) {
+      console.warn(`[widget-booking-management] reschedule WhatsApp notification failed: ${whatsappResult.error || 'Unknown error'}`);
+    }
   } catch (error) {
     console.warn(`[widget-booking-management] reschedule WhatsApp notification failed: ${error}`);
   }

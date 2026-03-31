@@ -185,7 +185,7 @@ test('sendBookingConfirmationWhatsapp retries when Chatwoot later marks a templa
   }
 });
 
-test('sendBookingConfirmationWhatsapp sends plain text into an active conversation before trying templates', async () => {
+test('sendBookingConfirmationWhatsapp prefers templates even when a Chatwoot conversation is already open', async () => {
   const originalFetch = global.fetch;
   const originalEnv = {
     CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
@@ -297,7 +297,7 @@ test('sendBookingConfirmationWhatsapp sends plain text into an active conversati
     assert.equal(result.whatsappSent, true);
     assert.equal(result.conversationId, 42);
     assert.equal(sentMessagePayloads.length, 1);
-    assert.equal(sentMessagePayloads[0]?.template_params, undefined);
+    assert.equal(sentMessagePayloads[0]?.template_params?.name, 'booking_confirm');
     assert.equal(typeof sentMessagePayloads[0]?.content, 'string');
   } finally {
     global.fetch = originalFetch;

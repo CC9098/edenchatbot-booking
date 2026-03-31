@@ -884,6 +884,7 @@ async function sendBookingWhatsappNotification(
     buildContent: () => string;
     buildBodyParams: () => Record<string, string>;
     getTemplateConfigs: (inbox: ChatwootInbox) => TemplateConfig[];
+    preferTemplateIfAvailable?: boolean;
   },
 ): Promise<SendWhatsappBookingConfirmationResult> {
   const baseUrl = (process.env.CHATWOOT_BASE_URL || '').trim().replace(/\/$/, '');
@@ -950,6 +951,23 @@ async function sendBookingWhatsappNotification(
   const templateConfigs = options.getTemplateConfigs(inbox);
   const bodyParams = options.buildBodyParams();
 
+  if (options.preferTemplateIfAvailable && templateConfigs.length > 0) {
+    await sendMessageWithTemplateFallback(
+      client,
+      accountId,
+      conversationId,
+      content,
+      templateConfigs,
+      bodyParams,
+    );
+
+    return {
+      success: true,
+      whatsappSent: true,
+      conversationId,
+    };
+  }
+
   if (isActiveConversation(existingConversation)) {
     try {
       await client.createMessage(accountId, conversationId, {
@@ -998,6 +1016,7 @@ export async function sendBookingConfirmationWhatsapp(
       buildContent: () => buildWhatsappConfirmationText(input),
       buildBodyParams: () => buildWhatsappTemplateBodyParams(input),
       getTemplateConfigs,
+      preferTemplateIfAvailable: true,
     });
   } catch (error) {
     return {
@@ -1016,6 +1035,7 @@ export async function sendBookingReminderWhatsapp(
       buildContent: () => buildWhatsappReminderText(input),
       buildBodyParams: () => buildWhatsappReminderTemplateBodyParams(input),
       getTemplateConfigs: getReminderTemplateConfigs,
+      preferTemplateIfAvailable: true,
     });
   } catch (error) {
     return {
@@ -1139,6 +1159,7 @@ export async function sendBookingManageAccessWhatsapp(
       buildContent: () => buildWhatsappManageAccessText(input),
       buildBodyParams: () => buildWhatsappManageAccessTemplateBodyParams(input),
       getTemplateConfigs: getManageLinkTemplateConfigs,
+      preferTemplateIfAvailable: true,
     });
   } catch (error) {
     return {
@@ -1161,6 +1182,7 @@ export async function sendBookingCancellationWhatsapp(
       buildContent: () => buildWhatsappCancellationText(input),
       buildBodyParams: () => buildWhatsappCancellationTemplateBodyParams(input),
       getTemplateConfigs: getCancellationTemplateConfigs,
+      preferTemplateIfAvailable: true,
     });
   } catch (error) {
     return {
@@ -1183,6 +1205,7 @@ export async function sendBookingRescheduleWhatsapp(
       buildContent: () => buildWhatsappRescheduleText(input),
       buildBodyParams: () => buildWhatsappRescheduleTemplateBodyParams(input),
       getTemplateConfigs: getRescheduleTemplateConfigs,
+      preferTemplateIfAvailable: true,
     });
   } catch (error) {
     return {
