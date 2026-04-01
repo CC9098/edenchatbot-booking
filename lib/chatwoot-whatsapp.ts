@@ -629,6 +629,18 @@ function getNamedTemplateConfigs(
 
   const preferredSyncedTemplates = [...syncedTemplates]
     .sort((left, right) => {
+      const nameRankDifference = rankTemplateName(
+        left.name || '',
+        templateNames,
+      ) - rankTemplateName(
+        right.name || '',
+        templateNames,
+      );
+
+      if (nameRankDifference !== 0) {
+        return nameRankDifference;
+      }
+
       return rankTemplateLanguage(left.language || '', preferredLanguages)
         - rankTemplateLanguage(right.language || '', preferredLanguages);
     });
@@ -659,6 +671,11 @@ function buildPreferredTemplateLanguages(configuredLanguage: string): string[] {
 function rankTemplateLanguage(language: string, preferredLanguages: string[]): number {
   const index = preferredLanguages.indexOf(language);
   return index === -1 ? preferredLanguages.length : index;
+}
+
+function rankTemplateName(name: string, preferredNames: string[]): number {
+  const index = preferredNames.indexOf(name);
+  return index === -1 ? preferredNames.length : index;
 }
 
 async function sendMessageWithTemplateFallback(
