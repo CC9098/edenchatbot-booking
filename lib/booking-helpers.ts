@@ -2,7 +2,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { WeeklySchedule, TimeRange } from '../shared/schedule-config';
 import { type Holiday } from '../shared/schema';
 import { PHYSICAL_CLINIC_IDS, type PhysicalClinicId } from '../shared/clinic-data';
-import { storage } from './storage';
+import { getHolidaysForDate } from './holiday-store';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const AFTERNOON_SESSION_START_MINUTES = 15 * 60;
@@ -33,7 +33,7 @@ export async function getApplicableHolidaysForDate(
   doctorId?: string,
   clinicId?: string
 ): Promise<Holiday[]> {
-  const holidays = await storage.getHolidaysForDate(date);
+  const holidays = await getHolidaysForDate(date);
   if (holidays.length === 0) return [];
   return holidays.filter((holiday) => isHolidayScopeMatched(holiday, doctorId, clinicId));
 }
