@@ -823,8 +823,10 @@ function extractManageButtonParameters(manageUrl: string): string[] {
     const token = parsedUrl.searchParams.get('token');
     const pathWithQuery = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
 
-    pushCandidate(token);
+    // Prefer path/query first because the current production templates append the
+    // dynamic URL button parameter directly after the base domain.
     pushCandidate(pathWithQuery === '/' ? '' : pathWithQuery);
+    pushCandidate(token);
   } catch {
     // Preserve the original value below when the URL is not parseable.
   }
