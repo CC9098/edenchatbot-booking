@@ -15,4 +15,9 @@ if [[ ! -x "$PWCLI" ]]; then
   exit 1
 fi
 
+if [[ ${#SESSION} -gt 16 ]]; then
+  echo "ECTCM_POS_SESSION must be 16 characters or fewer to avoid Playwright socket path collisions." >&2
+  exit 1
+fi
+
 exec "$PWCLI" -s="$SESSION" "$@"
