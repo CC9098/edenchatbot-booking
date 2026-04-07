@@ -1,0 +1,4 @@
+interface:
+  display_name: "ECTCM POS Automation"
+  short_description: "ECTCM POS login and patient workflow automation"
+  default_prompt: "Use $ectcm-pos-automation to log into ECTCM POS, verify the patient workflow, and update the recorded steps."
