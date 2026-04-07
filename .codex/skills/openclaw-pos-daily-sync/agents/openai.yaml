@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenClaw POS Daily Sync"
+  short_description: "Prepare daily Eden booking candidates for ECTCM POS sync"
+  default_prompt: "Use $openclaw-pos-daily-sync to prepare today's POS sync plan, then hand safe candidates to the ECTCM POS automation flow."
