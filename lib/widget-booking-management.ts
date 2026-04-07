@@ -995,6 +995,9 @@ export async function cancelWidgetBooking(
   }
 
   try {
+    const phoneDigits = getRowPhoneDigits(row);
+    const manageAccessToken = phoneDigits ? createManageAccessToken(phoneDigits) : undefined;
+
     const whatsappResult = await sendBookingCancellationWhatsapp({
       bookingId: row.google_event_id || row.id,
       patientName: row.patient_name,
@@ -1005,6 +1008,7 @@ export async function cancelWidgetBooking(
       phone: row.phone,
       email: row.email,
       clinicWhatsappPhone: getClinicWhatsappPhone(row.clinic_id),
+      manageAccessToken,
     });
     if (!whatsappResult.success) {
       console.warn(`[widget-booking-management] cancel WhatsApp notification failed: ${whatsappResult.error || 'Unknown error'}`);
@@ -1219,6 +1223,9 @@ export async function rescheduleWidgetBooking(params: {
   }
 
   try {
+    const phoneDigits = getRowPhoneDigits(row);
+    const manageAccessToken = phoneDigits ? createManageAccessToken(phoneDigits) : undefined;
+
     const whatsappResult = await sendBookingRescheduleWhatsapp({
       bookingId: nextEventId || row.id,
       patientName: row.patient_name,
@@ -1231,6 +1238,7 @@ export async function rescheduleWidgetBooking(params: {
       phone: row.phone,
       email: row.email,
       clinicWhatsappPhone: getClinicWhatsappPhone(effectiveClinicId),
+      manageAccessToken,
     });
     if (!whatsappResult.success) {
       console.warn(`[widget-booking-management] reschedule WhatsApp notification failed: ${whatsappResult.error || 'Unknown error'}`);

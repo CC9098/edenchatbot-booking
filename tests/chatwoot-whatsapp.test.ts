@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   sendBookingCancellationWhatsapp,
   sendBookingConfirmationWhatsapp,
+  sendBookingRescheduleWhatsapp,
 } from '@/lib/chatwoot-whatsapp';
 
 function jsonResponse(body: unknown, status = 200) {
@@ -981,12 +982,156 @@ test('sendBookingCancellationWhatsapp falls back to appointment_cancel when book
       appointmentDate: '2026-04-01',
       appointmentTime: '13:45',
       clinicWhatsappPhone: '+85267333801',
+      manageAccessToken: 'cancel-abc123',
     });
 
     assert.equal(result.success, true);
     assert.equal(sentMessagePayloads.length, 1);
     assert.equal(sentMessagePayloads[0]?.template_params?.name, 'appointment_cancel');
     assert.equal(sentMessagePayloads[0]?.template_params?.language, 'zh_HK');
+    assert.equal(
+      sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter,
+      '/manage-booking?token=cancel-abc123',
+    );
+  } finally {
+    global.fetch = originalFetch;
+
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (typeof value === 'undefined') {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});
+
+test('sendBookingRescheduleWhatsapp uses tokenized manage-booking path for WhatsApp URL buttons', async () => {
+  const originalFetch = global.fetch;
+  const originalEnv = {
+    CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
+    CHATWOOT_API_ACCESS_TOKEN: process.env.CHATWOOT_API_ACCESS_TOKEN,
+    CHATWOOT_ACCOUNT_ID: process.env.CHATWOOT_ACCOUNT_ID,
+    CHATWOOT_WHATSAPP_INBOX_ID: process.env.CHATWOOT_WHATSAPP_INBOX_ID,
+    CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_NAME: process.env.CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_NAME,
+    CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_LANGUAGE: process.env.CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_LANGUAGE,
+    CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_CATEGORY: process.env.CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_CATEGORY,
+  };
+
+  const sentMessagePayloads: Array<Record<string, any>> = [];
+
+  process.env.CHATWOOT_BASE_URL = 'https://chatwoot.example';
+  process.env.CHATWOOT_API_ACCESS_TOKEN = 'test-token';
+  process.env.CHATWOOT_ACCOUNT_ID = '';
+  process.env.CHATWOOT_WHATSAPP_INBOX_ID = '';
+  process.env.CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_NAME = 'appointment_rescheduled';
+  process.env.CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_LANGUAGE = 'zh_HK';
+  process.env.CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_CATEGORY = 'UTILITY';
+
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const parsedUrl = new URL(requestUrl);
+    const method = init?.method || 'GET';
+    const path = `${parsedUrl.pathname}${parsedUrl.search}`;
+
+    if (method === 'GET' && path === '/api/v1/profile') {
+      return jsonResponse({ account_id: 1 });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/inboxes') {
+      return jsonResponse({
+        payload: [{
+          id: 7,
+          channel_type: 'Channel::Whatsapp',
+          phone_number: '+85267333801',
+          message_templates: [{
+            name: 'appointment_rescheduled',
+            language: 'zh_HK',
+            status: 'approved',
+            category: 'UTILITY',
+          }],
+        }],
+      });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/inboxes/7/sync_templates') {
+      return jsonResponse({ message: 'ok' });
+    }
+
+    if (method === 'GET' && path.startsWith('/api/v1/accounts/1/contacts/search?')) {
+      return jsonResponse({
+        payload: [{
+          id: 99,
+          phone_number: '+85296563420',
+          email: 'edenethel333@gmail.com',
+        }],
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/99/contactable_inboxes') {
+      return jsonResponse({
+        payload: [{
+          source_id: '85296563420',
+          inbox: { id: 7 },
+        }],
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/99/conversations') {
+      return jsonResponse({
+        payload: [{
+          id: 42,
+          inbox_id: 7,
+          status: 'resolved',
+        }],
+      });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/conversations/42/messages') {
+      const payload = JSON.parse(String(init?.body || '{}'));
+      sentMessagePayloads.push(payload);
+
+      return jsonResponse({
+        id: 811,
+        status: 'sent',
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/conversations/42/messages') {
+      return jsonResponse({
+        payload: [{
+          id: 811,
+          status: 'delivered',
+        }],
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${method} ${path}`);
+  }) as typeof global.fetch;
+
+  try {
+    const result = await sendBookingRescheduleWhatsapp({
+      bookingId: 'booking-reschedule-link',
+      patientName: '梁 仲威',
+      phone: '96563420',
+      email: 'edenethel333@gmail.com',
+      doctorNameZh: '梁仲威醫師',
+      clinicNameZh: '荃灣',
+      oldDate: '2026-04-09',
+      oldTime: '17:00',
+      newDate: '2026-04-12',
+      newTime: '13:15',
+      clinicWhatsappPhone: '+85267333801',
+      manageAccessToken: 'res-abc123',
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(sentMessagePayloads.length, 1);
+    assert.equal(sentMessagePayloads[0]?.template_params?.name, 'appointment_rescheduled');
+    assert.equal(
+      sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter,
+      '/manage-booking?token=res-abc123',
+    );
   } finally {
     global.fetch = originalFetch;
 

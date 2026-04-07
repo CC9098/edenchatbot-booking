@@ -69,12 +69,16 @@ export function getClinicWhatsappPhone(clinicId: string): string | null {
   return normalizedDigits ? `+${normalizedDigits}` : null;
 }
 
+function buildPatientManageBookingUrl(manageAccessToken?: string): string {
+  return manageAccessToken
+    ? buildManageBookingUrl({ token: manageAccessToken })
+    : buildManageBookingUrl();
+}
+
 export function buildWhatsappConfirmationText(
   input: BookingWhatsappConfirmationInput & { manageAccessToken?: string },
 ): string {
-  const manageUrl = input.manageAccessToken
-    ? buildManageBookingUrl({ token: input.manageAccessToken })
-    : buildManageBookingUrl();
+  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
 
   return [
     '醫天圓中醫診所預約確認',
@@ -95,9 +99,7 @@ export function buildWhatsappConfirmationText(
 export function buildWhatsappTemplateBodyParams(
   input: BookingWhatsappConfirmationInput & { manageAccessToken?: string },
 ): Record<string, string> {
-  const manageUrl = input.manageAccessToken
-    ? buildManageBookingUrl({ token: input.manageAccessToken })
-    : buildManageBookingUrl();
+  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
 
   return {
     patient_name: input.patientName,
@@ -113,9 +115,7 @@ export function buildWhatsappTemplateBodyParams(
 export function buildWhatsappReminderText(
   input: BookingWhatsappReminderInput & { manageAccessToken?: string },
 ): string {
-  const manageUrl = input.manageAccessToken
-    ? buildManageBookingUrl({ token: input.manageAccessToken })
-    : buildManageBookingUrl();
+  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
 
   return [
     '醫天圓中醫診所預約提醒',
@@ -137,9 +137,7 @@ export function buildWhatsappReminderText(
 export function buildWhatsappReminderTemplateBodyParams(
   input: BookingWhatsappReminderInput & { manageAccessToken?: string },
 ): Record<string, string> {
-  const manageUrl = input.manageAccessToken
-    ? buildManageBookingUrl({ token: input.manageAccessToken })
-    : buildManageBookingUrl();
+  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
 
   return {
     patient_name: input.patientName,
@@ -163,6 +161,7 @@ export interface BookingWhatsappCancellationInput {
   clinicNameZh: string;
   appointmentDate: string;
   appointmentTime: string;
+  manageAccessToken?: string;
 }
 
 export function buildWhatsappCancellationText(
@@ -180,7 +179,7 @@ export function buildWhatsappCancellationText(
     `預約編號：${input.bookingId}`,
     '',
     '如需重新預約，歡迎隨時使用以下連結：',
-    buildManageBookingUrl(),
+    buildPatientManageBookingUrl(input.manageAccessToken),
   ].join('\n');
 }
 
@@ -193,7 +192,7 @@ export function buildWhatsappCancellationTemplateBodyParams(
     clinic_name: input.clinicNameZh,
     appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
     booking_id: input.bookingId,
-    manage_url: buildManageBookingUrl(),
+    manage_url: buildPatientManageBookingUrl(input.manageAccessToken),
   };
 }
 
@@ -206,6 +205,7 @@ export interface BookingWhatsappRescheduleInput {
   oldTime: string;
   newDate: string;
   newTime: string;
+  manageAccessToken?: string;
 }
 
 export function buildWhatsappRescheduleText(
@@ -222,7 +222,7 @@ export function buildWhatsappRescheduleText(
     `新時間：${formatDateForWhatsapp(input.newDate)} ${input.newTime}`,
     `預約編號：${input.bookingId}`,
     '',
-    `管理預約：${buildManageBookingUrl()}`,
+    `管理預約：${buildPatientManageBookingUrl(input.manageAccessToken)}`,
   ].join('\n');
 }
 
@@ -236,6 +236,6 @@ export function buildWhatsappRescheduleTemplateBodyParams(
     old_datetime: `${formatDateForWhatsapp(input.oldDate)} ${input.oldTime}`,
     new_datetime: `${formatDateForWhatsapp(input.newDate)} ${input.newTime}`,
     booking_id: input.bookingId,
-    manage_url: buildManageBookingUrl(),
+    manage_url: buildPatientManageBookingUrl(input.manageAccessToken),
   };
 }

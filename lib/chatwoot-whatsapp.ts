@@ -1208,6 +1208,7 @@ export async function sendBookingCancellationWhatsapp(
     phone: string;
     email: string;
     clinicWhatsappPhone?: string | null;
+    manageAccessToken?: string;
   },
 ): Promise<SendWhatsappBookingConfirmationResult> {
   try {
@@ -1231,6 +1232,7 @@ export async function sendBookingRescheduleWhatsapp(
     phone: string;
     email: string;
     clinicWhatsappPhone?: string | null;
+    manageAccessToken?: string;
   },
 ): Promise<SendWhatsappBookingConfirmationResult> {
   try {
