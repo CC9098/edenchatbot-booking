@@ -83,6 +83,36 @@ Artifacts:
 
 - `output/playwright/ectcm-pos-login/.playwright-cli/page-2026-04-07T09-35-18-602Z.png`
 
+## 2026-04-07: Reusable bootstrap automation
+
+- Goal: Turn the validated login and navigation steps into a reusable script.
+- Result: Added `scripts/login-and-open-register-list.sh`.
+- Expected environment:
+  - `ECTCM_POS_USERNAME`
+  - `ECTCM_POS_PASSWORD`
+  - optional `ECTCM_POS_LOGIN_URL`
+  - optional `ECTCM_POS_CLINIC_MATCH`
+  - optional `ECTCM_POS_SESSION`
+- Script behavior:
+  - open or reuse a Playwright session
+  - log into ECTCM
+  - choose the clinic by partial text match
+  - wait for `/MCMSIndex`
+  - attempt to dismiss common popups
+  - open `診所顧客列表`
+  - verify `掛號列表` and `快速掛號` are visible in `ContentIframe`
+
+### Verification run
+
+- Date: 2026-04-07
+- Session used: `ectcm-pos-bootstrap-4`
+- Outcome: success
+- Final page title observed during run: `顧客管理 > 掛號列表`
+- Notes:
+  - the script reached the registration list without entering patient data
+  - unread-message and system-message popups can still remain visible afterward
+  - later mutation steps should still re-check popup state before clicking final action buttons
+
 ## Open Questions
 
 - What exact screen appears after a successful customer search plus `快速掛號`

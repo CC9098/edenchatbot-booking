@@ -30,8 +30,15 @@ export ECTCM_POS_SESSION='ectcm-pos'
 ./.codex/skills/ectcm-pos-automation/scripts/pos_pwcli.sh snapshot
 ```
 
-3. Keep artifacts in `output/playwright/<label>/`.
-4. Read [references/validated-flow.md](./references/validated-flow.md) before changing the automation path.
+3. Use [scripts/login-and-open-register-list.sh](./scripts/login-and-open-register-list.sh) to replay the validated bootstrap flow.
+
+```bash
+./.codex/skills/ectcm-pos-automation/scripts/login-and-open-register-list.sh
+./.codex/skills/ectcm-pos-automation/scripts/pos_pwcli.sh snapshot
+```
+
+4. Keep artifacts in `output/playwright/<label>/`.
+5. Read [references/validated-flow.md](./references/validated-flow.md) before changing the automation path.
 
 ## Workflow
 
@@ -50,6 +57,8 @@ Use the login page text labels instead of brittle coordinates.
 - Match the clinic by partial text. Do not hardcode the trailing queue count, because it changes.
 
 If the page remains on `/Login`, inspect network and body text before retrying. The login request currently posts to `/Login/ValidateLogin`.
+
+For the already-verified bootstrap path, prefer [scripts/login-and-open-register-list.sh](./scripts/login-and-open-register-list.sh) instead of retyping the full sequence.
 
 ### 3. Stabilize the landing page
 
@@ -102,4 +111,5 @@ Keep the record concise and factual. Do not paste secrets into the reference.
 ## Resources
 
 - Session wrapper: [scripts/pos_pwcli.sh](./scripts/pos_pwcli.sh)
+- Bootstrap flow: [scripts/login-and-open-register-list.sh](./scripts/login-and-open-register-list.sh)
 - Verified findings: [references/validated-flow.md](./references/validated-flow.md)
