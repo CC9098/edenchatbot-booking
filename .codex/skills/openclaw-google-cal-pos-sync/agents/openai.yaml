@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenClaw Google Cal POS Sync"
+  short_description: "Plan daily POS sync from multiple Google Calendars"
+  default_prompt: "Use $openclaw-google-cal-pos-sync to scan today's Google Calendar bookings, infer patient identity fields, and prepare a safe POS sync plan."
