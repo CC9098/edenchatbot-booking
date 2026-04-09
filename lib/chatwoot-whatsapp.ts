@@ -771,6 +771,12 @@ function buildTemplateProcessedParamCandidates(
         });
       }
     }
+
+    // Support confirmation templates that removed the dynamic URL button and
+    // now only accept the body placeholders that remain in Meta.
+    for (const bodyCandidate of bodyCandidates) {
+      pushCandidate(bodyCandidate ? { body: bodyCandidate } : {});
+    }
   }
 
   const verificationCode = normalizedBody.verification_code?.trim();
