@@ -68,6 +68,7 @@ const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const MAX_RESCHEDULE_WINDOW_DAYS = 90;
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const;
 const UNAVAILABLE_DOT_CLASS_NAME = 'bg-slate-300';
+const SUPPORT_CLINIC_IDS: ClinicId[] = ['jordan', 'tsuenwan', 'central'];
 const DEFAULT_CLINIC_AVAILABILITY_STYLE = {
   dotClassName: 'bg-primary',
   badgeClassName: 'border-primary/15 bg-primary-light text-primary',
@@ -116,6 +117,67 @@ type AvailabilityRequestResult = {
 function getActionLabel(action: ManageAction | null) {
   if (!action) return '管理預約';
   return action === 'reschedule' ? '更改預約' : '取消預約';
+}
+
+function digitsOnly(value: string) {
+  return value.replace(/\D/g, '');
+}
+
+function getWhatsappPhoneDigits(clinicId: ClinicId) {
+  const whatsappUrl = CLINIC_BY_ID[clinicId]?.whatsappUrl;
+  return whatsappUrl ? digitsOnly(whatsappUrl) : '';
+}
+
+function buildSupportWhatsappMessage({
+  action,
+  booking,
+  clinicId,
+}: {
+  action: ManageAction | null;
+  booking?: VerifiedBooking | null;
+  clinicId: ClinicId;
+}) {
+  const clinicName = CLINIC_BY_ID[clinicId]?.nameZh || '診所';
+  const lines = [`你好，我想聯絡${clinicName}診所姑娘協助處理預約。`];
+
+  lines.push(`需要協助項目：${getActionLabel(action)}`);
+
+  if (booking) {
+    lines.push(`病人姓名：${booking.patientName}`);
+    lines.push(`預約編號：${booking.bookingId}`);
+    lines.push(`醫師：${booking.doctorNameZh}`);
+    lines.push(`原預約診所：${booking.clinicNameZh}`);
+    lines.push(
+      `原預約時間：${formatBookingDateTime(booking.appointmentDate, booking.appointmentTime)}`,
+    );
+  }
+
+  lines.push('麻煩姑娘跟進，謝謝。');
+  return lines.join('\n');
+}
+
+function buildSupportWhatsappHref({
+  action,
+  booking,
+  clinicId,
+}: {
+  action: ManageAction | null;
+  booking?: VerifiedBooking | null;
+  clinicId: ClinicId;
+}) {
+  const phoneDigits = getWhatsappPhoneDigits(clinicId);
+  if (!phoneDigits) {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    phone: phoneDigits,
+    text: buildSupportWhatsappMessage({ action, booking, clinicId }),
+    type: 'phone_number',
+    app_absent: '0',
+  });
+
+  return `https://api.whatsapp.com/send/?${params.toString()}`;
 }
 
 function toIsoDateInHongKong(date: Date): string {
@@ -371,6 +433,40 @@ function BookingSummaryCard({
         {booking.message}
       </p>
     </button>
+  );
+}
+
+function SupportClinicButtons({
+  action,
+  booking,
+}: {
+  action: ManageAction | null;
+  booking?: VerifiedBooking | null;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      {SUPPORT_CLINIC_IDS.map((clinicId) => {
+        const clinic = CLINIC_BY_ID[clinicId];
+        const href = buildSupportWhatsappHref({ action, booking, clinicId });
+        if (!clinic || !href) {
+          return null;
+        }
+
+        const style = CLINIC_AVAILABILITY_STYLES[clinicId];
+
+        return (
+          <a
+            key={clinicId}
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className={`inline-flex min-h-11 items-center justify-center rounded-[18px] border px-4 py-3 text-sm font-semibold transition hover:brightness-[0.98] ${style.selectedButtonClassName}`}
+          >
+            WhatsApp {clinic.nameZh}
+          </a>
+        );
+      })}
+    </div>
   );
 }
 
@@ -906,16 +1002,7 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
                   <div className="space-y-3">
                     <h3 className="text-lg font-semibold text-amber-900">此預約需由姑娘協助</h3>
                     <p className="text-sm leading-relaxed text-amber-800">{selectedBooking.message}</p>
-                    {selectedBooking.clinicWhatsappUrl ? (
-                      <a
-                        href={selectedBooking.clinicWhatsappUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex min-h-11 w-full items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover sm:w-auto"
-                      >
-                        WhatsApp 聯絡姑娘
-                      </a>
-                    ) : null}
+                    <SupportClinicButtons action={action} booking={selectedBooking} />
                   </div>
                 </div>
               </div>
@@ -1240,16 +1327,9 @@ export function ManageBookingFlow({ action, manageAccessToken }: ManageBookingFl
                   <div className="space-y-3">
                     <h3 className="text-lg font-semibold text-slate-900">需要人工協助？</h3>
                     <p className="text-sm leading-relaxed text-slate-600">
-                      如果目前未能自助處理，你可以直接 WhatsApp 聯絡姑娘跟進。
+                      如果目前未能自助處理，你可以直接選擇診所 WhatsApp 聯絡姑娘跟進。
                     </p>
-                    <a
-                      href={supportWhatsappUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex min-h-11 w-full items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover sm:w-auto"
-                    >
-                      WhatsApp 聯絡姑娘
-                    </a>
+                    <SupportClinicButtons action={action} booking={selectedBooking} />
                   </div>
                 </div>
               </div>
