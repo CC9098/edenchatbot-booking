@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ALL_BOOKING_TREATMENT_OPTION_IDS } from '@/shared/booking-treatment-options';
 
 // Zod Schemas for validation
 export const availabilitySchema = z.object({
@@ -21,6 +22,7 @@ export const bookingSchema = z.object({
                 patientName: z.string().min(2),
                 phone: z.string().min(8),
                 email: z.string().email(),
+                treatmentOptions: z.array(z.enum(ALL_BOOKING_TREATMENT_OPTION_IDS)).optional(),
                 notes: z.string().optional(),
 });
 
@@ -56,5 +58,6 @@ export type ChatbotBookingState = {
                 patientName?: string;
                 phone?: string;
                 email?: string;
+                treatmentOptions?: string[];
                 notes?: string;
 };

@@ -27,6 +27,11 @@ import {
   type BookingPickupType,
 } from '@/shared/booking-pickup';
 import type { BookableDoctorSchedule } from '@/shared/bookable-schedule-data';
+import {
+  formatBookingTreatmentOptionLabel,
+  type BookingTreatmentOption,
+  type BookingTreatmentOptionId,
+} from '@/shared/booking-treatment-options';
 import { type ClinicId, type DoctorId } from '@/shared/clinic-data';
 import type { TimeRange, WeeklySchedule } from '@/shared/schedule-config';
 
@@ -231,6 +236,12 @@ function formatShortDate(dateIso: string): string {
     month: 'numeric',
     day: 'numeric',
   }).format(date);
+}
+
+function formatSelectedTreatments(
+  treatmentOptions: Pick<BookingTreatmentOption, 'labelZh' | 'labelEn'>[]
+): string {
+  return treatmentOptions.map((option) => formatBookingTreatmentOptionLabel(option)).join('、');
 }
 
 async function requestAvailabilityForDoctor(
@@ -469,6 +480,7 @@ export function BookingTabFlow({
   const [visitType, setVisitType] = useState<VisitType>(initialSelection?.visitType ?? 'first');
   const [doctorId, setDoctorId] = useState<DoctorId | ''>(initialSelection?.doctorId ?? '');
   const [clinicId, setClinicId] = useState<ClinicId | ''>(initialSelection?.clinicId ?? '');
+  const [selectedTreatmentOptions, setSelectedTreatmentOptions] = useState<BookingTreatmentOptionId[]>([]);
 
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
@@ -511,6 +523,26 @@ export function BookingTabFlow({
     () => doctorOptions.find((doctor) => doctor.doctorId === doctorId),
     [doctorId, doctorOptions]
   );
+  const availableTreatmentOptions = selectedDoctor?.bookingTreatmentOptions ?? [];
+  const selectedTreatmentDetails = useMemo(() => {
+    if (!selectedDoctor) return [];
+
+    const treatmentOptionById = new Map(
+      selectedDoctor.bookingTreatmentOptions.map((option) => [option.id, option] as const)
+    );
+
+    return selectedTreatmentOptions
+      .map((optionId) => treatmentOptionById.get(optionId))
+      .filter((option): option is BookingTreatmentOption => Boolean(option));
+  }, [selectedDoctor, selectedTreatmentOptions]);
+  const selectedTreatmentSummary = selectedTreatmentDetails.length > 0
+    ? formatSelectedTreatments(selectedTreatmentDetails)
+    : '';
+  const treatmentSummaryDetail = selectedTreatmentSummary
+    ? `已選治療項目：${selectedTreatmentSummary}`
+    : selectedDoctor
+      ? '治療項目：未指定（可留待到診時再確認）'
+      : null;
 
   const selectedClinic = useMemo(
     () => clinicOptions.find((clinic) => clinic.clinicId === clinicId),
@@ -851,6 +883,22 @@ export function BookingTabFlow({
     previousClinicIdRef.current = clinicId;
   }, [clinicId]);
 
+  useEffect(() => {
+    if (!selectedDoctor) {
+      setSelectedTreatmentOptions((prev) => (prev.length > 0 ? [] : prev));
+      return;
+    }
+
+    const availableOptionIds = new Set(
+      selectedDoctor.bookingTreatmentOptions.map((option) => option.id)
+    );
+
+    setSelectedTreatmentOptions((prev) => {
+      const next = prev.filter((optionId) => availableOptionIds.has(optionId));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [selectedDoctor]);
+
   function clearSelectedTimeslot(keepDate = false) {
     if (!keepDate) {
       setSelectedDate('');
@@ -998,6 +1046,14 @@ export function BookingTabFlow({
     }
   }
 
+  function toggleTreatmentOption(optionId: BookingTreatmentOptionId) {
+    setSelectedTreatmentOptions((prev) => (
+      prev.includes(optionId)
+        ? prev.filter((value) => value !== optionId)
+        : [...prev, optionId]
+    ));
+  }
+
   function validateForm(values: BookingFormValues): BookingFormErrors {
     const nextErrors: BookingFormErrors = {};
 
@@ -1064,8 +1120,12 @@ export function BookingTabFlow({
   }
 
   function buildBookingNotes(values: BookingFormValues): string {
+    const selectedTreatmentLine = selectedTreatmentDetails.length > 0
+      ? `治療項目: ${formatSelectedTreatments(selectedTreatmentDetails)}`
+      : null;
     const notes = visitType === 'first'
       ? [
+          selectedTreatmentLine,
           '[首診]',
           `身份證號碼: ${values.idCard.trim() || '未提供'}`,
           `出生日期: ${values.dateOfBirth.trim() || '未提供'}`,
@@ -1075,11 +1135,12 @@ export function BookingTabFlow({
           `主要症狀: ${values.symptoms.trim() || '未提供'}`,
           `得知來源: ${REFERRAL_SOURCE_LABELS[values.referralSource.trim()] || '未提供'}`,
           `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
-        ]
+        ].filter((value): value is string => Boolean(value))
       : [
+          selectedTreatmentLine,
           '[覆診]',
           `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
-        ];
+        ].filter((value): value is string => Boolean(value));
 
     if (isOnlineConsultation && values.medicationPickup) {
       notes.push(`取藥方法: ${BOOKING_PICKUP_LABELS[values.medicationPickup]}`);
@@ -1135,6 +1196,7 @@ export function BookingTabFlow({
       patientName: `${formValues.lastName.trim()} ${formValues.firstName.trim()}`.trim(),
       phone: normalizePhoneForStorage(formValues.phone),
       email: formValues.email.trim().toLowerCase(),
+      treatmentOptions: selectedTreatmentOptions,
       notes: buildBookingNotes(formValues),
     };
     const medicationPickup = isOnlineConsultation
@@ -1267,7 +1329,7 @@ export function BookingTabFlow({
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
-                        治療項目：{selectedDoctor.bookingTreatmentLabel}
+                        可選治療項目：{selectedDoctor.bookingTreatmentLabel}
                       </span>
                       <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
                         {getSlotDurationLabel(selectedDoctor.bookingSlotMinutes)}
@@ -1410,6 +1472,47 @@ export function BookingTabFlow({
             </div>
           </div>
 
+          {selectedDoctor ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-slate-700">治療項目</p>
+                <span className="text-xs font-medium text-slate-500">可留空，可多選</span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {availableTreatmentOptions.map((option) => {
+                  const isChecked = selectedTreatmentOptions.includes(option.id);
+
+                  return (
+                    <label
+                      key={option.id}
+                      className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 transition ${
+                        isChecked
+                          ? 'border-primary bg-primary-light/70 text-primary'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-primary/40'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleTreatmentOption(option.id)}
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-semibold">{option.labelZh}</span>
+                        <span className="mt-1 block text-xs text-slate-500">{option.labelEn}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <p className="text-xs leading-relaxed text-slate-500">
+                如未確定做哪一項，可先留空，稍後由醫師到診時再確認。
+              </p>
+            </div>
+          ) : null}
+
           <button
             type="button"
             onClick={() => setStep('timeslot')}
@@ -1436,7 +1539,7 @@ export function BookingTabFlow({
             clinicNameZh={selectedClinic?.clinicNameZh || '比較全部診所'}
             eyebrow="已選醫師"
             details={compactDetails([
-              selectedDoctor ? `治療項目：${selectedDoctor.bookingTreatmentLabel}` : null,
+              treatmentSummaryDetail || (selectedDoctor ? `可選治療項目：${selectedDoctor.bookingTreatmentLabel}` : null),
               `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`,
               selectedClinic
                 ? '日曆只顯示所選診所燈號。'
@@ -1700,7 +1803,7 @@ export function BookingTabFlow({
             eyebrow="預約摘要"
             details={compactDetails([
               `${formatDateForDisplay(selectedDate)} ${selectedTime}`,
-              selectedDoctor ? `治療項目：${selectedDoctor.bookingTreatmentLabel}` : null,
+              treatmentSummaryDetail || (selectedDoctor ? `可選治療項目：${selectedDoctor.bookingTreatmentLabel}` : null),
               `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`,
             ])}
           />

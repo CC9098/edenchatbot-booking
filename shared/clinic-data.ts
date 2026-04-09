@@ -1,4 +1,10 @@
 import { buildBookingUrl } from '@/lib/public-url';
+import {
+  formatBookingTreatmentLabelFromIds,
+  getBookingTreatmentOptionsByIds,
+  type BookingTreatmentOption,
+  type BookingTreatmentOptionId,
+} from '@/shared/booking-treatment-options';
 
 export const DOCTOR_IDS = ['chan', 'lee', 'hon', 'chau', 'cheung', 'leung'] as const;
 export type DoctorId = (typeof DOCTOR_IDS)[number];
@@ -26,7 +32,7 @@ export type DoctorProfile = {
   bookingUrl?: string;
   bookingNote?: string;
   scheduleNote?: string;
-  bookingTreatmentLabel?: string;
+  bookingTreatmentOptions?: readonly BookingTreatmentOptionId[];
   bookingSlotMinutes?: number;
 };
 
@@ -48,7 +54,10 @@ function formatMarkdownLink(label: string, href: string): string {
   return `[${label}](${href})`;
 }
 
-const DEFAULT_DOCTOR_BOOKING_TREATMENT_LABEL = '針灸/治療手法 Acupuncture / Manual therapy';
+const DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS: readonly BookingTreatmentOptionId[] = [
+  'acupuncture',
+  'manual_therapy',
+];
 const DEFAULT_DOCTOR_BOOKING_SLOT_MINUTES = 15;
 
 export const CLINICS: ClinicProfile[] = [
@@ -107,7 +116,7 @@ export const DOCTORS: DoctorProfile[] = [
     nameZh: '陳家富醫師',
     nameEn: 'Dr. Chan',
     bookingUrl: buildBookingUrl({ doctorId: 'chan' }),
-    bookingTreatmentLabel: DEFAULT_DOCTOR_BOOKING_TREATMENT_LABEL,
+    bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
   },
   {
     id: 'lee',
@@ -116,7 +125,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: '/doctor-avatars/lee.jpg',
     avatarObjectPosition: '84% center',
     bookingUrl: buildBookingUrl({ doctorId: 'lee' }),
-    bookingTreatmentLabel: '針灸 Acupuncture',
+    bookingTreatmentOptions: ['acupuncture'],
   },
   {
     id: 'hon',
@@ -125,7 +134,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: '/doctor-avatars/hon.jpg',
     avatarObjectPosition: '38% center',
     bookingUrl: buildBookingUrl({ doctorId: 'hon' }),
-    bookingTreatmentLabel: DEFAULT_DOCTOR_BOOKING_TREATMENT_LABEL,
+    bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
     bookingSlotMinutes: 30,
     scheduleNote:
       '2026年3月1日至2026年3月9日如欲預約，請致電或 WhatsApp 聯絡診所；2026年3月10日至2026年4月30日韓醫師進修休診，會由張天慧醫師及梁仲威醫師駐診。',
@@ -137,7 +146,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: '/doctor-avatars/chau.jpg',
     avatarObjectPosition: '82% center',
     bookingUrl: buildBookingUrl({ doctorId: 'chau' }),
-    bookingTreatmentLabel: DEFAULT_DOCTOR_BOOKING_TREATMENT_LABEL,
+    bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
     bookingSlotMinutes: 30,
   },
   {
@@ -147,7 +156,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: '/doctor-avatars/cheung.jpg',
     avatarObjectPosition: '80% center',
     bookingUrl: buildBookingUrl({ doctorId: 'cheung' }),
-    bookingTreatmentLabel: DEFAULT_DOCTOR_BOOKING_TREATMENT_LABEL,
+    bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
   },
   {
     id: 'leung',
@@ -156,7 +165,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: '/doctor-avatars/leung.jpg',
     avatarObjectPosition: '88% center',
     bookingUrl: buildBookingUrl({ doctorId: 'leung' }),
-    bookingTreatmentLabel: DEFAULT_DOCTOR_BOOKING_TREATMENT_LABEL,
+    bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
   },
 ];
 
@@ -189,11 +198,30 @@ export function isClinicId(value: string): value is ClinicId {
 }
 
 export function getDoctorBookingTreatmentLabel(doctorId: string): string {
+  return formatBookingTreatmentLabelFromIds(
+    getDoctorBookingTreatmentOptionIds(doctorId)
+  );
+}
+
+export function getDoctorBookingTreatmentOptionIds(
+  doctorId: string
+): readonly BookingTreatmentOptionId[] {
   if (!isDoctorId(doctorId)) {
-    return DEFAULT_DOCTOR_BOOKING_TREATMENT_LABEL;
+    return DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS;
   }
 
-  return DOCTOR_BY_ID[doctorId].bookingTreatmentLabel || DEFAULT_DOCTOR_BOOKING_TREATMENT_LABEL;
+  return (
+    DOCTOR_BY_ID[doctorId].bookingTreatmentOptions ||
+    DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS
+  );
+}
+
+export function getDoctorBookingTreatmentOptions(
+  doctorId: string
+): BookingTreatmentOption[] {
+  return getBookingTreatmentOptionsByIds(
+    getDoctorBookingTreatmentOptionIds(doctorId)
+  );
 }
 
 export function getDoctorBookingSlotMinutes(doctorId: string): number {

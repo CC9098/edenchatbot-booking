@@ -7,6 +7,7 @@ import {
   PHYSICAL_CLINIC_IDS,
   getDoctorBookingSlotMinutes,
   getDoctorBookingTreatmentLabel,
+  getDoctorBookingTreatmentOptions,
 } from '@/shared/clinic-data';
 import type {
   BookableClinicSchedule,
@@ -87,6 +88,7 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
         avatarObjectPosition: doctor.avatarObjectPosition,
         scheduleNote: doctor.scheduleNote,
         bookingTreatmentLabel: getDoctorBookingTreatmentLabel(doctor.id),
+        bookingTreatmentOptions: getDoctorBookingTreatmentOptions(doctor.id),
         bookingSlotMinutes: getDoctorBookingSlotMinutes(doctor.id),
         summary: '',
         clinics: [clinicSchedule],

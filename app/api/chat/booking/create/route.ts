@@ -18,6 +18,7 @@ import { getSafeErrorMessage } from "@/lib/error-sanitizer";
 import { syncPatientProfileContact } from "@/lib/profile-contact-sync";
 import { resolveOnlineSourceMappingForSlot } from "@/lib/virtual-online-booking";
 import { getDoctorBookingSlotMinutes } from "@/shared/clinic-data";
+import { ALL_BOOKING_TREATMENT_OPTION_IDS } from "@/shared/booking-treatment-options";
 
 // ── Whitelist schema ────────────────────────────────────────────────
 const bridgeBookingSchema = z
@@ -34,6 +35,7 @@ const bridgeBookingSchema = z
     patientName: z.string().min(2),
     phone: z.string().min(8),
     email: z.string().email(),
+    treatmentOptions: z.array(z.enum(ALL_BOOKING_TREATMENT_OPTION_IDS)).optional(),
     notes: z.string().optional(),
   })
   .strict();
