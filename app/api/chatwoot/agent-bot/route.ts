@@ -12,7 +12,6 @@ import {
   CHATWOOT_MAIN_MENU_ITEMS,
   CHATWOOT_MAIN_MENU_PROMPT,
   CHATWOOT_TIMETABLE_MESSAGE,
-  buildChatwootBookingDoctorReply,
   type ChatwootOutgoingMessagePayload,
   createChatwootClientFromEnv,
   extractIncomingChatwootEvent,
@@ -24,6 +23,7 @@ import {
   resolveClinicMenuSelection,
   resolveGeneralMenuSelection,
   resolveMenuSelection,
+  sendChatwootBookingDoctorReply,
   verifyChatwootSignature,
 } from '@/lib/chatwoot-agent-bot';
 import { generateLegacyChatResponse } from '@/lib/legacy-chat-response';
@@ -110,12 +110,14 @@ export async function POST(request: NextRequest) {
       reply = CHATWOOT_HUMAN_ACK;
     } else if (rootSelection?.kind === 'booking') {
       nextState = 'menu';
-      reply = await buildChatwootBookingDoctorReply({
+      await sendChatwootBookingDoctorReply({
         client,
         accountId: event.accountId,
+        conversationId: event.conversationId,
         contactId: event.contactId,
         contactPhone: event.contactPhone,
       });
+      reply = null;
     } else if (rootSelection?.kind === 'general') {
       nextState = 'general_menu';
       reply = GENERAL_MENU_REPLY;

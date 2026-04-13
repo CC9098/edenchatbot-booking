@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { LegacyChatMessage } from '@/lib/legacy-chat-response';
 import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import { buildManageBookingUrl, buildPublicUrl } from '@/lib/public-url';
-import { createManageAccessToken } from '@/lib/widget-booking-management';
+import { createManageAccessToken } from '@/lib/widget-manage-token';
 import { DEFAULT_WIDGET_CHATBOT_SETTINGS } from '@/lib/widget-chatbot-settings';
 import {
   getClinicAddressLines,
@@ -90,6 +90,7 @@ interface ChatwootMessage {
   message_type?: number | string | null;
   private?: boolean;
   sender_type?: string | null;
+  status?: string | null;
 }
 
 interface ChatwootConversationDetails {
@@ -113,15 +114,39 @@ export interface ChatwootSelectItem {
   value: string;
 }
 
+interface ChatwootTemplateProcessedParams {
+  body?: Record<string, string>;
+  buttons?: Array<{
+    type: 'url' | 'copy_code';
+    parameter: string;
+  }>;
+}
+
+interface ChatwootTemplateConfig {
+  name: string;
+  category: string;
+  language: string;
+}
+
 export interface ChatwootOutgoingMessagePayload {
   content: string;
   contentType?: 'text' | 'input_select';
   items?: ChatwootSelectItem[];
+  templateParams?: {
+    name: string;
+    category: string;
+    language: string;
+    processed_params: ChatwootTemplateProcessedParams;
+  };
 }
 
 type MenuSelectionKind = 'general' | 'booking' | 'human';
 type GeneralSelectionKind = 'fees' | 'clinic' | 'timetable' | 'other' | 'main';
 type ClinicSelectionKind = 'hours' | 'addresses' | 'main';
+
+const CHATWOOT_DELIVERY_TERMINAL_STATUSES = new Set(['failed', 'delivered', 'read']);
+const CHATWOOT_DELIVERY_POLL_ATTEMPTS = 4;
+const CHATWOOT_DELIVERY_POLL_INTERVAL_MS = 1000;
 
 export class ChatwootClient {
   constructor(
@@ -189,14 +214,29 @@ export class ChatwootClient {
                 },
               }
             : {}),
+          ...(payload.templateParams ? { template_params: payload.templateParams } : {}),
         };
 
-    return this.request(
+    return this.request<ChatwootMessage>(
       `/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`,
       {
         method: 'POST',
         body: JSON.stringify(messagePayload),
       },
+    );
+  }
+
+  listMessages(accountId: number, conversationId: number) {
+    return this.request<{ payload?: ChatwootMessage[] }>(
+      `/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`,
+      { method: 'GET' },
+    );
+  }
+
+  deleteMessage(accountId: number, conversationId: number, messageId: number) {
+    return this.request<void>(
+      `/api/v1/accounts/${accountId}/conversations/${conversationId}/messages/${messageId}`,
+      { method: 'DELETE' },
     );
   }
 
@@ -408,6 +448,227 @@ export function mergeFlowAttributes(
   };
 }
 
+function buildDirectManageBookingReply(manageUrl: string): string {
+  return [
+    '收到，你可以直接打開以下專屬預約管理連結：',
+    '',
+    `管理預約：${manageUrl}`,
+    '',
+    '進入後可以查看、更改或取消預約。',
+    '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
+  ].join('\n');
+}
+
+function buildGenericBookingReply(): string {
+  const genericBookingUrl = buildPublicUrl('/booking-whatsapp');
+  const manageRescheduleUrl = buildManageBookingUrl({ action: 'reschedule' });
+  const manageCancelUrl = buildManageBookingUrl({ action: 'cancel' });
+
+  return [
+    '收到，以下係預約管理入口：',
+    '',
+    `新預約：${genericBookingUrl}`,
+    `更改預約：${manageRescheduleUrl}`,
+    `取消預約：${manageCancelUrl}`,
+    '',
+    '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
+  ].join('\n');
+}
+
+function getManageLinkTemplateConfigs(): ChatwootTemplateConfig[] {
+  const configuredName = (
+    process.env.CHATWOOT_WHATSAPP_MANAGE_LINK_TEMPLATE_NAME
+    || process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_NAME
+    || ''
+  ).trim();
+  const configuredLanguage = (
+    process.env.CHATWOOT_WHATSAPP_MANAGE_LINK_TEMPLATE_LANGUAGE
+    || process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_LANGUAGE
+    || 'zh_HK'
+  ).trim();
+  const category = (
+    process.env.CHATWOOT_WHATSAPP_MANAGE_LINK_TEMPLATE_CATEGORY
+    || process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_CATEGORY
+    || 'UTILITY'
+  ).trim();
+  const templateNames = Array.from(new Set([configuredName, 'booking_manage_link'].filter(Boolean)));
+  const languages = Array.from(new Set([configuredLanguage, 'zh_HK', 'en_US', 'en'].filter(Boolean)));
+
+  return templateNames.flatMap((name) =>
+    languages.map((language) => ({
+      name,
+      category,
+      language,
+    })),
+  );
+}
+
+function extractManageButtonParameters(manageUrl: string): string[] {
+  const normalizedUrl = manageUrl.trim();
+  if (!normalizedUrl) return [];
+
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+  const pushCandidate = (value: string | null | undefined) => {
+    const normalizedValue = value?.trim();
+    if (!normalizedValue || seen.has(normalizedValue)) return;
+    seen.add(normalizedValue);
+    candidates.push(normalizedValue);
+  };
+
+  try {
+    const parsedUrl = new URL(normalizedUrl);
+    const token = parsedUrl.searchParams.get('token');
+    const pathWithQuery = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+
+    pushCandidate(pathWithQuery === '/' ? '' : pathWithQuery);
+    pushCandidate(token);
+  } catch {
+    // Preserve the original value below when the URL is not parseable.
+  }
+
+  pushCandidate(normalizedUrl);
+  return candidates;
+}
+
+function buildManageLinkTemplateProcessedParamCandidates(
+  manageUrl: string,
+): ChatwootTemplateProcessedParams[] {
+  const candidates: ChatwootTemplateProcessedParams[] = [];
+  const seen = new Set<string>();
+  const pushCandidate = (candidate: ChatwootTemplateProcessedParams) => {
+    const key = JSON.stringify(candidate);
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push(candidate);
+  };
+
+  for (const manageButtonParameter of extractManageButtonParameters(manageUrl)) {
+    pushCandidate({
+      buttons: [{ type: 'url', parameter: manageButtonParameter }],
+    });
+  }
+
+  pushCandidate({});
+  pushCandidate({
+    body: { manage_url: manageUrl },
+  });
+  pushCandidate({
+    body: { '1': manageUrl },
+  });
+
+  return candidates;
+}
+
+function normalizeMessageStatus(status: string | null | undefined): string | null {
+  const normalized = status?.trim().toLowerCase();
+  return normalized || null;
+}
+
+function buildTemplateFailureDetail(
+  templateConfig: ChatwootTemplateConfig,
+  processedParams: ChatwootTemplateProcessedParams,
+  message: ChatwootMessage | undefined,
+): string {
+  const status = normalizeMessageStatus(message?.status) || 'unknown';
+  return `[Chatwoot] WhatsApp template delivery failed for ${templateConfig.name} (${templateConfig.language}, status=${status}) with params ${JSON.stringify(processedParams)}`;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForMessageDeliveryStatus(
+  client: ChatwootClient,
+  accountId: number,
+  conversationId: number,
+  createdMessage: ChatwootMessage | undefined,
+): Promise<{ status: string | null; message: ChatwootMessage | undefined }> {
+  if (!createdMessage?.id) {
+    return {
+      status: normalizeMessageStatus(createdMessage?.status),
+      message: createdMessage,
+    };
+  }
+
+  let latestMessage: ChatwootMessage | undefined = createdMessage;
+
+  for (let attempt = 0; attempt < CHATWOOT_DELIVERY_POLL_ATTEMPTS; attempt += 1) {
+    const messagesResponse = await client.listMessages(accountId, conversationId).catch(() => null);
+    const matchedMessage = (messagesResponse?.payload || []).find((message) => message.id === createdMessage.id);
+
+    if (matchedMessage) {
+      latestMessage = matchedMessage;
+    }
+
+    const status = normalizeMessageStatus(latestMessage?.status);
+    if (status && CHATWOOT_DELIVERY_TERMINAL_STATUSES.has(status)) {
+      return { status, message: latestMessage };
+    }
+
+    if (attempt < CHATWOOT_DELIVERY_POLL_ATTEMPTS - 1) {
+      await sleep(CHATWOOT_DELIVERY_POLL_INTERVAL_MS);
+    }
+  }
+
+  return {
+    status: normalizeMessageStatus(latestMessage?.status),
+    message: latestMessage,
+  };
+}
+
+async function sendMessageWithTemplateFallback(
+  client: ChatwootClient,
+  accountId: number,
+  conversationId: number,
+  content: string,
+  templateConfigs: ChatwootTemplateConfig[],
+  manageUrl: string,
+) {
+  let lastError: unknown = null;
+  const processedParamCandidates = buildManageLinkTemplateProcessedParamCandidates(manageUrl);
+
+  for (const templateConfig of templateConfigs) {
+    for (const processedParams of processedParamCandidates) {
+      try {
+        const message = await client.createMessage(accountId, conversationId, {
+          content,
+          templateParams: {
+            name: templateConfig.name,
+            category: templateConfig.category,
+            language: templateConfig.language,
+            processed_params: processedParams,
+          },
+        });
+
+        const deliveryStatus = await waitForMessageDeliveryStatus(
+          client,
+          accountId,
+          conversationId,
+          message,
+        );
+
+        if (deliveryStatus.status === 'failed') {
+          if (message.id) {
+            await client.deleteMessage(accountId, conversationId, message.id).catch(() => undefined);
+          }
+
+          lastError = new Error(buildTemplateFailureDetail(templateConfig, processedParams, deliveryStatus.message));
+          continue;
+        }
+
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+}
+
 export async function buildChatwootBookingDoctorReply(options: {
   client: ChatwootClient;
   accountId: number;
@@ -424,29 +685,63 @@ export async function buildChatwootBookingDoctorReply(options: {
       token: createManageAccessToken(phoneDigits),
     });
 
-    return [
-      '收到，你可以直接打開以下專屬預約管理連結：',
-      '',
-      `管理預約：${manageUrl}`,
-      '',
-      '進入後可以查看、更改或取消預約。',
-      '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
-    ].join('\n');
+    return buildDirectManageBookingReply(manageUrl);
   }
 
-  const genericBookingUrl = buildPublicUrl('/booking-whatsapp');
-  const manageRescheduleUrl = buildManageBookingUrl({ action: 'reschedule' });
-  const manageCancelUrl = buildManageBookingUrl({ action: 'cancel' });
+  return buildGenericBookingReply();
+}
 
-  return [
-    '收到，以下係預約管理入口：',
-    '',
-    `新預約：${genericBookingUrl}`,
-    `更改預約：${manageRescheduleUrl}`,
-    `取消預約：${manageCancelUrl}`,
-    '',
-    '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
-  ].join('\n');
+export async function sendChatwootBookingDoctorReply(options: {
+  client: ChatwootClient;
+  accountId: number;
+  conversationId: number;
+  contactId: number | null;
+  contactPhone: string | null;
+}): Promise<void> {
+  const resolvedPhone = await resolveChatwootContactPhone(options.client, options.accountId, {
+    contactId: options.contactId,
+    contactPhone: options.contactPhone,
+  });
+  const phoneDigits = normalizePhoneForSearch(resolvedPhone);
+
+  if (phoneDigits.length < 8) {
+    await options.client.createMessage(
+      options.accountId,
+      options.conversationId,
+      buildGenericBookingReply(),
+    );
+    return;
+  }
+
+  const manageUrl = buildManageBookingUrl({
+    token: createManageAccessToken(phoneDigits),
+  });
+  const fallbackReply = buildDirectManageBookingReply(manageUrl);
+  const templateConfigs = getManageLinkTemplateConfigs();
+
+  if (templateConfigs.length > 0) {
+    try {
+      await sendMessageWithTemplateFallback(
+        options.client,
+        options.accountId,
+        options.conversationId,
+        fallbackReply,
+        templateConfigs,
+        manageUrl,
+      );
+      return;
+    } catch (error) {
+      console.warn(
+        `[chatwoot-agent-bot] Manage-link template send failed, falling back to text: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  await options.client.createMessage(
+    options.accountId,
+    options.conversationId,
+    fallbackReply,
+  );
 }
 
 function resolveSelection<K extends string>(

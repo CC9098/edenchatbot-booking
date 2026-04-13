@@ -30,14 +30,20 @@ import { buildManageBookingUrl } from "@/lib/public-url";
 import { createServiceClient } from "@/lib/supabase";
 import { resolveOnlineSourceMappingForSlot } from "@/lib/virtual-online-booking";
 import { getClinicWhatsappPhone } from "@/lib/whatsapp-booking";
+import {
+  createManageAccessToken,
+  fromBase64Url,
+  signManagePayload,
+  toBase64Url,
+} from "@/lib/widget-manage-token";
 import { CLINIC_BY_ID, isClinicId } from "@/shared/clinic-data";
+
+export { createManageAccessToken };
 
 const HONG_KONG_TIMEZONE = "Asia/Hong_Kong";
 const MANAGE_TOKEN_TTL_MS = 1000 * 60 * 15;
-const MANAGE_ACCESS_TOKEN_TTL_MS = 1000 * 60 * 60 * 72; // 72 hours
 const OTP_MAX_ATTEMPTS = 5;
 const SELF_SERVICE_CUTOFF_MS = 1000 * 60 * 60;
-const STATIC_WIDGET_MANAGE_SECRET = "eden-widget-booking-manage-sign";
 const STATIC_WIDGET_OTP_SECRET = "eden-widget-booking-otp-sign";
 const DEFAULT_OTP_TTL_MINUTES = 10;
 
@@ -82,12 +88,6 @@ type ManageTokenPayload = {
 };
 
 /** Phone-level access token — lets the holder skip OTP and manage all bookings for that phone. */
-type ManageAccessTokenPayload = {
-  type: "access";
-  phoneDigits: string;
-  expiresAtMs: number;
-};
-
 type WidgetBookingSummary = {
   bookingId: string;
   status: BookingStatus;
@@ -187,10 +187,6 @@ const BOOKING_SELECT_FIELDS = [
   "visit_type",
 ].join(", ");
 
-function getWidgetManageSecret() {
-  return process.env.WIDGET_BOOKING_MANAGE_SECRET?.trim() || STATIC_WIDGET_MANAGE_SECRET;
-}
-
 function getWidgetOtpSecret() {
   return process.env.WIDGET_BOOKING_OTP_SECRET?.trim() || STATIC_WIDGET_OTP_SECRET;
 }
@@ -215,20 +211,6 @@ function getTodayInHongKongDate() {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-}
-
-function toBase64Url(value: string) {
-  return Buffer.from(value, "utf8").toString("base64url");
-}
-
-function fromBase64Url(value: string) {
-  return Buffer.from(value, "base64url").toString("utf8");
-}
-
-function signManagePayload(encodedPayload: string) {
-  return createHmac("sha256", getWidgetManageSecret())
-    .update(`widget-booking:${encodedPayload}`)
-    .digest("base64url");
 }
 
 function hashOtpCode(verificationId: string, phoneDigits: string, code: string) {
@@ -286,19 +268,11 @@ function verifyManageToken(token: string) {
 // Phone-level manage access token (for zero-OTP entry from WhatsApp links)
 // ---------------------------------------------------------------------------
 
-export function createManageAccessToken(
-  phoneDigits: string,
-  options?: { ttlMs?: number },
-): string {
-  const payload: ManageAccessTokenPayload = {
-    type: "access",
-    phoneDigits,
-    expiresAtMs: Date.now() + (options?.ttlMs && options.ttlMs > 0 ? options.ttlMs : MANAGE_ACCESS_TOKEN_TTL_MS),
-  };
-  const encodedPayload = toBase64Url(JSON.stringify(payload));
-  const signature = signManagePayload(encodedPayload);
-  return `${encodedPayload}.${signature}`;
-}
+type ManageAccessTokenPayload = {
+  type: "access";
+  phoneDigits: string;
+  expiresAtMs: number;
+};
 
 function verifyManageAccessToken(token: string): {
   success: true;
