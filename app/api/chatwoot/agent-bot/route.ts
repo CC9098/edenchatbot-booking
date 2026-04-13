@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  CHATWOOT_BOOKING_MENU_ITEMS,
+  CHATWOOT_BOOKING_MENU_PROMPT,
   CHATWOOT_CLINIC_ADDRESSES_MESSAGE,
   CHATWOOT_CLINIC_HOURS_MESSAGE,
   CHATWOOT_CLINIC_MENU_ITEMS,
@@ -13,6 +15,7 @@ import {
   CHATWOOT_MAIN_MENU_PROMPT,
   CHATWOOT_TIMETABLE_MESSAGE,
   type ChatwootOutgoingMessagePayload,
+  buildDirectBookingReply,
   createChatwootClientFromEnv,
   extractIncomingChatwootEvent,
   getFlowState,
@@ -20,6 +23,7 @@ import {
   mapConversationMessagesToLegacyChat,
   mergeFlowAttributes,
   replaceLatestUserMessage,
+  resolveBookingMenuSelection,
   resolveClinicMenuSelection,
   resolveGeneralMenuSelection,
   resolveMenuSelection,
@@ -46,6 +50,12 @@ const CLINIC_MENU_REPLY: ChatwootOutgoingMessagePayload = {
   content: CHATWOOT_CLINIC_MENU_PROMPT,
   contentType: 'input_select',
   items: [...CHATWOOT_CLINIC_MENU_ITEMS],
+};
+
+const BOOKING_MENU_REPLY: ChatwootOutgoingMessagePayload = {
+  content: CHATWOOT_BOOKING_MENU_PROMPT,
+  contentType: 'input_select',
+  items: [...CHATWOOT_BOOKING_MENU_ITEMS],
 };
 
 async function generateGeneralAiReply(
@@ -102,13 +112,22 @@ export async function POST(request: NextRequest) {
     const rootSelection = resolveMenuSelection(event.content, {
       allowNumeric: currentState === 'menu',
     });
+    const bookingSelection = currentState === 'booking_menu'
+      ? resolveBookingMenuSelection(event.content)
+      : null;
     let nextState = currentState;
     let reply: string | ChatwootOutgoingMessagePayload | null = null;
 
     if (rootSelection?.kind === 'human') {
       nextState = 'human';
       reply = CHATWOOT_HUMAN_ACK;
-    } else if (rootSelection?.kind === 'booking') {
+    } else if (rootSelection?.kind === 'general') {
+      nextState = 'general_menu';
+      reply = GENERAL_MENU_REPLY;
+    } else if (bookingSelection?.kind === 'new_booking') {
+      nextState = 'menu';
+      reply = buildDirectBookingReply();
+    } else if (bookingSelection?.kind === 'manage_booking') {
       nextState = 'menu';
       await sendChatwootBookingDoctorReply({
         client,
@@ -118,9 +137,22 @@ export async function POST(request: NextRequest) {
         contactPhone: event.contactPhone,
       });
       reply = null;
-    } else if (rootSelection?.kind === 'general') {
-      nextState = 'general_menu';
-      reply = GENERAL_MENU_REPLY;
+    } else if (bookingSelection?.kind === 'main') {
+      nextState = 'menu';
+      reply = MAIN_MENU_REPLY;
+    } else if (rootSelection?.kind === 'manage') {
+      nextState = 'menu';
+      await sendChatwootBookingDoctorReply({
+        client,
+        accountId: event.accountId,
+        conversationId: event.conversationId,
+        contactId: event.contactId,
+        contactPhone: event.contactPhone,
+      });
+      reply = null;
+    } else if (rootSelection?.kind === 'booking') {
+      nextState = 'booking_menu';
+      reply = BOOKING_MENU_REPLY;
     } else if (currentState === 'general_menu') {
       const generalSelection = resolveGeneralMenuSelection(event.content);
 
@@ -162,7 +194,9 @@ export async function POST(request: NextRequest) {
     } else {
       if (nextState === 'general_ai') {
         reply = await generateGeneralAiReply(conversation.messages, event.content);
-      } else if (nextState === 'booking' || nextState === 'human') {
+      } else if (nextState === 'booking_menu') {
+        reply = BOOKING_MENU_REPLY;
+      } else if (nextState === 'human') {
         reply = null;
       } else {
         nextState = 'menu';

@@ -2,7 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  CHATWOOT_MAIN_MENU_ITEMS,
+  CHATWOOT_MAIN_MENU_MESSAGE,
   ChatwootClient,
+  buildDirectBookingReply,
+  getFlowState,
+  resolveBookingMenuSelection,
+  resolveMenuSelection,
   sendChatwootBookingDoctorReply,
 } from '@/lib/chatwoot-agent-bot';
 
@@ -14,6 +20,25 @@ function jsonResponse(body: unknown, status = 200) {
     },
   });
 }
+
+test('resolveBookingMenuSelection recognizes new booking and manage booking actions', () => {
+  assert.equal(resolveBookingMenuSelection('立即預約')?.kind, 'new_booking');
+  assert.equal(resolveBookingMenuSelection('管理預約')?.kind, 'manage_booking');
+  assert.equal(resolveBookingMenuSelection('返回主選單')?.kind, 'main');
+});
+
+test('main menu uses booking service label and routes manage intents separately', () => {
+  assert.equal(CHATWOOT_MAIN_MENU_ITEMS[1]?.title, '預約服務');
+  assert.equal(CHATWOOT_MAIN_MENU_MESSAGE.includes('2. 預約服務'), true);
+  assert.equal(resolveMenuSelection('2', { allowNumeric: true })?.kind, 'booking');
+  assert.equal(resolveMenuSelection('預約管理')?.kind, 'manage');
+});
+
+test('booking menu copy points users to booking page while legacy booking state still resolves', () => {
+  assert.equal(buildDirectBookingReply().includes('/booking-whatsapp'), true);
+  assert.equal(buildDirectBookingReply().includes('管理預約'), true);
+  assert.equal(getFlowState({ eden_flow_state: 'booking' }), 'booking_menu');
+});
 
 test('sendChatwootBookingDoctorReply prefers manage-link templates in the current conversation', async () => {
   const originalFetch = global.fetch;

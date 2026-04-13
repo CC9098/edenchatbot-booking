@@ -13,12 +13,12 @@ import {
 export const CHATWOOT_MAIN_MENU_PROMPT = '你好，我們是醫天圓中醫診所，請問有什麼可以幫到你？';
 export const CHATWOOT_MAIN_MENU_ITEMS = [
   { title: '一般查詢', value: 'general' },
-  { title: '預約管理', value: 'booking' },
+  { title: '預約服務', value: 'booking' },
   { title: '想直接與姑娘對話', value: 'human' },
 ] as const;
 export const CHATWOOT_MAIN_MENU_MESSAGE = `${CHATWOOT_MAIN_MENU_PROMPT}
 1. 一般查詢
-2. 預約管理
+2. 預約服務
 3. 想直接與姑娘對話`;
 
 const widgetSettings = DEFAULT_WIDGET_CHATBOT_SETTINGS;
@@ -57,8 +57,17 @@ export const CHATWOOT_GENERAL_INQUIRY_PROMPT =
 
 export const CHATWOOT_FEES_MESSAGE = widgetSettings.flows.fees.reply;
 
-export const CHATWOOT_BOOKING_ACK =
-  '收到，你想查預約。我先記低，你可以等姑娘跟進。';
+export const CHATWOOT_BOOKING_MENU_PROMPT =
+  '你好，請選擇你想處理的預約項目：';
+export const CHATWOOT_BOOKING_MENU_ITEMS = [
+  { title: '立即預約', value: 'new_booking' },
+  { title: '管理預約', value: 'manage_booking' },
+  { title: '返回主選單', value: 'main' },
+] as const;
+export const CHATWOOT_BOOKING_MENU_MESSAGE = `${CHATWOOT_BOOKING_MENU_PROMPT}
+1. 立即預約
+2. 管理預約
+3. 返回主選單`;
 
 export const CHATWOOT_HUMAN_ACK =
   '好，我幫你轉交姑娘跟進，請稍等。';
@@ -72,7 +81,7 @@ export const CHATWOOT_CLINIC_ADDRESSES_MESSAGE = `${widgetSettings.flows.clinic.
 export const CHATWOOT_FLOW_STATE_ATTRIBUTE = 'eden_flow_state';
 export const CHATWOOT_LAST_INCOMING_MESSAGE_ID_ATTRIBUTE = 'eden_last_incoming_message_id';
 
-export type ChatwootFlowState = 'menu' | 'general_menu' | 'clinic_menu' | 'general_ai' | 'booking' | 'human';
+export type ChatwootFlowState = 'menu' | 'general_menu' | 'clinic_menu' | 'booking_menu' | 'general_ai' | 'human';
 
 export interface ChatwootIncomingEvent {
   accountId: number;
@@ -140,9 +149,10 @@ export interface ChatwootOutgoingMessagePayload {
   };
 }
 
-type MenuSelectionKind = 'general' | 'booking' | 'human';
+type MenuSelectionKind = 'general' | 'booking' | 'manage' | 'human';
 type GeneralSelectionKind = 'fees' | 'clinic' | 'timetable' | 'other' | 'main';
 type ClinicSelectionKind = 'hours' | 'addresses' | 'main';
+type BookingSelectionKind = 'new_booking' | 'manage_booking' | 'main';
 
 const CHATWOOT_DELIVERY_TERMINAL_STATUSES = new Set(['failed', 'delivered', 'read']);
 const CHATWOOT_DELIVERY_POLL_ATTEMPTS = 4;
@@ -416,11 +426,15 @@ export function getFlowState(customAttributes: Record<string, unknown> | null | 
     ? customAttributes[CHATWOOT_FLOW_STATE_ATTRIBUTE]
     : '';
 
+  if (value === 'booking') {
+    return 'booking_menu';
+  }
+
   if (
     value === 'general_menu' ||
     value === 'clinic_menu' ||
+    value === 'booking_menu' ||
     value === 'general_ai' ||
-    value === 'booking' ||
     value === 'human'
   ) {
     return value;
@@ -459,18 +473,28 @@ function buildDirectManageBookingReply(manageUrl: string): string {
   ].join('\n');
 }
 
-function buildGenericBookingReply(): string {
+export function buildDirectBookingReply(): string {
   const genericBookingUrl = buildPublicUrl('/booking-whatsapp');
-  const manageRescheduleUrl = buildManageBookingUrl({ action: 'reschedule' });
-  const manageCancelUrl = buildManageBookingUrl({ action: 'cancel' });
 
   return [
-    '收到，以下係預約管理入口：',
+    '收到，如果你想立即預約，可以直接打開以下連結：',
     '',
-    `新預約：${genericBookingUrl}`,
-    `更改預約：${manageRescheduleUrl}`,
-    `取消預約：${manageCancelUrl}`,
+    `立即預約：${genericBookingUrl}`,
     '',
+    '如果你想查看、更改或取消現有預約，請選擇「管理預約」。',
+    '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
+  ].join('\n');
+}
+
+function buildGenericManageBookingReply(): string {
+  const manageBookingUrl = buildManageBookingUrl();
+
+  return [
+    '收到，你可以用以下連結管理現有預約：',
+    '',
+    `管理預約：${manageBookingUrl}`,
+    '',
+    '進入後可以查看、更改或取消預約。',
     '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
   ].join('\n');
 }
@@ -688,7 +712,7 @@ export async function buildChatwootBookingDoctorReply(options: {
     return buildDirectManageBookingReply(manageUrl);
   }
 
-  return buildGenericBookingReply();
+  return buildGenericManageBookingReply();
 }
 
 export async function sendChatwootBookingDoctorReply(options: {
@@ -708,7 +732,7 @@ export async function sendChatwootBookingDoctorReply(options: {
     await options.client.createMessage(
       options.accountId,
       options.conversationId,
-      buildGenericBookingReply(),
+      buildGenericManageBookingReply(),
     );
     return;
   }
@@ -778,8 +802,12 @@ export function resolveMenuSelection(
     {
       kind: 'booking',
       pattern: allowNumeric
-        ? /^(?:2(?:[.)、\s-]|$)|預約管理(?:[:：\s-]|$)|预约管理(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$)|更改預約(?:[:：\s-]|$)|更改(?:[:：\s-]|$)|改期(?:[:：\s-]|$)|取消預約(?:[:：\s-]|$)|取消(?:[:：\s-]|$))/u
-        : /^(?:預約管理(?:[:：\s-]|$)|预约管理(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$)|更改預約(?:[:：\s-]|$)|更改(?:[:：\s-]|$)|改期(?:[:：\s-]|$)|取消預約(?:[:：\s-]|$)|取消(?:[:：\s-]|$))/u,
+        ? /^(?:2(?:[.)、\s-]|$)|預約服務(?:[:：\s-]|$)|预约服务(?:[:：\s-]|$)|立即預約(?:[:：\s-]|$)|立即预约(?:[:：\s-]|$)|新預約(?:[:：\s-]|$)|新预约(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u
+        : /^(?:預約服務(?:[:：\s-]|$)|预约服务(?:[:：\s-]|$)|立即預約(?:[:：\s-]|$)|立即预约(?:[:：\s-]|$)|新預約(?:[:：\s-]|$)|新预约(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u,
+    },
+    {
+      kind: 'manage',
+      pattern: /^(?:管理預約(?:[:：\s-]|$)|管理预约(?:[:：\s-]|$)|預約管理(?:[:：\s-]|$)|预约管理(?:[:：\s-]|$)|更改預約(?:[:：\s-]|$)|更改预约(?:[:：\s-]|$)|更改(?:[:：\s-]|$)|改期(?:[:：\s-]|$)|取消預約(?:[:：\s-]|$)|取消预约(?:[:：\s-]|$)|取消(?:[:：\s-]|$))/u,
     },
     {
       kind: 'human',
@@ -838,6 +866,34 @@ export function resolveClinicMenuSelection(content: string): { kind: ClinicSelec
   ]);
 }
 
+export function resolveBookingMenuSelection(
+  content: string,
+  options?: { allowNumeric?: boolean },
+): { kind: BookingSelectionKind; remainder: string } | null {
+  const allowNumeric = options?.allowNumeric ?? true;
+
+  return resolveSelection(content, [
+    {
+      kind: 'new_booking',
+      pattern: allowNumeric
+        ? /^(?:1(?:[.)、\s-]|$)|立即預約(?:[:：\s-]|$)|立即预约(?:[:：\s-]|$)|新預約(?:[:：\s-]|$)|新预约(?:[:：\s-]|$)|預約服務(?:[:：\s-]|$)|预约服务(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u
+        : /^(?:立即預約(?:[:：\s-]|$)|立即预约(?:[:：\s-]|$)|新預約(?:[:：\s-]|$)|新预约(?:[:：\s-]|$)|預約服務(?:[:：\s-]|$)|预约服务(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u,
+    },
+    {
+      kind: 'manage_booking',
+      pattern: allowNumeric
+        ? /^(?:2(?:[.)、\s-]|$)|管理預約(?:[:：\s-]|$)|管理预约(?:[:：\s-]|$)|預約管理(?:[:：\s-]|$)|预约管理(?:[:：\s-]|$)|更改預約(?:[:：\s-]|$)|更改预约(?:[:：\s-]|$)|更改(?:[:：\s-]|$)|改期(?:[:：\s-]|$)|取消預約(?:[:：\s-]|$)|取消预约(?:[:：\s-]|$)|取消(?:[:：\s-]|$))/u
+        : /^(?:管理預約(?:[:：\s-]|$)|管理预约(?:[:：\s-]|$)|預約管理(?:[:：\s-]|$)|预约管理(?:[:：\s-]|$)|更改預約(?:[:：\s-]|$)|更改预约(?:[:：\s-]|$)|更改(?:[:：\s-]|$)|改期(?:[:：\s-]|$)|取消預約(?:[:：\s-]|$)|取消预约(?:[:：\s-]|$)|取消(?:[:：\s-]|$))/u,
+    },
+    {
+      kind: 'main',
+      pattern: allowNumeric
+        ? /^(?:3(?:[.)、\s-]|$)|返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/u
+        : /^(?:返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/u,
+    },
+  ]);
+}
+
 export function mapConversationMessagesToLegacyChat(
   messages: ChatwootMessage[] | undefined,
 ): LegacyChatMessage[] {
@@ -858,7 +914,8 @@ export function mapConversationMessagesToLegacyChat(
       if (content === CHATWOOT_CLINIC_MENU_PROMPT) return false;
       if (content === CHATWOOT_CLINIC_MENU_MESSAGE) return false;
       if (content === CHATWOOT_FEES_MESSAGE) return false;
-      if (content === CHATWOOT_BOOKING_ACK) return false;
+      if (content === CHATWOOT_BOOKING_MENU_PROMPT) return false;
+      if (content === CHATWOOT_BOOKING_MENU_MESSAGE) return false;
       if (content === CHATWOOT_HUMAN_ACK) return false;
       if (content === CHATWOOT_TIMETABLE_MESSAGE) return false;
       if (content === CHATWOOT_CLINIC_HOURS_MESSAGE) return false;
@@ -911,6 +968,9 @@ function isPureSelection(content: string): boolean {
 
   const generalSelection = resolveGeneralMenuSelection(content);
   if (generalSelection && !generalSelection.remainder) return true;
+
+  const bookingSelection = resolveBookingMenuSelection(content);
+  if (bookingSelection && !bookingSelection.remainder) return true;
 
   const clinicSelection = resolveClinicMenuSelection(content);
   return Boolean(clinicSelection && !clinicSelection.remainder);
