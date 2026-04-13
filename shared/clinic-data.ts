@@ -57,6 +57,8 @@ function formatMarkdownLink(label: string, href: string): string {
 const DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS: readonly BookingTreatmentOptionId[] = [
   'acupuncture',
   'manual_therapy',
+  'herbal_prescription',
+  'other',
 ];
 const DEFAULT_DOCTOR_BOOKING_SLOT_MINUTES = 15;
 

@@ -23,11 +23,11 @@ test('Dr. Hon and Dr. Chau use 30-minute booking slots', () => {
 test('other doctors keep the default treatment label and 15-minute slots', () => {
   assert.equal(
     getDoctorBookingTreatmentLabel('chan'),
-    '針灸/治療手法 Acupuncture / Manual therapy'
+    '針灸/治療手法/中藥處方/其他（請註明） Acupuncture / Manual therapy / Chinese herbal prescription / Other (please specify)'
   );
   assert.deepEqual(
     getDoctorBookingTreatmentOptions('chan').map((option) => option.id),
-    ['acupuncture', 'manual_therapy']
+    ['acupuncture', 'manual_therapy', 'herbal_prescription', 'other']
   );
   assert.equal(getDoctorBookingSlotMinutes('chan'), 15);
   assert.equal(getDoctorBookingSlotMinutes('cheung'), 15);

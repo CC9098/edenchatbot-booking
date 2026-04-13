@@ -1,6 +1,8 @@
 export const ALL_BOOKING_TREATMENT_OPTION_IDS = [
   'acupuncture',
   'manual_therapy',
+  'herbal_prescription',
+  'other',
 ] as const;
 
 export type BookingTreatmentOptionId =
@@ -22,6 +24,16 @@ export const BOOKING_TREATMENT_OPTIONS: readonly BookingTreatmentOption[] = [
     id: 'manual_therapy',
     labelZh: '治療手法',
     labelEn: 'Manual therapy',
+  },
+  {
+    id: 'herbal_prescription',
+    labelZh: '中藥處方',
+    labelEn: 'Chinese herbal prescription',
+  },
+  {
+    id: 'other',
+    labelZh: '其他（請註明）',
+    labelEn: 'Other (please specify)',
   },
 ];
 

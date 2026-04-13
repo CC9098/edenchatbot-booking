@@ -47,6 +47,7 @@ type BookingFormValues = {
   lastName: string;
   phone: string;
   email: string;
+  treatmentOtherDetails: string;
   needReceipt: ReceiptType;
   medicationPickup: BookingPickupSelection;
   shippingAddressDetails: string;
@@ -94,6 +95,7 @@ const DEFAULT_SLOT_DURATION_MINUTES = 15;
 const MAX_BOOKING_WINDOW_DAYS = 90;
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const;
 const WEEKDAY_LABELS_ZH = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'] as const;
+const OTHER_TREATMENT_OPTION_ID: BookingTreatmentOptionId = 'other';
 
 const VISIT_TYPE_LABELS: Record<VisitType, string> = {
   first: '首診',
@@ -160,6 +162,7 @@ const INITIAL_FORM_VALUES: BookingFormValues = {
   lastName: '',
   phone: '',
   email: '',
+  treatmentOtherDetails: '',
   needReceipt: 'no',
   medicationPickup: '',
   shippingAddressDetails: '',
@@ -237,9 +240,20 @@ function formatShortDate(dateIso: string): string {
 }
 
 function formatSelectedTreatments(
-  treatmentOptions: Pick<BookingTreatmentOption, 'labelZh' | 'labelEn'>[]
+  treatmentOptions: BookingTreatmentOption[],
+  treatmentOtherDetails?: string
 ): string {
-  return treatmentOptions.map((option) => formatBookingTreatmentOptionLabel(option)).join('、');
+  const normalizedOtherDetails = treatmentOtherDetails?.trim();
+
+  return treatmentOptions
+    .map((option) => {
+      const label = formatBookingTreatmentOptionLabel(option);
+      if (option.id === OTHER_TREATMENT_OPTION_ID && normalizedOtherDetails) {
+        return `${label}: ${normalizedOtherDetails}`;
+      }
+      return label;
+    })
+    .join('、');
 }
 
 async function requestAvailabilityForDoctor(
@@ -534,7 +548,7 @@ export function BookingTabFlow({
       .filter((option): option is BookingTreatmentOption => Boolean(option));
   }, [selectedDoctor, selectedTreatmentOptions]);
   const selectedTreatmentSummary = selectedTreatmentDetails.length > 0
-    ? formatSelectedTreatments(selectedTreatmentDetails)
+    ? formatSelectedTreatments(selectedTreatmentDetails, formValues.treatmentOtherDetails)
     : '';
   const treatmentSummaryDetail = selectedTreatmentSummary
     ? `已選治療項目：${selectedTreatmentSummary}`
@@ -555,6 +569,7 @@ export function BookingTabFlow({
     isOnlineConsultation && isShippingBookingPickup(formValues.medicationPickup);
   const needsClinicPickupRemarks =
     isOnlineConsultation && isClinicPickupBookingPickup(formValues.medicationPickup);
+  const needsTreatmentOtherDetails = selectedTreatmentOptions.includes(OTHER_TREATMENT_OPTION_ID);
   const selectedDoctorSlotMinutes = selectedDoctor?.bookingSlotMinutes ?? DEFAULT_SLOT_DURATION_MINUTES;
   const scannableClinics = useMemo(
     () => selectedDoctor?.clinics ?? [],
@@ -897,6 +912,21 @@ export function BookingTabFlow({
     });
   }, [selectedDoctor]);
 
+  useEffect(() => {
+    if (selectedTreatmentOptions.includes(OTHER_TREATMENT_OPTION_ID)) return;
+
+    setFormValues((prev) => (
+      prev.treatmentOtherDetails
+        ? { ...prev, treatmentOtherDetails: '' }
+        : prev
+    ));
+    setFormErrors((prev) => (
+      prev.treatmentOtherDetails
+        ? { ...prev, treatmentOtherDetails: undefined }
+        : prev
+    ));
+  }, [selectedTreatmentOptions]);
+
   function clearSelectedTimeslot(keepDate = false) {
     if (!keepDate) {
       setSelectedDate('');
@@ -1072,6 +1102,10 @@ export function BookingTabFlow({
       nextErrors.email = '請輸入有效電郵地址';
     }
 
+    if (selectedTreatmentOptions.includes(OTHER_TREATMENT_OPTION_ID) && !values.treatmentOtherDetails.trim()) {
+      nextErrors.treatmentOtherDetails = '如選擇其他，請註明服務內容';
+    }
+
     if (isOnlineConsultation && !values.medicationPickup) {
       nextErrors.medicationPickup = '請選擇取藥方法';
     }
@@ -1115,7 +1149,7 @@ export function BookingTabFlow({
 
   function buildBookingNotes(values: BookingFormValues): string {
     const selectedTreatmentLine = selectedTreatmentDetails.length > 0
-      ? `治療項目: ${formatSelectedTreatments(selectedTreatmentDetails)}`
+      ? `治療項目: ${formatSelectedTreatments(selectedTreatmentDetails, values.treatmentOtherDetails)}`
       : null;
     const notes = visitType === 'first'
       ? [
@@ -1498,6 +1532,21 @@ export function BookingTabFlow({
                   );
                 })}
               </div>
+
+              {needsTreatmentOtherDetails ? (
+                <label className="space-y-1.5">
+                  <span className="text-sm font-semibold text-slate-700">其他服務內容 *</span>
+                  <input
+                    value={formValues.treatmentOtherDetails}
+                    onChange={(event) => updateFormField('treatmentOtherDetails', event.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
+                    placeholder="請註明想預約的其他服務"
+                  />
+                  {formErrors.treatmentOtherDetails ? (
+                    <p className="text-xs text-red-600">{formErrors.treatmentOtherDetails}</p>
+                  ) : null}
+                </label>
+              ) : null}
 
               <p className="text-xs leading-relaxed text-slate-500">
                 如未確定做哪一項，可先留空，稍後由醫師到診時再確認。
