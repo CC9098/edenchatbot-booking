@@ -51,7 +51,6 @@ type BookingFormValues = {
   medicationPickup: BookingPickupSelection;
   shippingAddressDetails: string;
   clinicPickupRemarks: string;
-  idCard: string;
   dateOfBirth: string;
   gender: GenderType;
   allergies: string;
@@ -165,7 +164,6 @@ const INITIAL_FORM_VALUES: BookingFormValues = {
   medicationPickup: '',
   shippingAddressDetails: '',
   clinicPickupRemarks: '',
-  idCard: '',
   dateOfBirth: '',
   gender: '',
   allergies: '',
@@ -1087,10 +1085,6 @@ export function BookingTabFlow({
     }
 
     if (visitType === 'first') {
-      if (values.idCard.trim().length < 5) {
-        nextErrors.idCard = '首診需要身份證資料';
-      }
-
       if (!values.dateOfBirth.trim()) {
         nextErrors.dateOfBirth = '首診需要出生日期';
       }
@@ -1127,7 +1121,6 @@ export function BookingTabFlow({
       ? [
           selectedTreatmentLine,
           '[首診]',
-          `身份證號碼: ${values.idCard.trim() || '未提供'}`,
           `出生日期: ${values.dateOfBirth.trim() || '未提供'}`,
           `性別: ${values.gender ? GENDER_LABELS[values.gender] : '未提供'}`,
           `過敏史: ${values.allergies.trim() || '沒有'}`,
@@ -1209,7 +1202,6 @@ export function BookingTabFlow({
           visitType,
           needReceipt: formValues.needReceipt,
           medicationPickup,
-          idCard: formValues.idCard.trim(),
           dateOfBirth: formValues.dateOfBirth.trim(),
           gender: formValues.gender || undefined,
           allergies: formValues.allergies.trim(),
@@ -1947,17 +1939,6 @@ export function BookingTabFlow({
                   <UserRound className="h-4 w-4" />
                   首診資料（必填）
                 </p>
-
-                <label className="space-y-1.5">
-                  <span className="text-sm font-semibold text-slate-700">身份證號碼 *</span>
-                  <input
-                    value={formValues.idCard}
-                    onChange={(event) => updateFormField('idCard', event.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                    placeholder="例如：A123456(7)"
-                  />
-                  {formErrors.idCard ? <p className="text-xs text-red-600">{formErrors.idCard}</p> : null}
-                </label>
 
                 <label className="space-y-1.5">
                   <span className="text-sm font-semibold text-slate-700">出生日期 *</span>

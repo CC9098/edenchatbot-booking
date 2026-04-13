@@ -179,7 +179,6 @@ export async function POST(request: NextRequest) {
       visitType: bookingData.visitType as BookingVisitType,
       needReceipt: bookingData.needReceipt as BookingReceiptType,
       medicationPickup: bookingData.medicationPickup as BookingPickupType,
-      idCard: normalizeOptionalString(bookingData.idCard),
       dob: normalizeOptionalString(bookingData.dateOfBirth),
       gender: bookingData.gender as BookingGender | undefined,
       allergies: normalizeOptionalString(bookingData.allergies),
