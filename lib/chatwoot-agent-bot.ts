@@ -60,14 +60,16 @@ export const CHATWOOT_FEES_MESSAGE = widgetSettings.flows.fees.reply;
 export const CHATWOOT_BOOKING_MENU_PROMPT =
   '你好，請選擇你想處理的預約項目：';
 export const CHATWOOT_BOOKING_MENU_ITEMS = [
-  { title: '立即預約', value: 'new_booking' },
-  { title: '管理預約', value: 'manage_booking' },
+  { title: '預約', value: 'new_booking' },
+  { title: '更期', value: 'reschedule_booking' },
+  { title: '取消', value: 'cancel_booking' },
   { title: '返回主選單', value: 'main' },
 ] as const;
 export const CHATWOOT_BOOKING_MENU_MESSAGE = `${CHATWOOT_BOOKING_MENU_PROMPT}
-1. 立即預約
-2. 管理預約
-3. 返回主選單`;
+1. 預約
+2. 更期
+3. 取消
+4. 返回主選單`;
 
 export const CHATWOOT_HUMAN_ACK =
   '好，我幫你轉交姑娘跟進，請稍等。';
@@ -149,10 +151,11 @@ export interface ChatwootOutgoingMessagePayload {
   };
 }
 
-type MenuSelectionKind = 'general' | 'booking' | 'manage' | 'human';
+type MenuSelectionKind = 'general' | 'booking' | 'reschedule' | 'cancel' | 'human';
 type GeneralSelectionKind = 'fees' | 'clinic' | 'timetable' | 'other' | 'main';
 type ClinicSelectionKind = 'hours' | 'addresses' | 'main';
-type BookingSelectionKind = 'new_booking' | 'manage_booking' | 'main';
+type BookingSelectionKind = 'new_booking' | 'reschedule_booking' | 'cancel_booking' | 'main';
+type ChatwootManageBookingAction = 'reschedule' | 'cancel';
 
 const CHATWOOT_DELIVERY_TERMINAL_STATUSES = new Set(['failed', 'delivered', 'read']);
 const CHATWOOT_DELIVERY_POLL_ATTEMPTS = 4;
@@ -462,13 +465,46 @@ export function mergeFlowAttributes(
   };
 }
 
-function buildDirectManageBookingReply(manageUrl: string): string {
+function getManageActionCopy(action?: ChatwootManageBookingAction): {
+  intro: string;
+  linkLabel: string;
+  followup: string;
+} {
+  if (action === 'reschedule') {
+    return {
+      intro: '收到，如果你想更期預約，可以直接打開以下專屬連結：',
+      linkLabel: '更期',
+      followup: '進入後可以查看及更改現有預約。',
+    };
+  }
+
+  if (action === 'cancel') {
+    return {
+      intro: '收到，如果你想取消預約，可以直接打開以下專屬連結：',
+      linkLabel: '取消',
+      followup: '進入後可以查看及取消現有預約。',
+    };
+  }
+
+  return {
+    intro: '收到，你可以直接打開以下專屬預約管理連結：',
+    linkLabel: '管理預約',
+    followup: '進入後可以查看、更改或取消預約。',
+  };
+}
+
+function buildDirectManageBookingReply(
+  manageUrl: string,
+  action?: ChatwootManageBookingAction,
+): string {
+  const copy = getManageActionCopy(action);
+
   return [
-    '收到，你可以直接打開以下專屬預約管理連結：',
+    copy.intro,
     '',
-    `管理預約：${manageUrl}`,
+    `${copy.linkLabel}：${manageUrl}`,
     '',
-    '進入後可以查看、更改或取消預約。',
+    copy.followup,
     '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
   ].join('\n');
 }
@@ -477,24 +513,25 @@ export function buildDirectBookingReply(): string {
   const genericBookingUrl = buildPublicUrl('/booking-whatsapp');
 
   return [
-    '收到，如果你想立即預約，可以直接打開以下連結：',
+    '收到，如果你想預約，可以直接打開以下連結：',
     '',
-    `立即預約：${genericBookingUrl}`,
+    `預約：${genericBookingUrl}`,
     '',
-    '如果你想查看、更改或取消現有預約，請選擇「管理預約」。',
+    '如果你想更期或取消現有預約，請選擇相應項目。',
     '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
   ].join('\n');
 }
 
-function buildGenericManageBookingReply(): string {
-  const manageBookingUrl = buildManageBookingUrl();
+function buildGenericManageBookingReply(action?: ChatwootManageBookingAction): string {
+  const manageBookingUrl = buildManageBookingUrl(action ? { action } : undefined);
+  const copy = getManageActionCopy(action);
 
   return [
-    '收到，你可以用以下連結管理現有預約：',
+    copy.intro.replace('專屬', ''),
     '',
-    `管理預約：${manageBookingUrl}`,
+    `${copy.linkLabel}：${manageBookingUrl}`,
     '',
-    '進入後可以查看、更改或取消預約。',
+    copy.followup,
     '如果你想直接搵姑娘跟進，回覆「姑娘」就可以。',
   ].join('\n');
 }
@@ -698,6 +735,7 @@ export async function buildChatwootBookingDoctorReply(options: {
   accountId: number;
   contactId: number | null;
   contactPhone: string | null;
+  action?: ChatwootManageBookingAction;
 }): Promise<string> {
   const resolvedPhone = await resolveChatwootContactPhone(options.client, options.accountId, {
     contactId: options.contactId,
@@ -706,13 +744,14 @@ export async function buildChatwootBookingDoctorReply(options: {
   const phoneDigits = normalizePhoneForSearch(resolvedPhone);
   if (phoneDigits.length >= 8) {
     const manageUrl = buildManageBookingUrl({
+      ...(options.action ? { action: options.action } : {}),
       token: createManageAccessToken(phoneDigits),
     });
 
-    return buildDirectManageBookingReply(manageUrl);
+    return buildDirectManageBookingReply(manageUrl, options.action);
   }
 
-  return buildGenericManageBookingReply();
+  return buildGenericManageBookingReply(options.action);
 }
 
 export async function sendChatwootBookingDoctorReply(options: {
@@ -721,6 +760,7 @@ export async function sendChatwootBookingDoctorReply(options: {
   conversationId: number;
   contactId: number | null;
   contactPhone: string | null;
+  action?: ChatwootManageBookingAction;
 }): Promise<void> {
   const resolvedPhone = await resolveChatwootContactPhone(options.client, options.accountId, {
     contactId: options.contactId,
@@ -732,15 +772,16 @@ export async function sendChatwootBookingDoctorReply(options: {
     await options.client.createMessage(
       options.accountId,
       options.conversationId,
-      buildGenericManageBookingReply(),
+      buildGenericManageBookingReply(options.action),
     );
     return;
   }
 
   const manageUrl = buildManageBookingUrl({
+    ...(options.action ? { action: options.action } : {}),
     token: createManageAccessToken(phoneDigits),
   });
-  const fallbackReply = buildDirectManageBookingReply(manageUrl);
+  const fallbackReply = buildDirectManageBookingReply(manageUrl, options.action);
   const templateConfigs = getManageLinkTemplateConfigs();
 
   if (templateConfigs.length > 0) {
@@ -802,12 +843,16 @@ export function resolveMenuSelection(
     {
       kind: 'booking',
       pattern: allowNumeric
-        ? /^(?:2(?:[.)、\s-]|$)|預約服務(?:[:：\s-]|$)|预约服务(?:[:：\s-]|$)|立即預約(?:[:：\s-]|$)|立即预约(?:[:：\s-]|$)|新預約(?:[:：\s-]|$)|新预约(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u
-        : /^(?:預約服務(?:[:：\s-]|$)|预约服务(?:[:：\s-]|$)|立即預約(?:[:：\s-]|$)|立即预约(?:[:：\s-]|$)|新預約(?:[:：\s-]|$)|新预约(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u,
+        ? /^(?:2(?:[.)、\s-]|$)|預約服務(?:[:：\s-]|$)|预约服务(?:[:：\s-]|$)|預約管理(?:[:：\s-]|$)|预约管理(?:[:：\s-]|$)|管理預約(?:[:：\s-]|$)|管理预约(?:[:：\s-]|$)|立即預約(?:[:：\s-]|$)|立即预约(?:[:：\s-]|$)|新預約(?:[:：\s-]|$)|新预约(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u
+        : /^(?:預約服務(?:[:：\s-]|$)|预约服务(?:[:：\s-]|$)|預約管理(?:[:：\s-]|$)|预约管理(?:[:：\s-]|$)|管理預約(?:[:：\s-]|$)|管理预约(?:[:：\s-]|$)|立即預約(?:[:：\s-]|$)|立即预约(?:[:：\s-]|$)|新預約(?:[:：\s-]|$)|新预约(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u,
     },
     {
-      kind: 'manage',
-      pattern: /^(?:管理預約(?:[:：\s-]|$)|管理预约(?:[:：\s-]|$)|預約管理(?:[:：\s-]|$)|预约管理(?:[:：\s-]|$)|更改預約(?:[:：\s-]|$)|更改预约(?:[:：\s-]|$)|更改(?:[:：\s-]|$)|改期(?:[:：\s-]|$)|取消預約(?:[:：\s-]|$)|取消预约(?:[:：\s-]|$)|取消(?:[:：\s-]|$))/u,
+      kind: 'reschedule',
+      pattern: /^(?:更期(?:[:：\s-]|$)|更改預約(?:[:：\s-]|$)|更改预约(?:[:：\s-]|$)|更改(?:[:：\s-]|$)|改期(?:[:：\s-]|$))/u,
+    },
+    {
+      kind: 'cancel',
+      pattern: /^(?:取消預約(?:[:：\s-]|$)|取消预约(?:[:：\s-]|$)|取消(?:[:：\s-]|$))/u,
     },
     {
       kind: 'human',
@@ -876,19 +921,25 @@ export function resolveBookingMenuSelection(
     {
       kind: 'new_booking',
       pattern: allowNumeric
-        ? /^(?:1(?:[.)、\s-]|$)|立即預約(?:[:：\s-]|$)|立即预约(?:[:：\s-]|$)|新預約(?:[:：\s-]|$)|新预约(?:[:：\s-]|$)|預約服務(?:[:：\s-]|$)|预约服务(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u
-        : /^(?:立即預約(?:[:：\s-]|$)|立即预约(?:[:：\s-]|$)|新預約(?:[:：\s-]|$)|新预约(?:[:：\s-]|$)|預約服務(?:[:：\s-]|$)|预约服务(?:[:：\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$))/u,
+        ? /^(?:1(?:[.)、\s-]|$)|預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$)|立即預約(?:[:：\s-]|$)|立即预约(?:[:：\s-]|$)|新預約(?:[:：\s-]|$)|新预约(?:[:：\s-]|$))/u
+        : /^(?:預約(?:[:：\s-]|$)|预约(?:[:：\s-]|$)|立即預約(?:[:：\s-]|$)|立即预约(?:[:：\s-]|$)|新預約(?:[:：\s-]|$)|新预约(?:[:：\s-]|$))/u,
     },
     {
-      kind: 'manage_booking',
+      kind: 'reschedule_booking',
       pattern: allowNumeric
-        ? /^(?:2(?:[.)、\s-]|$)|管理預約(?:[:：\s-]|$)|管理预约(?:[:：\s-]|$)|預約管理(?:[:：\s-]|$)|预约管理(?:[:：\s-]|$)|更改預約(?:[:：\s-]|$)|更改预约(?:[:：\s-]|$)|更改(?:[:：\s-]|$)|改期(?:[:：\s-]|$)|取消預約(?:[:：\s-]|$)|取消预约(?:[:：\s-]|$)|取消(?:[:：\s-]|$))/u
-        : /^(?:管理預約(?:[:：\s-]|$)|管理预约(?:[:：\s-]|$)|預約管理(?:[:：\s-]|$)|预约管理(?:[:：\s-]|$)|更改預約(?:[:：\s-]|$)|更改预约(?:[:：\s-]|$)|更改(?:[:：\s-]|$)|改期(?:[:：\s-]|$)|取消預約(?:[:：\s-]|$)|取消预约(?:[:：\s-]|$)|取消(?:[:：\s-]|$))/u,
+        ? /^(?:2(?:[.)、\s-]|$)|更期(?:[:：\s-]|$)|更改預約(?:[:：\s-]|$)|更改预约(?:[:：\s-]|$)|更改(?:[:：\s-]|$)|改期(?:[:：\s-]|$))/u
+        : /^(?:更期(?:[:：\s-]|$)|更改預約(?:[:：\s-]|$)|更改预约(?:[:：\s-]|$)|更改(?:[:：\s-]|$)|改期(?:[:：\s-]|$))/u,
+    },
+    {
+      kind: 'cancel_booking',
+      pattern: allowNumeric
+        ? /^(?:3(?:[.)、\s-]|$)|取消預約(?:[:：\s-]|$)|取消预约(?:[:：\s-]|$)|取消(?:[:：\s-]|$))/u
+        : /^(?:取消預約(?:[:：\s-]|$)|取消预约(?:[:：\s-]|$)|取消(?:[:：\s-]|$))/u,
     },
     {
       kind: 'main',
       pattern: allowNumeric
-        ? /^(?:3(?:[.)、\s-]|$)|返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/u
+        ? /^(?:4(?:[.)、\s-]|$)|返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/u
         : /^(?:返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/u,
     },
   ]);

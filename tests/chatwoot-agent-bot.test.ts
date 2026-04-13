@@ -5,6 +5,7 @@ import {
   CHATWOOT_MAIN_MENU_ITEMS,
   CHATWOOT_MAIN_MENU_MESSAGE,
   ChatwootClient,
+  buildChatwootBookingDoctorReply,
   buildDirectBookingReply,
   getFlowState,
   resolveBookingMenuSelection,
@@ -21,9 +22,10 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-test('resolveBookingMenuSelection recognizes new booking and manage booking actions', () => {
+test('resolveBookingMenuSelection recognizes booking, reschedule, and cancel actions', () => {
   assert.equal(resolveBookingMenuSelection('立即預約')?.kind, 'new_booking');
-  assert.equal(resolveBookingMenuSelection('管理預約')?.kind, 'manage_booking');
+  assert.equal(resolveBookingMenuSelection('更期')?.kind, 'reschedule_booking');
+  assert.equal(resolveBookingMenuSelection('取消')?.kind, 'cancel_booking');
   assert.equal(resolveBookingMenuSelection('返回主選單')?.kind, 'main');
 });
 
@@ -31,13 +33,59 @@ test('main menu uses booking service label and routes manage intents separately'
   assert.equal(CHATWOOT_MAIN_MENU_ITEMS[1]?.title, '預約服務');
   assert.equal(CHATWOOT_MAIN_MENU_MESSAGE.includes('2. 預約服務'), true);
   assert.equal(resolveMenuSelection('2', { allowNumeric: true })?.kind, 'booking');
-  assert.equal(resolveMenuSelection('預約管理')?.kind, 'manage');
+  assert.equal(resolveMenuSelection('預約管理')?.kind, 'booking');
+  assert.equal(resolveMenuSelection('更期')?.kind, 'reschedule');
+  assert.equal(resolveMenuSelection('取消')?.kind, 'cancel');
 });
 
-test('booking menu copy points users to booking page while legacy booking state still resolves', () => {
+test('booking menu copy points users to booking page while legacy booking state still resolves', async () => {
   assert.equal(buildDirectBookingReply().includes('/booking-whatsapp'), true);
-  assert.equal(buildDirectBookingReply().includes('管理預約'), true);
+  assert.equal(buildDirectBookingReply().includes('更期或取消'), true);
   assert.equal(getFlowState({ eden_flow_state: 'booking' }), 'booking_menu');
+
+  const originalFetch = global.fetch;
+  const originalEnv = {
+    WIDGET_BOOKING_MANAGE_SECRET: process.env.WIDGET_BOOKING_MANAGE_SECRET,
+  };
+
+  process.env.WIDGET_BOOKING_MANAGE_SECRET = 'test-secret';
+
+  global.fetch = (async () => {
+    throw new Error('No fetch expected');
+  }) as typeof global.fetch;
+
+  try {
+    const client = new ChatwootClient('https://chatwoot.example', 'test-token');
+    const rescheduleReply = await buildChatwootBookingDoctorReply({
+      client,
+      accountId: 1,
+      contactId: null,
+      contactPhone: '+85296322476',
+      action: 'reschedule',
+    });
+    const cancelReply = await buildChatwootBookingDoctorReply({
+      client,
+      accountId: 1,
+      contactId: null,
+      contactPhone: '+85296322476',
+      action: 'cancel',
+    });
+
+    assert.equal(rescheduleReply.includes('更期：https://'), true);
+    assert.equal(rescheduleReply.includes('action=reschedule'), true);
+    assert.equal(cancelReply.includes('取消：https://'), true);
+    assert.equal(cancelReply.includes('action=cancel'), true);
+  } finally {
+    global.fetch = originalFetch;
+
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (typeof value === 'undefined') {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
 });
 
 test('sendChatwootBookingDoctorReply prefers manage-link templates in the current conversation', async () => {
@@ -92,17 +140,18 @@ test('sendChatwootBookingDoctorReply prefers manage-link templates in the curren
       conversationId: 42,
       contactId: null,
       contactPhone: '+85296322476',
+      action: 'reschedule',
     });
 
     assert.equal(sentMessagePayloads.length, 1);
     assert.equal(sentMessagePayloads[0]?.template_params?.name, 'booking_manage_link');
     assert.equal(sentMessagePayloads[0]?.template_params?.language, 'zh_HK');
     assert.equal(
-      sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter.startsWith('/manage-booking?token='),
+      sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter.startsWith('/manage-booking?action=reschedule&token='),
       true,
     );
     assert.equal(
-      String(sentMessagePayloads[0]?.content || '').includes('如果你想直接搵姑娘跟進'),
+      String(sentMessagePayloads[0]?.content || '').includes('更期'),
       true,
     );
   } finally {
@@ -166,6 +215,7 @@ test('sendChatwootBookingDoctorReply falls back to plain text when manage-link t
       conversationId: 42,
       contactId: null,
       contactPhone: '+85296322476',
+      action: 'cancel',
     });
 
     assert.equal(sentMessagePayloads.length > 1, true);
@@ -174,7 +224,11 @@ test('sendChatwootBookingDoctorReply falls back to plain text when manage-link t
       undefined,
     );
     assert.equal(
-      String(sentMessagePayloads.at(-1)?.content || '').includes('管理預約：https://'),
+      String(sentMessagePayloads.at(-1)?.content || '').includes('取消：https://'),
+      true,
+    );
+    assert.equal(
+      String(sentMessagePayloads.at(-1)?.content || '').includes('action=cancel'),
       true,
     );
   } finally {

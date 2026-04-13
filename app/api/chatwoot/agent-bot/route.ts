@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
     } else if (bookingSelection?.kind === 'new_booking') {
       nextState = 'menu';
       reply = buildDirectBookingReply();
-    } else if (bookingSelection?.kind === 'manage_booking') {
+    } else if (bookingSelection?.kind === 'reschedule_booking') {
       nextState = 'menu';
       await sendChatwootBookingDoctorReply({
         client,
@@ -135,12 +135,24 @@ export async function POST(request: NextRequest) {
         conversationId: event.conversationId,
         contactId: event.contactId,
         contactPhone: event.contactPhone,
+        action: 'reschedule',
+      });
+      reply = null;
+    } else if (bookingSelection?.kind === 'cancel_booking') {
+      nextState = 'menu';
+      await sendChatwootBookingDoctorReply({
+        client,
+        accountId: event.accountId,
+        conversationId: event.conversationId,
+        contactId: event.contactId,
+        contactPhone: event.contactPhone,
+        action: 'cancel',
       });
       reply = null;
     } else if (bookingSelection?.kind === 'main') {
       nextState = 'menu';
       reply = MAIN_MENU_REPLY;
-    } else if (rootSelection?.kind === 'manage') {
+    } else if (rootSelection?.kind === 'reschedule') {
       nextState = 'menu';
       await sendChatwootBookingDoctorReply({
         client,
@@ -148,6 +160,18 @@ export async function POST(request: NextRequest) {
         conversationId: event.conversationId,
         contactId: event.contactId,
         contactPhone: event.contactPhone,
+        action: 'reschedule',
+      });
+      reply = null;
+    } else if (rootSelection?.kind === 'cancel') {
+      nextState = 'menu';
+      await sendChatwootBookingDoctorReply({
+        client,
+        accountId: event.accountId,
+        conversationId: event.conversationId,
+        contactId: event.contactId,
+        contactPhone: event.contactPhone,
+        action: 'cancel',
       });
       reply = null;
     } else if (rootSelection?.kind === 'booking') {
