@@ -1,6 +1,15 @@
 import { z } from 'zod';
 import { ALL_BOOKING_TREATMENT_OPTION_IDS } from '@/shared/booking-treatment-options';
 
+const optionalEmailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine(
+    (value) => value === '' || z.string().email().safeParse(value).success,
+    { message: 'Invalid email address' }
+  );
+
 // Zod Schemas for validation
 export const availabilitySchema = z.object({
                 doctorId: z.string(),
@@ -21,7 +30,7 @@ export const bookingSchema = z.object({
                 durationMinutes: z.number().default(15),
                 patientName: z.string().min(2),
                 phone: z.string().min(8),
-                email: z.string().email(),
+                email: optionalEmailSchema,
                 treatmentOptions: z.array(z.enum(ALL_BOOKING_TREATMENT_OPTION_IDS)).optional(),
                 notes: z.string().optional(),
 });

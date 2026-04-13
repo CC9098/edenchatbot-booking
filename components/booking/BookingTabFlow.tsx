@@ -590,11 +590,13 @@ export function BookingTabFlow({
   const submitLoadingLabel = '預約處理中...';
   const detailNotice = isWhatsappFlow
     ? '成功預約後會透過 WhatsApp 發送確認訊息到你提供的電話。'
-    : '成功預約後會收到確認電郵通知；更改或取消可使用電郵內連結。';
+    : '如有提供電郵，系統會發送確認電郵；更改或取消可使用電郵內連結。';
   const successTitle = '預約成功';
   const successDescription = isWhatsappFlow
     ? '預約已建立，診所會透過 WhatsApp 跟進並發送確認訊息到你提供的電話。'
-    : '確認電郵將發送到你提供的信箱。';
+    : formValues.email.trim()
+      ? '確認電郵將發送到你提供的信箱。'
+      : '預約已建立；如需更改或取消，請聯絡診所跟進。';
   const successQuote = '「每一次回來，身體都記得。」';
   const referenceLabel = '預約編號';
 
@@ -1098,7 +1100,8 @@ export function BookingTabFlow({
       nextErrors.phone = '請輸入有效電話（至少 8 位數字）';
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim().toLowerCase())) {
+    const normalizedEmail = values.email.trim().toLowerCase();
+    if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       nextErrors.email = '請輸入有效電郵地址';
     }
 
@@ -1898,7 +1901,7 @@ export function BookingTabFlow({
             </label>
 
             <label className="space-y-1.5">
-              <span className="text-sm font-semibold text-slate-700">電郵 *</span>
+              <span className="text-sm font-semibold text-slate-700">電郵（選填）</span>
               <input
                 type="email"
                 autoComplete="email"
