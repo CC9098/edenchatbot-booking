@@ -36,7 +36,7 @@ import { type ClinicId, type DoctorId } from '@/shared/clinic-data';
 import type { TimeRange, WeeklySchedule } from '@/shared/schedule-config';
 
 type BookingStep = 'setup' | 'timeslot' | 'details' | 'success';
-type FlowVariant = 'booking' | 'whatsapp';
+type FlowVariant = 'booking' | 'whatsapp' | 'staff';
 type VisitType = 'first' | 'followup';
 type ReceiptType = 'no' | 'yes_insurance' | 'yes_not_insurance';
 type GenderType = '' | 'male' | 'female' | 'other';
@@ -86,6 +86,7 @@ type BookingTabFlowProps = {
     clinicId?: ClinicId;
     visitType?: VisitType;
   };
+  staffPatientUserId?: string | null;
   embedMode?: boolean;
   flowVariant?: FlowVariant;
 };
@@ -484,10 +485,12 @@ export function BookingTabFlow({
   doctors,
   initialContact,
   initialSelection,
+  staffPatientUserId,
   embedMode = false,
   flowVariant = 'booking',
 }: BookingTabFlowProps) {
   const isWhatsappFlow = flowVariant === 'whatsapp';
+  const isStaffFlow = flowVariant === 'staff';
   const [step, setStep] = useState<BookingStep>('setup');
   const [visitType, setVisitType] = useState<VisitType>(initialSelection?.visitType ?? 'first');
   const [doctorId, setDoctorId] = useState<DoctorId | ''>(initialSelection?.doctorId ?? '');
@@ -582,22 +585,28 @@ export function BookingTabFlow({
         : scannableClinics,
     [clinicId, scannableClinics]
   );
-  const pageTitle = '預約服務';
-  const pageSubtitle = isWhatsappFlow
+  const pageTitle = isStaffFlow ? '姑娘代約' : '預約服務';
+  const pageSubtitle = isStaffFlow
+    ? '供姑娘或前台代病人安排時段。成功後系統會優先透過 WhatsApp 發送確認訊息，若有電郵則會一併寄出確認電郵。'
+    : isWhatsappFlow
     ? '成功預約後，診所會透過 WhatsApp 發送確認訊息到你提供的電話。'
     : '「每一次預約，都是照顧自己的開始。」';
   const submitButtonLabel = '確認預約';
-  const submitLoadingLabel = '預約處理中...';
-  const detailNotice = isWhatsappFlow
+  const submitLoadingLabel = isStaffFlow ? '代約處理中...' : '預約處理中...';
+  const detailNotice = isStaffFlow
+    ? '此頁會以病人資料建立正式預約，並嘗試即時發送 WhatsApp 確認。若病人已有電郵，系統亦會補發確認電郵。'
+    : isWhatsappFlow
     ? '成功預約後會透過 WhatsApp 發送確認訊息到你提供的電話。'
     : '如有提供電郵，系統會發送確認電郵；更改或取消可使用電郵內連結。';
-  const successTitle = '預約成功';
-  const successDescription = isWhatsappFlow
+  const successTitle = isStaffFlow ? '代約完成' : '預約成功';
+  const successDescription = isStaffFlow
+    ? '預約已建立，系統已嘗試發送確認訊息到病人提供的聯絡方式。'
+    : isWhatsappFlow
     ? '預約已建立，診所會透過 WhatsApp 跟進並發送確認訊息到你提供的電話。'
     : formValues.email.trim()
       ? '確認電郵將發送到你提供的信箱。'
       : '預約已建立；如需更改或取消，請聯絡診所跟進。';
-  const successQuote = '「每一次回來，身體都記得。」';
+  const successQuote = isStaffFlow ? '「資料確認得愈完整，跟進就愈穩陣。」' : '「每一次回來，身體都記得。」';
   const referenceLabel = '預約編號';
 
   const canContinueSetup = Boolean(doctorId && visitType);
@@ -1232,8 +1241,12 @@ export function BookingTabFlow({
     const medicationPickup = isOnlineConsultation
       ? (formValues.medicationPickup as BookingPickupType)
       : 'none';
-    const submitEndpoint = isWhatsappFlow ? '/api/booking-whatsapp' : '/api/booking';
-    const requestBody = isWhatsappFlow
+    const submitEndpoint = isStaffFlow
+      ? '/api/doctor/bookings'
+      : isWhatsappFlow
+        ? '/api/booking-whatsapp'
+        : '/api/booking';
+    const requestBody = isStaffFlow || isWhatsappFlow
       ? {
           ...payload,
           visitType,
@@ -1245,6 +1258,7 @@ export function BookingTabFlow({
           medications: formValues.medications.trim(),
           symptoms: formValues.symptoms.trim(),
           referralSource: formValues.referralSource.trim(),
+          ...(isStaffFlow && staffPatientUserId ? { patientUserId: staffPatientUserId } : {}),
         }
       : payload;
 
@@ -1264,11 +1278,10 @@ export function BookingTabFlow({
         return;
       }
 
-      if (isWhatsappFlow) {
-        setBookingId(data.bookingId || '');
+      setBookingId(data.bookingId || '');
+
+      if (isWhatsappFlow || isStaffFlow) {
         setWhatsappSent(data.whatsappSent === true);
-      } else {
-        setBookingId(data.bookingId || '');
       }
       setStep('success');
     } catch {
@@ -1290,14 +1303,14 @@ export function BookingTabFlow({
         <div className="patient-card p-6 sm:p-8">
         <h1 className="text-2xl font-semibold text-primary">{pageTitle}</h1>
         <p className="mt-3 text-sm text-slate-600">
-          目前未有可用的醫師時段，請稍後再試或於聊天頁聯絡我們。
+          {isStaffFlow ? '目前未有可用的醫師時段，請稍後再試或由姑娘人工跟進。' : '目前未有可用的醫師時段，請稍後再試或於聊天頁聯絡我們。'}
         </p>
         {!embedMode ? (
           <Link
-            href="/chat"
+            href={isStaffFlow ? '/doctor' : '/chat'}
             className="mt-6 inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
           >
-            返回聊天頁
+            {isStaffFlow ? '返回控制台' : '返回聊天頁'}
           </Link>
         ) : null}
       </div>
@@ -1855,7 +1868,9 @@ export function BookingTabFlow({
           <form className="space-y-5" onSubmit={handleSubmit}>
             {hasAutofilledContact ? (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-800">
-                已從登入帳戶帶入可用聯絡資料，你可按需要修改。
+                {isStaffFlow
+                  ? '已從所選病人資料帶入聯絡資料，你可按需要修改。'
+                  : '已從登入帳戶帶入可用聯絡資料，你可按需要修改。'}
               </div>
             ) : null}
 
@@ -2116,9 +2131,11 @@ export function BookingTabFlow({
           <div className="space-y-3">
             <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-slate-800">{successTitle}</h2>
             <p className="text-sm text-slate-500">{successDescription}</p>
-            {isWhatsappFlow && whatsappSent === false ? (
+            {(isWhatsappFlow || isStaffFlow) && whatsappSent === false ? (
               <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                已完成預約，但 WhatsApp 確認訊息暫時未能自動發送。診所會另行跟進。
+                {isStaffFlow
+                  ? '已完成代約，但 WhatsApp 確認訊息暫時未能自動發送，請姑娘跟進。'
+                  : '已完成預約，但 WhatsApp 確認訊息暫時未能自動發送。診所會另行跟進。'}
               </p>
             ) : null}
             <p
@@ -2150,10 +2167,10 @@ export function BookingTabFlow({
 
             {!embedMode ? (
               <Link
-                href="/chat"
+                href={isStaffFlow ? '/doctor' : '/chat'}
                 className="inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
               >
-                返回聊天頁
+                {isStaffFlow ? '返回病人列表' : '返回聊天頁'}
               </Link>
             ) : null}
           </div>

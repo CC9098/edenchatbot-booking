@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { fromZonedTime } from 'date-fns-tz';
 
-import { getCurrentUser } from '@/lib/auth-helpers';
+import { getCurrentUser, requirePatientAccess, requireStaffRole, AuthError } from '@/lib/auth-helpers';
 import {
   isSlotAfterClinicLastBookingCutoffUtc,
   isSlotAvailableUtc,
@@ -19,9 +19,14 @@ import {
 import { sendBookingConfirmationWhatsapp } from '@/lib/chatwoot-whatsapp';
 import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import { getSafeErrorMessage } from '@/lib/error-sanitizer';
+import { sendBookingConfirmationEmail } from '@/lib/gmail';
 import { createBooking, getFreeBusy } from '@/lib/google-calendar';
 import { syncPatientProfileContact } from '@/lib/profile-contact-sync';
-import { getDoctorBookingSlotMinutes } from '@/shared/clinic-data';
+import { createServiceClient } from '@/lib/supabase';
+import {
+  getClinicAddress,
+  getDoctorBookingSlotMinutes,
+} from '@/shared/clinic-data';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { getClinicWhatsappPhone } from '@/lib/whatsapp-booking';
 import { resolveOnlineSourceMappingForSlot } from '@/lib/virtual-online-booking';
@@ -30,7 +35,9 @@ import { detailedBookingSchema } from '@/shared/booking-intake-schema';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
-const whatsappBookingSchema = detailedBookingSchema;
+const staffBookingSchema = detailedBookingSchema.extend({
+  patientUserId: z.string().uuid().optional(),
+});
 
 function formatZodIssues(error: z.ZodError) {
   return error.issues.map((issue) => ({
@@ -49,9 +56,14 @@ export async function POST(request: NextRequest) {
   let intakeId: string | undefined;
 
   try {
-    const user = await getCurrentUser().catch(() => null);
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const staffRole = await requireStaffRole(user.id);
     const body = await request.json();
-    const parsed = whatsappBookingSchema.safeParse(body);
+    const parsed = staffBookingSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -61,6 +73,32 @@ export async function POST(request: NextRequest) {
     }
 
     const bookingData = parsed.data;
+    if (bookingData.patientUserId) {
+      await requirePatientAccess(user.id, bookingData.patientUserId);
+
+      const supabase = createServiceClient();
+      const { data: linkedStaffRole, error: linkedStaffRoleError } = await supabase
+        .from('staff_roles')
+        .select('user_id')
+        .eq('user_id', bookingData.patientUserId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (linkedStaffRoleError) {
+        console.error('[doctor/bookings] staff identity check failed:', linkedStaffRoleError.message);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+
+      if (linkedStaffRole?.user_id) {
+        return NextResponse.json(
+          {
+            error: '姑娘代約只可連結病人帳戶。若要代未建檔人士落單，請改用手動輸入模式。',
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     const durationMinutes = getDoctorBookingSlotMinutes(bookingData.doctorId);
 
     let calendarId = '';
@@ -113,7 +151,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid date/time' }, { status: 400 });
     }
 
-    if (bookingData.clinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, bookingData.clinicId)) {
+    if (
+      bookingData.clinicId !== 'online' &&
+      isSlotAfterClinicLastBookingCutoffUtc(startDate, bookingData.clinicId)
+    ) {
       return NextResponse.json(
         { error: '已超過此分店最後預約時間，請選擇較早時段。' },
         { status: 409 },
@@ -138,7 +179,7 @@ export async function POST(request: NextRequest) {
       }
     } catch (calendarError) {
       console.error(
-        `[booking-whatsapp] Calendar availability re-check failed: ${getSafeErrorMessage(calendarError)}`,
+        `[doctor/bookings] Calendar availability re-check failed: ${getSafeErrorMessage(calendarError)}`,
       );
       return NextResponse.json(
         {
@@ -149,9 +190,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    intakeId = undefined;
     const intakeResult = await createPendingBookingIntake({
-      source: 'booking_whatsapp_page',
-      userId: user?.id,
+      source: 'staff_console',
+      userId: bookingData.patientUserId,
       doctorId: bookingData.doctorId,
       doctorNameZh: bookingData.doctorNameZh,
       clinicId: bookingData.clinicId,
@@ -165,6 +207,7 @@ export async function POST(request: NextRequest) {
       visitType: bookingData.visitType as BookingVisitType,
       needReceipt: bookingData.needReceipt as BookingReceiptType,
       medicationPickup: bookingData.medicationPickup as BookingPickupType,
+      idCard: normalizeOptionalString(bookingData.idCard),
       dob: normalizeOptionalString(bookingData.dateOfBirth),
       gender: bookingData.gender as BookingGender | undefined,
       allergies: normalizeOptionalString(bookingData.allergies),
@@ -175,14 +218,16 @@ export async function POST(request: NextRequest) {
       bookingPayload: {
         ...bookingData,
         durationMinutes,
-        channel: 'whatsapp_confirmation',
+        channel: 'staff_console',
         notificationClinicId,
+        createdByStaffUserId: user.id,
+        createdByStaffRole: staffRole.role,
       },
     });
 
     intakeId = intakeResult.intakeId;
     if (!intakeResult.success) {
-      console.error(`[booking-whatsapp] booking_intake warning: ${intakeResult.error}`);
+      console.error(`[doctor/bookings] booking_intake warning: ${intakeResult.error}`);
     }
 
     const calResult = await createBooking(calendarId, {
@@ -207,21 +252,23 @@ export async function POST(request: NextRequest) {
           reason: calResult.error || 'Failed to create booking in calendar',
         });
         if (!failedSync.success) {
-          console.warn(`[booking-whatsapp] booking_intake failure sync warning: ${failedSync.error}`);
+          console.warn(`[doctor/bookings] booking_intake failure sync warning: ${failedSync.error}`);
         }
       }
 
-      console.error('[booking-whatsapp] Calendar creation failed:', calResult.error);
+      console.error('[doctor/bookings] Calendar creation failed:', calResult.error);
       return NextResponse.json({ error: 'Failed to create booking in calendar' }, { status: 500 });
     }
 
-    const profileSync = await syncPatientProfileContact({
-      userId: user?.id,
-      displayName: bookingData.patientName,
-      phone: bookingData.phone,
-    });
-    if (!profileSync.success) {
-      console.warn(`[booking-whatsapp] profile sync warning: ${profileSync.error}`);
+    if (bookingData.patientUserId) {
+      const profileSync = await syncPatientProfileContact({
+        userId: bookingData.patientUserId,
+        displayName: bookingData.patientName,
+        phone: bookingData.phone,
+      });
+      if (!profileSync.success) {
+        console.warn(`[doctor/bookings] profile sync warning: ${profileSync.error}`);
+      }
     }
 
     if (intakeId) {
@@ -231,12 +278,10 @@ export async function POST(request: NextRequest) {
         calendarId,
       });
       if (!confirmSync.success) {
-        console.warn(`[booking-whatsapp] booking_intake confirm sync warning: ${confirmSync.error}`);
+        console.warn(`[doctor/bookings] booking_intake confirm sync warning: ${confirmSync.error}`);
       }
     }
 
-    // Generate a manage access token so the patient can manage bookings
-    // directly from the WhatsApp confirmation link without OTP
     const phoneDigits = normalizePhoneForSearch(bookingData.phone);
     const manageAccessToken = phoneDigits ? createManageAccessToken(phoneDigits) : undefined;
 
@@ -256,8 +301,33 @@ export async function POST(request: NextRequest) {
 
     if (!whatsappResult.success) {
       console.error(
-        `[booking-whatsapp] Chatwoot WhatsApp warning: ${whatsappResult.error || 'Unknown error'}`,
+        `[doctor/bookings] Chatwoot WhatsApp warning: ${whatsappResult.error || 'Unknown error'}`,
       );
+    }
+
+    let emailSent = false;
+    const normalizedEmail = bookingData.email.trim().toLowerCase();
+    if (normalizedEmail) {
+      try {
+        await sendBookingConfirmationEmail({
+          patientName: bookingData.patientName,
+          patientEmail: normalizedEmail,
+          doctorName: bookingData.doctorName,
+          doctorNameZh: bookingData.doctorNameZh,
+          clinicName: bookingData.clinicName,
+          clinicNameZh: bookingData.clinicNameZh,
+          clinicAddress: getClinicAddress(bookingData.clinicId),
+          date: bookingData.date,
+          time: bookingData.time,
+          eventId: calResult.eventId,
+          calendarId,
+        });
+        emailSent = true;
+      } catch (emailError) {
+        console.error(
+          `[doctor/bookings] Email sending failed: ${getSafeErrorMessage(emailError)}`,
+        );
+      }
     }
 
     return NextResponse.json({
@@ -267,19 +337,24 @@ export async function POST(request: NextRequest) {
       intakeSaved: intakeResult.success,
       whatsappSent: whatsappResult.success,
       whatsappConversationId: whatsappResult.conversationId,
+      emailSent,
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     if (intakeId) {
       const failedSync = await markBookingIntakeFailed({
         intakeId,
         reason: getSafeErrorMessage(error),
       });
       if (!failedSync.success) {
-        console.warn(`[booking-whatsapp] booking_intake exception sync warning: ${failedSync.error}`);
+        console.warn(`[doctor/bookings] booking_intake exception sync warning: ${failedSync.error}`);
       }
     }
 
-    console.error(`[booking-whatsapp] Error: ${getSafeErrorMessage(error)}`);
+    console.error(`[doctor/bookings] Error: ${getSafeErrorMessage(error)}`);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
