@@ -538,9 +538,16 @@ export function BookingTabFlow({
     () => doctorOptions.find((doctor) => doctor.doctorId === doctorId),
     [doctorId, doctorOptions]
   );
-  const availableTreatmentOptions = selectedDoctor?.bookingTreatmentOptions ?? [];
+  const selectedClinic = useMemo(
+    () => clinicOptions.find((clinic) => clinic.clinicId === clinicId),
+    [clinicId, clinicOptions]
+  );
+  const isOnlineConsultation = clinicId === 'online';
+  const availableTreatmentOptions = !isOnlineConsultation
+    ? selectedDoctor?.bookingTreatmentOptions ?? []
+    : [];
   const selectedTreatmentDetails = useMemo(() => {
-    if (!selectedDoctor) return [];
+    if (!selectedDoctor || isOnlineConsultation) return [];
 
     const treatmentOptionById = new Map(
       selectedDoctor.bookingTreatmentOptions.map((option) => [option.id, option] as const)
@@ -549,30 +556,27 @@ export function BookingTabFlow({
     return selectedTreatmentOptions
       .map((optionId) => treatmentOptionById.get(optionId))
       .filter((option): option is BookingTreatmentOption => Boolean(option));
-  }, [selectedDoctor, selectedTreatmentOptions]);
+  }, [isOnlineConsultation, selectedDoctor, selectedTreatmentOptions]);
   const selectedTreatmentSummary = selectedTreatmentDetails.length > 0
     ? formatSelectedTreatments(selectedTreatmentDetails, formValues.treatmentOtherDetails)
     : '';
-  const treatmentSummaryDetail = selectedTreatmentSummary
-    ? `已選治療項目：${selectedTreatmentSummary}`
-    : selectedDoctor
-      ? '治療項目：未指定（可留待到診時再確認）'
-      : null;
-
-  const selectedClinic = useMemo(
-    () => clinicOptions.find((clinic) => clinic.clinicId === clinicId),
-    [clinicId, clinicOptions]
-  );
+  const treatmentSummaryDetail = isOnlineConsultation
+    ? null
+    : selectedTreatmentSummary
+      ? `已選治療項目：${selectedTreatmentSummary}`
+      : selectedDoctor
+        ? '治療項目：未指定（可留待到診時再確認）'
+        : null;
   const pickupOptions = useMemo(
     () => getBookingPickupOptions(clinicId),
     [clinicId]
   );
-  const isOnlineConsultation = clinicId === 'online';
   const needsShippingAddressDetails =
     isOnlineConsultation && isShippingBookingPickup(formValues.medicationPickup);
   const needsClinicPickupRemarks =
     isOnlineConsultation && isClinicPickupBookingPickup(formValues.medicationPickup);
-  const needsTreatmentOtherDetails = selectedTreatmentOptions.includes(OTHER_TREATMENT_OPTION_ID);
+  const needsTreatmentOtherDetails =
+    !isOnlineConsultation && selectedTreatmentOptions.includes(OTHER_TREATMENT_OPTION_ID);
   const selectedDoctorSlotMinutes = selectedDoctor?.bookingSlotMinutes ?? DEFAULT_SLOT_DURATION_MINUTES;
   const scannableClinics = useMemo(
     () => selectedDoctor?.clinics ?? [],
@@ -924,6 +928,22 @@ export function BookingTabFlow({
   }, [selectedDoctor]);
 
   useEffect(() => {
+    if (!isOnlineConsultation) return;
+
+    setSelectedTreatmentOptions((prev) => (prev.length > 0 ? [] : prev));
+    setFormValues((prev) => (
+      prev.treatmentOtherDetails
+        ? { ...prev, treatmentOtherDetails: '' }
+        : prev
+    ));
+    setFormErrors((prev) => (
+      prev.treatmentOtherDetails
+        ? { ...prev, treatmentOtherDetails: undefined }
+        : prev
+    ));
+  }, [isOnlineConsultation]);
+
+  useEffect(() => {
     if (selectedTreatmentOptions.includes(OTHER_TREATMENT_OPTION_ID)) return;
 
     setFormValues((prev) => (
@@ -1114,7 +1134,7 @@ export function BookingTabFlow({
       nextErrors.email = '請輸入有效電郵地址';
     }
 
-    if (selectedTreatmentOptions.includes(OTHER_TREATMENT_OPTION_ID) && !values.treatmentOtherDetails.trim()) {
+    if (needsTreatmentOtherDetails && !values.treatmentOtherDetails.trim()) {
       nextErrors.treatmentOtherDetails = '如選擇其他，請註明服務內容';
     }
 
@@ -1222,6 +1242,7 @@ export function BookingTabFlow({
     setIsSubmitting(true);
     setSubmitError('');
 
+    const treatmentOptions = isOnlineConsultation ? [] : selectedTreatmentOptions;
     const payload = {
       doctorId,
       clinicId,
@@ -1235,7 +1256,7 @@ export function BookingTabFlow({
       patientName: `${formValues.lastName.trim()} ${formValues.firstName.trim()}`.trim(),
       phone: normalizePhoneForStorage(formValues.phone),
       email: formValues.email.trim().toLowerCase(),
-      treatmentOptions: selectedTreatmentOptions,
+      treatmentOptions,
       notes: buildBookingNotes(formValues),
     };
     const medicationPickup = isOnlineConsultation
@@ -1514,7 +1535,7 @@ export function BookingTabFlow({
             </div>
           </div>
 
-          {selectedDoctor ? (
+          {selectedDoctor && !isOnlineConsultation ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-slate-700">治療項目</p>
@@ -1596,7 +1617,9 @@ export function BookingTabFlow({
             clinicNameZh={selectedClinic?.clinicNameZh || '比較全部診所'}
             eyebrow="已選醫師"
             details={compactDetails([
-              treatmentSummaryDetail || (selectedDoctor ? `可選治療項目：${selectedDoctor.bookingTreatmentLabel}` : null),
+              !isOnlineConsultation
+                ? treatmentSummaryDetail || (selectedDoctor ? `可選治療項目：${selectedDoctor.bookingTreatmentLabel}` : null)
+                : null,
               `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`,
               selectedClinic
                 ? '日曆只顯示所選診所燈號。'
@@ -1860,7 +1883,9 @@ export function BookingTabFlow({
             eyebrow="預約摘要"
             details={compactDetails([
               `${formatDateForDisplay(selectedDate)} ${selectedTime}`,
-              treatmentSummaryDetail || (selectedDoctor ? `可選治療項目：${selectedDoctor.bookingTreatmentLabel}` : null),
+              !isOnlineConsultation
+                ? treatmentSummaryDetail || (selectedDoctor ? `可選治療項目：${selectedDoctor.bookingTreatmentLabel}` : null)
+                : null,
               `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`,
             ])}
           />
