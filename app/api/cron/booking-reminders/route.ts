@@ -1,95 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { formatInTimeZone } from 'date-fns-tz';
 
+import { buildBookingReminderPayload } from '@/lib/booking-reminder-payload';
 import { listEventsInRange, patchEventPrivateMetadata } from '@/lib/google-calendar';
 import { sendBookingReminderWhatsapp } from '@/lib/chatwoot-whatsapp';
 import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import { sendBookingReminderEmail } from '@/lib/gmail';
 import { getActiveCalendarIds } from '@/lib/doctor-schedule-store';
-import { CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
 import { getClinicWhatsappPhone } from '@/lib/whatsapp-booking';
 import { createManageAccessToken } from '@/lib/widget-booking-management';
-import { type BookingVisitType } from '@/lib/booking-intake-storage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const EMAIL_REMINDER_SENT_KEY = 'eden_reminder_24h_sent_at';
 const WHATSAPP_REMINDER_SENT_KEY = 'eden_reminder_24h_whatsapp_sent_at';
-
-function inferVisitType(description: string): BookingVisitType {
-  if (/first|首診/i.test(description)) {
-    return 'first';
-  }
-
-  return 'followup';
-}
-
-function parseLineValue(description: string, label: string): string {
-  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = description.match(new RegExp(`${escaped}\\s*:\\s*(.+)`));
-  return match?.[1]?.trim() || '';
-}
-
-function extractBookingEmailMetadata(event: any) {
-  const description = typeof event?.description === 'string' ? event.description : '';
-  const summary = typeof event?.summary === 'string' ? event.summary : '';
-
-  const patientName =
-    parseLineValue(description, 'Patient / 病人') ||
-    summary.split(' - ').slice(1).join(' - ').trim();
-  const patientPhone = parseLineValue(description, 'Phone / 電話');
-  const patientEmail = parseLineValue(description, 'Email / 電郵');
-
-  const doctorMatch = description.match(/Doctor \/ 醫師:\s*(.+?)\s*\((.+?)\)/);
-  const clinicMatch = description.match(/Clinic \/ 診所:\s*(.+?)\s*\((.+?)\)/);
-
-  const doctorNameZh = doctorMatch?.[1]?.trim() || '';
-  const doctorName = doctorMatch?.[2]?.trim() || doctorNameZh;
-  const clinicNameZh = clinicMatch?.[1]?.trim() || '';
-  const clinicName = clinicMatch?.[2]?.trim() || clinicNameZh;
-
-  if (!patientName || !patientEmail || !doctorNameZh || !clinicNameZh) {
-    return null;
-  }
-
-  const clinicId = CLINIC_ID_BY_NAME_ZH[clinicNameZh];
-  const clinicAddress = clinicId ? getClinicAddress(clinicId) : '';
-
-  return {
-    patientName,
-    patientPhone,
-    patientEmail,
-    doctorName,
-    doctorNameZh,
-    clinicName,
-    clinicNameZh,
-    clinicAddress,
-    clinicId,
-    visitType: inferVisitType(description),
-  };
-}
-
-function buildReminderPayload(event: any, calendarId: string) {
-  const metadata = extractBookingEmailMetadata(event);
-  if (!metadata) return null;
-
-  const eventId = typeof event?.id === 'string' ? event.id : '';
-  const startDateTime = typeof event?.start?.dateTime === 'string' ? event.start.dateTime : '';
-  if (!eventId || !startDateTime) return null;
-
-  const start = new Date(startDateTime);
-  if (Number.isNaN(start.getTime())) return null;
-
-  return {
-    ...metadata,
-    date: formatInTimeZone(start, HONG_KONG_TIMEZONE, 'yyyy-MM-dd'),
-    time: formatInTimeZone(start, HONG_KONG_TIMEZONE, 'HH:mm'),
-    eventId,
-    calendarId,
-  };
-}
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -118,6 +42,7 @@ export async function GET(request: NextRequest) {
     eligible: 0,
     emailAlreadySent: 0,
     whatsappAlreadySent: 0,
+    emailSkippedMissing: 0,
     skippedInvalid: 0,
     emailWouldSend: 0,
     whatsappWouldSend: 0,
@@ -149,7 +74,7 @@ export async function GET(request: NextRequest) {
       const emailAlreadySentAt = event?.extendedProperties?.private?.[EMAIL_REMINDER_SENT_KEY];
       const whatsappAlreadySentAt = event?.extendedProperties?.private?.[WHATSAPP_REMINDER_SENT_KEY];
 
-      const payload = buildReminderPayload(event, calendarId);
+      const payload = buildBookingReminderPayload(event, calendarId);
       if (!payload) {
         summary.skippedInvalid += 1;
         continue;
@@ -174,7 +99,11 @@ export async function GET(request: NextRequest) {
 
       if (dryRun) {
         if (shouldSendEmail) {
-          summary.emailWouldSend += 1;
+          if (payload.patientEmail) {
+            summary.emailWouldSend += 1;
+          } else {
+            summary.emailSkippedMissing += 1;
+          }
         }
 
         if (shouldSendWhatsapp) {
@@ -190,12 +119,16 @@ export async function GET(request: NextRequest) {
       const metadataToPatch: Record<string, string> = {};
 
       if (shouldSendEmail) {
-        const emailResult = await sendBookingReminderEmail(payload);
-        if (!emailResult.success) {
-          summary.emailSendFailed += 1;
+        if (!payload.patientEmail) {
+          summary.emailSkippedMissing += 1;
         } else {
-          summary.emailSent += 1;
-          metadataToPatch[EMAIL_REMINDER_SENT_KEY] = nowIso;
+          const emailResult = await sendBookingReminderEmail(payload);
+          if (!emailResult.success) {
+            summary.emailSendFailed += 1;
+          } else {
+            summary.emailSent += 1;
+            metadataToPatch[EMAIL_REMINDER_SENT_KEY] = nowIso;
+          }
         }
       }
 
