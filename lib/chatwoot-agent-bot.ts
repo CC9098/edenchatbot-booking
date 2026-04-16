@@ -945,20 +945,70 @@ export function resolveBookingMenuSelection(
   ]);
 }
 
+function isActivityMessage(message: ChatwootMessage | null | undefined): boolean {
+  const messageType = message?.message_type;
+  return (
+    messageType === 2 ||
+    messageType === '2' ||
+    messageType === 'activity'
+  );
+}
+
+function isVisibleConversationMessage(message: ChatwootMessage | null | undefined): message is ChatwootMessage {
+  const content = message?.content?.trim();
+  if (!content || message?.private) return false;
+  return !isActivityMessage(message);
+}
+
+function sortConversationMessages(messages: ChatwootMessage[] | undefined): ChatwootMessage[] {
+  return [...(messages || [])].sort((left, right) => {
+    const createdAtDiff = (left.created_at || 0) - (right.created_at || 0);
+    if (createdAtDiff !== 0) return createdAtDiff;
+    return Number(left.id || 0) - Number(right.id || 0);
+  });
+}
+
+export function getPreviousVisibleConversationMessage(
+  messages: ChatwootMessage[] | undefined,
+  incomingMessageId: number,
+): ChatwootMessage | undefined {
+  const visibleMessages = sortConversationMessages(messages).filter(isVisibleConversationMessage);
+
+  if (visibleMessages.length === 0) {
+    return undefined;
+  }
+
+  const incomingIndex = visibleMessages.findIndex(
+    (message) => String(message.id ?? '') === String(incomingMessageId),
+  );
+
+  if (incomingIndex > 0) {
+    return visibleMessages[incomingIndex - 1];
+  }
+
+  if (incomingIndex === 0) {
+    return undefined;
+  }
+
+  return visibleMessages.at(-1);
+}
+
+export function shouldAllowGeneralAiReply(
+  messages: ChatwootMessage[] | undefined,
+  incomingMessageId: number,
+): boolean {
+  const previousVisibleMessage = getPreviousVisibleConversationMessage(messages, incomingMessageId);
+  return previousVisibleMessage?.content?.trim() === CHATWOOT_GENERAL_INQUIRY_PROMPT;
+}
+
 export function mapConversationMessagesToLegacyChat(
   messages: ChatwootMessage[] | undefined,
 ): LegacyChatMessage[] {
   return (messages || [])
     .filter((message) => {
       const content = message.content?.trim();
-      const messageType = message.message_type;
-      const isActivity =
-        messageType === 2 ||
-        messageType === '2' ||
-        messageType === 'activity';
-
-      if (!content || message.private) return false;
-      if (isActivity) return false;
+      if (!content) return false;
+      if (!isVisibleConversationMessage(message)) return false;
       if (content === CHATWOOT_GENERAL_INQUIRY_PROMPT) return false;
       if (content === CHATWOOT_GENERAL_MENU_PROMPT) return false;
       if (content === CHATWOOT_GENERAL_MENU_MESSAGE) return false;

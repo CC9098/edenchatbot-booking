@@ -28,6 +28,7 @@ import {
   resolveGeneralMenuSelection,
   resolveMenuSelection,
   sendChatwootBookingDoctorReply,
+  shouldAllowGeneralAiReply,
   verifyChatwootSignature,
 } from '@/lib/chatwoot-agent-bot';
 import { generateLegacyChatResponse } from '@/lib/legacy-chat-response';
@@ -46,8 +47,20 @@ const GENERAL_MENU_REPLY: ChatwootOutgoingMessagePayload = {
   items: [...CHATWOOT_GENERAL_MENU_ITEMS],
 };
 
+const GENERAL_MENU_RETRY_REPLY: ChatwootOutgoingMessagePayload = {
+  content: `${CHATWOOT_GENERAL_MENU_PROMPT}\n\n如想自由輸入問題，請先選擇「其他問題」。`,
+  contentType: 'input_select',
+  items: [...CHATWOOT_GENERAL_MENU_ITEMS],
+};
+
 const CLINIC_MENU_REPLY: ChatwootOutgoingMessagePayload = {
   content: CHATWOOT_CLINIC_MENU_PROMPT,
+  contentType: 'input_select',
+  items: [...CHATWOOT_CLINIC_MENU_ITEMS],
+};
+
+const CLINIC_MENU_RETRY_REPLY: ChatwootOutgoingMessagePayload = {
+  content: `${CHATWOOT_CLINIC_MENU_PROMPT}\n\n請先選擇以上項目；如想問其他內容，請返回上一層再選擇「其他問題」。`,
   contentType: 'input_select',
   items: [...CHATWOOT_CLINIC_MENU_ITEMS],
 };
@@ -196,8 +209,8 @@ export async function POST(request: NextRequest) {
         nextState = 'menu';
         reply = MAIN_MENU_REPLY;
       } else {
-        nextState = 'general_ai';
-        reply = await generateGeneralAiReply(conversation.messages, event.content);
+        nextState = 'general_menu';
+        reply = GENERAL_MENU_RETRY_REPLY;
       }
     } else if (currentState === 'clinic_menu') {
       const clinicSelection = resolveClinicMenuSelection(event.content);
@@ -212,12 +225,17 @@ export async function POST(request: NextRequest) {
         nextState = 'menu';
         reply = MAIN_MENU_REPLY;
       } else {
-        nextState = 'general_ai';
-        reply = await generateGeneralAiReply(conversation.messages, event.content);
+        nextState = 'clinic_menu';
+        reply = CLINIC_MENU_RETRY_REPLY;
       }
     } else {
       if (nextState === 'general_ai') {
-        reply = await generateGeneralAiReply(conversation.messages, event.content);
+        const aiReplyIsArmed = shouldAllowGeneralAiReply(conversation.messages, event.messageId);
+
+        nextState = 'human';
+        reply = aiReplyIsArmed
+          ? await generateGeneralAiReply(conversation.messages, event.content)
+          : null;
       } else if (nextState === 'booking_menu') {
         reply = BOOKING_MENU_REPLY;
       } else if (nextState === 'human') {

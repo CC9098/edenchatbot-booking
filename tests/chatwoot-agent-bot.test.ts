@@ -3,14 +3,17 @@ import assert from 'node:assert/strict';
 
 import {
   CHATWOOT_MAIN_MENU_ITEMS,
+  CHATWOOT_GENERAL_INQUIRY_PROMPT,
   CHATWOOT_MAIN_MENU_MESSAGE,
   ChatwootClient,
   buildChatwootBookingDoctorReply,
   buildDirectBookingReply,
   getFlowState,
+  getPreviousVisibleConversationMessage,
   resolveBookingMenuSelection,
   resolveMenuSelection,
   sendChatwootBookingDoctorReply,
+  shouldAllowGeneralAiReply,
 } from '@/lib/chatwoot-agent-bot';
 
 function jsonResponse(body: unknown, status = 200) {
@@ -242,4 +245,67 @@ test('sendChatwootBookingDoctorReply falls back to plain text when manage-link t
       }
     }
   }
+});
+
+test('shouldAllowGeneralAiReply only when the incoming message directly follows the AI opt-in prompt', () => {
+  const armedMessages = [
+    {
+      id: 101,
+      content: CHATWOOT_GENERAL_INQUIRY_PROMPT,
+      created_at: 100,
+      message_type: 'outgoing',
+      sender_type: 'user',
+    },
+    {
+      id: 102,
+      content: '我想問針灸會唔會好痛',
+      created_at: 200,
+      message_type: 'incoming',
+      sender_type: 'contact',
+    },
+  ];
+
+  const staleMessages = [
+    {
+      id: 201,
+      content: CHATWOOT_GENERAL_INQUIRY_PROMPT,
+      created_at: 100,
+      message_type: 'outgoing',
+      sender_type: 'user',
+    },
+    {
+      id: 202,
+      content: '我幫你跟進，請稍等。',
+      created_at: 150,
+      message_type: 'outgoing',
+      sender_type: 'agent',
+    },
+    {
+      id: 203,
+      content: '好呀',
+      created_at: 200,
+      message_type: 'incoming',
+      sender_type: 'contact',
+    },
+  ];
+
+  assert.equal(shouldAllowGeneralAiReply(armedMessages, 102), true);
+  assert.equal(shouldAllowGeneralAiReply(staleMessages, 203), false);
+});
+
+test('getPreviousVisibleConversationMessage falls back to the latest visible message when Chatwoot has not yet returned the incoming row', () => {
+  const messages = [
+    {
+      id: 301,
+      content: CHATWOOT_GENERAL_INQUIRY_PROMPT,
+      created_at: 100,
+      message_type: 'outgoing',
+      sender_type: 'user',
+    },
+  ];
+
+  assert.equal(
+    getPreviousVisibleConversationMessage(messages, 999)?.content,
+    CHATWOOT_GENERAL_INQUIRY_PROMPT,
+  );
 });
