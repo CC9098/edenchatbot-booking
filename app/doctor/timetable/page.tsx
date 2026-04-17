@@ -104,6 +104,25 @@ function formatHolidayScope(item: HolidayItem): string {
   return `${doctor} / ${clinic}`;
 }
 
+function formatHolidayDateLabel(dateIso: string): string {
+  if (!dateIso) return "未設定日期";
+
+  const date = new Date(`${dateIso}T00:00:00+08:00`);
+  if (Number.isNaN(date.getTime())) return dateIso;
+
+  return new Intl.DateTimeFormat("zh-HK", {
+    timeZone: "Asia/Hong_Kong",
+    month: "numeric",
+    day: "numeric",
+    weekday: "short",
+  }).format(date);
+}
+
+function formatHolidayTimeLabel(item: HolidayItem): string {
+  if (!item.startTime || !item.endTime) return "全日";
+  return `${normalizeDbTime(item.startTime)}-${normalizeDbTime(item.endTime)}`;
+}
+
 export default function DoctorTimetablePage() {
   const [role, setRole] = useState<StaffRole>("assistant");
   const [loading, setLoading] = useState(true);
@@ -149,6 +168,13 @@ export default function DoctorTimetablePage() {
       rows: scheduleRows.filter((row) => row.clinicId === clinic.id),
     }));
   }, [scheduleRows]);
+
+  const activeScheduleCount = useMemo(
+    () => scheduleRows.filter((row) => row.isActive).length,
+    [scheduleRows]
+  );
+
+  const inactiveScheduleCount = scheduleRows.length - activeScheduleCount;
 
   function updateScheduleRow(
     doctorId: DoctorId,
@@ -323,104 +349,144 @@ export default function DoctorTimetablePage() {
               </p>
             </div>
 
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-primary/10 bg-white px-4 py-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">已啟用排班</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900">{activeScheduleCount}</p>
+                <p className="mt-1 text-sm text-slate-500">會同步到預約頁與 timetable embed。</p>
+              </div>
+              <div className="rounded-2xl border border-primary/10 bg-white px-4 py-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">未啟用排班</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900">{inactiveScheduleCount}</p>
+                <p className="mt-1 text-sm text-slate-500">通常代表未開診或未設定 Google Calendar。</p>
+              </div>
+              <div className="rounded-2xl border border-primary/10 bg-white px-4 py-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">休診資料</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900">{holidays.length}</p>
+                <p className="mt-1 text-sm text-slate-500">新增後會同步影響 booking 可預約與提示文案。</p>
+              </div>
+            </div>
+
             {scheduleRowsByClinic.map(({ clinic, rows }) => (
               <section
                 key={clinic.id}
                 className="overflow-hidden rounded-3xl border border-primary/10 bg-white shadow-sm"
               >
                 <div className="border-b border-primary/10 bg-primary/5 px-5 py-4">
-                  <h3 className="text-lg font-semibold text-slate-900">{clinic.nameZh} 時間表</h3>
-                  <p className="mt-1 text-sm text-slate-600">{clinic.hoursText}</p>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">{clinic.nameZh} 時間表</h3>
+                      <p className="mt-1 text-sm text-slate-600">{clinic.hoursText}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">
+                        啟用 {rows.filter((row) => row.isActive).length} 位醫師
+                      </span>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">
+                        共 {rows.length} 個排班卡
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="min-w-[1280px] w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-600">
-                        <th className="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-left font-semibold">醫師</th>
-                        <th className="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-left font-semibold">日曆 ID</th>
-                        <th className="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-center font-semibold">啟用</th>
-                        {DAY_FIELD_ORDER.map((dayKey) => (
-                          <th
-                            key={`${clinic.id}-${dayKey}`}
-                            className="whitespace-nowrap border-b border-slate-200 px-3 py-3 text-left font-semibold"
-                          >
-                            {DAY_LABELS_ZH[dayKey]}
-                          </th>
-                        ))}
-                        <th className="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-left font-semibold">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((row) => {
-                        const saveKey = `${row.doctorId}:${row.clinicId}`;
-                        const isSaving = savingKey === saveKey;
+                <div className="grid gap-4 p-4 xl:grid-cols-2">
+                  {rows.map((row) => {
+                    const saveKey = `${row.doctorId}:${row.clinicId}`;
+                    const isSaving = savingKey === saveKey;
 
-                        return (
-                          <tr key={saveKey} className="align-top">
-                            <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-900">
+                    return (
+                      <article
+                        key={saveKey}
+                        className={`rounded-2xl border px-4 py-4 transition ${
+                          row.isActive
+                            ? "border-primary/15 bg-white shadow-sm"
+                            : "border-slate-200 bg-slate-50/70"
+                        }`}
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-base font-semibold text-slate-900">
                               {DOCTOR_LABELS[row.doctorId]}
-                            </td>
-                            <td className="border-b border-slate-100 px-4 py-4">
+                            </p>
+                            <p className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
+                              {clinic.nameZh}
+                            </p>
+                          </div>
+
+                          <label className="inline-flex items-center gap-2 self-start rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={row.isActive}
+                              onChange={(event) =>
+                                updateScheduleRow(row.doctorId, row.clinicId, (current) => ({
+                                  ...current,
+                                  isActive: event.target.checked,
+                                }))
+                              }
+                              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                            />
+                            {row.isActive ? "已啟用" : "未啟用"}
+                          </label>
+                        </div>
+
+                        <label className="mt-4 block space-y-1.5">
+                          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            Google Calendar ID
+                          </span>
+                          <input
+                            value={row.calendarId}
+                            onChange={(event) =>
+                              updateScheduleRow(row.doctorId, row.clinicId, (current) => ({
+                                ...current,
+                                calendarId: event.target.value,
+                              }))
+                            }
+                            placeholder="Google Calendar ID"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          />
+                        </label>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          {DAY_FIELD_ORDER.map((dayKey) => (
+                            <label key={`${saveKey}-${dayKey}`} className="space-y-1.5">
+                              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                                {DAY_LABELS_ZH[dayKey]}
+                              </span>
                               <input
-                                value={row.calendarId}
+                                value={row.dayInputs[dayKey]}
                                 onChange={(event) =>
                                   updateScheduleRow(row.doctorId, row.clinicId, (current) => ({
                                     ...current,
-                                    calendarId: event.target.value,
+                                    dayInputs: {
+                                      ...current.dayInputs,
+                                      [dayKey]: event.target.value,
+                                    },
                                   }))
                                 }
-                                placeholder="Google Calendar ID"
-                                className="w-[240px] rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                placeholder="11:00-14:00"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                               />
-                            </td>
-                            <td className="border-b border-slate-100 px-4 py-4 text-center">
-                              <input
-                                type="checkbox"
-                                checked={row.isActive}
-                                onChange={(event) =>
-                                  updateScheduleRow(row.doctorId, row.clinicId, (current) => ({
-                                    ...current,
-                                    isActive: event.target.checked,
-                                  }))
-                                }
-                                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                              />
-                            </td>
-                            {DAY_FIELD_ORDER.map((dayKey) => (
-                              <td key={`${saveKey}-${dayKey}`} className="border-b border-slate-100 px-3 py-4">
-                                <input
-                                  value={row.dayInputs[dayKey]}
-                                  onChange={(event) =>
-                                    updateScheduleRow(row.doctorId, row.clinicId, (current) => ({
-                                      ...current,
-                                      dayInputs: {
-                                        ...current.dayInputs,
-                                        [dayKey]: event.target.value,
-                                      },
-                                    }))
-                                  }
-                                  placeholder="11:00-14:00"
-                                  className="w-[150px] rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                />
-                              </td>
-                            ))}
-                            <td className="border-b border-slate-100 px-4 py-4">
-                              <button
-                                type="button"
-                                onClick={() => void handleSaveRow(row)}
-                                disabled={isSaving}
-                                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                <Save className="h-4 w-4" />
-                                {isSaving ? "儲存中..." : "儲存"}
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                            </label>
+                          ))}
+                        </div>
+
+                        <div className="mt-4 flex flex-col gap-3 border-t border-slate-200/80 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-xs leading-5 text-slate-500">
+                            留空代表該日唔應診；多段時段可用逗號分隔。
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void handleSaveRow(row)}
+                            disabled={isSaving}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <Save className="h-4 w-4" />
+                            {isSaving ? "儲存中..." : "儲存排班"}
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               </section>
             ))}
@@ -553,70 +619,73 @@ export default function DoctorTimetablePage() {
                 </p>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="min-w-[760px] w-full border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 text-left text-slate-600">
-                      <th className="border-b border-slate-200 px-4 py-3 font-semibold">作用範圍</th>
-                      <th className="border-b border-slate-200 px-4 py-3 font-semibold">日期</th>
-                      <th className="border-b border-slate-200 px-4 py-3 font-semibold">時間</th>
-                      <th className="border-b border-slate-200 px-4 py-3 font-semibold">原因</th>
-                      <th className="border-b border-slate-200 px-4 py-3 font-semibold">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {holidays.map((item) => (
-                      <tr key={item.id}>
-                        <td className="border-b border-slate-100 px-4 py-4 text-slate-800">{formatHolidayScope(item)}</td>
-                        <td className="border-b border-slate-100 px-4 py-4 text-slate-700">{item.holidayDate}</td>
-                        <td className="border-b border-slate-100 px-4 py-4 text-slate-700">
-                          {item.startTime && item.endTime
-                            ? `${normalizeDbTime(item.startTime)}-${normalizeDbTime(item.endTime)}`
-                            : "全日"}
-                        </td>
-                        <td className="border-b border-slate-100 px-4 py-4 text-slate-700">{item.reason || "—"}</td>
-                        <td className="border-b border-slate-100 px-4 py-4">
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setHolidayForm({
-                                  id: item.id,
-                                  doctorId: item.doctorId ?? "",
-                                  clinicId: item.clinicId ?? "",
-                                  holidayDate: item.holidayDate,
-                                  startTime: normalizeDbTime(item.startTime) ?? "",
-                                  endTime: normalizeDbTime(item.endTime) ?? "",
-                                  reason: item.reason,
-                                })
-                              }
-                              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
-                            >
-                              編輯
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDeleteHoliday(item.id)}
-                              disabled={holidayDeletingId === item.id}
-                              className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              {holidayDeletingId === item.id ? "刪除中..." : "刪除"}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+              <div className="space-y-3 p-4">
+                {holidays.map((item) => (
+                  <article
+                    key={item.id}
+                    className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4"
+                  >
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 space-y-3">
+                        <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700">
+                            {formatHolidayScope(item)}
+                          </span>
+                          <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">
+                            {formatHolidayDateLabel(item.holidayDate)}
+                          </span>
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-700">
+                            {formatHolidayTimeLabel(item)}
+                          </span>
+                        </div>
 
-                    {holidays.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">
-                          暫時未有休診資料
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            原因
+                          </p>
+                          <p className="mt-1 text-sm leading-6 text-slate-800">
+                            {item.reason || "—"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 lg:justify-end">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setHolidayForm({
+                              id: item.id,
+                              doctorId: item.doctorId ?? "",
+                              clinicId: item.clinicId ?? "",
+                              holidayDate: item.holidayDate,
+                              startTime: normalizeDbTime(item.startTime) ?? "",
+                              endTime: normalizeDbTime(item.endTime) ?? "",
+                              reason: item.reason,
+                            })
+                          }
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                        >
+                          編輯
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteHoliday(item.id)}
+                          disabled={holidayDeletingId === item.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          {holidayDeletingId === item.id ? "刪除中..." : "刪除"}
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+
+                {holidays.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
+                    暫時未有休診資料
+                  </div>
+                ) : null}
               </div>
             </div>
           </section>
