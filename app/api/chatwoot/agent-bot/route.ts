@@ -2,19 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   CHATWOOT_BOOKING_MENU_ITEMS,
   CHATWOOT_BOOKING_MENU_PROMPT,
-  CHATWOOT_CLINIC_ADDRESSES_MESSAGE,
-  CHATWOOT_CLINIC_HOURS_MESSAGE,
-  CHATWOOT_CLINIC_MENU_ITEMS,
-  CHATWOOT_CLINIC_MENU_PROMPT,
-  CHATWOOT_FEES_MESSAGE,
-  CHATWOOT_GENERAL_MENU_ITEMS,
-  CHATWOOT_GENERAL_MENU_PROMPT,
-  CHATWOOT_GENERAL_INQUIRY_PROMPT,
   CHATWOOT_HUMAN_ACK,
   CHATWOOT_MAIN_MENU_ITEMS,
   CHATWOOT_MAIN_MENU_PROMPT,
-  CHATWOOT_TIMETABLE_MESSAGE,
   type ChatwootOutgoingMessagePayload,
+  buildChatwootRuntimeCopy,
+  buildChatwootSystemMessageSet,
   buildDirectBookingReply,
   createChatwootClientFromEnv,
   extractIncomingChatwootEvent,
@@ -32,6 +25,7 @@ import {
   verifyChatwootSignature,
 } from '@/lib/chatwoot-agent-bot';
 import { generateLegacyChatResponse } from '@/lib/legacy-chat-response';
+import { loadWidgetChatbotSettings } from '@/lib/widget-chatbot-settings-store';
 
 export const runtime = 'nodejs';
 
@@ -39,30 +33,6 @@ const MAIN_MENU_REPLY: ChatwootOutgoingMessagePayload = {
   content: CHATWOOT_MAIN_MENU_PROMPT,
   contentType: 'input_select',
   items: [...CHATWOOT_MAIN_MENU_ITEMS],
-};
-
-const GENERAL_MENU_REPLY: ChatwootOutgoingMessagePayload = {
-  content: CHATWOOT_GENERAL_MENU_PROMPT,
-  contentType: 'input_select',
-  items: [...CHATWOOT_GENERAL_MENU_ITEMS],
-};
-
-const GENERAL_MENU_RETRY_REPLY: ChatwootOutgoingMessagePayload = {
-  content: `${CHATWOOT_GENERAL_MENU_PROMPT}\n\n如想自由輸入問題，請先選擇「其他問題」。`,
-  contentType: 'input_select',
-  items: [...CHATWOOT_GENERAL_MENU_ITEMS],
-};
-
-const CLINIC_MENU_REPLY: ChatwootOutgoingMessagePayload = {
-  content: CHATWOOT_CLINIC_MENU_PROMPT,
-  contentType: 'input_select',
-  items: [...CHATWOOT_CLINIC_MENU_ITEMS],
-};
-
-const CLINIC_MENU_RETRY_REPLY: ChatwootOutgoingMessagePayload = {
-  content: `${CHATWOOT_CLINIC_MENU_PROMPT}\n\n請先選擇以上項目；如想問其他內容，請返回上一層再選擇「其他問題」。`,
-  contentType: 'input_select',
-  items: [...CHATWOOT_CLINIC_MENU_ITEMS],
 };
 
 const BOOKING_MENU_REPLY: ChatwootOutgoingMessagePayload = {
@@ -74,8 +44,9 @@ const BOOKING_MENU_REPLY: ChatwootOutgoingMessagePayload = {
 async function generateGeneralAiReply(
   messages: Parameters<typeof mapConversationMessagesToLegacyChat>[0],
   userMessage: string,
+  systemMessages: Parameters<typeof mapConversationMessagesToLegacyChat>[1],
 ) {
-  const mappedMessages = mapConversationMessagesToLegacyChat(messages);
+  const mappedMessages = mapConversationMessagesToLegacyChat(messages, systemMessages);
   const aiMessages = replaceLatestUserMessage(mappedMessages, userMessage);
   const { reply } = await generateLegacyChatResponse({
     messages: aiMessages,
@@ -115,7 +86,30 @@ export async function POST(request: NextRequest) {
   try {
     const client = createChatwootClientFromEnv();
     const conversation = await client.getConversationDetails(event.accountId, event.conversationId);
+    const { settings: widgetSettings } = await loadWidgetChatbotSettings();
+    const runtimeCopy = buildChatwootRuntimeCopy(widgetSettings);
+    const runtimeSystemMessages = buildChatwootSystemMessageSet(runtimeCopy);
     const currentAttributes = conversation.custom_attributes || {};
+    const generalMenuReply: ChatwootOutgoingMessagePayload = {
+      content: runtimeCopy.generalMenuPrompt,
+      contentType: 'input_select',
+      items: [...runtimeCopy.generalMenuItems],
+    };
+    const generalMenuRetryReply: ChatwootOutgoingMessagePayload = {
+      content: `${runtimeCopy.generalMenuPrompt}\n\n如想自由輸入問題，請先選擇「其他問題」。`,
+      contentType: 'input_select',
+      items: [...runtimeCopy.generalMenuItems],
+    };
+    const clinicMenuReply: ChatwootOutgoingMessagePayload = {
+      content: runtimeCopy.clinicMenuPrompt,
+      contentType: 'input_select',
+      items: [...runtimeCopy.clinicMenuItems],
+    };
+    const clinicMenuRetryReply: ChatwootOutgoingMessagePayload = {
+      content: `${runtimeCopy.clinicMenuPrompt}\n\n請先選擇以上項目；如想問其他內容，請返回上一層再選擇「其他問題」。`,
+      contentType: 'input_select',
+      items: [...runtimeCopy.clinicMenuItems],
+    };
 
     if (isDuplicateIncomingMessage(currentAttributes, event.messageId)) {
       return NextResponse.json({ ok: true, ignored: 'duplicate_message' });
@@ -136,7 +130,7 @@ export async function POST(request: NextRequest) {
       reply = CHATWOOT_HUMAN_ACK;
     } else if (rootSelection?.kind === 'general') {
       nextState = 'general_menu';
-      reply = GENERAL_MENU_REPLY;
+      reply = generalMenuReply;
     } else if (bookingSelection?.kind === 'new_booking') {
       nextState = 'menu';
       reply = buildDirectBookingReply();
@@ -191,50 +185,68 @@ export async function POST(request: NextRequest) {
       nextState = 'booking_menu';
       reply = BOOKING_MENU_REPLY;
     } else if (currentState === 'general_menu') {
-      const generalSelection = resolveGeneralMenuSelection(event.content);
+      const generalSelection = resolveGeneralMenuSelection(event.content, {
+        labels: {
+          fees: runtimeCopy.generalMenuItems[0]?.title,
+          clinic: runtimeCopy.generalMenuItems[1]?.title,
+          timetable: runtimeCopy.generalMenuItems[2]?.title,
+          other: runtimeCopy.generalMenuItems[3]?.title,
+          main: runtimeCopy.generalMenuItems[4]?.title,
+        },
+      });
 
       if (generalSelection?.kind === 'fees') {
         nextState = 'general_menu';
-        reply = CHATWOOT_FEES_MESSAGE;
+        reply = runtimeCopy.feesMessage;
       } else if (generalSelection?.kind === 'clinic') {
         nextState = 'clinic_menu';
-        reply = CLINIC_MENU_REPLY;
+        reply = clinicMenuReply;
       } else if (generalSelection?.kind === 'timetable') {
         nextState = 'general_menu';
-        reply = CHATWOOT_TIMETABLE_MESSAGE;
+        reply = runtimeCopy.timetableMessage;
       } else if (generalSelection?.kind === 'other') {
         nextState = 'general_ai';
-        reply = CHATWOOT_GENERAL_INQUIRY_PROMPT;
+        reply = runtimeCopy.generalInquiryPrompt;
       } else if (generalSelection?.kind === 'main') {
         nextState = 'menu';
         reply = MAIN_MENU_REPLY;
       } else {
         nextState = 'general_menu';
-        reply = GENERAL_MENU_RETRY_REPLY;
+        reply = generalMenuRetryReply;
       }
     } else if (currentState === 'clinic_menu') {
-      const clinicSelection = resolveClinicMenuSelection(event.content);
+      const clinicSelection = resolveClinicMenuSelection(event.content, {
+        labels: {
+          hours: runtimeCopy.clinicMenuItems[0]?.title,
+          addresses: runtimeCopy.clinicMenuItems[1]?.title,
+          main: runtimeCopy.clinicMenuItems[2]?.title,
+        },
+      });
 
       if (clinicSelection?.kind === 'hours') {
         nextState = 'clinic_menu';
-        reply = CHATWOOT_CLINIC_HOURS_MESSAGE;
+        reply = runtimeCopy.clinicHoursMessage;
       } else if (clinicSelection?.kind === 'addresses') {
         nextState = 'clinic_menu';
-        reply = CHATWOOT_CLINIC_ADDRESSES_MESSAGE;
+        reply = runtimeCopy.clinicAddressesMessage;
       } else if (clinicSelection?.kind === 'main') {
         nextState = 'menu';
         reply = MAIN_MENU_REPLY;
       } else {
         nextState = 'clinic_menu';
-        reply = CLINIC_MENU_RETRY_REPLY;
+        reply = clinicMenuRetryReply;
       }
     } else {
       if (nextState === 'general_ai') {
-        const aiReplyIsArmed = shouldAllowGeneralAiReply(conversation.messages, event.messageId);
+        const aiReplyIsArmed = shouldAllowGeneralAiReply(
+          conversation.messages,
+          event.messageId,
+          runtimeCopy.generalInquiryPrompt,
+        );
 
         nextState = 'human';
         reply = aiReplyIsArmed
-          ? await generateGeneralAiReply(conversation.messages, event.content)
+          ? await generateGeneralAiReply(conversation.messages, event.content, runtimeSystemMessages)
           : null;
       } else if (nextState === 'booking_menu') {
         reply = BOOKING_MENU_REPLY;

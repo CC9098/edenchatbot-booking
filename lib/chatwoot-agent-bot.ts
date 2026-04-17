@@ -3,7 +3,11 @@ import type { LegacyChatMessage } from '@/lib/legacy-chat-response';
 import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import { buildManageBookingUrl, buildPublicUrl } from '@/lib/public-url';
 import { createManageAccessToken } from '@/lib/widget-manage-token';
-import { DEFAULT_WIDGET_CHATBOT_SETTINGS } from '@/lib/widget-chatbot-settings';
+import {
+  DEFAULT_WIDGET_CHATBOT_SETTINGS,
+  getWidgetChatbotMenuLabelByTarget,
+  type WidgetChatbotSettings,
+} from '@/lib/widget-chatbot-settings';
 import {
   getClinicAddressLines,
   getClinicHoursLines,
@@ -22,40 +26,8 @@ export const CHATWOOT_MAIN_MENU_MESSAGE = `${CHATWOOT_MAIN_MENU_PROMPT}
 3. 想直接與姑娘對話`;
 
 const widgetSettings = DEFAULT_WIDGET_CHATBOT_SETTINGS;
-const clinicRouteLinkLines = getClinicRouteLinks()
-  .map(({ label, href }) => `${label}: ${href}`)
-  .join('\n');
-
-export const CHATWOOT_GENERAL_MENU_PROMPT = widgetSettings.flows.clinic.prompt;
-export const CHATWOOT_GENERAL_MENU_ITEMS = [
-  { title: '收費', value: 'fees' },
-  { title: '診所資訊', value: 'clinic' },
-  { title: '醫師時間表', value: 'timetable' },
-  { title: '其他問題', value: 'other' },
-  { title: '返回主選單', value: 'main' },
-] as const;
-export const CHATWOOT_GENERAL_MENU_MESSAGE = `${CHATWOOT_GENERAL_MENU_PROMPT}
-1. 收費
-2. 診所資訊
-3. 醫師時間表
-4. 其他問題
-5. 返回主選單`;
-
-export const CHATWOOT_CLINIC_MENU_PROMPT = widgetSettings.flows.clinic.prompt;
-export const CHATWOOT_CLINIC_MENU_ITEMS = [
-  { title: widgetSettings.flows.clinic.hoursButtonLabel, value: 'hours' },
-  { title: widgetSettings.flows.clinic.addressesButtonLabel, value: 'addresses' },
-  { title: widgetSettings.flows.clinic.backButtonLabel, value: 'main' },
-] as const;
-export const CHATWOOT_CLINIC_MENU_MESSAGE = `${CHATWOOT_CLINIC_MENU_PROMPT}
-1. ${widgetSettings.flows.clinic.hoursButtonLabel}
-2. ${widgetSettings.flows.clinic.addressesButtonLabel}
-3. ${widgetSettings.flows.clinic.backButtonLabel}`;
-
 export const CHATWOOT_GENERAL_INQUIRY_PROMPT =
   '可以呀，請直接講你想問嘅內容，我會盡快幫你。';
-
-export const CHATWOOT_FEES_MESSAGE = widgetSettings.flows.fees.reply;
 
 export const CHATWOOT_BOOKING_MENU_PROMPT =
   '你好，請選擇你想處理的預約項目：';
@@ -73,12 +45,6 @@ export const CHATWOOT_BOOKING_MENU_MESSAGE = `${CHATWOOT_BOOKING_MENU_PROMPT}
 
 export const CHATWOOT_HUMAN_ACK =
   '好，我幫你轉交姑娘跟進，請稍等。';
-
-export const CHATWOOT_TIMETABLE_MESSAGE = widgetSettings.flows.timetable.reply;
-
-export const CHATWOOT_CLINIC_HOURS_MESSAGE = `${getClinicHoursLines().join('\n')}\n\n${widgetSettings.flows.clinic.hoursClosingText}`;
-
-export const CHATWOOT_CLINIC_ADDRESSES_MESSAGE = `${widgetSettings.flows.clinic.addressesPrompt}\n\n${getClinicAddressLines().join('\n\n')}${clinicRouteLinkLines ? `\n\n${clinicRouteLinkLines}` : ''}`;
 
 export const CHATWOOT_FLOW_STATE_ATTRIBUTE = 'eden_flow_state';
 export const CHATWOOT_LAST_INCOMING_MESSAGE_ID_ATTRIBUTE = 'eden_last_incoming_message_id';
@@ -151,6 +117,20 @@ export interface ChatwootOutgoingMessagePayload {
   };
 }
 
+export interface ChatwootRuntimeCopy {
+  generalMenuPrompt: string;
+  generalMenuItems: ChatwootSelectItem[];
+  generalMenuMessage: string;
+  clinicMenuPrompt: string;
+  clinicMenuItems: ChatwootSelectItem[];
+  clinicMenuMessage: string;
+  generalInquiryPrompt: string;
+  feesMessage: string;
+  timetableMessage: string;
+  clinicHoursMessage: string;
+  clinicAddressesMessage: string;
+}
+
 type MenuSelectionKind = 'general' | 'booking' | 'reschedule' | 'cancel' | 'human';
 type GeneralSelectionKind = 'fees' | 'clinic' | 'timetable' | 'other' | 'main';
 type ClinicSelectionKind = 'hours' | 'addresses' | 'main';
@@ -160,6 +140,105 @@ type ChatwootManageBookingAction = 'reschedule' | 'cancel';
 const CHATWOOT_DELIVERY_TERMINAL_STATUSES = new Set(['failed', 'delivered', 'read']);
 const CHATWOOT_DELIVERY_POLL_ATTEMPTS = 4;
 const CHATWOOT_DELIVERY_POLL_INTERVAL_MS = 1000;
+
+function buildMenuMessage(prompt: string, items: readonly ChatwootSelectItem[]): string {
+  const numberedItems = items.map((item, index) => `${index + 1}. ${item.title}`).join('\n');
+  return `${prompt}\n${numberedItems}`;
+}
+
+function buildClinicRouteLinkLines(): string {
+  return getClinicRouteLinks()
+    .map(({ label, href }) => `${label}: ${href}`)
+    .join('\n');
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildMenuSelectionPattern(
+  numericIndex: number,
+  labels: Array<string | null | undefined>,
+  allowNumeric = true,
+): RegExp {
+  const normalizedLabels = Array.from(
+    new Set(
+      labels
+        .map((label) => label?.trim())
+        .filter((label): label is string => Boolean(label))
+        .map((label) => escapeRegExp(label)),
+    ),
+  );
+  const numericSegment = allowNumeric ? `${numericIndex}(?:[.)、\\s-]|$)|` : '';
+  return new RegExp(`^(?:${numericSegment}${normalizedLabels.join('|')})(?:[:：\\s-]|$)`, 'u');
+}
+
+export function buildChatwootRuntimeCopy(
+  settings: WidgetChatbotSettings = DEFAULT_WIDGET_CHATBOT_SETTINGS,
+): ChatwootRuntimeCopy {
+  const generalMenuItems: ChatwootSelectItem[] = [
+    { title: getWidgetChatbotMenuLabelByTarget(settings, 'fees'), value: 'fees' },
+    { title: getWidgetChatbotMenuLabelByTarget(settings, 'clinic'), value: 'clinic' },
+    { title: getWidgetChatbotMenuLabelByTarget(settings, 'timetable'), value: 'timetable' },
+    { title: getWidgetChatbotMenuLabelByTarget(settings, 'other'), value: 'other' },
+    { title: settings.flows.common.returnMainButtonLabel, value: 'main' },
+  ];
+  const clinicMenuItems: ChatwootSelectItem[] = [
+    { title: settings.flows.clinic.hoursButtonLabel, value: 'hours' },
+    { title: settings.flows.clinic.addressesButtonLabel, value: 'addresses' },
+    { title: settings.flows.clinic.backButtonLabel, value: 'main' },
+  ];
+  const clinicRouteLinkLines = buildClinicRouteLinkLines();
+
+  return {
+    generalMenuPrompt: settings.flows.clinic.prompt,
+    generalMenuItems,
+    generalMenuMessage: buildMenuMessage(settings.flows.clinic.prompt, generalMenuItems),
+    clinicMenuPrompt: settings.flows.clinic.prompt,
+    clinicMenuItems,
+    clinicMenuMessage: buildMenuMessage(settings.flows.clinic.prompt, clinicMenuItems),
+    generalInquiryPrompt: CHATWOOT_GENERAL_INQUIRY_PROMPT,
+    feesMessage: settings.flows.fees.reply,
+    timetableMessage: settings.flows.timetable.reply,
+    clinicHoursMessage: `${getClinicHoursLines().join('\n')}\n\n${settings.flows.clinic.hoursClosingText}`,
+    clinicAddressesMessage: `${settings.flows.clinic.addressesPrompt}\n\n${getClinicAddressLines().join('\n\n')}${clinicRouteLinkLines ? `\n\n${clinicRouteLinkLines}` : ''}`,
+  };
+}
+
+export function buildChatwootSystemMessageSet(
+  copy: ChatwootRuntimeCopy = buildChatwootRuntimeCopy(),
+): Set<string> {
+  return new Set([
+    copy.generalInquiryPrompt,
+    copy.generalMenuPrompt,
+    copy.generalMenuMessage,
+    copy.clinicMenuPrompt,
+    copy.clinicMenuMessage,
+    copy.feesMessage,
+    CHATWOOT_BOOKING_MENU_PROMPT,
+    CHATWOOT_BOOKING_MENU_MESSAGE,
+    CHATWOOT_HUMAN_ACK,
+    copy.timetableMessage,
+    copy.clinicHoursMessage,
+    copy.clinicAddressesMessage,
+    CHATWOOT_MAIN_MENU_PROMPT,
+    CHATWOOT_MAIN_MENU_MESSAGE,
+  ]);
+}
+
+const DEFAULT_CHATWOOT_RUNTIME_COPY = buildChatwootRuntimeCopy(widgetSettings);
+const DEFAULT_CHATWOOT_SYSTEM_MESSAGES = buildChatwootSystemMessageSet(DEFAULT_CHATWOOT_RUNTIME_COPY);
+
+export const CHATWOOT_GENERAL_MENU_PROMPT = DEFAULT_CHATWOOT_RUNTIME_COPY.generalMenuPrompt;
+export const CHATWOOT_GENERAL_MENU_ITEMS = DEFAULT_CHATWOOT_RUNTIME_COPY.generalMenuItems;
+export const CHATWOOT_GENERAL_MENU_MESSAGE = DEFAULT_CHATWOOT_RUNTIME_COPY.generalMenuMessage;
+export const CHATWOOT_CLINIC_MENU_PROMPT = DEFAULT_CHATWOOT_RUNTIME_COPY.clinicMenuPrompt;
+export const CHATWOOT_CLINIC_MENU_ITEMS = DEFAULT_CHATWOOT_RUNTIME_COPY.clinicMenuItems;
+export const CHATWOOT_CLINIC_MENU_MESSAGE = DEFAULT_CHATWOOT_RUNTIME_COPY.clinicMenuMessage;
+export const CHATWOOT_FEES_MESSAGE = DEFAULT_CHATWOOT_RUNTIME_COPY.feesMessage;
+export const CHATWOOT_TIMETABLE_MESSAGE = DEFAULT_CHATWOOT_RUNTIME_COPY.timetableMessage;
+export const CHATWOOT_CLINIC_HOURS_MESSAGE = DEFAULT_CHATWOOT_RUNTIME_COPY.clinicHoursMessage;
+export const CHATWOOT_CLINIC_ADDRESSES_MESSAGE = DEFAULT_CHATWOOT_RUNTIME_COPY.clinicAddressesMessage;
 
 export class ChatwootClient {
   constructor(
@@ -865,49 +944,59 @@ export function resolveMenuSelection(
 
 export function resolveGeneralMenuSelection(
   content: string,
-  options?: { allowNumeric?: boolean },
+  options?: {
+    allowNumeric?: boolean;
+    labels?: Partial<Record<Exclude<GeneralSelectionKind, 'main'> | 'main', string>>;
+  },
 ): { kind: GeneralSelectionKind; remainder: string } | null {
   const allowNumeric = options?.allowNumeric ?? true;
 
   return resolveSelection(content, [
     {
       kind: 'fees',
-      pattern: allowNumeric
-        ? /^(?:1(?:[.)、\s-]|$)|收費(?:[:：\s-]|$)|收费(?:[:：\s-]|$))/u
-        : /^(?:收費(?:[:：\s-]|$)|收费(?:[:：\s-]|$))/u,
+      pattern: buildMenuSelectionPattern(1, [options?.labels?.fees, '收費', '收费'], allowNumeric),
     },
     {
       kind: 'clinic',
-      pattern: allowNumeric
-        ? /^(?:2(?:[.)、\s-]|$)|診所資訊(?:[:：\s-]|$)|诊所资讯(?:[:：\s-]|$))/u
-        : /^(?:診所資訊(?:[:：\s-]|$)|诊所资讯(?:[:：\s-]|$))/u,
+      pattern: buildMenuSelectionPattern(2, [options?.labels?.clinic, '診所資訊', '诊所资讯'], allowNumeric),
     },
     {
       kind: 'timetable',
-      pattern: allowNumeric
-        ? /^(?:3(?:[.)、\s-]|$)|醫師時間表(?:[:：\s-]|$)|医师时间表(?:[:：\s-]|$))/u
-        : /^(?:醫師時間表(?:[:：\s-]|$)|医师时间表(?:[:：\s-]|$))/u,
+      pattern: buildMenuSelectionPattern(3, [options?.labels?.timetable, '醫師時間表', '医师时间表'], allowNumeric),
     },
     {
       kind: 'other',
-      pattern: allowNumeric
-        ? /^(?:4(?:[.)、\s-]|$)|其他問題(?:[:：\s-]|$)|其他问题(?:[:：\s-]|$))/u
-        : /^(?:其他問題(?:[:：\s-]|$)|其他问题(?:[:：\s-]|$))/u,
+      pattern: buildMenuSelectionPattern(4, [options?.labels?.other, '其他問題', '其他问题'], allowNumeric),
     },
     {
       kind: 'main',
-      pattern: allowNumeric
-        ? /^(?:5(?:[.)、\s-]|$)|返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/u
-        : /^(?:返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/u,
+      pattern: buildMenuSelectionPattern(5, [options?.labels?.main, '返回主選單', '返回主菜单'], allowNumeric),
     },
   ]);
 }
 
-export function resolveClinicMenuSelection(content: string): { kind: ClinicSelectionKind; remainder: string } | null {
+export function resolveClinicMenuSelection(
+  content: string,
+  options?: {
+    allowNumeric?: boolean;
+    labels?: Partial<Record<ClinicSelectionKind, string>>;
+  },
+): { kind: ClinicSelectionKind; remainder: string } | null {
+  const allowNumeric = options?.allowNumeric ?? true;
+
   return resolveSelection(content, [
-    { kind: 'hours', pattern: /^(?:1(?:[.)、\s-]|$)|營業時間(?:[:：\s-]|$)|营业时间(?:[:：\s-]|$))/u },
-    { kind: 'addresses', pattern: /^(?:2(?:[.)、\s-]|$)|地址(?:[:：\s-]|$)|路線圖(?:[:：\s-]|$)|路线图(?:[:：\s-]|$))/u },
-    { kind: 'main', pattern: /^(?:3(?:[.)、\s-]|$)|返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/u },
+    {
+      kind: 'hours',
+      pattern: buildMenuSelectionPattern(1, [options?.labels?.hours, '營業時間', '营业时间'], allowNumeric),
+    },
+    {
+      kind: 'addresses',
+      pattern: buildMenuSelectionPattern(2, [options?.labels?.addresses, '地址', '路線圖', '路线图'], allowNumeric),
+    },
+    {
+      kind: 'main',
+      pattern: buildMenuSelectionPattern(3, [options?.labels?.main, '返回主選單', '返回主菜单'], allowNumeric),
+    },
   ]);
 }
 
@@ -996,33 +1085,26 @@ export function getPreviousVisibleConversationMessage(
 export function shouldAllowGeneralAiReply(
   messages: ChatwootMessage[] | undefined,
   incomingMessageId: number,
+  expectedPrompt = CHATWOOT_GENERAL_INQUIRY_PROMPT,
 ): boolean {
   const previousVisibleMessage = getPreviousVisibleConversationMessage(messages, incomingMessageId);
-  return previousVisibleMessage?.content?.trim() === CHATWOOT_GENERAL_INQUIRY_PROMPT;
+  return previousVisibleMessage?.content?.trim() === expectedPrompt;
 }
 
 export function mapConversationMessagesToLegacyChat(
   messages: ChatwootMessage[] | undefined,
+  systemMessages: Iterable<string> = DEFAULT_CHATWOOT_SYSTEM_MESSAGES,
 ): LegacyChatMessage[] {
+  const hiddenSystemMessages = systemMessages instanceof Set
+    ? systemMessages
+    : new Set(systemMessages);
+
   return (messages || [])
     .filter((message) => {
       const content = message.content?.trim();
       if (!content) return false;
       if (!isVisibleConversationMessage(message)) return false;
-      if (content === CHATWOOT_GENERAL_INQUIRY_PROMPT) return false;
-      if (content === CHATWOOT_GENERAL_MENU_PROMPT) return false;
-      if (content === CHATWOOT_GENERAL_MENU_MESSAGE) return false;
-      if (content === CHATWOOT_CLINIC_MENU_PROMPT) return false;
-      if (content === CHATWOOT_CLINIC_MENU_MESSAGE) return false;
-      if (content === CHATWOOT_FEES_MESSAGE) return false;
-      if (content === CHATWOOT_BOOKING_MENU_PROMPT) return false;
-      if (content === CHATWOOT_BOOKING_MENU_MESSAGE) return false;
-      if (content === CHATWOOT_HUMAN_ACK) return false;
-      if (content === CHATWOOT_TIMETABLE_MESSAGE) return false;
-      if (content === CHATWOOT_CLINIC_HOURS_MESSAGE) return false;
-      if (content === CHATWOOT_CLINIC_ADDRESSES_MESSAGE) return false;
-      if (content === CHATWOOT_MAIN_MENU_PROMPT) return false;
-      if (content === CHATWOOT_MAIN_MENU_MESSAGE) return false;
+      if (hiddenSystemMessages.has(content)) return false;
       if (isPureSelection(content)) return false;
       return true;
     })
