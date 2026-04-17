@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { AuthError, getCurrentUser, requireStaffRole } from '@/lib/auth-helpers';
 import { createServiceClient } from '@/lib/supabase';
+import { invalidateTimetableConsumers } from '@/lib/timetable-cache-invalidation';
 import { isClinicId, isDoctorId } from '@/shared/clinic-data';
 
 export const dynamic = 'force-dynamic';
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create holiday' }, { status: 500 });
     }
 
+    invalidateTimetableConsumers();
     return NextResponse.json({ id: data.id }, { status: 201 });
   } catch (error) {
     if (error instanceof AuthError) {

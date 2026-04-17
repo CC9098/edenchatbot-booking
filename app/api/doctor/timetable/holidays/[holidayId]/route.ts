@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { AuthError, getCurrentUser, requireStaffRole } from '@/lib/auth-helpers';
 import { createServiceClient } from '@/lib/supabase';
+import { invalidateTimetableConsumers } from '@/lib/timetable-cache-invalidation';
 import { isClinicId, isDoctorId } from '@/shared/clinic-data';
 
 export const dynamic = 'force-dynamic';
@@ -89,6 +90,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Failed to update holiday' }, { status: 500 });
     }
 
+    invalidateTimetableConsumers();
     return NextResponse.json({ id: data.id });
   } catch (error) {
     if (error instanceof AuthError) {
@@ -127,6 +129,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Failed to delete holiday' }, { status: 500 });
     }
 
+    invalidateTimetableConsumers();
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof AuthError) {
