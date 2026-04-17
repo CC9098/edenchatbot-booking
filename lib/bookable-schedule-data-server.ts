@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
+import { getUpcomingHolidayNotices } from '@/lib/holiday-notices';
 import {
   CLINIC_BY_ID,
   DOCTORS,
@@ -58,7 +59,10 @@ function formatWeeklySchedule(schedule: WeeklySchedule): string {
 }
 
 export async function getPublicBookableScheduleData(): Promise<BookableDoctorSchedule[]> {
-  const mappings = await getActiveScheduleMappings();
+  const [mappings, holidayNotices] = await Promise.all([
+    getActiveScheduleMappings(),
+    getUpcomingHolidayNotices(),
+  ]);
   const doctorMap = new Map<string, BookableDoctorSchedule>();
 
   for (const mapping of mappings) {
@@ -121,6 +125,24 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
 
       return {
         ...doctor,
+        bookingNotices: holidayNotices
+          .filter((notice) => {
+            if (notice.doctorId && notice.doctorId !== doctor.doctorId) {
+              return false;
+            }
+
+            if (!notice.clinicId) {
+              return true;
+            }
+
+            return clinics.some((clinic) => clinic.clinicId === notice.clinicId);
+          })
+          .map((notice) => ({
+            id: notice.id,
+            text: notice.bookingText,
+            clinicId: notice.clinicId,
+            clinicNameZh: notice.clinicNameZh,
+          })),
         clinics,
         summary: clinics
           .map((clinic) => `${clinic.clinicNameZh}：${clinic.summary}`)

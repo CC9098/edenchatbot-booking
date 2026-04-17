@@ -432,7 +432,7 @@ export default function DoctorTimetablePage() {
                 {holidayForm.id ? "編輯休診資料" : "新增休診資料"}
               </h2>
               <p className="mt-1 text-sm text-slate-600">
-                不填開始／結束時間即代表全日休診。`doctor` 或 `clinic` 留空可作用於全體。
+                不填開始／結束時間即代表全日休診。`doctor` 或 `clinic` 留空可作用於全體。原因會同步顯示喺 booking 頁黃色提示。
               </p>
 
               <form className="mt-5 space-y-4" onSubmit={handleHolidaySubmit}>
@@ -520,7 +520,7 @@ export default function DoctorTimetablePage() {
                       setHolidayForm((prev) => ({ ...prev, reason: event.target.value }))
                     }
                     rows={3}
-                    placeholder="例如：年假、進修休診、公眾假期休息"
+                    placeholder="例如：23/4(四)員工活動日，全線休息一日"
                     className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>

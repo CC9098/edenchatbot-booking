@@ -538,6 +538,35 @@ export function BookingTabFlow({
     () => doctorOptions.find((doctor) => doctor.doctorId === doctorId),
     [doctorId, doctorOptions]
   );
+  const selectedDoctorNotices = useMemo(() => {
+    if (!selectedDoctor) return [];
+
+    const notices: Array<{
+      id: string;
+      text: string;
+      clinicId?: ClinicId;
+      clinicNameZh?: string;
+      isStatic?: boolean;
+    }> = [];
+
+    if (selectedDoctor.scheduleNote) {
+      notices.push({
+        id: `static:${selectedDoctor.doctorId}`,
+        text: selectedDoctor.scheduleNote,
+        isStatic: true,
+      });
+    }
+
+    for (const notice of selectedDoctor.bookingNotices ?? []) {
+      if (clinicId && notice.clinicId && notice.clinicId !== clinicId) {
+        continue;
+      }
+
+      notices.push(notice);
+    }
+
+    return notices;
+  }, [clinicId, selectedDoctor]);
   const selectedClinic = useMemo(
     () => clinicOptions.find((clinic) => clinic.clinicId === clinicId),
     [clinicId, clinicOptions]
@@ -1416,10 +1445,21 @@ export function BookingTabFlow({
                 </div>
               </div>
 
-              {selectedDoctor.scheduleNote && (
+              {selectedDoctorNotices.length > 0 && (
                 <div className="mt-4 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>{selectedDoctor.scheduleNote}</p>
+                  <div className="space-y-2">
+                    {selectedDoctorNotices.map((notice) => (
+                      <div key={notice.id} className="flex flex-wrap items-start gap-2">
+                        {!clinicId && notice.clinicNameZh && !notice.isStatic ? (
+                          <span className="rounded-full border border-amber-300/80 bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                            {notice.clinicNameZh}
+                          </span>
+                        ) : null}
+                        <p className="flex-1">{notice.text}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

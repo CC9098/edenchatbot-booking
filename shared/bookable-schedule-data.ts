@@ -10,6 +10,13 @@ export type BookableClinicSchedule = {
   summary: string;
 };
 
+export type BookableScheduleNotice = {
+  id: string;
+  text: string;
+  clinicId?: ClinicId;
+  clinicNameZh?: string;
+};
+
 export type BookableDoctorSchedule = {
   doctorId: DoctorId;
   doctorNameZh: string;
@@ -17,6 +24,7 @@ export type BookableDoctorSchedule = {
   avatarSrc?: string;
   avatarObjectPosition?: string;
   scheduleNote?: string;
+  bookingNotices?: BookableScheduleNotice[];
   bookingTreatmentLabel: string;
   bookingTreatmentOptions: BookingTreatmentOption[];
   bookingSlotMinutes: number;
