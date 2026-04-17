@@ -18,15 +18,15 @@ function normalizeBaseUrl(value?: string | null): string | null {
 }
 
 export function getPublicWebBaseUrl() {
+  if (typeof window !== "undefined" && /^https?:\/\//.test(window.location.origin)) {
+    return window.location.origin;
+  }
+
   const configured =
     normalizeBaseUrl(process.env.NEXT_PUBLIC_BASE_URL) ||
     normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL);
 
   if (configured) return configured;
-
-  if (typeof window !== "undefined" && /^https?:\/\//.test(window.location.origin)) {
-    return window.location.origin;
-  }
 
   return DEFAULT_PUBLIC_WEB_URL;
 }
