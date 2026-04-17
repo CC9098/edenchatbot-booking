@@ -180,6 +180,7 @@
   <header>
     <h2>⚕ Eden 系統架構總覽</h2>
     <p>EdenChatbotBooking · Next.js 14 · Supabase · Google Calendar · Gemini</p>
+    <p>Last updated: 2026-04-15</p>
   </header>
 
   <div class="tabs">
@@ -226,7 +227,8 @@
         <h3>B-Mode Intake</h3>
         <ul>
           <li>必填：姓名、電話、email、首診/覆診、醫師、診所、日期時段</li>
-          <li>首診額外：身份證、DOB、性別、過敏、用藥、症狀</li>
+          <li>可選：<code>treatmentOptions</code>（按共享 booking treatment option IDs 驗證）</li>
+          <li>首診額外：DOB、身份證（可選）、性別、過敏、用藥、症狀</li>
         </ul>
       </div>
       <div class="card">
@@ -234,7 +236,33 @@
         <ul>
           <li><code>POST /api/availability</code> 查時段</li>
           <li><code>POST /api/booking</code> 建立預約</li>
+          <li><code>POST /api/doctor/bookings</code> 姑娘代客建立預約（staff-auth + booking_intake）</li>
           <li>同步 <code>booking_intake</code> + Google Calendar + Gmail</li>
+          <li><code>GET /api/cron/booking-reminders</code>（CRON_SECRET 保護；掃描 now+23h 至 now+25h 視窗，派發 24h 提醒）</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>WhatsApp 通知策略</h3>
+        <ul>
+          <li><code>lib/chatwoot-whatsapp.ts</code> 採用 template-preferred 發送</li>
+          <li>同步模板會先按設定的 template 名稱順序排序，再按語言偏好排序</li>
+          <li>模板參數候選已支援 body-only 組合（適配移除 URL 按鈕後只留 body placeholders 的確認模板）</li>
+          <li>manage-link URL 按鈕參數會優先抽取 path+query（配合模板 base domain 串接），再 fallback token</li>
+          <li><code>/api/chatwoot/agent-bot</code> 的「預約服務」會進入子選單（預約/更期/取消）；更期或取消會發對應 manage-link 訊息</li>
+          <li>manage-link 發送流程仍為：優先 template 按鈕，輪詢送達狀態，失敗訊息刪除後 fallback 文字</li>
+          <li><code>lib/widget-manage-token.ts</code> 抽出 manage access token 簽署/編碼邏輯，供 Chatwoot 及 widget booking 共用</li>
+          <li><code>/manage/[...legacy]</code> + <code>lib/legacy-manage-link.ts</code> 會處理 legacy 模板連結並 redirect 到 canonical manage URL</li>
+          <li>如屬 active conversation 且 template 失敗，fallback 文字訊息避免中斷送達</li>
+          <li><code>lib/whatsapp-booking.ts</code> 統一確認/取消/改期模板參數</li>
+          <li><code>lib/booking-reminder-payload.ts</code> 統一 24h 提醒 payload 解析；若缺 email 會跳過 email 但不阻斷 WhatsApp 提醒</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Holiday 封鎖來源</h3>
+        <ul>
+          <li><code>POST /api/availability</code> 透過 <code>lib/holiday-store.ts</code> 取假期封鎖資料</li>
+          <li>來源為 Supabase <code>holidays</code> + legacy storage，並做去重合併</li>
+          <li>單一來源失敗時，如另一來源有資料，仍可維持封鎖判斷</li>
         </ul>
       </div>
     </div>
@@ -244,7 +272,7 @@
     <div class="grid">
       <div class="card"><h3>公開頁</h3><p><code>/</code>, <code>/articles</code>, <code>/courses</code>, <code>/chat</code>, <code>/booking</code></p></div>
       <div class="card"><h3>操作頁</h3><p><code>/reschedule</code>, <code>/cancel</code>, <code>/embed</code></p></div>
-      <div class="card"><h3>後台頁</h3><p><code>/doctor</code>, <code>/doctor/patients/[id]</code>, <code>/doctor/content/articles</code></p></div>
+      <div class="card"><h3>後台頁</h3><p><code>/doctor</code>, <code>/doctor/booking</code>, <code>/doctor/patients/[id]</code>, <code>/doctor/content/articles</code></p></div>
     </div>
   </section>
 
@@ -254,8 +282,12 @@
         <h3>核心 API</h3>
         <ul>
           <li><code>/api/chat</code> (legacy/simple)</li>
+          <li><code>/api/chat/booking/create</code> (bridge booking create；支援可選 treatmentOptions)</li>
           <li><code>/api/chat/v2</code> (main intelligent flow)</li>
           <li><code>/api/availability</code> + <code>/api/booking</code></li>
+          <li><code>/api/doctor/bookings</code> (staff console 代約建立)</li>
+          <li><code>/api/cron/pos-sync-daily</code> (CRON_SECRET 保護；輸出每日 POS sync 候選清單/摘要)</li>
+          <li><code>/api/cron/booking-reminders</code> (CRON_SECRET 保護；24h 提醒派發，支援 <code>dryRun=1</code>)</li>
         </ul>
       </div>
       <div class="card">

@@ -1,6 +1,6 @@
 # CLAUDE_CONTEXT
 
-Last updated: 2026-02-17
+Last updated: 2026-04-15
 
 ## 1) Purpose (AI Quick-Action Layer)
 
@@ -59,13 +59,22 @@ Use this file first when you need to decide:
 ### C) Booking flow (availability, create, cancel, reschedule)
 - `app/api/availability/route.ts`
 - `app/api/booking/route.ts`
+- `app/api/booking-whatsapp/route.ts`
+- `app/api/doctor/bookings/route.ts`
+- `app/api/chat/booking/create/route.ts`
 - `lib/booking-helpers.ts`
+- `lib/holiday-store.ts`
 - `lib/google-calendar.ts`
 - `lib/storage-helpers.ts`
+- `lib/bookable-schedule-data-server.ts`
+- `POST /api/chat/booking/create` accepts optional `treatmentOptions` (validated against shared booking treatment option IDs).
+- Public bookable schedule payload now includes doctor-level `bookingTreatmentOptions` metadata from clinic config.
+- `POST /api/doctor/bookings` is staff-authenticated (`requireStaffRole`) and creates booking intake with `source='staff_console'` before Calendar/WhatsApp/Email fan-out.
 
 ### D) Booking and consultation emails
 - `lib/gmail.ts`
 - `lib/public-url.ts`
+- `lib/booking-reminder-payload.ts`
 
 ### E) Website content (articles/courses/lessons)
 - `lib/content-service.ts`
@@ -80,13 +89,49 @@ Use this file first when you need to decide:
 
 ### G) Timetable / staff schedule admin / WordPress embed
 - `app/doctor/timetable/page.tsx`
+- `app/doctor/booking/page.tsx`
 - `app/api/doctor/timetable/route.ts`
 - `app/api/doctor/timetable/schedules/route.ts`
 - `app/api/doctor/timetable/holidays/route.ts`
+- `app/api/doctor/bookings/route.ts`
 - `app/embed/timetable/page.tsx`
 - `app/api/public/bookable-schedules/route.ts`
 - `lib/doctor-schedule-store.ts`
 - `lib/public-timetable-data-server.ts`
+
+### H) Chatwoot / WhatsApp booking notifications
+- `app/api/chatwoot/agent-bot/route.ts`
+- `app/manage/[...legacy]/page.tsx`
+- `lib/chatwoot-agent-bot.ts`
+- `lib/chatwoot-whatsapp.ts`
+- `lib/legacy-manage-link.ts`
+- `lib/whatsapp-booking.ts`
+- `lib/widget-booking-management.ts`
+- `lib/widget-manage-token.ts`
+- Current delivery strategy for booking-related sends is template-preferred, with active-conversation text fallback to preserve delivery when template runtime fails.
+- Synced template candidates are ranked by configured template name order first, then by preferred language.
+- Template parameter candidates now include body-only combinations (supports confirmation templates without dynamic URL buttons).
+- Manage-access button parameter extraction now prefers URL path+query first (for template button concatenation), then falls back to token.
+- Chatwoot agent-bot booking flow now uses a booking sub-menu (`預約` / `更期` / `取消` / `返回主選單`), and routes `更期` / `取消` to action-specific manage-link sends.
+- Chatwoot manage-link sends still attempt WhatsApp template button delivery, poll delivery status, delete failed template messages, then fall back to plain text.
+- Manage access token signing helpers are centralized in `lib/widget-manage-token.ts` and reused by Chatwoot + widget booking management flows.
+- Legacy WhatsApp manage links are normalized via `resolveLegacyManageBookingRedirect()` and redirected to canonical manage-booking URL, preserving token from path/query when available.
+
+### I) Daily POS sync plan API
+- `app/api/cron/pos-sync-daily/route.ts`
+- `lib/pos-sync-daily-plan.ts`
+- `GET /api/cron/pos-sync-daily` requires `Authorization: Bearer ${CRON_SECRET}`.
+- Supports query params: `date (YYYY-MM-DD)`, `clinicId`, `limit`, `includeCandidates=0` (summary-only).
+- Builds a same-day `booking_intake` confirmed-candidate plan for POS search/register action sequencing.
+
+### J) 24h booking reminder cron
+- `app/api/cron/booking-reminders/route.ts`
+- `lib/booking-reminder-payload.ts`
+- `GET /api/cron/booking-reminders` requires `Authorization: Bearer ${CRON_SECRET}`.
+- Reminder window is now+23h to now+25h; supports `dryRun=1` summary mode.
+- Booking reminder payload extraction is centralized in `buildBookingReminderPayload()`.
+- Email reminder send is skipped (not failed) when `patientEmail` is missing; WhatsApp reminder send remains independent.
+- Successful sends mark Google Calendar event private metadata keys: `eden_reminder_24h_sent_at` and `eden_reminder_24h_whatsapp_sent_at`.
 
 ## 5) Core Data Model (What matters most)
 
@@ -121,6 +166,7 @@ Reference migrations:
 
 ### Timetable and closures
 - `doctor_schedules` and `holidays` are now read from Supabase via `createServiceClient()` in `lib/doctor-schedule-store.ts`.
+- Holiday blocking for availability uses `getHolidaysForDate()` in `lib/holiday-store.ts`, which merges Supabase `holidays` rows with legacy `storage` holidays and de-duplicates overlap.
 - If Supabase returns no active `doctor_schedules` rows or errors, the app falls back to `shared/schedule-config.ts`. Treat that file as fallback, not source of truth.
 - Staff can edit live timetable data at `/doctor/timetable`.
 - Public timetable rendering uses `/embed/timetable` and `GET /api/public/bookable-schedules`.
@@ -140,13 +186,17 @@ Reference migrations:
 ## 7) API Surface (Critical Routes)
 
 - `POST /api/chat`
+- `POST /api/chat/booking/create` (bridge booking create; optional treatment option IDs)
 - `POST /api/chat/v2`
 - `POST /api/availability`
 - `POST|GET|DELETE|PATCH /api/booking`
+- `POST /api/doctor/bookings` (staff-assisted booking console)
 - `POST /api/consultation`
 - `GET /api/articles`, `GET /api/articles/[slug]`
 - `GET /api/courses`, `GET /api/courses/[slug]`
 - `GET|PUT /api/me/lesson-progress*`
+- `GET /api/cron/pos-sync-daily` (cron-protected POS sync planning)
+- `GET /api/cron/booking-reminders` (cron-protected 24h reminder dispatch; `dryRun=1` supported)
 
 ## 8) Minimum Verification Before Push
 
@@ -167,6 +217,10 @@ Reference migrations:
 4. Content checks (if content code changed)
 - Published-only filtering still enforced.
 - Slug resolution still works for encoded slugs.
+
+5. Chatwoot WhatsApp checks (if WhatsApp send logic changed)
+- Confirmation/cancel/reschedule/manage-access flows still send on real booking scenarios.
+- Keep active-conversation text fallback available when template delivery fails.
 
 ## 9) Suggested Read Order for New AI Session
 
