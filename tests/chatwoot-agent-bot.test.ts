@@ -6,15 +6,21 @@ import {
   CHATWOOT_GENERAL_INQUIRY_PROMPT,
   CHATWOOT_MAIN_MENU_MESSAGE,
   ChatwootClient,
+  buildChatwootRuntimeCopy,
+  buildChatwootSystemMessageSet,
   buildChatwootBookingDoctorReply,
   buildDirectBookingReply,
   getFlowState,
   getPreviousVisibleConversationMessage,
+  mapConversationMessagesToLegacyChat,
   resolveBookingMenuSelection,
+  resolveClinicMenuSelection,
+  resolveGeneralMenuSelection,
   resolveMenuSelection,
   sendChatwootBookingDoctorReply,
   shouldAllowGeneralAiReply,
 } from '@/lib/chatwoot-agent-bot';
+import { DEFAULT_WIDGET_CHATBOT_SETTINGS } from '@/lib/widget-chatbot-settings';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -307,5 +313,135 @@ test('getPreviousVisibleConversationMessage falls back to the latest visible mes
   assert.equal(
     getPreviousVisibleConversationMessage(messages, 999)?.content,
     CHATWOOT_GENERAL_INQUIRY_PROMPT,
+  );
+});
+
+test('chatwoot runtime copy follows customized widget labels for menu resolution', () => {
+  const customSettings = {
+    ...DEFAULT_WIDGET_CHATBOT_SETTINGS,
+    menu: {
+      items: DEFAULT_WIDGET_CHATBOT_SETTINGS.menu.items.map((item) => {
+        if (item.id === 'fees') return { ...item, label: '價目表' };
+        if (item.id === 'clinic') return { ...item, label: '診所資料' };
+        if (item.id === 'timetable') return { ...item, label: '出診時間' };
+        if (item.id === 'other') return { ...item, label: '自由提問' };
+        return item;
+      }),
+    },
+    flows: {
+      ...DEFAULT_WIDGET_CHATBOT_SETTINGS.flows,
+      clinic: {
+        ...DEFAULT_WIDGET_CHATBOT_SETTINGS.flows.clinic,
+        hoursButtonLabel: '開診時間',
+        addressesButtonLabel: '位置地圖',
+        backButtonLabel: '回主選單',
+      },
+      common: {
+        ...DEFAULT_WIDGET_CHATBOT_SETTINGS.flows.common,
+        returnMainButtonLabel: '回到主頁',
+      },
+    },
+  };
+
+  const runtimeCopy = buildChatwootRuntimeCopy(customSettings);
+
+  assert.equal(resolveGeneralMenuSelection('價目表', {
+    labels: {
+      fees: runtimeCopy.generalMenuItems[0]?.title,
+      clinic: runtimeCopy.generalMenuItems[1]?.title,
+      timetable: runtimeCopy.generalMenuItems[2]?.title,
+      other: runtimeCopy.generalMenuItems[3]?.title,
+      main: runtimeCopy.generalMenuItems[4]?.title,
+    },
+  })?.kind, 'fees');
+  assert.equal(resolveGeneralMenuSelection('自由提問', {
+    labels: {
+      fees: runtimeCopy.generalMenuItems[0]?.title,
+      clinic: runtimeCopy.generalMenuItems[1]?.title,
+      timetable: runtimeCopy.generalMenuItems[2]?.title,
+      other: runtimeCopy.generalMenuItems[3]?.title,
+      main: runtimeCopy.generalMenuItems[4]?.title,
+    },
+  })?.kind, 'other');
+  assert.equal(resolveClinicMenuSelection('開診時間', {
+    labels: {
+      hours: runtimeCopy.clinicMenuItems[0]?.title,
+      addresses: runtimeCopy.clinicMenuItems[1]?.title,
+      main: runtimeCopy.clinicMenuItems[2]?.title,
+    },
+  })?.kind, 'hours');
+  assert.equal(resolveClinicMenuSelection('回主選單', {
+    labels: {
+      hours: runtimeCopy.clinicMenuItems[0]?.title,
+      addresses: runtimeCopy.clinicMenuItems[1]?.title,
+      main: runtimeCopy.clinicMenuItems[2]?.title,
+    },
+  })?.kind, 'main');
+});
+
+test('chatwoot runtime system messages are excluded from AI history after widget copy changes', () => {
+  const customSettings = {
+    ...DEFAULT_WIDGET_CHATBOT_SETTINGS,
+    menu: {
+      items: DEFAULT_WIDGET_CHATBOT_SETTINGS.menu.items.map((item) => {
+        if (item.id === 'other') return { ...item, label: '自由提問' };
+        return item;
+      }),
+    },
+    flows: {
+      ...DEFAULT_WIDGET_CHATBOT_SETTINGS.flows,
+      fees: {
+        ...DEFAULT_WIDGET_CHATBOT_SETTINGS.flows.fees,
+        reply: '最新收費版本',
+      },
+      clinic: {
+        ...DEFAULT_WIDGET_CHATBOT_SETTINGS.flows.clinic,
+        prompt: '你想查診所邊方面？',
+      },
+      timetable: {
+        reply: '最新時間表版本',
+      },
+    },
+  };
+  const runtimeCopy = buildChatwootRuntimeCopy(customSettings);
+  const systemMessages = buildChatwootSystemMessageSet(runtimeCopy);
+
+  const messages = [
+    {
+      id: 401,
+      content: runtimeCopy.generalMenuMessage,
+      created_at: 100,
+      message_type: 'outgoing',
+      sender_type: 'agent',
+    },
+    {
+      id: 402,
+      content: '我想知針灸痛唔痛',
+      created_at: 200,
+      message_type: 'incoming',
+      sender_type: 'contact',
+    },
+    {
+      id: 403,
+      content: runtimeCopy.feesMessage,
+      created_at: 300,
+      message_type: 'outgoing',
+      sender_type: 'agent',
+    },
+    {
+      id: 404,
+      content: '另外想問有冇夜診',
+      created_at: 400,
+      message_type: 'incoming',
+      sender_type: 'contact',
+    },
+  ];
+
+  assert.deepEqual(
+    mapConversationMessagesToLegacyChat(messages, systemMessages),
+    [
+      { role: 'user', content: '我想知針灸痛唔痛' },
+      { role: 'user', content: '另外想問有冇夜診' },
+    ],
   );
 });
