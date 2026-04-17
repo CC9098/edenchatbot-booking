@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 
 import { buildBookingReminderPayload } from '@/lib/booking-reminder-payload';
 import { listEventsInRange, patchEventPrivateMetadata } from '@/lib/google-calendar';
@@ -11,6 +12,7 @@ import { createManageAccessToken } from '@/lib/widget-booking-management';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const WHATSAPP_REMINDER_SENT_KEY = 'eden_reminder_24h_whatsapp_sent_at';
 
 export async function GET(request: NextRequest) {
@@ -26,12 +28,19 @@ export async function GET(request: NextRequest) {
 
   const dryRun = request.nextUrl.searchParams.get('dryRun') === '1';
   const now = new Date();
-  const windowStart = new Date(now.getTime() + 23 * 60 * 60 * 1000);
-  const windowEnd = new Date(now.getTime() + 25 * 60 * 60 * 1000);
+  const targetDate = formatInTimeZone(
+    new Date(now.getTime() + 24 * 60 * 60 * 1000),
+    HONG_KONG_TIMEZONE,
+    'yyyy-MM-dd'
+  );
+  const windowStart = fromZonedTime(`${targetDate}T00:00:00`, HONG_KONG_TIMEZONE);
+  const windowEnd = fromZonedTime(`${targetDate}T23:59:59.999`, HONG_KONG_TIMEZONE);
   const nowIso = now.toISOString();
 
   const summary = {
     now: nowIso,
+    timezone: HONG_KONG_TIMEZONE,
+    targetDate,
     windowStart: windowStart.toISOString(),
     windowEnd: windowEnd.toISOString(),
     dryRun,
