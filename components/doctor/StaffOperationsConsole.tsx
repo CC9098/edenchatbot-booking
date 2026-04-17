@@ -597,7 +597,7 @@ export function StaffOperationsConsole({
 
           <div className="flex flex-wrap items-center gap-3">
             <Link
-              href="/doctor/booking"
+              href="/nurse/booking"
               className="inline-flex items-center gap-2 rounded-2xl border border-cyan-200 bg-white/85 px-4 py-3 text-sm font-semibold text-cyan-900 transition hover:border-cyan-300 hover:bg-white"
             >
               前往姑娘代約

@@ -1,0 +1,129 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
+
+import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
+import { AuthGuard } from "@/components/auth/AuthGuard";
+import { StaffGuard } from "@/components/auth/StaffGuard";
+import {
+  getStaffWorkspaceConfig,
+  isWorkspacePathActive,
+  type StaffWorkspace,
+} from "@/lib/staff-console-workspace";
+
+function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
+  const { user, signOut } = useAuth();
+  const pathname = usePathname();
+  const config = getStaffWorkspaceConfig(workspace);
+  const iconLabel = workspace === "nurse" ? "護" : "醫";
+
+  return (
+    <header className="sticky top-0 z-40 border-b border-primary/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="flex min-w-0 items-center gap-4 sm:gap-6">
+          <Link
+            href={config.homeHref}
+            className="flex shrink-0 items-center gap-2 text-base font-bold text-primary sm:text-lg"
+          >
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
+              {iconLabel}
+            </span>
+            <span className="hidden sm:inline">{config.brandLabel}</span>
+            <span className="sm:hidden">{config.brandShortLabel}</span>
+          </Link>
+
+          <nav className="hidden items-center gap-1 overflow-x-auto xl:flex">
+            {config.navItems.map((item) => {
+              const active = isWorkspacePathActive(pathname, item);
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-primary/10 text-primary"
+                      : "text-gray-600 hover:bg-primary/5 hover:text-primary"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Link
+            href={config.switchHref}
+            className="hidden rounded-md border border-primary/15 px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5 md:inline-flex"
+          >
+            {config.switchLabel}
+          </Link>
+          <span className="hidden max-w-[180px] truncate text-sm text-gray-500 sm:block">
+            {user?.email}
+          </span>
+          <button
+            onClick={signOut}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
+          >
+            登出
+          </button>
+        </div>
+      </div>
+
+      <div className="border-t border-primary/10 bg-white/90 px-4 py-2 xl:hidden">
+        <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto">
+          {config.navItems.map((item) => {
+            const active = isWorkspacePathActive(pathname, item);
+
+            return (
+              <Link
+                key={`mobile-${item.href}`}
+                href={item.href}
+                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-primary text-white"
+                    : "border border-slate-200 bg-white text-slate-600 hover:border-primary/20 hover:text-primary"
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+          <Link
+            href={config.switchHref}
+            className="whitespace-nowrap rounded-full border border-primary/15 bg-white px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
+          >
+            {config.switchLabel}
+          </Link>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+export function StaffConsoleShell({
+  workspace,
+  children,
+}: {
+  workspace: StaffWorkspace;
+  children: ReactNode;
+}) {
+  const config = getStaffWorkspaceConfig(workspace);
+
+  return (
+    <AuthProvider>
+      <AuthGuard>
+        <StaffGuard areaLabel={config.areaLabel} loginNextPath={config.homeHref}>
+          <div className="min-h-screen bg-[#f5f9f2]">
+            <StaffConsoleHeader workspace={workspace} />
+            <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">{children}</main>
+          </div>
+        </StaffGuard>
+      </AuthGuard>
+    </AuthProvider>
+  );
+}

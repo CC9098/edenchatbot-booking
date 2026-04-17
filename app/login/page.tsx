@@ -51,8 +51,13 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const authError = searchParams.get("error") === "auth";
   const nextPath = sanitizeAuthNextPath(searchParams.get("next"));
-  const isDoctorEntry =
-    nextPath === "/doctor" || nextPath.startsWith("/doctor/") || nextPath.startsWith("/doctor?");
+  const isStaffConsoleEntry =
+    nextPath === "/doctor" ||
+    nextPath.startsWith("/doctor/") ||
+    nextPath.startsWith("/doctor?") ||
+    nextPath === "/nurse" ||
+    nextPath.startsWith("/nurse/") ||
+    nextPath.startsWith("/nurse?");
   const [activeMethod, setActiveMethod] = useState<"google" | "email">("google");
   const [emailAuthMode, setEmailAuthMode] = useState<EmailAuthMode>("signin");
   const [email, setEmail] = useState("");
@@ -244,18 +249,18 @@ function LoginForm() {
 
         {/* Card */}
         <div className="patient-card space-y-6 p-8">
-          <div className={`text-center ${isDoctorEntry ? "space-y-3" : ""}`}>
+          <div className={`text-center ${isStaffConsoleEntry ? "space-y-3" : ""}`}>
             <h2 className="text-lg font-semibold text-slate-900">
-              {isDoctorEntry ? "登入醫師控制台" : "登入帳號"}
+              {isStaffConsoleEntry ? "登入 staff 控制台" : "登入帳號"}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              {isDoctorEntry ? "登入後直接進入醫師工作台" : "選擇登入方式以繼續"}
+              {isStaffConsoleEntry ? "登入後直接進入醫師 / 姑娘工作台" : "選擇登入方式以繼續"}
             </p>
-            {isDoctorEntry ? (
+            {isStaffConsoleEntry ? (
               <div className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-emerald-50 px-4 py-4 text-left shadow-[0_8px_24px_rgba(8,145,178,0.08)]">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                  <p className="text-sm font-semibold text-slate-800">醫師專用入口</p>
+                  <p className="text-sm font-semibold text-slate-800">staff 專用入口</p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-cyan-100">
@@ -266,6 +271,9 @@ function LoginForm() {
                   </span>
                   <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-cyan-100">
                     內容管理
+                  </span>
+                  <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-cyan-100">
+                    姑娘代約
                   </span>
                 </div>
               </div>

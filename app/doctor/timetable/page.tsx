@@ -2,6 +2,7 @@
 
 import { startTransition, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { CalendarClock, RefreshCcw, Save, Trash2 } from "lucide-react";
 
 import {
@@ -12,6 +13,7 @@ import {
   type DayFieldKey,
   type DayInputMap,
 } from "@/lib/timetable-admin-utils";
+import { getWorkspaceFromPath } from "@/lib/staff-console-workspace";
 import { CLINICS, DOCTORS, type ClinicId, type DoctorId } from "@/shared/clinic-data";
 
 type ScheduleItem = {
@@ -35,7 +37,6 @@ type HolidayItem = {
 };
 
 type StaffRole = "doctor" | "assistant" | "admin";
-type TimetablePanel = "doctor" | "nurse";
 
 type TimetablePayload = {
   role: StaffRole;
@@ -125,6 +126,9 @@ function formatHolidayTimeLabel(item: HolidayItem): string {
 }
 
 export default function DoctorTimetablePage() {
+  const pathname = usePathname();
+  const workspace = getWorkspaceFromPath(pathname);
+  const isDoctorWorkspace = workspace === "doctor";
   const [role, setRole] = useState<StaffRole>("assistant");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -135,8 +139,6 @@ export default function DoctorTimetablePage() {
   const [holidayForm, setHolidayForm] = useState<HolidayFormState>(EMPTY_HOLIDAY_FORM);
   const [holidaySaving, setHolidaySaving] = useState(false);
   const [holidayDeletingId, setHolidayDeletingId] = useState<string | null>(null);
-  const [activePanel, setActivePanel] = useState<TimetablePanel>("doctor");
-  const [hasManualPanelSelection, setHasManualPanelSelection] = useState(false);
 
   async function loadTimetable() {
     setLoading(true);
@@ -164,11 +166,6 @@ export default function DoctorTimetablePage() {
   useEffect(() => {
     void loadTimetable();
   }, []);
-
-  useEffect(() => {
-    if (loading || hasManualPanelSelection) return;
-    setActivePanel(role === "assistant" ? "nurse" : "doctor");
-  }, [hasManualPanelSelection, loading, role]);
 
   const scheduleRowsByClinic = useMemo(() => {
     return CLINICS.map((clinic) => ({
@@ -300,11 +297,6 @@ export default function DoctorTimetablePage() {
     }
   }
 
-  function handlePanelChange(panel: TimetablePanel) {
-    setHasManualPanelSelection(true);
-    setActivePanel(panel);
-  }
-
   return (
     <div className="space-y-6">
       <section className="rounded-3xl border border-primary/10 bg-white px-5 py-5 shadow-sm">
@@ -354,41 +346,6 @@ export default function DoctorTimetablePage() {
             {error}
           </div>
         ) : null}
-
-        <div className="mt-5 rounded-2xl border border-primary/10 bg-[#f7fbf4] p-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">管理分頁</p>
-              <p className="mt-1 text-sm text-slate-600">
-                將醫師排班同姑娘休診公告分開處理，避免同頁混埋太亂。
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => handlePanelChange("doctor")}
-                className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                  activePanel === "doctor"
-                    ? "bg-primary text-white shadow-sm"
-                    : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:text-slate-900"
-                }`}
-              >
-                醫師排班
-              </button>
-              <button
-                type="button"
-                onClick={() => handlePanelChange("nurse")}
-                className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                  activePanel === "nurse"
-                    ? "bg-primary text-white shadow-sm"
-                    : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:text-slate-900"
-                }`}
-              >
-                姑娘休診 / 公告
-              </button>
-            </div>
-          </div>
-        </div>
       </section>
 
       {loading ? (
@@ -397,7 +354,7 @@ export default function DoctorTimetablePage() {
         </div>
       ) : (
         <>
-          {activePanel === "doctor" ? (
+          {isDoctorWorkspace ? (
             <section className="space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">醫師固定排班</h2>

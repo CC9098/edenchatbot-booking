@@ -13,6 +13,10 @@ const TIMETABLE_CONSUMER_PATHS = [
   '/doctor/booking',
   '/doctor/operations',
   '/doctor/timetable',
+  '/nurse',
+  '/nurse/booking',
+  '/nurse/operations',
+  '/nurse/timetable',
 ] as const;
 
 export function invalidateTimetableConsumers(): void {

@@ -8,7 +8,15 @@ import { useAuth } from "@/components/auth/AuthProvider";
 
 type StaffGuardState = "checking" | "authorized" | "forbidden" | "error";
 
-export function StaffGuard({ children }: { children: ReactNode }) {
+export function StaffGuard({
+  children,
+  areaLabel = "staff 控制台",
+  loginNextPath = "/doctor",
+}: {
+  children: ReactNode;
+  areaLabel?: string;
+  loginNextPath?: string;
+}) {
   const router = useRouter();
   const { signOut } = useAuth();
   const [state, setState] = useState<StaffGuardState>("checking");
@@ -65,7 +73,7 @@ export function StaffGuard({ children }: { children: ReactNode }) {
     setSigningOut(true);
     try {
       await signOut();
-      router.replace("/login?next=%2Fdoctor");
+      router.replace(`/login?next=${encodeURIComponent(loginNextPath)}`);
     } finally {
       setSigningOut(false);
     }
@@ -87,9 +95,9 @@ export function StaffGuard({ children }: { children: ReactNode }) {
     return (
       <div className="min-h-screen bg-[#f5f9f2] px-4 py-10">
         <div className="mx-auto max-w-md rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-semibold text-gray-900">無法進入醫師控制台</h1>
+          <h1 className="text-xl font-semibold text-gray-900">無法進入{areaLabel}</h1>
           <p className="mt-2 text-sm leading-6 text-gray-600">
-            此帳號已登入，但未有 staff 權限，所以不能進入醫師/姑娘後台。請聯絡管理者為此帳號加入
+            此帳號已登入，但未有 staff 權限，所以不能進入{areaLabel}。請聯絡管理者為此帳號加入
             <span className="mx-1 rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-700">
               staff_roles
             </span>
@@ -128,7 +136,7 @@ export function StaffGuard({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-[#f5f9f2] px-4 py-10">
       <div className="mx-auto max-w-md rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-gray-900">無法驗證 staff 權限</h1>
+        <h1 className="text-xl font-semibold text-gray-900">無法驗證{areaLabel}權限</h1>
         <p className="mt-2 text-sm leading-6 text-gray-600">
           {errorMessage || "系統暫時未能確認此帳號的 staff 權限。"}
         </p>

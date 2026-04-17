@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function LegacyDoctorOperationsPage() {
+export default function NurseHomePage() {
   redirect("/nurse/operations");
 }
