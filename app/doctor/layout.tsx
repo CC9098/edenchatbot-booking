@@ -11,6 +11,7 @@ function DoctorHeader() {
   const { user, signOut } = useAuth();
   const pathname = usePathname();
   const isPatientsActive = pathname === "/doctor" || pathname.startsWith("/doctor/patients/");
+  const isOperationsActive = pathname.startsWith("/doctor/operations");
   const isBookingActive = pathname.startsWith("/doctor/booking");
   const isChatbotActive = pathname.startsWith("/doctor/chatbot");
   const isWidgetChatbotActive = pathname.startsWith("/doctor/widget-chatbot");
@@ -45,6 +46,16 @@ function DoctorHeader() {
               }`}
             >
               病人列表
+            </Link>
+            <Link
+              href="/doctor/operations"
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                isOperationsActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-gray-600 hover:text-primary hover:bg-primary/5"
+              }`}
+            >
+              營運台
             </Link>
             <Link
               href="/doctor/booking"
