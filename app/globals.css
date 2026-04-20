@@ -86,6 +86,29 @@ body {
   overscroll-behavior-y: none;
 }
 
+.staff-console-shell {
+  --background: #f4f8f1;
+  --foreground: #2d5b39;
+  --primary: #4a7b52;
+  --primary-hover: #3d6844;
+  --primary-light: #e7f1e8;
+  --primary-pale: #f7fbf5;
+  --surface: #ffffff;
+  --border: #d5e2d6;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-light: var(--primary-light);
+  --color-primary-pale: var(--primary-pale);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  color: var(--foreground);
+  background:
+    radial-gradient(circle at top left, rgba(94, 132, 102, 0.16) 0%, transparent 42%),
+    linear-gradient(180deg, #f7faf5 0%, #eef5ec 100%);
+}
+
 html,
 body {
   height: 100%;

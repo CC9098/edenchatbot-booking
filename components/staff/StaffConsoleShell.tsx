@@ -118,7 +118,7 @@ export function StaffConsoleShell({
     <AuthProvider>
       <AuthGuard>
         <StaffGuard areaLabel={config.areaLabel} loginNextPath={config.homeHref}>
-          <div className="min-h-screen bg-[#f5f9f2]">
+          <div className="staff-console-shell min-h-screen">
             <StaffConsoleHeader workspace={workspace} />
             <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">{children}</main>
           </div>
