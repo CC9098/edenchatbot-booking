@@ -4,6 +4,7 @@ import { AuthError, getCurrentUser, requireStaffRole } from '@/lib/auth-helpers'
 import { createServiceClient } from '@/lib/supabase';
 import {
   createEmptyDayInputs,
+  getTodayIsoInHongKong,
   normalizeDbTime,
   type DayInputMap,
 } from '@/lib/timetable-admin-utils';
@@ -18,6 +19,7 @@ interface DoctorScheduleRow {
   clinic_id: string;
   calendar_id: string;
   is_active: boolean;
+  effective_from: string;
   schedule: WeeklySchedule | null;
 }
 
@@ -30,6 +32,20 @@ interface HolidayRow {
   end_time: string | null;
   reason: string | null;
   created_at: string;
+}
+
+function isMissingEffectiveFromColumnError(error: unknown): boolean {
+  const message =
+    typeof error === 'object' && error && 'message' in error && typeof error.message === 'string'
+      ? error.message
+      : error instanceof Error
+        ? error.message
+        : String(error);
+
+  const normalized = message.toLowerCase();
+  return normalized.includes('effective_from') && (
+    normalized.includes('column') || normalized.includes('schema cache')
+  );
 }
 
 function mapDayInputs(schedule: WeeklySchedule | null): DayInputMap {
@@ -46,6 +62,46 @@ function mapDayInputs(schedule: WeeklySchedule | null): DayInputMap {
   return next;
 }
 
+function selectVisibleScheduleRows(rows: DoctorScheduleRow[]): DoctorScheduleRow[] {
+  const today = getTodayIsoInHongKong();
+  const rowsByKey = new Map<string, DoctorScheduleRow[]>();
+
+  for (const row of rows) {
+    const key = `${row.doctor_id}:${row.clinic_id}`;
+    const current = rowsByKey.get(key);
+    if (current) {
+      current.push(row);
+    } else {
+      rowsByKey.set(key, [row]);
+    }
+  }
+
+  const visibleRows: DoctorScheduleRow[] = [];
+
+  for (const group of rowsByKey.values()) {
+    const sorted = [...group].sort((left, right) => left.effective_from.localeCompare(right.effective_from));
+    const current = [...sorted]
+      .reverse()
+      .find((row) => row.effective_from <= today);
+    const future = sorted.filter((row) => row.effective_from > today);
+
+    if (current) {
+      visibleRows.push(current);
+    }
+    visibleRows.push(...future);
+  }
+
+  return visibleRows.sort((left, right) => {
+    if (left.clinic_id !== right.clinic_id) {
+      return left.clinic_id.localeCompare(right.clinic_id);
+    }
+    if (left.doctor_id !== right.doctor_id) {
+      return left.doctor_id.localeCompare(right.doctor_id);
+    }
+    return left.effective_from.localeCompare(right.effective_from);
+  });
+}
+
 export async function GET() {
   try {
     const user = await getCurrentUser();
@@ -56,19 +112,41 @@ export async function GET() {
     const staffRole = await requireStaffRole(user.id);
     const supabase = createServiceClient();
 
-    const [{ data: scheduleRows, error: scheduleError }, { data: holidayRows, error: holidayError }] =
+    let scheduleRows: DoctorScheduleRow[] | null = null;
+    let scheduleError: { message: string } | null = null;
+    const [{ data: initialScheduleRows, error: initialScheduleError }, { data: holidayRows, error: holidayError }] =
       await Promise.all([
         supabase
           .from('doctor_schedules')
-          .select('id, doctor_id, clinic_id, calendar_id, is_active, schedule')
+          .select('id, doctor_id, clinic_id, calendar_id, is_active, effective_from, schedule')
           .order('doctor_id', { ascending: true })
-          .order('clinic_id', { ascending: true }),
+          .order('clinic_id', { ascending: true })
+          .order('effective_from', { ascending: true }),
         supabase
           .from('holidays')
           .select('id, doctor_id, clinic_id, holiday_date, start_time, end_time, reason, created_at')
           .order('holiday_date', { ascending: true })
           .order('created_at', { ascending: false }),
       ]);
+
+    if (initialScheduleError && isMissingEffectiveFromColumnError(initialScheduleError)) {
+      const fallbackResult = await supabase
+        .from('doctor_schedules')
+        .select('id, doctor_id, clinic_id, calendar_id, is_active, schedule')
+        .order('doctor_id', { ascending: true })
+        .order('clinic_id', { ascending: true });
+
+      scheduleRows = Array.isArray(fallbackResult.data)
+        ? (fallbackResult.data as Omit<DoctorScheduleRow, 'effective_from'>[]).map((row) => ({
+            ...row,
+            effective_from: getTodayIsoInHongKong(),
+          }))
+        : null;
+      scheduleError = fallbackResult.error;
+    } else {
+      scheduleRows = Array.isArray(initialScheduleRows) ? (initialScheduleRows as DoctorScheduleRow[]) : null;
+      scheduleError = initialScheduleError;
+    }
 
     if (scheduleError) {
       console.error('[GET /api/doctor/timetable] doctor_schedules query error:', scheduleError.message);
@@ -80,12 +158,13 @@ export async function GET() {
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
-    const schedules = ((scheduleRows ?? []) as DoctorScheduleRow[]).map((row) => ({
+    const schedules = selectVisibleScheduleRows(scheduleRows ?? []).map((row) => ({
       id: row.id,
       doctorId: row.doctor_id,
       clinicId: row.clinic_id,
       calendarId: row.calendar_id,
       isActive: Boolean(row.is_active),
+      effectiveFrom: row.effective_from,
       dayInputs: mapDayInputs(row.schedule),
     }));
 

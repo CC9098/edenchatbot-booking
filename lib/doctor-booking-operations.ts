@@ -568,7 +568,7 @@ export async function rescheduleStaffOperationBooking(
       nextCalendarId = targetCalendarId;
     }
   } else {
-    const mapping = await getMappingWithFallback(row.doctor_id, effectiveClinicId);
+    const mapping = await getMappingWithFallback(row.doctor_id, effectiveClinicId, params.date);
     if (!mapping || !mapping.isActive) {
       throw new Error("所選診所暫時未有此醫師應診。");
     }

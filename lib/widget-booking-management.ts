@@ -1117,7 +1117,7 @@ export async function rescheduleWidgetBooking(params: {
       }
     }
   } else {
-    const mapping = await getMappingWithFallback(row.doctor_id, effectiveClinicId);
+    const mapping = await getMappingWithFallback(row.doctor_id, effectiveClinicId, params.date);
     if (!mapping || !mapping.isActive) {
       return {
         success: false,

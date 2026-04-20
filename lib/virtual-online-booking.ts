@@ -120,8 +120,11 @@ function isPastSameDayCutoff(requestedDate: string, slotStart: Date, nowUtc: Dat
   return slotStart < bookingCutoffUtc;
 }
 
-async function getPhysicalMappingsForDoctor(doctorId: DoctorId): Promise<CalendarMapping[]> {
-  const mappings = await getActiveScheduleMappings();
+async function getPhysicalMappingsForDoctor(
+  doctorId: DoctorId,
+  targetDate?: string
+): Promise<CalendarMapping[]> {
+  const mappings = await getActiveScheduleMappings(targetDate);
   return mappings.filter(
     (mapping) => mapping.doctorId === doctorId && mapping.isActive && isPhysicalClinicId(mapping.clinicId)
   );
@@ -207,7 +210,7 @@ async function getOnlineCandidateMappingsForDate(
   doctorId: DoctorId,
   requestedDate: string
 ): Promise<CalendarMapping[]> {
-  const physicalMappings = await getPhysicalMappingsForDoctor(doctorId);
+  const physicalMappings = await getPhysicalMappingsForDoctor(doctorId, requestedDate);
   const { dayOfWeek } = getRequestedDayContext(requestedDate);
 
   return physicalMappings.filter((mapping) => {
@@ -294,9 +297,10 @@ export function buildVirtualOnlineScheduleFromMappings(
 }
 
 export async function getVirtualOnlineScheduleForDoctor(
-  doctorId: DoctorId
+  doctorId: DoctorId,
+  targetDate?: string
 ): Promise<WeeklySchedule | null> {
-  const mappings = await getActiveScheduleMappings();
+  const mappings = await getActiveScheduleMappings(targetDate);
   return buildVirtualOnlineScheduleFromMappings(mappings, doctorId);
 }
 
@@ -317,7 +321,7 @@ export async function getVirtualOnlineAvailability(params: {
 
   const candidateMappings = await getOnlineCandidateMappingsForDate(doctorId, requestedDate);
   if (candidateMappings.length === 0) {
-    const hasAnyPhysicalMapping = (await getPhysicalMappingsForDoctor(doctorId)).length > 0;
+    const hasAnyPhysicalMapping = (await getPhysicalMappingsForDoctor(doctorId, requestedDate)).length > 0;
     return {
       mappingFound: hasAnyPhysicalMapping,
       slots: [],

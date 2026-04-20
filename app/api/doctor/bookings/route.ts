@@ -132,7 +132,11 @@ export async function POST(request: NextRequest) {
       calendarId = resolvedOnlineMapping.mapping.calendarId;
       notificationClinicId = resolvedOnlineMapping.mapping.clinicId;
     } else {
-      const mapping = await getMappingWithFallback(bookingData.doctorId, bookingData.clinicId);
+      const mapping = await getMappingWithFallback(
+        bookingData.doctorId,
+        bookingData.clinicId,
+        bookingData.date
+      );
       if (mapping?.isActive) {
         calendarId = mapping.calendarId;
       }

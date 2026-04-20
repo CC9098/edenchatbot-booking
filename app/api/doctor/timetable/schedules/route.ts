@@ -6,6 +6,7 @@ import { invalidateTimetableConsumers } from '@/lib/timetable-cache-invalidation
 import {
   buildWeeklyScheduleFromDayInputs,
   createEmptyDayInputs,
+  getTodayIsoInHongKong,
   type DayInputMap,
 } from '@/lib/timetable-admin-utils';
 import { isClinicId, isDoctorId } from '@/shared/clinic-data';
@@ -14,6 +15,22 @@ export const dynamic = 'force-dynamic';
 
 interface DoctorScheduleRow {
   id: string;
+}
+
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function isMissingEffectiveFromColumnError(error: unknown): boolean {
+  const message =
+    typeof error === 'object' && error && 'message' in error && typeof error.message === 'string'
+      ? error.message
+      : error instanceof Error
+        ? error.message
+        : String(error);
+
+  const normalized = message.toLowerCase();
+  return normalized.includes('effective_from') && (
+    normalized.includes('column') || normalized.includes('schema cache')
+  );
 }
 
 function normalizeDayInputs(raw: unknown): DayInputMap {
@@ -32,6 +49,14 @@ function normalizeDayInputs(raw: unknown): DayInputMap {
   };
 }
 
+function normalizeEffectiveFrom(raw: unknown): string {
+  if (typeof raw === 'string' && ISO_DATE_REGEX.test(raw.trim())) {
+    return raw.trim();
+  }
+
+  return getTodayIsoInHongKong();
+}
+
 export async function PUT(request: NextRequest) {
   try {
     const user = await getCurrentUser();
@@ -47,6 +72,9 @@ export async function PUT(request: NextRequest) {
     const clinicId = typeof body.clinicId === 'string' ? body.clinicId.trim() : '';
     const calendarId = typeof body.calendarId === 'string' ? body.calendarId.trim() : '';
     const isActive = body.isActive !== false;
+    const effectiveFrom = normalizeEffectiveFrom(body.effectiveFrom);
+    const today = getTodayIsoInHongKong();
+    const isFutureVersion = effectiveFrom > today;
 
     if (!isDoctorId(doctorId)) {
       return NextResponse.json({ error: 'Invalid doctorId' }, { status: 400 });
@@ -70,6 +98,7 @@ export async function PUT(request: NextRequest) {
           clinic_id: clinicId,
           calendar_id: calendarId,
           is_active: isActive,
+          effective_from: effectiveFrom,
           schedule,
         })
         .eq('id', id)
@@ -77,6 +106,36 @@ export async function PUT(request: NextRequest) {
         .single();
 
       if (error || !data) {
+        if (isMissingEffectiveFromColumnError(error)) {
+          if (isFutureVersion) {
+            return NextResponse.json(
+              { error: '資料庫尚未升級完成，暫時未能儲存日後版本排班。' },
+              { status: 409 }
+            );
+          }
+
+          const fallback = await supabase
+            .from('doctor_schedules')
+            .update({
+              doctor_id: doctorId,
+              clinic_id: clinicId,
+              calendar_id: calendarId,
+              is_active: isActive,
+              schedule,
+            })
+            .eq('id', id)
+            .select('id')
+            .single();
+
+          if (fallback.error || !fallback.data) {
+            console.error('[PUT /api/doctor/timetable/schedules] fallback update error:', fallback.error?.message);
+            return NextResponse.json({ error: 'Failed to update schedule' }, { status: 500 });
+          }
+
+          invalidateTimetableConsumers();
+          return NextResponse.json({ id: fallback.data.id });
+        }
+
         console.error('[PUT /api/doctor/timetable/schedules] update error:', error?.message);
         return NextResponse.json({ error: 'Failed to update schedule' }, { status: 500 });
       }
@@ -90,7 +149,71 @@ export async function PUT(request: NextRequest) {
       .select('id')
       .eq('doctor_id', doctorId)
       .eq('clinic_id', clinicId)
+      .eq('effective_from', effectiveFrom)
       .limit(1);
+
+    if (existingError && isMissingEffectiveFromColumnError(existingError)) {
+      if (isFutureVersion) {
+        return NextResponse.json(
+          { error: '資料庫尚未升級完成，暫時未能儲存日後版本排班。' },
+          { status: 409 }
+        );
+      }
+
+      const fallbackExisting = await supabase
+        .from('doctor_schedules')
+        .select('id')
+        .eq('doctor_id', doctorId)
+        .eq('clinic_id', clinicId)
+        .limit(1);
+
+      const fallbackExistingId = (fallbackExisting.data as DoctorScheduleRow[] | null)?.[0]?.id;
+      if (fallbackExisting.error) {
+        console.error('[PUT /api/doctor/timetable/schedules] fallback existing query error:', fallbackExisting.error.message);
+        return NextResponse.json({ error: 'Failed to save schedule' }, { status: 500 });
+      }
+
+      if (fallbackExistingId) {
+        const fallbackUpdate = await supabase
+          .from('doctor_schedules')
+          .update({
+            calendar_id: calendarId,
+            is_active: isActive,
+            schedule,
+          })
+          .eq('id', fallbackExistingId)
+          .select('id')
+          .single();
+
+        if (fallbackUpdate.error || !fallbackUpdate.data) {
+          console.error('[PUT /api/doctor/timetable/schedules] fallback update error:', fallbackUpdate.error?.message);
+          return NextResponse.json({ error: 'Failed to update schedule' }, { status: 500 });
+        }
+
+        invalidateTimetableConsumers();
+        return NextResponse.json({ id: fallbackUpdate.data.id });
+      }
+
+      const fallbackInsert = await supabase
+        .from('doctor_schedules')
+        .insert({
+          doctor_id: doctorId,
+          clinic_id: clinicId,
+          calendar_id: calendarId,
+          is_active: isActive,
+          schedule,
+        })
+        .select('id')
+        .single();
+
+      if (fallbackInsert.error || !fallbackInsert.data) {
+        console.error('[PUT /api/doctor/timetable/schedules] fallback insert error:', fallbackInsert.error?.message);
+        return NextResponse.json({ error: 'Failed to create schedule' }, { status: 500 });
+      }
+
+      invalidateTimetableConsumers();
+      return NextResponse.json({ id: fallbackInsert.data.id }, { status: 201 });
+    }
 
     if (existingError) {
       console.error('[PUT /api/doctor/timetable/schedules] existing query error:', existingError.message);
@@ -104,6 +227,7 @@ export async function PUT(request: NextRequest) {
         .update({
           calendar_id: calendarId,
           is_active: isActive,
+          effective_from: effectiveFrom,
           schedule,
         })
         .eq('id', existingId)
@@ -126,6 +250,7 @@ export async function PUT(request: NextRequest) {
         clinic_id: clinicId,
         calendar_id: calendarId,
         is_active: isActive,
+        effective_from: effectiveFrom,
         schedule,
       })
       .select('id')

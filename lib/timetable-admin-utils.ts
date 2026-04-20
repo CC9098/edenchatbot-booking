@@ -2,6 +2,7 @@ import type { WeeklySchedule, TimeRange } from '@/shared/schedule-config';
 
 export const DAY_FIELD_ORDER = ['1', '2', '3', '4', '5', '6', '0'] as const;
 export type DayFieldKey = (typeof DAY_FIELD_ORDER)[number];
+const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
 export const DAY_LABELS_ZH: Record<DayFieldKey, string> = {
   '0': '週日',
@@ -20,6 +21,30 @@ const TIME_RANGE_REGEX = /^(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})$/;
 function toMinutes(value: string): number {
   const [hour, minute] = value.split(':').map(Number);
   return hour * 60 + minute;
+}
+
+export function getTodayIsoInHongKong(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: HONG_KONG_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+export function getStartOfNextMonthIso(seedDateIso?: string): string {
+  const base = seedDateIso
+    ? new Date(`${seedDateIso}T00:00:00+08:00`)
+    : new Date(`${getTodayIsoInHongKong()}T00:00:00+08:00`);
+
+  if (Number.isNaN(base.getTime())) {
+    return getTodayIsoInHongKong();
+  }
+
+  const year = base.getUTCFullYear();
+  const month = base.getUTCMonth();
+  const nextMonthUtc = new Date(Date.UTC(year, month + 1, 1));
+  return nextMonthUtc.toISOString().slice(0, 10);
 }
 
 export function normalizeDbTime(value: string | null | undefined): string | null {

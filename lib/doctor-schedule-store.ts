@@ -14,12 +14,17 @@ interface DoctorScheduleRow {
   clinic_id: string;
   calendar_id: string;
   is_active: boolean | null;
+  effective_from: string | null;
   schedule: unknown;
+}
+
+interface VersionedCalendarMapping extends CalendarMapping {
+  effectiveFrom: string;
 }
 
 interface MappingCache {
   expiresAt: number;
-  mappings: CalendarMapping[];
+  mappings: VersionedCalendarMapping[];
 }
 
 type DoctorScheduleLoadSource = 'supabase' | 'static-fallback-empty' | 'static-fallback-error';
@@ -35,9 +40,11 @@ const DEFAULT_CACHE_TTL_SECONDS = 120;
 const MIN_CACHE_TTL_SECONDS = 5;
 const MAX_CACHE_TTL_SECONDS = 1800;
 const TIME_TEXT_REGEX = /^\d{2}:\d{2}$/;
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
 let cache: MappingCache | null = null;
-let inFlightLoad: Promise<CalendarMapping[]> | null = null;
+let inFlightLoad: Promise<VersionedCalendarMapping[]> | null = null;
 let lastLoadInfo: DoctorScheduleLoadInfo = {
   detail: null,
   loadedAt: 0,
@@ -123,17 +130,79 @@ function cloneWeeklySchedule(schedule: WeeklySchedule): WeeklySchedule {
   return cloned;
 }
 
-function cloneCalendarMapping(mapping: CalendarMapping): CalendarMapping {
+function cloneCalendarMapping(mapping: VersionedCalendarMapping): VersionedCalendarMapping {
   return {
     ...mapping,
     schedule: cloneWeeklySchedule(mapping.schedule),
   };
 }
 
-function normalizeRow(row: DoctorScheduleRow): CalendarMapping | null {
+function getTodayIsoInHongKong(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: HONG_KONG_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function normalizeEffectiveFrom(raw: unknown): string | null {
+  if (typeof raw !== 'string') {
+    return null;
+  }
+
+  const value = raw.trim();
+  return ISO_DATE_REGEX.test(value) ? value : null;
+}
+
+function isMissingEffectiveFromColumnError(error: unknown): boolean {
+  const message =
+    typeof error === 'object' && error && 'message' in error && typeof error.message === 'string'
+      ? error.message
+      : error instanceof Error
+        ? error.message
+        : String(error);
+
+  const normalized = message.toLowerCase();
+  return normalized.includes('effective_from') && (
+    normalized.includes('column') || normalized.includes('schema cache')
+  );
+}
+
+function normalizeRequestedDate(targetDate?: string): string {
+  if (typeof targetDate === 'string' && ISO_DATE_REGEX.test(targetDate.trim())) {
+    return targetDate.trim();
+  }
+
+  return getTodayIsoInHongKong();
+}
+
+function resolveMappingsForDate(
+  mappings: VersionedCalendarMapping[],
+  targetDate: string
+): VersionedCalendarMapping[] {
+  const resolved = new Map<string, VersionedCalendarMapping>();
+
+  for (const mapping of mappings) {
+    if (mapping.effectiveFrom > targetDate) {
+      continue;
+    }
+
+    const key = `${mapping.doctorId}:${mapping.clinicId}`;
+    const current = resolved.get(key);
+    if (!current || mapping.effectiveFrom > current.effectiveFrom) {
+      resolved.set(key, mapping);
+    }
+  }
+
+  return Array.from(resolved.values()).map(cloneCalendarMapping);
+}
+
+function normalizeRow(row: DoctorScheduleRow): VersionedCalendarMapping | null {
   const doctorId = row.doctor_id?.trim();
   const clinicId = row.clinic_id?.trim();
   const calendarId = row.calendar_id?.trim();
+  const effectiveFrom = normalizeEffectiveFrom(row.effective_from) ?? getTodayIsoInHongKong();
 
   if (!doctorId || !clinicId || !calendarId) {
     return null;
@@ -152,35 +221,52 @@ function normalizeRow(row: DoctorScheduleRow): CalendarMapping | null {
     clinicId,
     calendarId,
     isActive: row.is_active !== false,
+    effectiveFrom,
     schedule,
   };
 }
 
-function getStaticFallbackMappings(): CalendarMapping[] {
-  return CALENDAR_MAPPINGS.filter((mapping) => mapping.isActive).map(cloneCalendarMapping);
+function getStaticFallbackMappings(): VersionedCalendarMapping[] {
+  return CALENDAR_MAPPINGS.map((mapping) =>
+    cloneCalendarMapping({
+      ...mapping,
+      effectiveFrom: '1970-01-01',
+    })
+  );
 }
 
-function normalizeRows(rows: DoctorScheduleRow[]): CalendarMapping[] {
-  const deduped = new Map<string, CalendarMapping>();
+function normalizeRows(rows: DoctorScheduleRow[]): VersionedCalendarMapping[] {
+  const normalized = rows
+    .map(normalizeRow)
+    .filter((mapping): mapping is VersionedCalendarMapping => Boolean(mapping));
 
-  for (const row of rows) {
-    const mapping = normalizeRow(row);
-    if (!mapping) continue;
-    const key = `${mapping.doctorId}:${mapping.clinicId}`;
-    if (!deduped.has(key)) {
-      deduped.set(key, mapping);
+  return normalized.sort((left, right) => {
+    if (left.doctorId !== right.doctorId) {
+      return left.doctorId.localeCompare(right.doctorId);
     }
-  }
-
-  return Array.from(deduped.values());
+    if (left.clinicId !== right.clinicId) {
+      return left.clinicId.localeCompare(right.clinicId);
+    }
+    return left.effectiveFrom.localeCompare(right.effectiveFrom);
+  });
 }
 
-async function fetchMappingsFromSupabase(): Promise<CalendarMapping[]> {
+async function fetchMappingsFromSupabase(): Promise<VersionedCalendarMapping[]> {
   const supabase = createServiceClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('doctor_schedules')
-    .select('doctor_id, clinic_id, calendar_id, is_active, schedule')
-    .eq('is_active', true);
+    .select('doctor_id, clinic_id, calendar_id, is_active, effective_from, schedule');
+
+  if (error && isMissingEffectiveFromColumnError(error)) {
+    const fallbackResult = await supabase
+      .from('doctor_schedules')
+      .select('doctor_id, clinic_id, calendar_id, is_active, schedule');
+
+    data = Array.isArray(fallbackResult.data)
+      ? fallbackResult.data.map((row) => ({ ...row, effective_from: getTodayIsoInHongKong() }))
+      : null;
+    error = fallbackResult.error;
+  }
 
   if (error) {
     throw new Error(error.message);
@@ -190,7 +276,7 @@ async function fetchMappingsFromSupabase(): Promise<CalendarMapping[]> {
   return normalizeRows(rows);
 }
 
-async function loadMappingsWithFallback(): Promise<CalendarMapping[]> {
+async function loadMappingsWithFallback(): Promise<VersionedCalendarMapping[]> {
   try {
     const supabaseMappings = await fetchMappingsFromSupabase();
     if (supabaseMappings.length > 0) {
@@ -204,11 +290,11 @@ async function loadMappingsWithFallback(): Promise<CalendarMapping[]> {
     }
 
     console.warn(
-      '[doctor-schedule-store] No active doctor_schedules in Supabase; using static schedule-config fallback.'
+      '[doctor-schedule-store] No doctor_schedules in Supabase; using static schedule-config fallback.'
     );
     const fallbackMappings = getStaticFallbackMappings();
     lastLoadInfo = {
-      detail: 'No active doctor_schedules rows in Supabase',
+      detail: 'No doctor_schedules rows in Supabase',
       loadedAt: Date.now(),
       mappingCount: fallbackMappings.length,
       source: 'static-fallback-empty',
@@ -230,7 +316,7 @@ async function loadMappingsWithFallback(): Promise<CalendarMapping[]> {
   }
 }
 
-async function getCachedMappings(): Promise<CalendarMapping[]> {
+async function getCachedMappings(): Promise<VersionedCalendarMapping[]> {
   const now = Date.now();
   if (cache && cache.expiresAt > now) {
     return cache.mappings;
@@ -262,28 +348,44 @@ export function getDoctorScheduleLoadInfo(): DoctorScheduleLoadInfo {
   return { ...lastLoadInfo };
 }
 
-export async function getActiveScheduleMappings(): Promise<CalendarMapping[]> {
+export async function getScheduleVersions(): Promise<CalendarMapping[]> {
   const mappings = await getCachedMappings();
   return mappings.map(cloneCalendarMapping);
 }
 
+export async function getActiveScheduleMappings(targetDate?: string): Promise<CalendarMapping[]> {
+  const mappings = await getCachedMappings();
+  const effectiveDate = normalizeRequestedDate(targetDate);
+
+  return resolveMappingsForDate(mappings, effectiveDate)
+    .filter((mapping) => mapping.isActive)
+    .map(cloneCalendarMapping);
+}
+
 export async function getScheduleMapping(
   doctorId: DoctorId,
-  clinicId: ClinicId
+  clinicId: ClinicId,
+  targetDate?: string
 ): Promise<CalendarMapping | undefined> {
-  const mappings = await getCachedMappings();
+  const mappings = await getActiveScheduleMappings(targetDate);
   const mapping = mappings.find((entry) => entry.doctorId === doctorId && entry.clinicId === clinicId);
-  return mapping ? cloneCalendarMapping(mapping) : undefined;
+  return mapping
+    ? {
+        ...mapping,
+        schedule: cloneWeeklySchedule(mapping.schedule),
+      }
+    : undefined;
 }
 
 export async function getScheduleMappingByRawIds(
   doctorId: string,
-  clinicId: string
+  clinicId: string,
+  targetDate?: string
 ): Promise<CalendarMapping | undefined> {
   if (!isDoctorId(doctorId) || !isClinicId(clinicId)) {
     return undefined;
   }
-  return getScheduleMapping(doctorId, clinicId);
+  return getScheduleMapping(doctorId, clinicId, targetDate);
 }
 
 export async function getActiveCalendarIds(): Promise<string[]> {
@@ -291,6 +393,7 @@ export async function getActiveCalendarIds(): Promise<string[]> {
   return Array.from(
     new Set(
       mappings
+        .filter((mapping) => mapping.isActive)
         .map((mapping) => mapping.calendarId.trim())
         .filter((calendarId) => calendarId.length > 0)
     )

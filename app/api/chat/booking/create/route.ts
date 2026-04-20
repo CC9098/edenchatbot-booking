@@ -97,7 +97,8 @@ export async function POST(request: NextRequest) {
     } else {
       const mapping = await getMappingWithFallback(
         bookingData.doctorId,
-        bookingData.clinicId
+        bookingData.clinicId,
+        bookingData.date
       );
       if (mapping && mapping.isActive) {
         calendarId = mapping.calendarId;

@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
         }
       }
     } else if (effectiveDoctorId && effectiveClinicId) {
-      const mapping = await getMappingWithFallback(effectiveDoctorId, effectiveClinicId);
+      const mapping = await getMappingWithFallback(effectiveDoctorId, effectiveClinicId, date);
       if (!mapping || !mapping.isActive) {
         return NextResponse.json(
           { error: "Doctor schedule not found" },

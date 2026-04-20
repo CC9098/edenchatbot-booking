@@ -1,7 +1,8 @@
 import 'server-only';
 
-import { getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
+import { getActiveScheduleMappings, getScheduleVersions } from '@/lib/doctor-schedule-store';
 import { getUpcomingHolidayNotices } from '@/lib/holiday-notices';
+import { getTodayIsoInHongKong } from '@/lib/timetable-admin-utils';
 import {
   CLINIC_BY_ID,
   DOCTORS,
@@ -58,9 +59,24 @@ function formatWeeklySchedule(schedule: WeeklySchedule): string {
   return sections.join(' | ');
 }
 
+function findNextScheduleChangeDate(
+  mappings: Awaited<ReturnType<typeof getScheduleVersions>>,
+  doctorId: string,
+  clinicId: string,
+  today: string
+): string | undefined {
+  return mappings
+    .filter((mapping) => mapping.doctorId === doctorId && mapping.clinicId === clinicId)
+    .map((mapping) => mapping.effectiveFrom)
+    .filter((value): value is string => typeof value === 'string' && value > today)
+    .sort((left, right) => left.localeCompare(right))[0];
+}
+
 export async function getPublicBookableScheduleData(): Promise<BookableDoctorSchedule[]> {
-  const [mappings, holidayNotices] = await Promise.all([
+  const today = getTodayIsoInHongKong();
+  const [mappings, allScheduleVersions, holidayNotices] = await Promise.all([
     getActiveScheduleMappings(),
+    getScheduleVersions(),
     getUpcomingHolidayNotices(),
   ]);
   const doctorMap = new Map<string, BookableDoctorSchedule>();
@@ -80,6 +96,12 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
       clinicNameEn: clinic.nameEn,
       schedule: cloneWeeklySchedule(mapping.schedule),
       summary: formatWeeklySchedule(mapping.schedule),
+      nextEffectiveFrom: findNextScheduleChangeDate(
+        allScheduleVersions,
+        mapping.doctorId,
+        mapping.clinicId,
+        today
+      ),
     };
 
     const existing = doctorMap.get(doctor.id);

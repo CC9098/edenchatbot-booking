@@ -9,19 +9,22 @@ import {
   DAY_FIELD_ORDER,
   DAY_LABELS_ZH,
   createEmptyDayInputs,
+  getStartOfNextMonthIso,
+  getTodayIsoInHongKong,
   normalizeDbTime,
-  type DayFieldKey,
   type DayInputMap,
 } from "@/lib/timetable-admin-utils";
 import { getWorkspaceFromPath } from "@/lib/staff-console-workspace";
 import { CLINICS, DOCTORS, type ClinicId, type DoctorId } from "@/shared/clinic-data";
 
 type ScheduleItem = {
+  clientKey: string;
   id: string | null;
   doctorId: DoctorId;
   clinicId: ClinicId;
   calendarId: string;
   isActive: boolean;
+  effectiveFrom: string;
   dayInputs: DayInputMap;
 };
 
@@ -46,6 +49,7 @@ type TimetablePayload = {
     clinicId: ClinicId;
     calendarId: string;
     isActive: boolean;
+    effectiveFrom: string;
     dayInputs: DayInputMap;
   }>;
   holidays: HolidayItem[];
@@ -63,6 +67,7 @@ type HolidayFormState = {
 
 const CLINIC_LABELS = Object.fromEntries(CLINICS.map((clinic) => [clinic.id, clinic.nameZh])) as Record<ClinicId, string>;
 const DOCTOR_LABELS = Object.fromEntries(DOCTORS.map((doctor) => [doctor.id, doctor.nameZh])) as Record<DoctorId, string>;
+const TODAY_IN_HONG_KONG = getTodayIsoInHongKong();
 
 const EMPTY_HOLIDAY_FORM: HolidayFormState = {
   id: null,
@@ -74,23 +79,86 @@ const EMPTY_HOLIDAY_FORM: HolidayFormState = {
   reason: "",
 };
 
-function buildScheduleMatrix(existing: TimetablePayload["schedules"]): ScheduleItem[] {
-  const byKey = new Map(existing.map((item) => [`${item.doctorId}:${item.clinicId}`, item]));
+function createScheduleClientKey(id: string | null, doctorId: DoctorId, clinicId: ClinicId, effectiveFrom: string) {
+  return id ? `saved:${id}` : `draft:${doctorId}:${clinicId}:${effectiveFrom}:${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function createScheduleDraft(
+  doctorId: DoctorId,
+  clinicId: ClinicId,
+  overrides?: Partial<Omit<ScheduleItem, "clientKey" | "doctorId" | "clinicId">>
+): ScheduleItem {
+  const effectiveFrom = overrides?.effectiveFrom ?? TODAY_IN_HONG_KONG;
+
+  return {
+    clientKey: createScheduleClientKey(null, doctorId, clinicId, effectiveFrom),
+    id: overrides?.id ?? null,
+    doctorId,
+    clinicId,
+    calendarId: overrides?.calendarId ?? "",
+    isActive: overrides?.isActive ?? false,
+    effectiveFrom,
+    dayInputs: overrides?.dayInputs ?? createEmptyDayInputs(),
+  };
+}
+
+function buildScheduleRows(existing: TimetablePayload["schedules"]): ScheduleItem[] {
+  const byKey = new Map<string, TimetablePayload["schedules"]>();
+
+  for (const item of existing) {
+    const key = `${item.doctorId}:${item.clinicId}`;
+    const group = byKey.get(key);
+    if (group) {
+      group.push(item);
+    } else {
+      byKey.set(key, [item]);
+    }
+  }
 
   return CLINICS.map((clinic) =>
     DOCTORS.map((doctor) => {
-      const existingItem = byKey.get(`${doctor.id}:${clinic.id}`);
+      const items = [...(byKey.get(`${doctor.id}:${clinic.id}`) ?? [])].sort((left, right) =>
+        left.effectiveFrom.localeCompare(right.effectiveFrom)
+      );
 
-      return {
-        id: existingItem?.id ?? null,
-        doctorId: doctor.id,
-        clinicId: clinic.id,
-        calendarId: existingItem?.calendarId ?? "",
-        isActive: existingItem?.isActive ?? false,
-        dayInputs: existingItem?.dayInputs ?? createEmptyDayInputs(),
-      };
+      if (items.length === 0) {
+        return [createScheduleDraft(doctor.id, clinic.id)];
+      }
+
+      return items.map((item) =>
+        createScheduleDraft(doctor.id, clinic.id, {
+          id: item.id,
+          calendarId: item.calendarId,
+          isActive: item.isActive,
+          effectiveFrom: item.effectiveFrom,
+          dayInputs: item.dayInputs,
+        })
+      );
     })
-  ).flat();
+  ).flat(2);
+}
+
+function formatEffectiveDateLabel(dateIso: string): string {
+  if (!dateIso) return "即日";
+
+  const date = new Date(`${dateIso}T00:00:00+08:00`);
+  if (Number.isNaN(date.getTime())) return dateIso;
+
+  return new Intl.DateTimeFormat("zh-HK", {
+    timeZone: "Asia/Hong_Kong",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).format(date);
+}
+
+function hasConfiguredSchedule(row: ScheduleItem): boolean {
+  return Boolean(
+    row.id ||
+    row.isActive ||
+    row.calendarId.trim() ||
+    Object.values(row.dayInputs).some((value) => value.trim().length > 0)
+  );
 }
 
 function isHolidayFormValid(form: HolidayFormState): boolean {
@@ -154,7 +222,7 @@ export default function DoctorTimetablePage() {
 
       const payload = data as TimetablePayload;
       setRole(payload.role);
-      setScheduleRows(buildScheduleMatrix(payload.schedules));
+      setScheduleRows(buildScheduleRows(payload.schedules));
       setHolidays(payload.holidays);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "載入時間表失敗");
@@ -170,16 +238,26 @@ export default function DoctorTimetablePage() {
   const scheduleRowsByClinic = useMemo(() => {
     return CLINICS.map((clinic) => ({
       clinic,
-      rows: scheduleRows.filter((row) => row.clinicId === clinic.id),
+      rows: scheduleRows
+        .filter((row) => row.clinicId === clinic.id)
+        .sort((left, right) => {
+          if (left.doctorId !== right.doctorId) {
+            return left.doctorId.localeCompare(right.doctorId);
+          }
+          return left.effectiveFrom.localeCompare(right.effectiveFrom);
+        }),
     }));
   }, [scheduleRows]);
 
   const activeScheduleCount = useMemo(
-    () => scheduleRows.filter((row) => row.isActive).length,
+    () => scheduleRows.filter((row) => row.isActive && row.effectiveFrom <= TODAY_IN_HONG_KONG).length,
     [scheduleRows]
   );
 
-  const inactiveScheduleCount = scheduleRows.length - activeScheduleCount;
+  const scheduledFutureCount = useMemo(
+    () => scheduleRows.filter((row) => row.effectiveFrom > TODAY_IN_HONG_KONG).length,
+    [scheduleRows]
+  );
   const allDayHolidayCount = useMemo(
     () => holidays.filter((item) => !item.startTime || !item.endTime).length,
     [holidays]
@@ -189,21 +267,74 @@ export default function DoctorTimetablePage() {
     [holidays]
   );
 
+  function getScheduleGroupRows(row: Pick<ScheduleItem, "doctorId" | "clinicId">) {
+    return scheduleRows
+      .filter(
+        (item) => item.doctorId === row.doctorId && item.clinicId === row.clinicId
+      )
+      .sort((left, right) => left.effectiveFrom.localeCompare(right.effectiveFrom));
+  }
+
+  function isLatestScheduleVersion(row: ScheduleItem): boolean {
+    const groupRows = getScheduleGroupRows(row);
+    const latest = groupRows[groupRows.length - 1];
+    return latest?.clientKey === row.clientKey;
+  }
+
+  function isCurrentScheduleVersion(row: ScheduleItem): boolean {
+    if (row.effectiveFrom > TODAY_IN_HONG_KONG) {
+      return false;
+    }
+
+    const groupRows = getScheduleGroupRows(row).filter(
+      (item) => item.effectiveFrom <= TODAY_IN_HONG_KONG
+    );
+    const current = groupRows[groupRows.length - 1];
+    return current?.clientKey === row.clientKey;
+  }
+
   function updateScheduleRow(
-    doctorId: DoctorId,
-    clinicId: ClinicId,
+    clientKey: string,
     updater: (row: ScheduleItem) => ScheduleItem
   ) {
     setScheduleRows((prev) =>
       prev.map((row) =>
-        row.doctorId === doctorId && row.clinicId === clinicId ? updater(row) : row
+        row.clientKey === clientKey ? updater(row) : row
       )
     );
   }
 
+  function handleAddScheduleVersion(baseRow: ScheduleItem) {
+    const groupRows = getScheduleGroupRows(baseRow);
+    const usedDates = new Set(groupRows.map((row) => row.effectiveFrom));
+    let nextEffectiveFrom = getStartOfNextMonthIso(baseRow.effectiveFrom || TODAY_IN_HONG_KONG);
+
+    while (usedDates.has(nextEffectiveFrom)) {
+      nextEffectiveFrom = getStartOfNextMonthIso(nextEffectiveFrom);
+    }
+
+    const draft = createScheduleDraft(baseRow.doctorId, baseRow.clinicId, {
+      calendarId: baseRow.calendarId,
+      isActive: baseRow.isActive,
+      effectiveFrom: nextEffectiveFrom,
+      dayInputs: { ...baseRow.dayInputs },
+    });
+
+    setScheduleRows((prev) =>
+      [...prev, draft].sort((left, right) => {
+        if (left.clinicId !== right.clinicId) {
+          return left.clinicId.localeCompare(right.clinicId);
+        }
+        if (left.doctorId !== right.doctorId) {
+          return left.doctorId.localeCompare(right.doctorId);
+        }
+        return left.effectiveFrom.localeCompare(right.effectiveFrom);
+      })
+    );
+  }
+
   async function handleSaveRow(row: ScheduleItem) {
-    const key = `${row.doctorId}:${row.clinicId}`;
-    setSavingKey(key);
+    setSavingKey(row.clientKey);
     setNotice(null);
     setError(null);
 
@@ -211,7 +342,15 @@ export default function DoctorTimetablePage() {
       const response = await fetch("/api/doctor/timetable/schedules", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(row),
+        body: JSON.stringify({
+          id: row.id,
+          doctorId: row.doctorId,
+          clinicId: row.clinicId,
+          calendarId: row.calendarId,
+          isActive: row.isActive,
+          effectiveFrom: row.effectiveFrom,
+          dayInputs: row.dayInputs,
+        }),
       });
       const data = await response.json().catch(() => ({}));
 
@@ -219,13 +358,54 @@ export default function DoctorTimetablePage() {
         throw new Error(data.error || `HTTP ${response.status}`);
       }
 
-      const savedId = typeof data.id === "string" ? data.id : row.id;
-      if (savedId) {
-        updateScheduleRow(row.doctorId, row.clinicId, (current) => ({ ...current, id: savedId }));
-      }
-      setNotice(`${DOCTOR_LABELS[row.doctorId]} @ ${CLINIC_LABELS[row.clinicId]} 已儲存`);
+      setNotice(
+        `${DOCTOR_LABELS[row.doctorId]} @ ${CLINIC_LABELS[row.clinicId]} 已儲存，${formatEffectiveDateLabel(row.effectiveFrom)} 起生效`
+      );
+      startTransition(() => {
+        void loadTimetable();
+      });
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "儲存排班失敗");
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
+  async function handleDeleteSchedule(row: ScheduleItem) {
+    if (!row.id) {
+      setScheduleRows((prev) => {
+        const remaining = prev.filter((item) => item.clientKey !== row.clientKey);
+        const stillHasGroup = remaining.some(
+          (item) => item.doctorId === row.doctorId && item.clinicId === row.clinicId
+        );
+
+        return stillHasGroup ? remaining : [...remaining, createScheduleDraft(row.doctorId, row.clinicId)];
+      });
+      return;
+    }
+
+    setSavingKey(row.clientKey);
+    setNotice(null);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/doctor/timetable/schedules/${row.id}`, {
+        method: "DELETE",
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      setNotice(
+        `${DOCTOR_LABELS[row.doctorId]} @ ${CLINIC_LABELS[row.clinicId]} 已刪除 ${formatEffectiveDateLabel(row.effectiveFrom)} 版本`
+      );
+      startTransition(() => {
+        void loadTimetable();
+      });
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "刪除排班版本失敗");
     } finally {
       setSavingKey(null);
     }
@@ -309,7 +489,7 @@ export default function DoctorTimetablePage() {
             <h1 className="mt-3 text-2xl font-bold text-slate-900">時間表管理</h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
               呢個控制台會直接影響 WordPress 嵌入時間表、Chatbot、預約頁、改期頁，同埋 reminder cron 用緊嘅日曆清單。
-              姑娘修改後會即時生效。
+              現時支援預先建立日後版本，例如 4 月先入 5 月 timetable，系統會到生效日先自動切換。
             </p>
           </div>
 
@@ -365,14 +545,14 @@ export default function DoctorTimetablePage() {
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-primary/10 bg-white px-4 py-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">已啟用排班</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">現行版本</p>
                   <p className="mt-2 text-2xl font-bold text-slate-900">{activeScheduleCount}</p>
-                  <p className="mt-1 text-sm text-slate-500">會同步到預約頁與 timetable embed。</p>
+                  <p className="mt-1 text-sm text-slate-500">今日起已生效，會同步到預約頁與 timetable embed。</p>
                 </div>
                 <div className="rounded-2xl border border-primary/10 bg-white px-4 py-4 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">未啟用排班</p>
-                  <p className="mt-2 text-2xl font-bold text-slate-900">{inactiveScheduleCount}</p>
-                  <p className="mt-1 text-sm text-slate-500">通常代表未開診或未設定 Google Calendar。</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">日後版本</p>
+                  <p className="mt-2 text-2xl font-bold text-slate-900">{scheduledFutureCount}</p>
+                  <p className="mt-1 text-sm text-slate-500">已預先排定，會到生效日先自動切換。</p>
                 </div>
                 <div className="rounded-2xl border border-primary/10 bg-white px-4 py-4 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">姑娘公告</p>
@@ -394,10 +574,10 @@ export default function DoctorTimetablePage() {
                       </div>
                       <div className="flex flex-wrap gap-2 text-xs font-semibold">
                         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">
-                          啟用 {rows.filter((row) => row.isActive).length} 位醫師
+                          現行 {rows.filter((row) => row.effectiveFrom <= TODAY_IN_HONG_KONG && hasConfiguredSchedule(row)).length} 個版本
                         </span>
                         <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">
-                          共 {rows.length} 個排班卡
+                          日後 {rows.filter((row) => row.effectiveFrom > TODAY_IN_HONG_KONG && hasConfiguredSchedule(row)).length} 個版本
                         </span>
                       </div>
                     </div>
@@ -405,12 +585,15 @@ export default function DoctorTimetablePage() {
 
                   <div className="grid gap-4 p-4 xl:grid-cols-2">
                     {rows.map((row) => {
-                      const saveKey = `${row.doctorId}:${row.clinicId}`;
-                      const isSaving = savingKey === saveKey;
+                      const isSaving = savingKey === row.clientKey;
+                      const isCurrentVersion = isCurrentScheduleVersion(row);
+                      const isFutureVersion = row.effectiveFrom > TODAY_IN_HONG_KONG;
+                      const canEditEffectiveFrom = !row.id || isFutureVersion;
+                      const showAddFutureButton = isLatestScheduleVersion(row);
 
                       return (
                         <article
-                          key={saveKey}
+                          key={row.clientKey}
                           className={`rounded-2xl border px-4 py-4 transition ${
                             row.isActive
                               ? "border-primary/15 bg-white shadow-sm"
@@ -422,9 +605,20 @@ export default function DoctorTimetablePage() {
                               <p className="text-base font-semibold text-slate-900">
                                 {DOCTOR_LABELS[row.doctorId]}
                               </p>
-                              <p className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
-                                {clinic.nameZh}
-                              </p>
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium">
+                                <span className="uppercase tracking-[0.2em] text-slate-500">{clinic.nameZh}</span>
+                                <span
+                                  className={`rounded-full border px-2.5 py-1 ${
+                                    isCurrentVersion
+                                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                      : isFutureVersion
+                                        ? "border-sky-200 bg-sky-50 text-sky-700"
+                                        : "border-slate-200 bg-slate-50 text-slate-600"
+                                  }`}
+                                >
+                                  {isCurrentVersion ? "現行版本" : `${formatEffectiveDateLabel(row.effectiveFrom)} 起`}
+                                </span>
+                              </div>
                             </div>
 
                             <label className="inline-flex items-center gap-2 self-start rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700">
@@ -432,7 +626,7 @@ export default function DoctorTimetablePage() {
                                 type="checkbox"
                                 checked={row.isActive}
                                 onChange={(event) =>
-                                  updateScheduleRow(row.doctorId, row.clinicId, (current) => ({
+                                  updateScheduleRow(row.clientKey, (current) => ({
                                     ...current,
                                     isActive: event.target.checked,
                                   }))
@@ -443,33 +637,53 @@ export default function DoctorTimetablePage() {
                             </label>
                           </div>
 
-                          <label className="mt-4 block space-y-1.5">
-                            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                              Google Calendar ID
-                            </span>
-                            <input
-                              value={row.calendarId}
-                              onChange={(event) =>
-                                updateScheduleRow(row.doctorId, row.clinicId, (current) => ({
-                                  ...current,
-                                  calendarId: event.target.value,
-                                }))
-                              }
-                              placeholder="Google Calendar ID"
-                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            />
-                          </label>
+                          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            <label className="space-y-1.5">
+                              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                                生效日期
+                              </span>
+                              <input
+                                type="date"
+                                value={row.effectiveFrom}
+                                disabled={!canEditEffectiveFrom}
+                                onChange={(event) =>
+                                  updateScheduleRow(row.clientKey, (current) => ({
+                                    ...current,
+                                    effectiveFrom: event.target.value,
+                                  }))
+                                }
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+                              />
+                            </label>
+
+                            <label className="space-y-1.5">
+                              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                                Google Calendar ID
+                              </span>
+                              <input
+                                value={row.calendarId}
+                                onChange={(event) =>
+                                  updateScheduleRow(row.clientKey, (current) => ({
+                                    ...current,
+                                    calendarId: event.target.value,
+                                  }))
+                                }
+                                placeholder="Google Calendar ID"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                              />
+                            </label>
+                          </div>
 
                           <div className="mt-4 grid gap-3 sm:grid-cols-2">
                             {DAY_FIELD_ORDER.map((dayKey) => (
-                              <label key={`${saveKey}-${dayKey}`} className="space-y-1.5">
+                              <label key={`${row.clientKey}-${dayKey}`} className="space-y-1.5">
                                 <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                                   {DAY_LABELS_ZH[dayKey]}
                                 </span>
                                 <input
                                   value={row.dayInputs[dayKey]}
                                   onChange={(event) =>
-                                    updateScheduleRow(row.doctorId, row.clinicId, (current) => ({
+                                    updateScheduleRow(row.clientKey, (current) => ({
                                       ...current,
                                       dayInputs: {
                                         ...current.dayInputs,
@@ -486,17 +700,39 @@ export default function DoctorTimetablePage() {
 
                           <div className="mt-4 flex flex-col gap-3 border-t border-slate-200/80 pt-4 sm:flex-row sm:items-center sm:justify-between">
                             <p className="text-xs leading-5 text-slate-500">
-                              留空代表該日唔應診；多段時段可用逗號分隔。
+                              留空代表該日唔應診；多段時段可用逗號分隔。要預先改下月時間表，請按「新增日後版本」。
                             </p>
-                            <button
-                              type="button"
-                              onClick={() => void handleSaveRow(row)}
-                              disabled={isSaving}
-                              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <Save className="h-4 w-4" />
-                              {isSaving ? "儲存中..." : "儲存排班"}
-                            </button>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {showAddFutureButton ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddScheduleVersion(row)}
+                                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                                >
+                                  新增日後版本
+                                </button>
+                              ) : null}
+                              {hasConfiguredSchedule(row) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteSchedule(row)}
+                                  disabled={isSaving}
+                                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  刪除此版本
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => void handleSaveRow(row)}
+                                disabled={isSaving}
+                                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                <Save className="h-4 w-4" />
+                                {isSaving ? "儲存中..." : "儲存排班"}
+                              </button>
+                            </div>
                           </div>
                         </article>
                       );

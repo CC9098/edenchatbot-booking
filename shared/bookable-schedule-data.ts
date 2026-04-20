@@ -8,6 +8,7 @@ export type BookableClinicSchedule = {
   clinicNameEn: string;
   schedule: WeeklySchedule;
   summary: string;
+  nextEffectiveFrom?: string;
 };
 
 export type BookableScheduleNotice = {

@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
                                                 }
                                 }
 
-                                const mapping = await getMappingWithFallback(doctorId, clinicId);
+                                const mapping = await getMappingWithFallback(doctorId, clinicId, requestedDate);
                                 if (!mapping || !mapping.isActive) {
                                                 return NextResponse.json({ error: 'Doctor not available at this clinic' }, { status: 404 });
                                 }

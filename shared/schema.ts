@@ -24,6 +24,7 @@ export const doctorSchedules = pgTable("doctor_schedules", {
   clinicId: text("clinic_id").notNull(),
   calendarId: text("calendar_id").notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  effectiveFrom: date("effective_from").notNull().default(sql`current_date`),
   schedule: json("schedule").notNull(), // WeeklySchedule JSON
 });
 

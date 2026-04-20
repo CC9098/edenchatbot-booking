@@ -23,6 +23,7 @@ import {
   BOOKING_PICKUP_LABELS,
 } from '@/shared/booking-pickup';
 import { getActiveCalendarIds, getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
+import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { getFreeBusy } from './google-calendar';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { createBooking, deleteEvent, listEventsInRange } from './google-calendar';
@@ -528,12 +529,12 @@ export async function listBookableDoctors(): Promise<{ doctors: DoctorInfo[] }> 
   return { doctors: doctorList };
 }
 
-async function getClinicsForDoctor(doctorNameZh: string): Promise<string[]> {
+async function getClinicsForDoctor(doctorNameZh: string, targetDate?: string): Promise<string[]> {
   const resolvedDoctorNameZh = resolveDoctorNameZh(doctorNameZh) || doctorNameZh;
   const doctor = DOCTOR_BY_NAME_ZH[resolvedDoctorNameZh];
   if (!doctor) return [];
 
-  const doctorMappings = (await getActiveScheduleMappings()).filter(
+  const doctorMappings = (await getActiveScheduleMappings(targetDate)).filter(
     (mapping) => mapping.doctorId === doctor.id
   );
 
@@ -577,7 +578,7 @@ export async function getBookingOptions(
     };
   }
 
-  const clinics = await getClinicsForDoctor(doctorNameZh);
+  const clinics = await getClinicsForDoctor(doctorNameZh, date || undefined);
 
   if (!date) {
     return {
@@ -835,7 +836,7 @@ export async function getAvailableTimeSlots(
     const doctorId = doctor.id;
 
     // Get all active mappings for this doctor
-    const doctorMappings = (await getActiveScheduleMappings()).filter(
+    const doctorMappings = (await getActiveScheduleMappings(date)).filter(
       (mapping) => mapping.doctorId === doctorId
     );
 
@@ -1021,8 +1022,10 @@ export async function createConversationalBooking(
     }
 
     // Find calendar mapping
-    const mapping = (await getActiveScheduleMappings()).find(
-      (m) => m.doctorId === doctor.id && m.clinicId === clinicId
+    const mapping = await getMappingWithFallback(
+      doctor.id,
+      clinicId,
+      normalizedBookingData.date
     );
 
     if (!mapping) {

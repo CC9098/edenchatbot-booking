@@ -18,6 +18,7 @@ export interface CalendarMapping {
   clinicId: ClinicId;
   calendarId: string;
   isActive: boolean;
+  effectiveFrom?: string;
   schedule: WeeklySchedule;
 }
 

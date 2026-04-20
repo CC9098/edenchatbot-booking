@@ -1511,6 +1511,11 @@ export function BookingTabFlow({
                               {clinic.clinicNameEn}
                             </span>
                           </p>
+                          {clinic.nextEffectiveFrom ? (
+                            <p className="mt-1 text-xs font-medium text-sky-700">
+                              已排定新版本，{formatShortDate(clinic.nextEffectiveFrom)} 起更新
+                            </p>
+                          ) : null}
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           <span

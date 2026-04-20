@@ -226,7 +226,11 @@ export async function POST(request: NextRequest) {
 
                                                 calendarId = resolvedOnlineMapping.mapping.calendarId;
                                 } else {
-                                                const mapping = await getMappingWithFallback(bookingData.doctorId, bookingData.clinicId);
+                                                const mapping = await getMappingWithFallback(
+                                                                bookingData.doctorId,
+                                                                bookingData.clinicId,
+                                                                bookingData.date
+                                                );
                                                 if (mapping && mapping.isActive) {
                                                                 calendarId = mapping.calendarId;
                                                 }
@@ -524,7 +528,11 @@ export async function PATCH(request: NextRequest) {
                                                                 }
                                                 }
                                 } else if (effectiveDoctorId && effectiveClinicId) {
-                                                const mapping = await getMappingWithFallback(effectiveDoctorId, effectiveClinicId);
+                                                const mapping = await getMappingWithFallback(
+                                                                effectiveDoctorId,
+                                                                effectiveClinicId,
+                                                                date
+                                                );
                                                 if (!mapping || !mapping.isActive) {
                                                                 return NextResponse.json({ error: 'Doctor schedule not found' }, { status: 404 });
                                                 }
