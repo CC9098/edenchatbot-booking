@@ -36,6 +36,37 @@ export interface BookingIntakeCreateInput {
   bookingPayload?: Record<string, unknown>;
 }
 
+export interface BookingReminderIntakeCandidate {
+  intakeId: string;
+  googleEventId: string;
+  calendarId: string;
+  patientName: string;
+  patientPhone: string;
+  patientEmail: string;
+  doctorNameZh: string;
+  clinicId: string;
+  clinicNameZh: string;
+  visitType: BookingVisitType;
+  appointmentDate: string;
+  appointmentTime: string;
+  notificationClinicId?: string;
+}
+
+function parseNotificationClinicId(raw: unknown): string | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return undefined;
+  }
+
+  const payload = raw as Record<string, unknown>;
+  const value = payload["notificationClinicId"];
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized || undefined;
+}
+
 export async function createPendingBookingIntake(
   input: BookingIntakeCreateInput,
 ): Promise<{ success: boolean; intakeId?: string; error?: string }> {
@@ -251,6 +282,91 @@ export async function markBookingIntakeRescheduledByEvent(params: {
   } catch (error) {
     return {
       success: false,
+      error: error instanceof Error ? error.message : "Unknown DB error",
+    };
+  }
+}
+
+export async function listConfirmedBookingReminderCandidatesByDate(
+  targetDate: string,
+): Promise<{ success: boolean; items: BookingReminderIntakeCandidate[]; error?: string }> {
+  try {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+      .from("booking_intake")
+      .select(`
+        id,
+        google_event_id,
+        calendar_id,
+        patient_name,
+        phone,
+        email,
+        doctor_name_zh,
+        clinic_id,
+        clinic_name_zh,
+        visit_type,
+        appointment_date,
+        appointment_time,
+        booking_payload
+      `)
+      .eq("status", "confirmed")
+      .eq("appointment_date", targetDate)
+      .not("google_event_id", "is", null)
+      .not("calendar_id", "is", null)
+      .order("appointment_time", { ascending: true });
+
+    if (error) {
+      return {
+        success: false,
+        items: [],
+        error: error.message,
+      };
+    }
+
+    const deduped = new Map<string, BookingReminderIntakeCandidate>();
+
+    for (const row of data ?? []) {
+      const googleEventId =
+        typeof row.google_event_id === "string" ? row.google_event_id.trim() : "";
+      const calendarId =
+        typeof row.calendar_id === "string" ? row.calendar_id.trim() : "";
+
+      if (!googleEventId || !calendarId) {
+        continue;
+      }
+
+      const key = `${calendarId}:${googleEventId}`;
+      if (deduped.has(key)) {
+        continue;
+      }
+
+      deduped.set(key, {
+        intakeId: String(row.id || ""),
+        googleEventId,
+        calendarId,
+        patientName: typeof row.patient_name === "string" ? row.patient_name.trim() : "",
+        patientPhone: typeof row.phone === "string" ? row.phone.trim() : "",
+        patientEmail: typeof row.email === "string" ? row.email.trim().toLowerCase() : "",
+        doctorNameZh: typeof row.doctor_name_zh === "string" ? row.doctor_name_zh.trim() : "",
+        clinicId: typeof row.clinic_id === "string" ? row.clinic_id.trim() : "",
+        clinicNameZh: typeof row.clinic_name_zh === "string" ? row.clinic_name_zh.trim() : "",
+        visitType: row.visit_type === "first" ? "first" : "followup",
+        appointmentDate:
+          typeof row.appointment_date === "string" ? row.appointment_date.trim() : "",
+        appointmentTime:
+          typeof row.appointment_time === "string" ? row.appointment_time.trim() : "",
+        notificationClinicId: parseNotificationClinicId(row.booking_payload),
+      });
+    }
+
+    return {
+      success: true,
+      items: Array.from(deduped.values()),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      items: [],
       error: error instanceof Error ? error.message : "Unknown DB error",
     };
   }

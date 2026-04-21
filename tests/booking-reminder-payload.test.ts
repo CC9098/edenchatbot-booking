@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildBookingReminderPayloadFromIntake,
   buildBookingReminderPayload,
   extractBookingReminderMetadata,
 } from '@/lib/booking-reminder-payload';
@@ -52,4 +53,50 @@ test('buildBookingReminderPayload returns payload without requiring email', () =
   assert.equal(payload.calendarId, 'calendar_abc');
   assert.equal(payload.date, '2026-04-16');
   assert.equal(payload.time, '10:00');
+});
+
+test('buildBookingReminderPayloadFromIntake uses confirmed booking_intake data directly', () => {
+  const payload = buildBookingReminderPayloadFromIntake({
+    intakeId: 'intake_123',
+    googleEventId: 'evt_456',
+    calendarId: 'calendar_abc',
+    patientName: '陳小明',
+    patientPhone: '96563420',
+    patientEmail: '',
+    doctorNameZh: '梁仲威醫師',
+    clinicId: 'jordan',
+    clinicNameZh: '佐敦',
+    visitType: 'followup',
+    appointmentDate: '2026-04-16',
+    appointmentTime: '10:00',
+    notificationClinicId: 'jordan',
+  });
+
+  assert.ok(payload);
+  assert.equal(payload.patientEmail, '');
+  assert.equal(payload.patientPhone, '96563420');
+  assert.equal(payload.eventId, 'evt_456');
+  assert.equal(payload.calendarId, 'calendar_abc');
+  assert.equal(payload.date, '2026-04-16');
+  assert.equal(payload.time, '10:00');
+  assert.equal(payload.clinicId, 'jordan');
+});
+
+test('buildBookingReminderPayloadFromIntake rejects incomplete booking_intake rows', () => {
+  const payload = buildBookingReminderPayloadFromIntake({
+    intakeId: 'intake_123',
+    googleEventId: '',
+    calendarId: 'calendar_abc',
+    patientName: '陳小明',
+    patientPhone: '96563420',
+    patientEmail: '',
+    doctorNameZh: '梁仲威醫師',
+    clinicId: 'jordan',
+    clinicNameZh: '佐敦',
+    visitType: 'followup',
+    appointmentDate: '2026-04-16',
+    appointmentTime: '10:00',
+  });
+
+  assert.equal(payload, null);
 });
