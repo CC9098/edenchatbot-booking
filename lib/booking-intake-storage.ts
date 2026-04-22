@@ -12,6 +12,7 @@ export interface BookingIntakeCreateInput {
   source?: string;
   userId?: string;
   sessionId?: string;
+  patientProfileId?: string;
   doctorId: string;
   doctorNameZh: string;
   clinicId: string;
@@ -80,6 +81,7 @@ export async function createPendingBookingIntake(
       status: "pending" as BookingIntakeStatus,
       user_id: input.userId ?? null,
       session_id: input.sessionId ?? null,
+      patient_profile_id: input.patientProfileId ?? null,
       doctor_id: input.doctorId,
       doctor_name_zh: input.doctorNameZh,
       clinic_id: input.clinicId,

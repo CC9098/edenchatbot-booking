@@ -34,6 +34,11 @@ import {
 } from '@/shared/booking-treatment-options';
 import { type ClinicId, type DoctorId } from '@/shared/clinic-data';
 import type { TimeRange, WeeklySchedule } from '@/shared/schedule-config';
+import {
+  PatientProfileSelector,
+  splitHkDisplayName,
+} from '@/components/booking/PatientProfileSelector';
+import type { PatientProfile } from '@/app/api/patient-profiles/route';
 
 type BookingStep = 'setup' | 'timeslot' | 'details' | 'success';
 type FlowVariant = 'booking' | 'whatsapp' | 'staff';
@@ -519,6 +524,7 @@ export function BookingTabFlow({
   const [submitError, setSubmitError] = useState('');
   const [bookingId, setBookingId] = useState('');
   const [whatsappSent, setWhatsappSent] = useState<boolean | null>(null);
+  const [selectedPatientProfileId, setSelectedPatientProfileId] = useState<string | null>(null);
 
   const minDate = getTodayIsoInHongKong();
   const maxDate = getMaxDateIsoInHongKong(MAX_BOOKING_WINDOW_DAYS);
@@ -1309,6 +1315,9 @@ export function BookingTabFlow({
           symptoms: formValues.symptoms.trim(),
           referralSource: formValues.referralSource.trim(),
           ...(isStaffFlow && staffPatientUserId ? { patientUserId: staffPatientUserId } : {}),
+          ...(isWhatsappFlow && selectedPatientProfileId
+            ? { patientProfileId: selectedPatientProfileId }
+            : {}),
         }
       : payload;
 
@@ -1934,6 +1943,38 @@ export function BookingTabFlow({
               `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`,
             ])}
           />
+
+          {isWhatsappFlow ? (
+            <PatientProfileSelector
+              selectedProfileId={selectedPatientProfileId}
+              onSelect={(profile) => {
+                setSelectedPatientProfileId(profile.id);
+                const { lastName, firstName } = splitHkDisplayName(profile.display_name);
+                setFormValues((prev) => ({
+                  ...prev,
+                  lastName: lastName || prev.lastName,
+                  firstName: firstName || prev.firstName,
+                  dateOfBirth: profile.date_of_birth ?? prev.dateOfBirth,
+                  gender: (profile.gender as typeof prev.gender) || prev.gender,
+                }));
+              }}
+              onInitialLoad={(profiles) => {
+                if (selectedPatientProfileId) return;
+                const preferred =
+                  profiles.find((p) => p.is_default) ?? profiles[0];
+                if (!preferred) return;
+                setSelectedPatientProfileId(preferred.id);
+                const { lastName, firstName } = splitHkDisplayName(preferred.display_name);
+                setFormValues((prev) => ({
+                  ...prev,
+                  lastName: prev.lastName || lastName,
+                  firstName: prev.firstName || firstName,
+                  dateOfBirth: prev.dateOfBirth || (preferred.date_of_birth ?? ''),
+                  gender: prev.gender || ((preferred.gender as typeof prev.gender) ?? ''),
+                }));
+              }}
+            />
+          ) : null}
 
           <form className="space-y-5" onSubmit={handleSubmit}>
             {hasAutofilledContact ? (

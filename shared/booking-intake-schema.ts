@@ -15,6 +15,7 @@ export const detailedBookingSchema = bookingSchema
     medications: z.string().optional(),
     symptoms: z.string().optional(),
     referralSource: z.string().optional(),
+    patientProfileId: z.string().uuid().optional(),
   })
   .strict();
 

@@ -21,6 +21,7 @@ import { normalizePhoneForSearch, toHKE164 } from '@/lib/contact-utils';
 import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import { ensureSupabaseUserForPhone } from '@/lib/whatsapp-auth-bridge';
 import { createBooking, getFreeBusy } from '@/lib/google-calendar';
+import { createServiceClient } from '@/lib/supabase';
 import { syncPatientProfileContact } from '@/lib/profile-contact-sync';
 import { getDoctorBookingSlotMinutes } from '@/shared/clinic-data';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
@@ -181,9 +182,45 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ------------------------------------------------------------------
+    // Patient profile ownership check: if a patientProfileId is supplied,
+    // verify it belongs to the effective user. A mismatch is a client error
+    // rather than a silent drop so callers can surface the issue to users.
+    // ------------------------------------------------------------------
+    let validatedPatientProfileId: string | undefined;
+    if (bookingData.patientProfileId) {
+      if (!effectiveUserId) {
+        return NextResponse.json(
+          { error: '請先登入才能使用家庭成員功能。' },
+          { status: 401 },
+        );
+      }
+      try {
+        const adminClient = createServiceClient();
+        const { data: profileRow, error: profileErr } = await adminClient
+          .from('patient_profiles')
+          .select('id, user_id')
+          .eq('id', bookingData.patientProfileId)
+          .maybeSingle();
+        if (profileErr) {
+          console.warn(`[booking-whatsapp] patient_profiles lookup warning: ${profileErr.message}`);
+        } else if (profileRow && profileRow.user_id === effectiveUserId) {
+          validatedPatientProfileId = profileRow.id;
+        } else {
+          return NextResponse.json(
+            { error: '無法核對所選家庭成員，請重新選擇。' },
+            { status: 403 },
+          );
+        }
+      } catch (profileCheckErr) {
+        console.warn(`[booking-whatsapp] patient_profiles check error: ${profileCheckErr instanceof Error ? profileCheckErr.message : String(profileCheckErr)}`);
+      }
+    }
+
     const intakeResult = await createPendingBookingIntake({
       source: 'booking_whatsapp_page',
       userId: effectiveUserId,
+      patientProfileId: validatedPatientProfileId,
       doctorId: bookingData.doctorId,
       doctorNameZh: bookingData.doctorNameZh,
       clinicId: bookingData.clinicId,
