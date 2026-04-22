@@ -16,6 +16,8 @@ import {
 } from "@/lib/tendency-storage";
 import { DailyTipCard } from "@/components/patient/DailyTipCard";
 import { DailySensePrompt } from "@/components/patient/DailySensePrompt";
+import { ClaimHistoricalBookingsCard } from "@/components/member/ClaimHistoricalBookingsCard";
+import { FamilyMemberSwitcher } from "@/components/member/FamilyMemberSwitcher";
 
 function getTimeGreeting(): string {
   const hour = new Date().getHours();
@@ -243,6 +245,12 @@ export default function CareAdvicePage() {
           </section>
         ) : (
           <>
+            {/* ── Claim historical bookings (shown only when orphan rows exist) ── */}
+            <ClaimHistoricalBookingsCard />
+
+            {/* ── Family member switcher (shown only when ≥2 profiles exist) ── */}
+            <FamilyMemberSwitcher />
+
             {/* ── Daily tip card (one quiet thought per day) ── */}
             <div className="animate-eden-enter-delay-1">
               <DailyTipCard constitution={constitutionKey} accentBg={accentBg} />

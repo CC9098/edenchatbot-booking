@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Figtree, Noto_Sans_TC, Noto_Serif_TC, Roboto_Mono } from "next/font/google";
 import { NativeOAuthListener } from "@/components/auth/NativeOAuthListener";
 import { PatientAppChrome } from "@/components/patient/PatientAppChrome";
+import { CrossMethodBanner } from "@/components/member/CrossMethodBanner";
 import "./globals.css";
 
 const display = Figtree({
@@ -54,6 +55,7 @@ export default function RootLayout({
         className={`${display.variable} ${sans.variable} ${mono.variable} ${serif.variable} antialiased`}
       >
         <NativeOAuthListener />
+        <CrossMethodBanner />
         <PatientAppChrome>{children}</PatientAppChrome>
       </body>
     </html>

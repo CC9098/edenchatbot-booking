@@ -42,6 +42,8 @@ import {
 import { isSlotAfterClinicLastBookingCutoffUtc } from './booking-helpers';
 import { getSafeErrorMessage } from './error-sanitizer';
 import { syncPatientProfileContact } from './profile-contact-sync';
+import { normalizePhoneForSearch, toHKE164 } from './contact-utils';
+import { ensureSupabaseUserForPhone } from './whatsapp-auth-bridge';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const MAX_LIST_BOOKINGS_LIMIT = 10;
@@ -701,6 +703,46 @@ export async function listMyBookings(
     const upcomingByUserData = (upcomingByUser.data || []) as unknown[];
     let upcomingRows = upcomingByUserData.filter(isRawBookingIntakeRow);
 
+    // --- Phone fallback: merge orphan bookings (user_id IS NULL) matched by phone_digits ---
+    // Fetch the caller's profile phone_digits first (generated column from Phase 0B migration)
+    const profileResp = await supabase
+      .from('profiles')
+      .select('phone, phone_digits')
+      .eq('id', userId)
+      .maybeSingle();
+
+    const profilePhoneDigits: string =
+      (profileResp.data?.phone_digits as string | null | undefined) ||
+      normalizePhoneForSearch(profileResp.data?.phone as string | null | undefined);
+
+    if (profilePhoneDigits) {
+      const orphanUpcoming = await supabase
+        .from('booking_intake')
+        .select(selectFields)
+        .eq('phone_digits', profilePhoneDigits)
+        .is('user_id', null)
+        .in('status', ['pending', 'confirmed'])
+        .gte('appointment_date', today)
+        .order('appointment_date', { ascending: true })
+        .order('appointment_time', { ascending: true })
+        .limit(bookingLimit);
+
+      if (!orphanUpcoming.error && orphanUpcoming.data) {
+        const orphanUpcomingRows = (orphanUpcoming.data as unknown[]).filter(isRawBookingIntakeRow);
+        if (orphanUpcomingRows.length > 0) {
+          const existingIds = new Set(upcomingRows.map((r) => r.id));
+          const newOrphans = orphanUpcomingRows.filter((r) => !existingIds.has(r.id));
+          upcomingRows = [...upcomingRows, ...newOrphans];
+          // Re-sort after merge
+          upcomingRows.sort((a, b) => {
+            const dateCmp = a.appointment_date.localeCompare(b.appointment_date);
+            return dateCmp !== 0 ? dateCmp : a.appointment_time.localeCompare(b.appointment_time);
+          });
+        }
+      }
+    }
+    // --- End phone fallback (upcoming) ---
+
     if (upcomingRows.length === 0 && fallbackEmail) {
       const upcomingByEmail = await supabase
         .from('booking_intake')
@@ -742,6 +784,35 @@ export async function listMyBookings(
 
       const recentByUserData = (recentByUser.data || []) as unknown[];
       recentRows = recentByUserData.filter(isRawBookingIntakeRow);
+
+      // --- Phone fallback: merge orphan recent bookings matched by phone_digits ---
+      if (profilePhoneDigits) {
+        const orphanRecent = await supabase
+          .from('booking_intake')
+          .select(selectFields)
+          .eq('phone_digits', profilePhoneDigits)
+          .is('user_id', null)
+          .in('status', ['confirmed', 'cancelled'])
+          .lt('appointment_date', today)
+          .order('appointment_date', { ascending: false })
+          .order('appointment_time', { ascending: false })
+          .limit(recentLimit);
+
+        if (!orphanRecent.error && orphanRecent.data) {
+          const orphanRecentRows = (orphanRecent.data as unknown[]).filter(isRawBookingIntakeRow);
+          if (orphanRecentRows.length > 0) {
+            const existingIds = new Set(recentRows.map((r) => r.id));
+            const newOrphans = orphanRecentRows.filter((r) => !existingIds.has(r.id));
+            recentRows = [...recentRows, ...newOrphans];
+            // Re-sort after merge (most recent first)
+            recentRows.sort((a, b) => {
+              const dateCmp = b.appointment_date.localeCompare(a.appointment_date);
+              return dateCmp !== 0 ? dateCmp : b.appointment_time.localeCompare(a.appointment_time);
+            });
+          }
+        }
+      }
+      // --- End phone fallback (recent) ---
 
       if (recentRows.length === 0 && fallbackEmail) {
         const recentByEmail = await supabase
@@ -1080,10 +1151,37 @@ export async function createConversationalBooking(
 
     const notes = buildStructuredBookingNotes(normalizedBookingData);
 
+    // ------------------------------------------------------------------
+    // Silent user provisioning: if context.userId is absent but the booking
+    // data has a phone, ensure a Supabase auth user exists so future OTP
+    // logins link back to this booking. Failures are non-fatal.
+    // ------------------------------------------------------------------
+    let effectiveUserId: string | undefined = context?.userId;
+    if (!effectiveUserId && normalizedBookingData.phone) {
+      try {
+        const phoneDigitsForBridge = normalizePhoneForSearch(normalizedBookingData.phone);
+        const phoneE164ForBridge = toHKE164(normalizedBookingData.phone);
+        if (phoneDigitsForBridge && phoneE164ForBridge) {
+          const bridgeResult = await ensureSupabaseUserForPhone({
+            phoneDigits: phoneDigitsForBridge,
+            phoneE164: phoneE164ForBridge,
+            displayNameHint: normalizedBookingData.patientName,
+          });
+          if (bridgeResult.error) {
+            console.warn(`[createConversationalBooking] silent provisioning warning: ${bridgeResult.error}`);
+          } else {
+            effectiveUserId = bridgeResult.userId;
+          }
+        }
+      } catch (bridgeErr) {
+        console.warn(`[createConversationalBooking] silent provisioning unexpected error: ${bridgeErr instanceof Error ? bridgeErr.message : String(bridgeErr)}`);
+      }
+    }
+
     // Persist intake first. If this fails, stop before writing Google Calendar.
     const intakeCreate = await createPendingBookingIntake({
       source: "chat_v2",
-      userId: context?.userId,
+      userId: effectiveUserId,
       sessionId: context?.sessionId,
       doctorId: doctor.id,
       doctorNameZh: doctor.nameZh,
@@ -1172,7 +1270,7 @@ export async function createConversationalBooking(
 
     // Keep patient profile searchable by doctor (name + phone) after booking succeeds.
     const profileSync = await syncPatientProfileContact({
-      userId: context?.userId,
+      userId: effectiveUserId,
       displayName: normalizedBookingData.patientName,
       phone: normalizedBookingData.phone,
     });

@@ -36,6 +36,11 @@ import {
   signManagePayload,
   toBase64Url,
 } from "@/lib/widget-manage-token";
+import {
+  ensureSupabaseUserForPhone,
+  establishSessionForUser,
+  type CookieSetter,
+} from "@/lib/whatsapp-auth-bridge";
 import { CLINIC_BY_ID, isClinicId } from "@/shared/clinic-data";
 
 export { createManageAccessToken };
@@ -140,6 +145,8 @@ export type WidgetBookingVerifyCodeResult =
       message: string;
       maskedPhone: string;
       bookings: WidgetManagedBooking[];
+      /** Supabase auth user_id resolved by ensureSupabaseUserForPhone, if the bridge ran. */
+      userId?: string;
     }
   | {
       success: false;
@@ -834,6 +841,14 @@ export async function requestWidgetBookingManageLink(params: {
 export async function verifyWidgetBookingVerificationCode(params: {
   phone: string;
   code: string;
+  /**
+   * Optional cookie setter for establishing a Supabase session after OTP success.
+   * In a Next.js Route Handler, pass:
+   *   (name, value, options) => response.cookies.set(name, value, options as ResponseCookies)
+   * When omitted the bridge still runs ensureSupabaseUserForPhone but skips
+   * writing session cookies.
+   */
+  setCookie?: CookieSetter;
 }): Promise<WidgetBookingVerifyCodeResult> {
   try {
     const phoneDigits = normalizePhoneForSearch(params.phone);
@@ -877,6 +892,57 @@ export async function verifyWidgetBookingVerificationCode(params: {
 
     const bookings = rows.map(toManagedBooking);
 
+    // ------------------------------------------------------------------
+    // WhatsApp Auth Bridge: ensure a Supabase auth user exists and,
+    // if a cookie setter was provided, establish a real session.
+    // This is additive — failures here do NOT block the OTP success path.
+    // ------------------------------------------------------------------
+    let resolvedUserId: string | undefined;
+    try {
+      // Derive E.164 from phone digits. HK numbers are 8 digits; if phone
+      // already starts with +852 or 852, strip the country code first.
+      const digitsRaw = verification.phone_digits;
+      const hkPrefix = "852";
+      const phoneE164 =
+        digitsRaw.startsWith("+852")
+          ? digitsRaw
+          : digitsRaw.startsWith(hkPrefix) && digitsRaw.length > 8
+            ? `+${digitsRaw}`
+            : `+${hkPrefix}${digitsRaw}`;
+
+      // Use the first booking's patient name as the display name hint.
+      const displayNameHint = rows[0]?.patient_name ?? undefined;
+
+      const userResult = await ensureSupabaseUserForPhone({
+        phoneDigits: digitsRaw,
+        phoneE164,
+        displayNameHint,
+      });
+
+      if (userResult.error) {
+        console.warn("[widget-booking-management] ensureSupabaseUserForPhone:", userResult.error);
+      } else {
+        resolvedUserId = userResult.userId;
+
+        if (params.setCookie && resolvedUserId) {
+          const sessionResult = await establishSessionForUser(resolvedUserId, params.setCookie);
+          if (!sessionResult.success) {
+            console.warn(
+              "[widget-booking-management] establishSessionForUser:",
+              sessionResult.error,
+            );
+          }
+        }
+      }
+    } catch (bridgeErr) {
+      // Never block the OTP success path for bridge errors.
+      console.error(
+        "[widget-booking-management] WhatsApp auth bridge unexpected error:",
+        bridgeErr instanceof Error ? bridgeErr.message : String(bridgeErr),
+      );
+    }
+    // ------------------------------------------------------------------
+
     return {
       success: true,
       message:
@@ -885,6 +951,7 @@ export async function verifyWidgetBookingVerificationCode(params: {
           : `已完成驗證，找到 ${bookings.length} 個可管理預約。`,
       maskedPhone: maskPhoneForDisplay(verification.phone_digits),
       bookings,
+      ...(resolvedUserId !== undefined ? { userId: resolvedUserId } : {}),
     };
   } catch (error) {
     return {

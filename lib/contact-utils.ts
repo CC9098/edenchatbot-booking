@@ -3,6 +3,26 @@ export function normalizePhoneForSearch(value: string | null | undefined): strin
   return value.replace(/\D/g, "");
 }
 
+/**
+ * Convert a Hong Kong phone string to E.164 format (+852XXXXXXXX).
+ * Handles:
+ *  - 8-digit local numbers  → +852XXXXXXXX
+ *  - Already "+852..." or "852..." with 11 digits → normalised to +852XXXXXXXX
+ *  - Other international formats (already has "+") → kept as-is
+ */
+export function toHKE164(phone: string): string {
+  if (!phone) return "";
+  // If already well-formed E.164 (starts with +), return as-is.
+  if (phone.startsWith("+")) return phone.replace(/[^\d+]/g, "").replace(/\s/g, "");
+  const digits = phone.replace(/\D/g, "");
+  // digits = "852XXXXXXXX" (11) → "+852XXXXXXXX"
+  if (digits.startsWith("852") && digits.length === 11) return `+${digits}`;
+  // digits = 8 local HK digits → "+852XXXXXXXX"
+  if (digits.length === 8) return `+852${digits}`;
+  // Fallback: prefix with "+" and let the caller handle edge cases
+  return `+${digits}`;
+}
+
 export function normalizePhoneForStorage(value: string | null | undefined): string {
   if (!value) return "";
 

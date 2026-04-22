@@ -17,8 +17,9 @@ import {
   type BookingVisitType,
 } from '@/lib/booking-intake-storage';
 import { sendBookingConfirmationWhatsapp } from '@/lib/chatwoot-whatsapp';
-import { normalizePhoneForSearch } from '@/lib/contact-utils';
+import { normalizePhoneForSearch, toHKE164 } from '@/lib/contact-utils';
 import { getSafeErrorMessage } from '@/lib/error-sanitizer';
+import { ensureSupabaseUserForPhone } from '@/lib/whatsapp-auth-bridge';
 import { createBooking, getFreeBusy } from '@/lib/google-calendar';
 import { syncPatientProfileContact } from '@/lib/profile-contact-sync';
 import { getDoctorBookingSlotMinutes } from '@/shared/clinic-data';
@@ -153,9 +154,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ------------------------------------------------------------------
+    // Silent user provisioning: if the patient is not logged in but has a
+    // phone number, ensure a Supabase auth user exists so future OTP logins
+    // automatically surface this booking. Failures are non-fatal.
+    // ------------------------------------------------------------------
+    let effectiveUserId: string | undefined = user?.id;
+    if (!effectiveUserId && bookingData.phone) {
+      try {
+        const phoneDigitsForBridge = normalizePhoneForSearch(bookingData.phone);
+        const phoneE164ForBridge = toHKE164(bookingData.phone);
+        if (phoneDigitsForBridge && phoneE164ForBridge) {
+          const bridgeResult = await ensureSupabaseUserForPhone({
+            phoneDigits: phoneDigitsForBridge,
+            phoneE164: phoneE164ForBridge,
+            displayNameHint: bookingData.patientName,
+          });
+          if (bridgeResult.error) {
+            console.warn(`[booking-whatsapp] silent provisioning warning: ${bridgeResult.error}`);
+          } else {
+            effectiveUserId = bridgeResult.userId;
+          }
+        }
+      } catch (bridgeErr) {
+        console.warn(`[booking-whatsapp] silent provisioning unexpected error: ${bridgeErr instanceof Error ? bridgeErr.message : String(bridgeErr)}`);
+      }
+    }
+
     const intakeResult = await createPendingBookingIntake({
       source: 'booking_whatsapp_page',
-      userId: user?.id,
+      userId: effectiveUserId,
       doctorId: bookingData.doctorId,
       doctorNameZh: bookingData.doctorNameZh,
       clinicId: bookingData.clinicId,
@@ -220,7 +248,7 @@ export async function POST(request: NextRequest) {
     }
 
     const profileSync = await syncPatientProfileContact({
-      userId: user?.id,
+      userId: effectiveUserId,
       displayName: bookingData.patientName,
       phone: bookingData.phone,
     });

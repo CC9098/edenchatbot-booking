@@ -22,7 +22,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await verifyWidgetBookingVerificationCode(parsed.data);
+    // Collect cookies written by the auth bridge so we can attach them to the
+    // final response. Each entry is a tuple [name, value, options].
+    const pendingCookies: Array<{
+      name: string;
+      value: string;
+      options: Record<string, unknown>;
+    }> = [];
+
+    const result = await verifyWidgetBookingVerificationCode({
+      ...parsed.data,
+      setCookie: (name, value, options) => {
+        pendingCookies.push({ name, value, options });
+      },
+    });
+
     if (!result.success) {
       return NextResponse.json(
         {
@@ -33,7 +47,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(result);
+    const response = NextResponse.json(result);
+
+    // Write session cookies onto the success response.
+    for (const { name, value, options } of pendingCookies) {
+      response.cookies.set(
+        name,
+        value,
+        options as Parameters<typeof response.cookies.set>[2],
+      );
+    }
+
+    return response;
   } catch (error) {
     return NextResponse.json(
       {
