@@ -28,11 +28,14 @@ export async function GET(request: NextRequest) {
 
   const dryRun = request.nextUrl.searchParams.get('dryRun') === '1';
   const now = new Date();
-  const targetDate = formatInTimeZone(
-    new Date(now.getTime() + 24 * 60 * 60 * 1000),
-    HONG_KONG_TIMEZONE,
-    'yyyy-MM-dd'
-  );
+  const targetDateOverride = request.nextUrl.searchParams.get('targetDate');
+  const targetDate = targetDateOverride
+    ? targetDateOverride
+    : formatInTimeZone(
+        new Date(now.getTime() + 24 * 60 * 60 * 1000),
+        HONG_KONG_TIMEZONE,
+        'yyyy-MM-dd'
+      );
   const nowIso = now.toISOString();
 
   const summary = {

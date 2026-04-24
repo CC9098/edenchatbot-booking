@@ -755,6 +755,15 @@ function buildTemplateProcessedParamCandidates(
     candidates.push(candidate);
   };
 
+  // Try full named body params first — handles templates where manage_url (or any
+  // other variable) lives in the body rather than as a URL button. Doing this early
+  // avoids burning several seconds on button-format attempts that will always fail
+  // for body-only templates (important on platforms with tight function timeouts).
+  if (Object.keys(normalizedBody).length > 0) {
+    pushCandidate({ body: normalizedBody });
+    pushCandidate({ body: toNumericBodyParams(normalizedBody) });
+  }
+
   const manageUrl = normalizedBody.manage_url?.trim();
   if (manageUrl) {
     const { manage_url: _manageUrl, ...bodyWithoutManageUrl } = normalizedBody;
@@ -797,11 +806,6 @@ function buildTemplateProcessedParamCandidates(
         buttons: [{ type: 'copy_code', parameter: verificationCode }],
       });
     }
-  }
-
-  if (Object.keys(normalizedBody).length > 0) {
-    pushCandidate({ body: normalizedBody });
-    pushCandidate({ body: toNumericBodyParams(normalizedBody) });
   }
 
   if (candidates.length === 0) {
