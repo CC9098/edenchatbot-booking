@@ -2,6 +2,7 @@ import 'server-only';
 
 import { buildBookingUrl } from '@/lib/public-url';
 import { getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
+import { getTodayIsoInHongKong } from '@/lib/timetable-admin-utils';
 import {
   getUpcomingHolidayNotices,
   type HolidayNotice as TimetableNotice,
@@ -72,8 +73,13 @@ function hasAnyPhysicalSchedule(schedule: Record<number, { start: string; end: s
   });
 }
 
-export async function getPublicTimetableData(): Promise<PublicTimetableData> {
-  const mappings = await getActiveScheduleMappings();
+export async function getPublicTimetableData(targetDate?: string): Promise<PublicTimetableData> {
+  const effectiveDate =
+    typeof targetDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(targetDate.trim())
+      ? targetDate.trim()
+      : getTodayIsoInHongKong();
+
+  const mappings = await getActiveScheduleMappings(effectiveDate);
   const rowsByClinic = Object.fromEntries(
     PHYSICAL_CLINIC_IDS.map((clinicId) => [
       clinicId,

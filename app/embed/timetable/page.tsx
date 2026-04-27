@@ -1,4 +1,4 @@
-import { CalendarClock, Clock3, ExternalLink } from 'lucide-react';
+import { CalendarClock, CalendarDays, Clock3, ExternalLink } from 'lucide-react';
 
 import { EmbedAutoHeightReporter } from '@/components/embed/EmbedAutoHeightReporter';
 import { buildBookingUrl } from '@/lib/public-url';
@@ -75,6 +75,68 @@ const DOCTOR_TONES: Record<
   cheung: { text: '#dd6d86' },
   leung: { text: '#238f3d' },
 };
+
+const MONTH_LABELS_ZH = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
+const MONTH_VALUE_REGEX = /^\d{4}-\d{2}$/;
+
+function getTodayMonthStart(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Hong_Kong',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function toMonthStart(dateIso: string): string {
+  const date = new Date(`${dateIso}T00:00:00+08:00`);
+  if (Number.isNaN(date.getTime())) return `${getTodayMonthStart().slice(0, 7)}-01`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+function toNextMonthStart(monthStartIso: string): string {
+  const [yearText, monthText] = monthStartIso.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) {
+    return monthStartIso;
+  }
+
+  const next = new Date(Date.UTC(year, month, 1));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-01`;
+}
+
+function normalizeMonthQuery(raw: string | undefined, fallback: string): string {
+  if (!raw) return fallback;
+  const trimmed = raw.trim();
+  if (!MONTH_VALUE_REGEX.test(trimmed)) return fallback;
+
+  const [yearText, monthText] = trimmed.split('-');
+  const month = Number(monthText);
+  const year = Number(yearText);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    return fallback;
+  }
+
+  return `${yearText}-${monthText}-01`;
+}
+
+function monthLabel(monthStartIso: string): string {
+  const month = Number(monthStartIso.split('-')[1]);
+  return `${MONTH_LABELS_ZH[month - 1] || '未指定'}（${monthStartIso.slice(0, 4)}）`;
+}
+
+function buildMonthHref(month: string, minimal: boolean, clinicId: string | undefined): string {
+  const params = new URLSearchParams();
+  params.set('month', month);
+  if (minimal) {
+    params.set('minimal', '1');
+  }
+  if (clinicId) {
+    params.set('clinic', clinicId);
+  }
+  return `/embed/timetable?${params.toString()}`;
+}
 
 function buildQueryValue(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0];
@@ -374,8 +436,31 @@ export default async function TimetableEmbedPage({
 }) {
   const clinicFilter = normalizeClinicFilter(buildQueryValue(searchParams?.clinic));
   const minimal = isMinimalMode(buildQueryValue(searchParams?.minimal));
-  const { cards, generatedAtLabel, notices } = await getPublicTimetableData();
+  const currentMonth = toMonthStart(getTodayMonthStart());
+  const selectedMonth = normalizeMonthQuery(
+    buildQueryValue(searchParams?.month),
+    currentMonth,
+  );
+  const nextMonth = toNextMonthStart(currentMonth);
+  const currentMonthQueryValue = currentMonth.slice(0, 7);
+  const nextMonthQueryValue = nextMonth.slice(0, 7);
+
+  const monthOptions = [
+    {
+      value: currentMonthQueryValue,
+      label: monthLabel(currentMonth),
+      isActive: selectedMonth === currentMonth,
+    },
+    {
+      value: nextMonthQueryValue,
+      label: monthLabel(nextMonth),
+      isActive: selectedMonth === nextMonth,
+    },
+  ];
+
+  const { cards, generatedAtLabel, notices } = await getPublicTimetableData(selectedMonth);
   const visibleCards = clinicFilter ? cards.filter((card) => card.clinicId === clinicFilter) : cards;
+  const activeMonthLabel = monthLabel(selectedMonth);
 
   return (
     <main
@@ -427,6 +512,27 @@ export default async function TimetableEmbedPage({
                 </div>
               </div>
             ) : null}
+
+            <div className="mt-6">
+              <p className="text-center text-sm font-semibold text-slate-600">選擇時間表月份（按入先可入）：</p>
+              <div className="mx-auto mt-4 grid max-w-lg grid-cols-2 gap-4">
+                {monthOptions.map((option) => (
+                  <a
+                    key={option.value}
+                    href={buildMonthHref(option.value, minimal, clinicFilter)}
+                    className={`group flex flex-col items-center justify-center rounded-[24px] border px-4 py-5 transition ${
+                      option.isActive
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700 shadow-[0_22px_40px_-24px_rgba(16,185,129,0.5)]'
+                        : 'border-white/80 bg-white/85 text-slate-600 hover:border-emerald-200 hover:bg-emerald-50'
+                    }`}
+                  >
+                    <CalendarDays className={`h-12 w-12 ${option.isActive ? 'text-emerald-600' : 'text-slate-500'}`} />
+                    <span className="mt-2 text-2xl font-black tracking-[0.06em]">{option.label}</span>
+                  </a>
+                ))}
+              </div>
+              <p className="mt-3 text-center text-xs text-slate-500">目前查看版本：{activeMonthLabel}</p>
+            </div>
 
             <div className="mt-5 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600">
               <a
