@@ -2,15 +2,14 @@
 @import "tailwindcss";
 
 :root {
-  /* ── Brand color evolution: From green to purple + element colors ── */
-  --background: #faf5ff;
-  --foreground: #4c1d95;
+  /* Eden brand colors */
+  --background: #f4f6f1;
+  --foreground: #223327;
 
-  /* Primary color (Purple - wellness, mystical) */
-  --primary: #8b5cf6;
-  --primary-hover: #7c3aed;
-  --primary-light: #ede9fe;
-  --primary-pale: #faf5ff;
+  --primary: #4b8158;
+  --primary-hover: #396845;
+  --primary-light: #e7f1e8;
+  --primary-pale: #f4f6f1;
 
   /* Element forces (風水雷) */
   --force-wind: #4e8a96;     /* Teal blue - flow, adaptation */
@@ -18,12 +17,12 @@
   --force-thunder: #b89a2c;  /* Golden amber - action, breakthrough */
 
   /* Semantic colors */
-  --success: #10b981;        /* Wellness green */
+  --success: #1ea26b;
   --error: #c44f4f;
   --warning: #d6a047;
 
   --surface: #ffffff;
-  --border: #e9d5ff;         /* Light purple border */
+  --border: #d8e2d8;
 
   --app-shell-max-width: 760px;
   --radius-card: 28px;
@@ -75,11 +74,10 @@
 }
 
 body {
-  /* Purple + Wind + Water gradient backdrop (storytelling aesthetic) */
   background:
-    radial-gradient(ellipse 140% 60% at 50% -20%, rgba(196, 181, 253, 0.35) 0%, transparent 70%),
-    radial-gradient(ellipse 80% 50% at 80% 100%, rgba(78, 138, 150, 0.08) 0%, transparent 50%),
-    #faf5ff;
+    radial-gradient(ellipse 140% 60% at 50% -20%, rgba(189, 210, 193, 0.45) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 50% at 80% 100%, rgba(78, 138, 150, 0.06) 0%, transparent 50%),
+    #f4f6f1;
   color: var(--foreground);
   font-family: var(--font-body);
   -webkit-text-size-adjust: 100%;
