@@ -183,7 +183,7 @@ export const DOCTORS: DoctorProfile[] = [
     bookingSlotMinutes: 30,
     onlineBookingEnabled: false,
     scheduleNote:
-      '為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以電郵確認。',
+      '為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以 WhatsApp 確認。',
   },
 ];
 

@@ -66,6 +66,7 @@ export interface GroupBookingIntakeCandidate {
   clinicNameZh: string;
   appointmentDate: string;
   appointmentTime: string;
+  visitType: BookingVisitType;
 }
 
 function parseNotificationClinicId(raw: unknown): string | undefined {
@@ -411,6 +412,7 @@ export async function listConfirmedGroupBookingCandidates(params: {
         doctor_name_zh,
         clinic_id,
         clinic_name_zh,
+        visit_type,
         appointment_date,
         appointment_time
       `)
@@ -447,6 +449,7 @@ export async function listConfirmedGroupBookingCandidates(params: {
         clinicNameZh: typeof row.clinic_name_zh === "string" ? row.clinic_name_zh : "",
         appointmentDate: typeof row.appointment_date === "string" ? row.appointment_date : params.appointmentDate,
         appointmentTime: typeof row.appointment_time === "string" ? row.appointment_time : "",
+        visitType: row.visit_type === "first" || row.visit_type === "followup" ? row.visit_type : "followup",
       });
     }
 

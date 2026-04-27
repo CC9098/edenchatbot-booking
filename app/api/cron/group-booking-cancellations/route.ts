@@ -5,10 +5,11 @@ import {
   listConfirmedGroupBookingCandidates,
   markBookingIntakeCancelledByEvent,
 } from "@/lib/booking-intake-storage";
-import { sendBookingCancellationWhatsapp } from "@/lib/chatwoot-whatsapp";
+import { sendBookingCancellationWhatsapp, sendBookingConfirmationWhatsapp } from "@/lib/chatwoot-whatsapp";
 import { normalizePhoneForSearch } from "@/lib/contact-utils";
-import { deleteEvent } from "@/lib/google-calendar";
+import { deleteEvent, getEvent, patchEventPrivateMetadata } from "@/lib/google-calendar";
 import {
+  DR_WONG_GROUP_BOOKING_CONFIRMED_NOTICE,
   GROUP_BOOKING_POLICIES,
   getGroupSessionCancelAt,
   getGroupSessionStartUtc,
@@ -20,6 +21,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const HONG_KONG_TIMEZONE = "Asia/Hong_Kong";
+const GROUP_CONFIRMATION_SENT_KEY = "eden_group_booking_confirmed_whatsapp_sent_at";
+const GENERAL_REMINDER_SENT_KEY = "eden_reminder_24h_whatsapp_sent_at";
 
 function buildCandidateDates(now: Date): string[] {
   const dates = new Set<string>();
@@ -60,6 +63,12 @@ export async function GET(request: NextRequest) {
     skippedPastSession: 0,
     groupRows: 0,
     groupsMetMinimum: 0,
+    groupConfirmationsAlreadySent: 0,
+    groupConfirmationsWouldSend: 0,
+    groupConfirmationsSent: 0,
+    groupConfirmationsFailed: 0,
+    groupConfirmationMarked: 0,
+    groupConfirmationMarkFailed: 0,
     groupsCancelled: 0,
     calendarDeleted: 0,
     calendarDeleteFailed: 0,
@@ -112,6 +121,70 @@ export async function GET(request: NextRequest) {
 
         if (listResult.items.length >= policy.minPatients) {
           summary.groupsMetMinimum += 1;
+          for (const item of listResult.items) {
+            if (dryRun) {
+              summary.groupConfirmationsWouldSend += 1;
+              continue;
+            }
+
+            const eventResult = await getEvent(item.calendarId, item.googleEventId);
+            if (!eventResult.success || !eventResult.event) {
+              summary.groupConfirmationsFailed += 1;
+              summary.errors.push(
+                `${item.calendarId}/${item.googleEventId}: ${eventResult.error || "event missing for group confirmation"}`,
+              );
+              continue;
+            }
+
+            if (eventResult.event?.status === "cancelled") {
+              summary.groupConfirmationsFailed += 1;
+              summary.errors.push(`${item.calendarId}/${item.googleEventId}: event already cancelled`);
+              continue;
+            }
+
+            if (eventResult.event?.extendedProperties?.private?.[GROUP_CONFIRMATION_SENT_KEY]) {
+              summary.groupConfirmationsAlreadySent += 1;
+              continue;
+            }
+
+            const phoneDigits = normalizePhoneForSearch(item.patientPhone);
+            const whatsappResult = await sendBookingConfirmationWhatsapp({
+              bookingId: item.googleEventId,
+              patientName: item.patientName,
+              phone: item.patientPhone,
+              email: item.patientEmail,
+              doctorNameZh: item.doctorNameZh,
+              clinicNameZh: item.clinicNameZh,
+              appointmentDate: item.appointmentDate,
+              appointmentTime: item.appointmentTime,
+              visitType: item.visitType,
+              clinicWhatsappPhone: getClinicWhatsappPhone(item.clinicId),
+              manageAccessToken: phoneDigits ? createManageAccessToken(phoneDigits) : undefined,
+              groupBookingNotice: DR_WONG_GROUP_BOOKING_CONFIRMED_NOTICE,
+            });
+
+            if (!whatsappResult.success) {
+              summary.groupConfirmationsFailed += 1;
+              summary.errors.push(
+                `${item.intakeId}: ${whatsappResult.error || "group confirmation whatsapp failed"}`,
+              );
+              continue;
+            }
+
+            summary.groupConfirmationsSent += 1;
+            const markResult = await patchEventPrivateMetadata(item.calendarId, item.googleEventId, {
+              [GROUP_CONFIRMATION_SENT_KEY]: now.toISOString(),
+              [GENERAL_REMINDER_SENT_KEY]: now.toISOString(),
+            });
+            if (markResult.success) {
+              summary.groupConfirmationMarked += 1;
+            } else {
+              summary.groupConfirmationMarkFailed += 1;
+              summary.errors.push(
+                `${item.calendarId}/${item.googleEventId}: ${markResult.error || "group confirmation mark failed"}`,
+              );
+            }
+          }
           continue;
         }
 

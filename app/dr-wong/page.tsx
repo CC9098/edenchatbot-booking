@@ -10,6 +10,7 @@ const posterSrc = "/images/dr-samuel-wong-chiropractor.png";
 const whatsappMessage = encodeURIComponent(
   "你好，我想預約黃浩哲 Dr. Samuel H.C. Wong 脊醫，請問最近可預約時間？"
 );
+const drWongWhatsappUrl = `https://wa.me/85295094441?text=${whatsappMessage}`;
 
 const clinicActions = [
   {
@@ -90,7 +91,7 @@ export default function DrWongPage() {
               預約 Dr Wong
             </div>
             <p className="mt-3 text-sm leading-relaxed text-[#496153]">
-              佐敦應診時間：星期四 10:30-13:00、星期六 14:30-16:30。為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以電郵確認。
+              佐敦應診時間：星期四 10:30-13:00、星期六 14:30-16:30。為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以 WhatsApp 確認。
             </p>
 
             <Link
@@ -125,6 +126,15 @@ export default function DrWongPage() {
               <MapPin className="h-4 w-4 text-[#1f6b3f]" />
               中環 | 佐敦 | 荃灣
             </span>
+            <a
+              href={drWongWhatsappUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2 font-semibold text-[#1f6b3f] transition hover:bg-white"
+            >
+              Dr Wong WhatsApp：9509 4441
+              <ExternalLink className="h-4 w-4" />
+            </a>
             <Link
               href="/embed/timetable"
               className="inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2 font-semibold text-[#1f6b3f] transition hover:bg-white"
