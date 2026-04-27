@@ -103,7 +103,7 @@ const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as cons
 const WEEKDAY_LABELS_ZH = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'] as const;
 const OTHER_TREATMENT_OPTION_ID: BookingTreatmentOptionId = 'other';
 const DR_WONG_GROUP_BOOKING_NOTICE =
-  '為咗方便醫生安排時間，呢個時段需要最少三位病人先會開診。未滿三人，系統會自動取消預約，唔好意思。';
+  '為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以電郵確認。';
 
 const VISIT_TYPE_LABELS: Record<VisitType, string> = {
   first: '首診',
