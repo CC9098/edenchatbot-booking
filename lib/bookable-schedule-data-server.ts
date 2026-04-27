@@ -132,7 +132,10 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
       const clinics: BookableClinicSchedule[] = PHYSICAL_CLINIC_IDS
         .map((clinicId) => doctor.clinics.find((clinic) => clinic.clinicId === clinicId))
         .filter((clinic): clinic is BookableClinicSchedule => Boolean(clinic));
-      const onlineSchedule = buildVirtualOnlineScheduleFromMappings(mappings, doctor.doctorId);
+      const onlineSchedule =
+        DOCTORS.find((candidate) => candidate.id === doctor.doctorId)?.onlineBookingEnabled === false
+          ? null
+          : buildVirtualOnlineScheduleFromMappings(mappings, doctor.doctorId);
 
       if (onlineSchedule && hasAnySchedule(onlineSchedule)) {
         const onlineClinic = CLINIC_BY_ID.online;
