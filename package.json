@@ -22,6 +22,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed:doctor-schedules": "tsx ./scripts/seed-doctor-schedules-to-supabase.ts",
+    "schedule:may-2026": "tsx ./scripts/upsert-may-2026-doctor-schedules.ts",
     "import:finished-articles": "tsx ./scripts/import-finished-articles.ts",
     "migrate:legacy-content": "tsx ./scripts/migrate-legacy-content.ts",
     "mcp:github": "tsx ./mcp/github-server/index.ts",
