@@ -6,6 +6,12 @@ This repo contains multiple chat systems. Do not mix them.
 
 If the user says only "chatbot", "AI 自動回覆", "最近歷史對話", "widget", or "database", first confirm which system they mean before analysing behavior, logs, or data.
 
+## Brand Color Guardrail
+
+Keep the public app and booking UI on Eden green brand tokens in `app/globals.css`.
+Do not change global `--primary`, `--primary-pale`, or page backgrounds to purple/violet unless the user explicitly asks for a new full-app palette.
+If a different area needs experimental styling, scope it locally instead of changing the global brand variables.
+
 ## Chat Systems
 
 ### 1) WordPress widget 客服 bot
