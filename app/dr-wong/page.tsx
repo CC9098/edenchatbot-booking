@@ -3,8 +3,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, ExternalLink, MapPin, MessageCircle, ShieldCheck } from "lucide-react";
 
-import { buildBookingUrl } from "@/lib/public-url";
-
 const posterSrc = "/images/dr-samuel-wong-chiropractor.png";
 
 const whatsappMessage = encodeURIComponent(
@@ -30,7 +28,7 @@ const clinicActions = [
   },
 ];
 
-const drWongBookingUrl = buildBookingUrl({ doctorId: "wong", clinicId: "jordan" });
+const drWongBookingUrl = "/booking?doctor=wong&clinic=jordan&source=dr-wong";
 
 export const metadata: Metadata = {
   title: "黃浩哲脊醫 Dr. Samuel H.C. Wong | 醫天圓",

@@ -1461,6 +1461,14 @@ export function BookingTabFlow({
                       ? `${selectedClinic.clinicNameZh} 已套用篩選，日曆只會顯示該診所燈號。`
                       : '未鎖定診所，下一步可直接比較全部診所日期。'}
                   </p>
+                  {selectedDoctor.doctorId === 'wong' ? (
+                    <Link
+                      href="/dr-wong"
+                      className="mt-3 inline-flex rounded-full border border-[#b8d7be] bg-[#f5fbf6] px-3 py-1.5 text-xs font-semibold text-[#1f6b3f] transition hover:border-[#71a97a] hover:bg-white"
+                    >
+                      查看 Dr Wong 專頁
+                    </Link>
+                  ) : null}
                 </div>
               </div>
 
