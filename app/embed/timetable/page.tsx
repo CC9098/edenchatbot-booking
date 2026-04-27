@@ -1,9 +1,10 @@
 import { CalendarClock, CalendarDays, Clock3, ExternalLink } from 'lucide-react';
+import Image from "next/image";
 
 import { EmbedAutoHeightReporter } from '@/components/embed/EmbedAutoHeightReporter';
 import { buildBookingUrl } from '@/lib/public-url';
 import { getPublicTimetableData, type TimetableClinicCard } from '@/lib/public-timetable-data-server';
-import { PHYSICAL_CLINIC_IDS, type PhysicalClinicId } from '@/shared/clinic-data';
+import { DOCTORS, PHYSICAL_CLINIC_IDS, type DoctorId, type PhysicalClinicId } from '@/shared/clinic-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,9 @@ const DAY_COLUMNS = [
   { day: 6, label: '星期六', short: 'SAT' },
   { day: 0, label: '星期日', short: 'SUN' },
 ] as const;
+
+const CHIROPRACTIC_DOCTOR_IDS = ['lee'] as const satisfies readonly DoctorId[];
+const CHIROPRACTIC_LABEL = '脊醫';
 
 const CLINIC_THEMES: Record<
   PhysicalClinicId,
@@ -61,6 +65,92 @@ const CLINIC_THEMES: Record<
     emptyCellBg: '#86c8c6',
   },
 };
+
+const CHIROPRACTIC_DOCTOR_ID_SET = new Set<string>(CHIROPRACTIC_DOCTOR_IDS);
+
+function getDoctorAvatarFallback(nameZh?: string): string {
+  return nameZh?.trim().slice(0, 1) || '醫';
+}
+
+function isChiropracticDoctor(doctorId: DoctorId): boolean {
+  return CHIROPRACTIC_DOCTOR_ID_SET.has(doctorId);
+}
+
+function getDoctorStripOrder() {
+  const chiropracticDoctors = DOCTORS.filter((doctor) => isChiropracticDoctor(doctor.id));
+  const regularDoctors = DOCTORS.filter((doctor) => !isChiropracticDoctor(doctor.id));
+  return [...chiropracticDoctors, ...regularDoctors];
+}
+
+function DoctorStripCard({
+  doctor,
+  isFeatured,
+}: {
+  doctor: (typeof DOCTORS)[number];
+  isFeatured: boolean;
+}) {
+  return (
+    <a
+      href={doctor.bookingUrl || buildBookingUrl({ doctorId: doctor.id })}
+      target="_top"
+      rel="noreferrer"
+      className={`group relative flex min-w-[104px] flex-col items-center gap-1 rounded-[16px] border px-3 py-2 transition ${
+        isFeatured
+          ? 'border-emerald-300/80 bg-emerald-50 text-emerald-700'
+          : 'border-slate-200/80 bg-white/85 text-slate-700'
+      } hover:-translate-y-0.5 hover:shadow-[0_14px_30px_-24px_rgba(15,23,42,0.6)]`}
+    >
+      <div className="relative h-14 w-14 overflow-hidden rounded-full border-4 border-white bg-[#edf7ef] shadow-[0_12px_28px_-20px_rgba(31,74,44,0.45)]">
+        {doctor.avatarSrc ? (
+          <Image
+            src={doctor.avatarSrc}
+            alt={`${doctor.nameZh}頭像`}
+            fill
+            sizes="56px"
+            className="object-cover"
+            style={{ objectPosition: doctor.avatarObjectPosition || 'center' }}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,#eaf8ed_0%,#cfe8d6_100%)] text-lg font-semibold text-[#2b5d38]">
+            {getDoctorAvatarFallback(doctor.nameZh)}
+          </div>
+        )}
+      </div>
+
+      <div className="text-center">
+        <p className="text-[11px] leading-tight font-semibold tracking-[0.02em]">{doctor.nameZh}</p>
+      </div>
+
+      {isFeatured ? (
+        <span className="inline-flex items-center rounded-full border border-emerald-300/80 bg-white px-2 py-0.5 text-[10px] font-bold tracking-[0.18em]">
+          {CHIROPRACTIC_LABEL}
+        </span>
+      ) : null}
+    </a>
+  );
+}
+
+function DoctorStrip() {
+  const doctorList = getDoctorStripOrder();
+  if (doctorList.length === 0) return null;
+
+  return (
+    <section className="mb-5">
+      <p className="text-sm font-semibold tracking-[0.04em] text-slate-700">
+        醫師名片
+      </p>
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+        {doctorList.map((doctor) => (
+          <DoctorStripCard
+            key={doctor.id}
+            doctor={doctor}
+            isFeatured={isChiropracticDoctor(doctor.id)}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
 
 const DOCTOR_TONES: Record<
   string,
@@ -473,7 +563,7 @@ export default async function TimetableEmbedPage({
       <EmbedAutoHeightReporter />
 
       <div className={`mx-auto max-w-[1260px] ${minimal ? 'px-3 py-4 sm:px-4' : 'px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10'}`}>
-        {!minimal ? (
+      {!minimal ? (
           <section className="mb-7">
             <div className="text-center">
               <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
@@ -487,6 +577,7 @@ export default async function TimetableEmbedPage({
                 由 Supabase 排班自動生成，最後同步：{generatedAtLabel}
               </p>
             </div>
+            <DoctorStrip />
 
             {notices.length > 0 ? (
               <div className="mt-6 rounded-[28px] border border-white/75 bg-white/72 px-5 py-5 shadow-[0_22px_55px_-42px_rgba(15,23,42,0.38)] backdrop-blur-sm">
@@ -553,7 +644,7 @@ export default async function TimetableEmbedPage({
             <ClinicCard key={card.clinicId} card={card} />
           ))}
         </div>
-      </div>
-    </main>
+        </div>
+      </main>
   );
 }
