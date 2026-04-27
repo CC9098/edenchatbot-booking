@@ -12,9 +12,85 @@ import {
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_TTL_MINUTES = 10;
 const DEFAULT_CLINIC_WHATSAPP_PHONE = "85267333234";
+const DEFAULT_RESEND_COOLDOWN_SECONDS = 60;
+const DEFAULT_MAX_REQUESTS_PER_HOUR = 5;
 
-function getOtpSecret() {
-  return process.env.WIDGET_BOOKING_OTP_SECRET?.trim() || "eden-widget-booking-otp-sign";
+export type LoginOtpThrottleRow = {
+  created_at: string | null;
+};
+
+type LoginOtpThrottleDecision =
+  | { allowed: true }
+  | { allowed: false; error: string; retryAfterSeconds?: number };
+
+function getPositiveIntegerEnv(name: string, fallback: number) {
+  const raw = Number(process.env[name]);
+  if (Number.isFinite(raw) && raw > 0) {
+    return Math.floor(raw);
+  }
+  return fallback;
+}
+
+export function getLoginOtpSecret() {
+  const secret = process.env.WIDGET_BOOKING_OTP_SECRET?.trim();
+  if (!secret) {
+    throw new Error("WhatsApp 登入設定未完成，請聯絡診所職員。");
+  }
+  return secret;
+}
+
+function getResendCooldownSeconds() {
+  return getPositiveIntegerEnv(
+    "LOGIN_OTP_RESEND_COOLDOWN_SECONDS",
+    DEFAULT_RESEND_COOLDOWN_SECONDS,
+  );
+}
+
+function getMaxRequestsPerHour() {
+  return getPositiveIntegerEnv(
+    "LOGIN_OTP_MAX_REQUESTS_PER_HOUR",
+    DEFAULT_MAX_REQUESTS_PER_HOUR,
+  );
+}
+
+export function getLoginOtpThrottleDecision(
+  rows: LoginOtpThrottleRow[],
+  nowMs = Date.now(),
+  options?: {
+    cooldownSeconds?: number;
+    maxRequestsPerHour?: number;
+  },
+): LoginOtpThrottleDecision {
+  const cooldownSeconds = options?.cooldownSeconds ?? getResendCooldownSeconds();
+  const maxRequestsPerHour = options?.maxRequestsPerHour ?? getMaxRequestsPerHour();
+  const oneHourAgoMs = nowMs - 60 * 60 * 1000;
+
+  const createdAtMs = rows
+    .map((row) => new Date(row.created_at || "").getTime())
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => b - a);
+
+  const newestMs = createdAtMs[0];
+  if (newestMs) {
+    const elapsedSeconds = Math.floor((nowMs - newestMs) / 1000);
+    if (elapsedSeconds < cooldownSeconds) {
+      return {
+        allowed: false,
+        error: `驗證碼剛剛已發送，請 ${Math.max(1, cooldownSeconds - elapsedSeconds)} 秒後再試。`,
+        retryAfterSeconds: Math.max(1, cooldownSeconds - elapsedSeconds),
+      };
+    }
+  }
+
+  const recentRequestCount = createdAtMs.filter((value) => value >= oneHourAgoMs).length;
+  if (recentRequestCount >= maxRequestsPerHour) {
+    return {
+      allowed: false,
+      error: "驗證碼索取太頻密，請稍後再試。",
+    };
+  }
+
+  return { allowed: true };
 }
 
 function getPhoneDigitVariants(digits: string): string[] {
@@ -26,7 +102,7 @@ function getPhoneDigitVariants(digits: string): string[] {
 }
 
 function hashOtpCode(verificationId: string, phoneDigits: string, code: string): string {
-  return createHmac("sha256", getOtpSecret())
+  return createHmac("sha256", getLoginOtpSecret())
     .update(`widget-booking-otp:${verificationId}:${phoneDigits}:${code}`)
     .digest("base64url");
 }
@@ -51,6 +127,28 @@ async function invalidateExistingLoginVerifications(phoneDigits: string) {
     .eq("purpose", "login")
     .is("consumed_at", null);
   if (error) throw new Error(error.message);
+}
+
+async function enforceLoginOtpRequestThrottle(phoneDigits: string) {
+  const supabase = createServiceClient();
+  const oneHourAgoIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("widget_booking_verifications")
+    .select("created_at")
+    .in("phone_digits", getPhoneDigitVariants(phoneDigits))
+    .eq("purpose", "login")
+    .gte("created_at", oneHourAgoIso)
+    .order("created_at", { ascending: false })
+    .limit(getMaxRequestsPerHour());
+
+  if (error) throw new Error(error.message);
+
+  const decision = getLoginOtpThrottleDecision((data || []) as LoginOtpThrottleRow[]);
+  if (!decision.allowed) {
+    return decision;
+  }
+
+  return { allowed: true as const };
 }
 
 type VerificationRow = {
@@ -108,6 +206,11 @@ export async function requestLoginOtp(phone: string): Promise<RequestLoginOtpRes
     const phoneDigits = normalizePhoneForSearch(phone);
     if (!phoneDigits || phoneDigits.length < 6) {
       return { success: false, error: "請輸入有效的 WhatsApp 電話號碼。" };
+    }
+
+    const throttle = await enforceLoginOtpRequestThrottle(phoneDigits);
+    if (!throttle.allowed) {
+      return { success: false, error: throttle.error };
     }
 
     const verificationId = randomUUID();
@@ -227,7 +330,7 @@ export async function verifyLoginOtp(params: {
       phoneE164,
     });
 
-    if (userResult.error) {
+    if ("error" in userResult) {
       return { success: false, error: "驗證成功，但無法建立用戶帳戶，請稍後再試。" };
     }
 
