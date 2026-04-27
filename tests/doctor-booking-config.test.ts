@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  DOCTOR_BY_ID,
   getDoctorBookingSlotMinutes,
   getDoctorBookingTreatmentLabel,
   getDoctorBookingTreatmentOptions,
@@ -31,4 +32,9 @@ test('other doctors keep the default treatment label and 15-minute slots', () =>
   );
   assert.equal(getDoctorBookingSlotMinutes('chan'), 15);
   assert.equal(getDoctorBookingSlotMinutes('cheung'), 15);
+});
+
+test('Dr. Chan has a configured avatar for booking profile cards', () => {
+  assert.equal(DOCTOR_BY_ID.chan.avatarSrc, '/doctor-avatars/chan.jpg');
+  assert.equal(DOCTOR_BY_ID.chan.avatarObjectPosition, '82% center');
 });

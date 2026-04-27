@@ -117,6 +117,8 @@ export const DOCTORS: DoctorProfile[] = [
     id: 'chan',
     nameZh: '陳家富醫師',
     nameEn: 'Dr. Chan',
+    avatarSrc: '/doctor-avatars/chan.jpg',
+    avatarObjectPosition: '82% center',
     bookingUrl: buildBookingUrl({ doctorId: 'chan' }),
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
   },
