@@ -6,7 +6,7 @@ import {
   type BookingTreatmentOptionId,
 } from '@/shared/booking-treatment-options';
 
-export const DOCTOR_IDS = ['chan', 'lee', 'hon', 'chau', 'cheung', 'leung'] as const;
+export const DOCTOR_IDS = ['chan', 'lee', 'hon', 'chau', 'cheung', 'leung', 'wong'] as const;
 export type DoctorId = (typeof DOCTOR_IDS)[number];
 
 export const CLINIC_IDS = ['central', 'jordan', 'tsuenwan', 'online'] as const;
@@ -168,6 +168,18 @@ export const DOCTORS: DoctorProfile[] = [
     avatarObjectPosition: '88% center',
     bookingUrl: buildBookingUrl({ doctorId: 'leung' }),
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
+  },
+  {
+    id: 'wong',
+    nameZh: '黃浩哲脊醫',
+    nameEn: 'Dr. Samuel H.C. Wong',
+    avatarSrc: '/images/dr-samuel-wong-chiropractor.png',
+    avatarObjectPosition: '74% 16%',
+    bookingUrl: buildBookingUrl({ doctorId: 'wong', clinicId: 'jordan' }),
+    bookingTreatmentOptions: ['manual_therapy'],
+    bookingSlotMinutes: 30,
+    scheduleNote:
+      '為咗方便醫生安排時間，呢個時段需要最少三位病人先會開診。未滿三人，系統會自動取消預約，唔好意思。',
   },
 ];
 

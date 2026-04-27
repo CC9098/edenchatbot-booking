@@ -17,6 +17,7 @@ export interface BookingWhatsappConfirmationInput {
   appointmentDate: string;
   appointmentTime: string;
   visitType: BookingVisitType;
+  groupBookingNotice?: string;
 }
 
 export interface BookingWhatsappReminderInput extends BookingWhatsappConfirmationInput {}
@@ -90,10 +91,12 @@ export function buildWhatsappConfirmationText(
     `時間：${input.appointmentTime}`,
     `診症類型：${VISIT_TYPE_LABELS[input.visitType]}`,
     `預約編號：${input.bookingId}`,
+    input.groupBookingNotice ? '' : '',
+    input.groupBookingNotice || '',
     '',
     `管理預約（更改 / 取消）：`,
     manageUrl,
-  ].join('\n');
+  ].filter((line, index, lines) => line || lines[index - 1] !== '').join('\n');
 }
 
 export function buildWhatsappTemplateBodyParams(
@@ -162,6 +165,7 @@ export interface BookingWhatsappCancellationInput {
   appointmentDate: string;
   appointmentTime: string;
   manageAccessToken?: string;
+  cancellationReason?: string;
 }
 
 export function buildWhatsappCancellationText(
@@ -177,10 +181,12 @@ export function buildWhatsappCancellationText(
     `原定日期：${formatDateForWhatsapp(input.appointmentDate)}`,
     `原定時間：${input.appointmentTime}`,
     `預約編號：${input.bookingId}`,
+    input.cancellationReason ? '' : '',
+    input.cancellationReason || '',
     '',
     '如需重新預約，歡迎隨時使用以下連結：',
     buildPatientManageBookingUrl(input.manageAccessToken),
-  ].join('\n');
+  ].filter((line, index, lines) => line || lines[index - 1] !== '').join('\n');
 }
 
 export function buildWhatsappCancellationTemplateBodyParams(

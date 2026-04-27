@@ -3,6 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, ExternalLink, MapPin, MessageCircle, ShieldCheck } from "lucide-react";
 
+import { buildBookingUrl } from "@/lib/public-url";
+
 const posterSrc = "/images/dr-samuel-wong-chiropractor.png";
 
 const whatsappMessage = encodeURIComponent(
@@ -26,6 +28,8 @@ const clinicActions = [
     href: `https://wa.me/85251899065?text=${whatsappMessage}`,
   },
 ];
+
+const drWongBookingUrl = buildBookingUrl({ doctorId: "wong", clinicId: "jordan" });
 
 export const metadata: Metadata = {
   title: "黃浩哲脊醫 Dr. Samuel H.C. Wong | 醫天圓",
@@ -86,10 +90,18 @@ export default function DrWongPage() {
               預約 Dr Wong
             </div>
             <p className="mt-3 text-sm leading-relaxed text-[#496153]">
-              請選擇方便分店，姑娘會跟進 Dr Wong 最近可預約時間。現階段此頁以 WhatsApp 預約為主，避免病人進入尚未開放的網上時段。
+              佐敦應診時間：星期四 10:30-13:00、星期六 14:30-16:30。為咗方便醫生安排時間，呢個時段需要最少三位病人先會開診。未滿三人，系統會自動取消預約，唔好意思。
             </p>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <Link
+              href={drWongBookingUrl}
+              className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] bg-[#0d4c2d] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0a3c24]"
+            >
+              立即網上預約
+              <ExternalLink className="h-4 w-4" />
+            </Link>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
               {clinicActions.map((clinic) => (
                 <a
                   key={clinic.clinicName}

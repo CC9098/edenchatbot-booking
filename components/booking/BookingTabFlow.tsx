@@ -102,6 +102,8 @@ const MAX_BOOKING_WINDOW_DAYS = 90;
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const;
 const WEEKDAY_LABELS_ZH = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'] as const;
 const OTHER_TREATMENT_OPTION_ID: BookingTreatmentOptionId = 'other';
+const DR_WONG_GROUP_BOOKING_NOTICE =
+  '為咗方便醫生安排時間，呢個時段需要最少三位病人先會開診。未滿三人，系統會自動取消預約，唔好意思。';
 
 const VISIT_TYPE_LABELS: Record<VisitType, string> = {
   first: '首診',
@@ -613,6 +615,10 @@ export function BookingTabFlow({
   const needsTreatmentOtherDetails =
     !isOnlineConsultation && selectedTreatmentOptions.includes(OTHER_TREATMENT_OPTION_ID);
   const selectedDoctorSlotMinutes = selectedDoctor?.bookingSlotMinutes ?? DEFAULT_SLOT_DURATION_MINUTES;
+  const groupBookingNotice =
+    selectedDoctor?.doctorId === 'wong' && clinicId === 'jordan'
+      ? DR_WONG_GROUP_BOOKING_NOTICE
+      : '';
   const scannableClinics = useMemo(
     () => selectedDoctor?.clinics ?? [],
     [selectedDoctor]
@@ -634,12 +640,16 @@ export function BookingTabFlow({
   const submitLoadingLabel = isStaffFlow ? '代約處理中...' : '預約處理中...';
   const detailNotice = isStaffFlow
     ? '此頁會以病人資料建立正式預約，並嘗試即時發送 WhatsApp 確認。若病人已有電郵，系統亦會補發確認電郵。'
+    : groupBookingNotice
+    ? groupBookingNotice
     : isWhatsappFlow
     ? '成功預約後會透過 WhatsApp 發送確認訊息到你提供的電話。'
     : '如有提供電郵，系統會發送確認電郵；更改或取消可使用電郵內連結。';
   const successTitle = isStaffFlow ? '代約完成' : '預約成功';
   const successDescription = isStaffFlow
     ? '預約已建立，系統已嘗試發送確認訊息到病人提供的聯絡方式。'
+    : groupBookingNotice
+    ? groupBookingNotice
     : isWhatsappFlow
     ? '預約已建立，診所會透過 WhatsApp 跟進並發送確認訊息到你提供的電話。'
     : formValues.email.trim()
@@ -1680,6 +1690,13 @@ export function BookingTabFlow({
                 : '日曆會同時顯示各診所燈號，方便直接比較日期。',
             ])}
           />
+
+          {groupBookingNotice ? (
+            <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>{groupBookingNotice}</p>
+            </div>
+          ) : null}
 
           {clinicId ? (
             <button

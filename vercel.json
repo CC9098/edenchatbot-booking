@@ -5,6 +5,10 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/group-booking-cancellations",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/follow-ups-overdue",
       "schedule": "15 16 * * *"
     }

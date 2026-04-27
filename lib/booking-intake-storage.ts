@@ -53,6 +53,21 @@ export interface BookingReminderIntakeCandidate {
   notificationClinicId?: string;
 }
 
+export interface GroupBookingIntakeCandidate {
+  intakeId: string;
+  googleEventId: string;
+  calendarId: string;
+  patientName: string;
+  patientPhone: string;
+  patientEmail: string;
+  doctorId: string;
+  doctorNameZh: string;
+  clinicId: string;
+  clinicNameZh: string;
+  appointmentDate: string;
+  appointmentTime: string;
+}
+
 function parseNotificationClinicId(raw: unknown): string | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return undefined;
@@ -365,6 +380,77 @@ export async function listConfirmedBookingReminderCandidatesByDate(
       success: true,
       items: Array.from(deduped.values()),
     };
+  } catch (error) {
+    return {
+      success: false,
+      items: [],
+      error: error instanceof Error ? error.message : "Unknown DB error",
+    };
+  }
+}
+
+export async function listConfirmedGroupBookingCandidates(params: {
+  doctorId: string;
+  clinicId: string;
+  appointmentDate: string;
+  startTime: string;
+  endTime: string;
+}): Promise<{ success: boolean; items: GroupBookingIntakeCandidate[]; error?: string }> {
+  try {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+      .from("booking_intake")
+      .select(`
+        id,
+        google_event_id,
+        calendar_id,
+        patient_name,
+        phone,
+        email,
+        doctor_id,
+        doctor_name_zh,
+        clinic_id,
+        clinic_name_zh,
+        appointment_date,
+        appointment_time
+      `)
+      .eq("status", "confirmed")
+      .eq("doctor_id", params.doctorId)
+      .eq("clinic_id", params.clinicId)
+      .eq("appointment_date", params.appointmentDate)
+      .gte("appointment_time", params.startTime)
+      .lt("appointment_time", params.endTime)
+      .not("google_event_id", "is", null)
+      .not("calendar_id", "is", null)
+      .order("appointment_time", { ascending: true });
+
+    if (error) {
+      return { success: false, items: [], error: error.message };
+    }
+
+    const items: GroupBookingIntakeCandidate[] = [];
+    for (const row of data ?? []) {
+      const googleEventId = typeof row.google_event_id === "string" ? row.google_event_id.trim() : "";
+      const calendarId = typeof row.calendar_id === "string" ? row.calendar_id.trim() : "";
+      if (!googleEventId || !calendarId) continue;
+
+      items.push({
+        intakeId: String(row.id),
+        googleEventId,
+        calendarId,
+        patientName: typeof row.patient_name === "string" ? row.patient_name : "",
+        patientPhone: typeof row.phone === "string" ? row.phone : "",
+        patientEmail: typeof row.email === "string" ? row.email : "",
+        doctorId: typeof row.doctor_id === "string" ? row.doctor_id : params.doctorId,
+        doctorNameZh: typeof row.doctor_name_zh === "string" ? row.doctor_name_zh : "",
+        clinicId: typeof row.clinic_id === "string" ? row.clinic_id : params.clinicId,
+        clinicNameZh: typeof row.clinic_name_zh === "string" ? row.clinic_name_zh : "",
+        appointmentDate: typeof row.appointment_date === "string" ? row.appointment_date : params.appointmentDate,
+        appointmentTime: typeof row.appointment_time === "string" ? row.appointment_time : "",
+      });
+    }
+
+    return { success: true, items };
   } catch (error) {
     return {
       success: false,

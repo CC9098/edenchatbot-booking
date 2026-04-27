@@ -13,6 +13,7 @@ const DOCTOR_EVENT_COLOR_ID_BY_ID: Record<string, string> = {
   chau: '9',
   cheung: '10',
   leung: '11',
+  wong: '8',
 };
 
 function buildBookingEventSummary(details: {

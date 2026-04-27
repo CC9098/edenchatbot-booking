@@ -27,7 +27,7 @@ interface MappingCache {
   mappings: VersionedCalendarMapping[];
 }
 
-type DoctorScheduleLoadSource = 'supabase' | 'static-fallback-empty' | 'static-fallback-error';
+type DoctorScheduleLoadSource = 'supabase' | 'supabase-with-static-new-doctors' | 'static-fallback-empty' | 'static-fallback-error';
 
 interface DoctorScheduleLoadInfo {
   detail: string | null;
@@ -235,6 +235,17 @@ function getStaticFallbackMappings(): VersionedCalendarMapping[] {
   );
 }
 
+function mergeStaticMappingsForNewDoctors(
+  supabaseMappings: VersionedCalendarMapping[]
+): VersionedCalendarMapping[] {
+  const supabaseDoctorIds = new Set(supabaseMappings.map((mapping) => mapping.doctorId));
+  const staticNewDoctorMappings = getStaticFallbackMappings().filter(
+    (mapping) => !supabaseDoctorIds.has(mapping.doctorId)
+  );
+
+  return [...supabaseMappings, ...staticNewDoctorMappings];
+}
+
 function normalizeRows(rows: DoctorScheduleRow[]): VersionedCalendarMapping[] {
   const normalized = rows
     .map(normalizeRow)
@@ -280,13 +291,14 @@ async function loadMappingsWithFallback(): Promise<VersionedCalendarMapping[]> {
   try {
     const supabaseMappings = await fetchMappingsFromSupabase();
     if (supabaseMappings.length > 0) {
+      const mappings = mergeStaticMappingsForNewDoctors(supabaseMappings);
       lastLoadInfo = {
-        detail: null,
+        detail: mappings.length === supabaseMappings.length ? null : 'Merged static schedules for doctors missing in Supabase',
         loadedAt: Date.now(),
-        mappingCount: supabaseMappings.length,
-        source: 'supabase',
+        mappingCount: mappings.length,
+        source: mappings.length === supabaseMappings.length ? 'supabase' : 'supabase-with-static-new-doctors',
       };
-      return supabaseMappings;
+      return mappings;
     }
 
     console.warn(

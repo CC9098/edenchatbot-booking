@@ -1059,7 +1059,7 @@ export async function sendBookingConfirmationWhatsapp(
       buildContent: () => buildWhatsappConfirmationText(input),
       buildBodyParams: () => buildWhatsappTemplateBodyParams(input),
       getTemplateConfigs,
-      preferTemplateIfAvailable: true,
+      preferTemplateIfAvailable: !input.groupBookingNotice,
     });
   } catch (error) {
     return {
@@ -1226,7 +1226,7 @@ export async function sendBookingCancellationWhatsapp(
       buildContent: () => buildWhatsappCancellationText(input),
       buildBodyParams: () => buildWhatsappCancellationTemplateBodyParams(input),
       getTemplateConfigs: getCancellationTemplateConfigs,
-      preferTemplateIfAvailable: true,
+      preferTemplateIfAvailable: !input.cancellationReason,
     });
   } catch (error) {
     return {

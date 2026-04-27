@@ -18,7 +18,7 @@ const DAY_COLUMNS = [
   { day: 0, label: '星期日', short: 'SUN' },
 ] as const;
 
-const CHIROPRACTIC_DOCTOR_IDS = ['lee'] as const satisfies readonly DoctorId[];
+const CHIROPRACTIC_DOCTOR_IDS = ['wong'] as const satisfies readonly DoctorId[];
 const CHIROPRACTIC_LABEL = '脊醫';
 
 const CLINIC_THEMES: Record<

@@ -339,6 +339,23 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
       6: null,
     }
   },
+
+  // ===== Dr. Wong 黃浩哲脊醫 =====
+  {
+    doctorId: "wong",
+    clinicId: "jordan",
+    calendarId: "40cb62a1e50a16724e785554027785b0b1b041a4b8dffea974d0a2d243c0985f@group.calendar.google.com",
+    isActive: true,
+    schedule: {
+      0: null,
+      1: null,
+      2: null,
+      3: null,
+      4: [{ start: "10:30", end: "13:00" }],
+      5: null,
+      6: [{ start: "14:30", end: "16:30" }],
+    }
+  },
 ];
 
 // Helper functions

@@ -29,6 +29,7 @@ import { getClinicWhatsappPhone } from '@/lib/whatsapp-booking';
 import { resolveOnlineSourceMappingForSlot } from '@/lib/virtual-online-booking';
 import { createManageAccessToken } from '@/lib/widget-booking-management';
 import { detailedBookingSchema } from '@/shared/booking-intake-schema';
+import { findGroupBookingSession, getGroupBookingNotice } from '@/lib/group-booking-policy';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
@@ -64,6 +65,15 @@ export async function POST(request: NextRequest) {
 
     const bookingData = parsed.data;
     const durationMinutes = getDoctorBookingSlotMinutes(bookingData.doctorId);
+    const groupBookingSession = findGroupBookingSession({
+      doctorId: bookingData.doctorId,
+      clinicId: bookingData.clinicId,
+      date: bookingData.date,
+      time: bookingData.time,
+    });
+    const groupBookingNotice = groupBookingSession
+      ? getGroupBookingNotice(bookingData.doctorId, bookingData.clinicId)
+      : null;
 
     let calendarId = '';
     let notificationClinicId = bookingData.clinicId;
@@ -246,6 +256,16 @@ export async function POST(request: NextRequest) {
         durationMinutes,
         channel: 'whatsapp_confirmation',
         notificationClinicId,
+        ...(groupBookingSession
+          ? {
+              groupBooking: {
+                minPatients: groupBookingSession.policy.minPatients,
+                cancelHoursBeforeStart: groupBookingSession.policy.cancelHoursBeforeStart,
+                sessionStart: groupBookingSession.start,
+                sessionEnd: groupBookingSession.end,
+              },
+            }
+          : {}),
       },
     });
 
@@ -321,6 +341,7 @@ export async function POST(request: NextRequest) {
       visitType: bookingData.visitType as BookingVisitType,
       clinicWhatsappPhone: getClinicWhatsappPhone(notificationClinicId),
       manageAccessToken,
+      groupBookingNotice: groupBookingNotice || undefined,
     });
 
     if (!whatsappResult.success) {
@@ -336,6 +357,7 @@ export async function POST(request: NextRequest) {
       intakeSaved: intakeResult.success,
       whatsappSent: whatsappResult.success,
       whatsappConversationId: whatsappResult.conversationId,
+      groupBookingNotice: groupBookingNotice || undefined,
     });
   } catch (error) {
     if (intakeId) {
