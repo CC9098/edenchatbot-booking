@@ -8,6 +8,7 @@ import {
 
 export const DOCTOR_IDS = ['chan', 'lee', 'hon', 'chau', 'cheung', 'leung', 'wong'] as const;
 export type DoctorId = (typeof DOCTOR_IDS)[number];
+export type BookingPractitionerGroup = 'tcm' | 'support';
 
 export const CLINIC_IDS = ['central', 'jordan', 'tsuenwan', 'online'] as const;
 export type ClinicId = (typeof CLINIC_IDS)[number];
@@ -32,6 +33,10 @@ export type DoctorProfile = {
   bookingUrl?: string;
   bookingNote?: string;
   scheduleNote?: string;
+  bookingPractitionerGroup?: BookingPractitionerGroup;
+  bookingGroupLabel?: string;
+  bookingRoleLabel?: string;
+  bookingSupportNote?: string;
   bookingTreatmentOptions?: readonly BookingTreatmentOptionId[];
   bookingSlotMinutes?: number;
   onlineBookingEnabled?: boolean;
@@ -62,6 +67,9 @@ const DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS: readonly BookingTreatmentOpti
   'other',
 ];
 const DEFAULT_DOCTOR_BOOKING_SLOT_MINUTES = 15;
+const DEFAULT_BOOKING_PRACTITIONER_GROUP: BookingPractitionerGroup = 'tcm';
+const DEFAULT_BOOKING_GROUP_LABEL = '中醫主診醫師';
+const DEFAULT_BOOKING_ROLE_LABEL = '中醫師';
 
 export const CLINICS: ClinicProfile[] = [
   {
@@ -179,6 +187,10 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: '/images/dr-samuel-wong-profile.jpg',
     avatarObjectPosition: 'center 18%',
     bookingUrl: buildBookingUrl({ doctorId: 'wong', clinicId: 'jordan' }),
+    bookingPractitionerGroup: 'support',
+    bookingGroupLabel: '協作脊醫服務',
+    bookingRoleLabel: '協作脊醫',
+    bookingSupportNote: '黃浩哲脊醫為協作脊醫服務，列於中醫主診醫師之後，方便病人分辨。',
     bookingTreatmentOptions: ['manual_therapy'],
     bookingSlotMinutes: 30,
     onlineBookingEnabled: false,
@@ -248,6 +260,42 @@ export function getDoctorBookingSlotMinutes(doctorId: string): number {
   }
 
   return DOCTOR_BY_ID[doctorId].bookingSlotMinutes || DEFAULT_DOCTOR_BOOKING_SLOT_MINUTES;
+}
+
+export function getDoctorBookingPractitionerGroup(doctorId: string): BookingPractitionerGroup {
+  if (!isDoctorId(doctorId)) {
+    return DEFAULT_BOOKING_PRACTITIONER_GROUP;
+  }
+
+  return DOCTOR_BY_ID[doctorId].bookingPractitionerGroup || DEFAULT_BOOKING_PRACTITIONER_GROUP;
+}
+
+export function isSupportBookingPractitioner(doctorId: string): boolean {
+  return getDoctorBookingPractitionerGroup(doctorId) === 'support';
+}
+
+export function getDoctorBookingGroupLabel(doctorId: string): string {
+  if (!isDoctorId(doctorId)) {
+    return DEFAULT_BOOKING_GROUP_LABEL;
+  }
+
+  return DOCTOR_BY_ID[doctorId].bookingGroupLabel || DEFAULT_BOOKING_GROUP_LABEL;
+}
+
+export function getDoctorBookingRoleLabel(doctorId: string): string {
+  if (!isDoctorId(doctorId)) {
+    return DEFAULT_BOOKING_ROLE_LABEL;
+  }
+
+  return DOCTOR_BY_ID[doctorId].bookingRoleLabel || DEFAULT_BOOKING_ROLE_LABEL;
+}
+
+export function getDoctorBookingSupportNote(doctorId: string): string | undefined {
+  if (!isDoctorId(doctorId)) {
+    return undefined;
+  }
+
+  return DOCTOR_BY_ID[doctorId].bookingSupportNote;
 }
 
 export function getDoctorBookingLinkOrNote(nameZh: string): string | undefined {

@@ -331,6 +331,37 @@ function compactDetails(details: Array<string | null | undefined | false>): stri
   return details.filter((detail): detail is string => Boolean(detail));
 }
 
+function isSupportBookingDoctor(
+  doctor?: Pick<BookableDoctorSchedule, 'bookingPractitionerGroup'>
+): boolean {
+  return doctor?.bookingPractitionerGroup === 'support';
+}
+
+function formatDoctorOptionLabel(
+  doctor: Pick<BookableDoctorSchedule, 'doctorNameZh' | 'doctorNameEn' | 'bookingPractitionerGroup' | 'bookingRoleLabel'>
+): string {
+  const suffix = isSupportBookingDoctor(doctor) ? ` - ${doctor.bookingRoleLabel}` : '';
+  return `${doctor.doctorNameZh} (${doctor.doctorNameEn})${suffix}`;
+}
+
+function getSelectedScheduleEyebrow(
+  doctor?: Pick<BookableDoctorSchedule, 'bookingPractitionerGroup'>
+): string {
+  return isSupportBookingDoctor(doctor) ? '協作脊醫時段' : '醫師應診時間';
+}
+
+function getSelectedCardLabel(
+  doctor?: Pick<BookableDoctorSchedule, 'bookingPractitionerGroup'>
+): string {
+  return isSupportBookingDoctor(doctor) ? '協作服務卡片' : '醫師卡片';
+}
+
+function getSelectedSummaryEyebrow(
+  doctor?: Pick<BookableDoctorSchedule, 'bookingPractitionerGroup'>
+): string {
+  return isSupportBookingDoctor(doctor) ? '已選協作服務' : '已選醫師';
+}
+
 function padTwo(value: number): string {
   return String(value).padStart(2, '0');
 }
@@ -536,6 +567,14 @@ export function BookingTabFlow({
     () => doctors,
     [doctors]
   );
+  const primaryDoctorOptions = useMemo(
+    () => doctorOptions.filter((doctor) => !isSupportBookingDoctor(doctor)),
+    [doctorOptions]
+  );
+  const supportDoctorOptions = useMemo(
+    () => doctorOptions.filter((doctor) => isSupportBookingDoctor(doctor)),
+    [doctorOptions]
+  );
 
   const clinicOptions = useMemo(() => {
     if (!doctorId) return [];
@@ -546,6 +585,7 @@ export function BookingTabFlow({
     () => doctorOptions.find((doctor) => doctor.doctorId === doctorId),
     [doctorId, doctorOptions]
   );
+  const selectedDoctorSummaryEyebrow = getSelectedSummaryEyebrow(selectedDoctor);
   const selectedDoctorNotices = useMemo(() => {
     if (!selectedDoctor) return [];
 
@@ -1265,7 +1305,7 @@ export function BookingTabFlow({
     event.preventDefault();
 
     if (!selectedDoctor || !selectedClinic || !doctorId || !clinicId) {
-      setSubmitError('請先選擇醫師與診所。');
+      setSubmitError('請先選擇醫師/協作服務與診所。');
       setStep('setup');
       return;
     }
@@ -1372,7 +1412,7 @@ export function BookingTabFlow({
         <div className="patient-card p-6 sm:p-8">
         <h1 className="text-2xl font-semibold text-primary">{pageTitle}</h1>
         <p className="mt-3 text-sm text-slate-600">
-          {isStaffFlow ? '目前未有可用的醫師時段，請稍後再試或由姑娘人工跟進。' : '目前未有可用的醫師時段，請稍後再試或於聊天頁聯絡我們。'}
+          {isStaffFlow ? '目前未有可用的醫師或協作服務時段，請稍後再試或由姑娘人工跟進。' : '目前未有可用的醫師或協作服務時段，請稍後再試或於聊天頁聯絡我們。'}
         </p>
         {!embedMode ? (
           <Link
@@ -1399,7 +1439,7 @@ export function BookingTabFlow({
       </div>
 
       <div className="mb-6 rounded-2xl border border-primary/15 bg-primary-light/40 p-3 text-xs font-medium text-primary sm:text-sm">
-        步驟：{step === 'setup' && '1. 醫師與診所'}{step === 'timeslot' && '2. 日期與時間'}
+        步驟：{step === 'setup' && '1. 醫師/協作服務與診所'}{step === 'timeslot' && '2. 日期與時間'}
         {step === 'details' && '3. 填寫資料'}{step === 'success' && '完成'}
       </div>
 
@@ -1413,14 +1453,32 @@ export function BookingTabFlow({
                 onChange={(event) => handleDoctorChange(event.target.value)}
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
               >
-                <option value="">請選擇醫師</option>
-                {doctorOptions.map((doctor) => (
-                  <option key={doctor.doctorId} value={doctor.doctorId}>
-                    {doctor.doctorNameZh} ({doctor.doctorNameEn})
-                  </option>
-                ))}
+                <option value="">請選擇醫師或協作服務</option>
+                {primaryDoctorOptions.length > 0 ? (
+                  <optgroup label="中醫主診醫師">
+                    {primaryDoctorOptions.map((doctor) => (
+                      <option key={doctor.doctorId} value={doctor.doctorId}>
+                        {formatDoctorOptionLabel(doctor)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+                {supportDoctorOptions.length > 0 ? (
+                  <optgroup label="協作服務">
+                    {supportDoctorOptions.map((doctor) => (
+                      <option key={doctor.doctorId} value={doctor.doctorId}>
+                        {formatDoctorOptionLabel(doctor)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
               </select>
             </label>
+            {supportDoctorOptions.length > 0 ? (
+              <p className="text-xs leading-relaxed text-slate-500">
+                中醫主診醫師優先顯示；協作脊醫服務列於下方。
+              </p>
+            ) : null}
           </div>
 
           {selectedDoctor && (
@@ -1430,7 +1488,7 @@ export function BookingTabFlow({
                   <DoctorAvatar doctor={selectedDoctor} size="lg" />
                   <div className="min-w-0">
                     <p className="text-xs font-semibold tracking-[0.28em] text-[#5d8c67]">
-                      醫師應診時間
+                      {getSelectedScheduleEyebrow(selectedDoctor)}
                     </p>
                     <h2 className="mt-2 text-[1.35rem] font-semibold text-[#234230] sm:text-[1.5rem]">
                       {selectedDoctor.doctorNameZh}
@@ -1445,13 +1503,23 @@ export function BookingTabFlow({
                       <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
                         {getSlotDurationLabel(selectedDoctor.bookingSlotMinutes)}
                       </span>
+                      {isSupportBookingDoctor(selectedDoctor) ? (
+                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                          {selectedDoctor.bookingRoleLabel}
+                        </span>
+                      ) : null}
                     </div>
+                    {selectedDoctor.bookingSupportNote ? (
+                      <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                        {selectedDoctor.bookingSupportNote}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
                 <div className="rounded-[22px] border border-[#d5e7d8] bg-white/85 px-4 py-3 text-sm shadow-[0_12px_30px_-26px_rgba(31,74,44,0.4)] sm:max-w-[240px]">
                   <p className="text-[11px] font-semibold tracking-[0.24em] text-[#5d8c67]">
-                    醫師卡片
+                    {getSelectedCardLabel(selectedDoctor)}
                   </p>
                   <p className="mt-1 font-semibold text-[#254430]">
                     {selectedDoctor.doctorNameZh}
@@ -1658,7 +1726,7 @@ export function BookingTabFlow({
               ) : null}
 
               <p className="text-xs leading-relaxed text-slate-500">
-                如未確定做哪一項，可先留空，稍後由醫師到診時再確認。
+                如未確定做哪一項，可先留空，稍後到診時再確認。
               </p>
             </div>
           ) : null}
@@ -1687,7 +1755,7 @@ export function BookingTabFlow({
           <DoctorBookingSummary
             doctor={selectedDoctor}
             clinicNameZh={selectedClinic?.clinicNameZh || '比較全部診所'}
-            eyebrow="已選醫師"
+            eyebrow={selectedDoctorSummaryEyebrow}
             details={compactDetails([
               !isOnlineConsultation
                 ? treatmentSummaryDetail || (selectedDoctor ? `可選治療項目：${selectedDoctor.bookingTreatmentLabel}` : null)
@@ -1893,7 +1961,7 @@ export function BookingTabFlow({
             <p className="text-xs text-slate-500">
               {selectedDoctor
                 ? `已按 ${selectedDoctor.doctorNameZh} 設定顯示 ${getSlotDurationLabel(selectedDoctorSlotMinutes)}。`
-                : `已按醫師設定顯示 ${getSlotDurationLabel(selectedDoctorSlotMinutes)}。`}
+                : `已按醫師/協作服務設定顯示 ${getSlotDurationLabel(selectedDoctorSlotMinutes)}。`}
             </p>
 
             {slotsLoading ? (

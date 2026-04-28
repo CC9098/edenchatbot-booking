@@ -1,4 +1,4 @@
-import type { ClinicId, DoctorId } from '@/shared/clinic-data';
+import type { BookingPractitionerGroup, ClinicId, DoctorId } from '@/shared/clinic-data';
 import type { BookingTreatmentOption } from '@/shared/booking-treatment-options';
 import type { WeeklySchedule } from '@/shared/schedule-config';
 
@@ -24,6 +24,10 @@ export type BookableDoctorSchedule = {
   doctorNameEn: string;
   avatarSrc?: string;
   avatarObjectPosition?: string;
+  bookingPractitionerGroup: BookingPractitionerGroup;
+  bookingGroupLabel: string;
+  bookingRoleLabel: string;
+  bookingSupportNote?: string;
   scheduleNote?: string;
   bookingNotices?: BookableScheduleNotice[];
   bookingTreatmentLabel: string;

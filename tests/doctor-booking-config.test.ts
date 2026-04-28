@@ -3,9 +3,14 @@ import assert from 'node:assert/strict';
 
 import {
   DOCTOR_BY_ID,
+  getDoctorBookingGroupLabel,
+  getDoctorBookingPractitionerGroup,
+  getDoctorBookingRoleLabel,
   getDoctorBookingSlotMinutes,
+  getDoctorBookingSupportNote,
   getDoctorBookingTreatmentLabel,
   getDoctorBookingTreatmentOptions,
+  isSupportBookingPractitioner,
 } from '@/shared/clinic-data';
 
 test('Dr. Lee shows acupuncture only on booking pages', () => {
@@ -37,4 +42,13 @@ test('other doctors keep the default treatment label and 15-minute slots', () =>
 test('Dr. Chan has a configured avatar for booking profile cards', () => {
   assert.equal(DOCTOR_BY_ID.chan.avatarSrc, '/doctor-avatars/chan.jpg');
   assert.equal(DOCTOR_BY_ID.chan.avatarObjectPosition, '82% center');
+});
+
+test('Dr. Wong is treated as a support chiropractic service in booking lists', () => {
+  assert.equal(getDoctorBookingPractitionerGroup('wong'), 'support');
+  assert.equal(isSupportBookingPractitioner('wong'), true);
+  assert.equal(getDoctorBookingGroupLabel('wong'), '協作脊醫服務');
+  assert.equal(getDoctorBookingRoleLabel('wong'), '協作脊醫');
+  assert.match(getDoctorBookingSupportNote('wong') || '', /協作脊醫服務/);
+  assert.equal(isSupportBookingPractitioner('chan'), false);
 });
