@@ -8,6 +8,7 @@ import { sendBookingReminderWhatsapp } from '@/lib/chatwoot-whatsapp';
 import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import { getClinicWhatsappPhone } from '@/lib/whatsapp-booking';
 import { createManageAccessToken } from '@/lib/widget-booking-management';
+import { authorizeBookingReminderCronRequest } from '@/lib/booking-reminder-cron-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,17 +17,18 @@ const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const WHATSAPP_REMINDER_SENT_KEY = 'eden_reminder_24h_whatsapp_sent_at';
 
 export async function GET(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    return NextResponse.json({ error: 'CRON_SECRET is not configured' }, { status: 500 });
-  }
-
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const dryRun = request.nextUrl.searchParams.get('dryRun') === '1';
+  const authHeader = request.headers.get('authorization');
+  const authResult = authorizeBookingReminderCronRequest({
+    authHeader,
+    dryRun,
+    cronSecret: process.env.CRON_SECRET,
+    dryRunTestSecret: process.env.BOOKING_REMINDER_TEST_SECRET,
+  });
+  if (!authResult.success) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+  }
+
   const now = new Date();
   const targetDateOverride = request.nextUrl.searchParams.get('targetDate');
   const targetDate = targetDateOverride
@@ -43,6 +45,7 @@ export async function GET(request: NextRequest) {
     timezone: HONG_KONG_TIMEZONE,
     targetDate,
     dryRun,
+    authMode: authResult.mode,
     intakeCandidates: 0,
     eventChecks: 0,
     eventMissing: 0,
