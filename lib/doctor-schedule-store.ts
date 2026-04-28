@@ -230,7 +230,7 @@ function getStaticFallbackMappings(): VersionedCalendarMapping[] {
   return CALENDAR_MAPPINGS.map((mapping) =>
     cloneCalendarMapping({
       ...mapping,
-      effectiveFrom: '1970-01-01',
+      effectiveFrom: mapping.effectiveFrom ?? '1970-01-01',
     })
   );
 }

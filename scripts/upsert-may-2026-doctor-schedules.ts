@@ -2,6 +2,7 @@ import { config as loadDotenv } from 'dotenv';
 
 import { createClient } from '@supabase/supabase-js';
 
+import { DOCTORS } from '../shared/clinic-data';
 import {
   CALENDAR_MAPPINGS,
   type TimeRange,
@@ -17,6 +18,14 @@ interface ExistingScheduleRow {
   id: string;
   doctor_id: string;
   clinic_id: string;
+}
+
+function doctorTitleZh(doctorId: string): string {
+  return doctorId === 'wong' ? '脊醫' : '醫師';
+}
+
+function doctorTitleEn(doctorId: string): string {
+  return doctorId === 'wong' ? 'Chiropractor' : 'Doctor';
 }
 
 function requireEnv(name: string): string {
@@ -105,6 +114,10 @@ const MAY_2026_SCHEDULES: ScheduleMap = {
     5: [AFTERNOON_1530_1930],
     6: [MORNING_1100_1400, { start: '15:30', end: '18:30' }],
   }),
+  [scheduleKey('wong', 'jordan')]: schedule({
+    4: [{ start: '10:30', end: '13:00' }],
+    6: [{ start: '14:30', end: '16:30' }],
+  }),
 
   // 荃灣診所
   [scheduleKey('chan', 'tsuenwan')]: schedule({
@@ -145,6 +158,26 @@ async function main() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  const doctorSeedRows = DOCTORS.map((doctor) => ({
+    id: doctor.id,
+    name: doctor.nameEn,
+    name_zh: doctor.nameZh,
+    title: doctorTitleEn(doctor.id),
+    title_zh: doctorTitleZh(doctor.id),
+    is_active: true,
+  }));
+
+  if (dryRun) {
+    console.log(`upsert doctors count=${doctorSeedRows.length}`);
+  } else {
+    const { error: doctorUpsertError } = await supabase
+      .from('doctors')
+      .upsert(doctorSeedRows, { onConflict: 'id' });
+    if (doctorUpsertError) {
+      throw new Error(`Failed to upsert doctors: ${doctorUpsertError.message}`);
+    }
+  }
+
   const { data: existingRows, error: existingRowsError } = await supabase
     .from('doctor_schedules')
     .select('id, doctor_id, clinic_id')
@@ -159,7 +192,7 @@ async function main() {
     existingByKey.set(scheduleKey(row.doctor_id, row.clinic_id), row);
   }
 
-  const { data: doctorRows, error: doctorRowsError } = await supabase
+  const { data: dbDoctorRows, error: doctorRowsError } = await supabase
     .from('doctors')
     .select('id');
 
@@ -168,10 +201,15 @@ async function main() {
   }
 
   const registeredDoctorIds = new Set(
-    (doctorRows || [])
+    (dbDoctorRows || [])
       .map((row) => (typeof row.id === 'string' ? row.id.trim() : ''))
       .filter(Boolean)
   );
+  if (dryRun) {
+    for (const row of doctorSeedRows) {
+      registeredDoctorIds.add(row.id);
+    }
+  }
 
   let insertedCount = 0;
   let updatedCount = 0;

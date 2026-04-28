@@ -177,12 +177,6 @@ const DOCTOR_TONES: Record<
 
 const MONTH_LABELS_ZH = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
 const MONTH_VALUE_REGEX = /^\d{4}-\d{2}$/;
-const PUBLIC_TIMETABLE_MONTH_DISPLAY_ALIASES: Record<string, string> = {
-  '2026-05-01': '2026-04-01',
-};
-const PUBLIC_TIMETABLE_MONTH_SOURCE_OVERRIDES: Record<string, string> = {
-  '2026-04-01': '2026-05-01',
-};
 
 function getTodayMonthStart(): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -241,14 +235,6 @@ function buildMonthHref(month: string, minimal: boolean, clinicId: string | unde
     params.set('clinic', clinicId);
   }
   return `/embed/timetable?${params.toString()}`;
-}
-
-function resolvePublicTimetableSourceMonth(displayMonthStartIso: string): string {
-  return PUBLIC_TIMETABLE_MONTH_SOURCE_OVERRIDES[displayMonthStartIso] ?? displayMonthStartIso;
-}
-
-function resolvePublicTimetableDisplayMonth(requestedMonthStartIso: string): string {
-  return PUBLIC_TIMETABLE_MONTH_DISPLAY_ALIASES[requestedMonthStartIso] ?? requestedMonthStartIso;
 }
 
 function buildQueryValue(value: string | string[] | undefined): string | undefined {
@@ -556,12 +542,13 @@ export default async function TimetableEmbedPage({
 }) {
   const clinicFilter = normalizeClinicFilter(buildQueryValue(searchParams?.clinic));
   const minimal = isMinimalMode(buildQueryValue(searchParams?.minimal));
-  const currentMonth = toMonthStart(getTodayMonthStart());
+  const todayIso = getTodayMonthStart();
+  const currentMonth = toMonthStart(todayIso);
   const requestedMonth = normalizeMonthQuery(
     buildQueryValue(searchParams?.month),
     currentMonth,
   );
-  const selectedMonth = resolvePublicTimetableDisplayMonth(requestedMonth);
+  const selectedMonth = requestedMonth;
   const nextMonth = toNextMonthStart(currentMonth);
   const currentMonthQueryValue = currentMonth.slice(0, 7);
   const nextMonthQueryValue = nextMonth.slice(0, 7);
@@ -579,8 +566,8 @@ export default async function TimetableEmbedPage({
     },
   ];
 
-  const sourceMonth = resolvePublicTimetableSourceMonth(selectedMonth);
-  const { cards, generatedAtLabel, notices } = await getPublicTimetableData(sourceMonth);
+  const sourceDate = selectedMonth === currentMonth ? todayIso : selectedMonth;
+  const { cards, generatedAtLabel, notices } = await getPublicTimetableData(sourceDate);
   const visibleCards = clinicFilter ? cards.filter((card) => card.clinicId === clinicFilter) : cards;
   const activeMonthLabel = monthLabel(selectedMonth);
   const versionLabel = buildMonthRibbonLabel(selectedMonth);

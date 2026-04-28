@@ -11,6 +11,14 @@ interface ExistingScheduleRow {
   clinic_id: string;
 }
 
+function doctorTitleZh(doctorId: string): string {
+  return doctorId === 'wong' ? '脊醫' : '醫師';
+}
+
+function doctorTitleEn(doctorId: string): string {
+  return doctorId === 'wong' ? 'Chiropractor' : 'Doctor';
+}
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -34,8 +42,8 @@ async function main() {
     id: doctor.id,
     name: doctor.nameEn,
     name_zh: doctor.nameZh,
-    title: 'Doctor',
-    title_zh: '醫師',
+    title: doctorTitleEn(doctor.id),
+    title_zh: doctorTitleZh(doctor.id),
     is_active: true,
   }));
 
