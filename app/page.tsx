@@ -3,10 +3,13 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { createServerClient } from "@/lib/supabase-server";
 import { isNativeAppUserAgent } from "@/lib/platform";
+import { DOCTORS } from "@/shared/clinic-data";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 export const dynamic = 'force-dynamic';
+
+const HOME_HERO_DOCTORS = DOCTORS.filter((doctor) => doctor.avatarSrc);
 
 export default async function Home() {
   const userAgent = headers().get("user-agent") ?? "";
@@ -24,19 +27,21 @@ export default async function Home() {
 
   return (
     <main className="relative min-h-screen bg-primary-pale text-slate-800">
-      <section className="relative isolate min-h-[720px] overflow-hidden bg-white sm:min-h-[760px]">
-        <Image
-          src="/images/eden-doctor-team-hero.webp"
-          alt="醫天圓醫師團隊合照"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-[58%_center]"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/50 sm:bg-gradient-to-r sm:from-white/95 sm:via-white/40 sm:to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-primary-pale via-primary-pale/10 to-transparent" />
+      <section className="relative isolate min-h-[760px] overflow-hidden bg-white">
+        <div className="absolute -inset-6">
+          <Image
+            src="/images/edenclinic-homepage-bg.webp"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="scale-105 object-cover object-top opacity-90 blur-lg"
+          />
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/90 to-primary-pale/90 lg:bg-gradient-to-r lg:from-white/95 lg:via-white/70 lg:to-white/35" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_42%,rgba(255,255,255,0.26),transparent_34%)]" />
 
-        <div className="relative z-10 mx-auto flex min-h-[720px] max-w-6xl flex-col px-6 pb-16 pt-8 sm:min-h-[760px] sm:px-10 sm:pb-20">
+        <div className="relative z-10 mx-auto flex min-h-[760px] max-w-6xl flex-col px-6 pb-16 pt-8 sm:px-10 sm:pb-20">
           <div className="flex items-center justify-between gap-4">
             <Link
               href="https://edenclinic.hk"
@@ -60,7 +65,7 @@ export default async function Home() {
             </div>
           </div>
 
-          <div className="flex flex-1 items-center py-16">
+          <div className="grid flex-1 items-center gap-10 py-12 lg:grid-cols-[0.9fr_1.1fr] lg:py-16">
             <div className="max-w-xl space-y-6">
               <p className="text-sm font-semibold text-primary">
                 醫天圓病人服務平台
@@ -93,6 +98,39 @@ export default async function Home() {
                   登入後繼續使用
                 </Link>
               </p>
+            </div>
+
+            <div className="relative">
+              <div className="absolute -inset-4 rounded-[32px] bg-white/25 blur-2xl" />
+              <div className="relative grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+                {HOME_HERO_DOCTORS.map((doctor, index) => (
+                  <Link
+                    key={doctor.id}
+                    href={doctor.bookingUrl || "/booking"}
+                    className={[
+                      "group relative block h-32 overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-[0_18px_45px_rgba(15,23,42,0.14)] transition hover:-translate-y-1 hover:shadow-[0_24px_60px_rgba(15,23,42,0.2)]",
+                      "sm:h-40 lg:h-48",
+                      index === 0 || index === 4 ? "lg:translate-y-6" : "",
+                      index === 2 ? "lg:-translate-y-3" : "",
+                    ].join(" ")}
+                    aria-label={`預約${doctor.nameZh}`}
+                  >
+                    <Image
+                      src={doctor.avatarSrc!}
+                      alt={doctor.nameZh}
+                      fill
+                      sizes="(min-width: 1024px) 150px, 33vw"
+                      className="object-cover transition duration-300 group-hover:scale-105"
+                      style={{ objectPosition: doctor.avatarObjectPosition || "center" }}
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/75 to-transparent px-2 pb-2 pt-8">
+                      <p className="text-[11px] font-semibold leading-tight text-white sm:text-xs">
+                        {doctor.nameZh}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         </div>
