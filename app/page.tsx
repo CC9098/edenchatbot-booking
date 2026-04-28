@@ -65,7 +65,7 @@ export default async function Home() {
             </div>
           </div>
 
-          <div className="grid flex-1 items-center gap-10 py-12 lg:grid-cols-[0.9fr_1.1fr] lg:py-16">
+          <div className="grid flex-1 items-center gap-7 py-12 lg:grid-cols-[390px_minmax(0,1fr)] lg:gap-12 lg:py-16 xl:grid-cols-[450px_minmax(0,1fr)]">
             <div className="max-w-xl space-y-6">
               <p className="text-sm font-semibold text-primary">
                 醫天圓病人服務平台
@@ -100,18 +100,18 @@ export default async function Home() {
               </p>
             </div>
 
-            <div className="relative">
-              <div className="absolute -inset-4 rounded-[32px] bg-white/25 blur-2xl" />
-              <div className="relative grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+            <div className="relative -mx-6 overflow-hidden px-6 pt-2 sm:-mx-10 sm:px-10 lg:mx-0 lg:overflow-visible lg:px-0">
+              <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-white/70 to-transparent lg:-inset-x-10 lg:h-64" />
+              <div className="relative flex items-end justify-start gap-0 overflow-x-auto pb-4 pt-6 [scrollbar-width:none] sm:justify-center lg:overflow-visible lg:pb-0">
                 {HOME_HERO_DOCTORS.map((doctor, index) => (
                   <Link
                     key={doctor.id}
                     href={doctor.bookingUrl || "/booking"}
                     className={[
-                      "group relative block h-32 overflow-hidden rounded-lg border border-white/70 bg-white/80 shadow-[0_18px_45px_rgba(15,23,42,0.14)] transition hover:-translate-y-1 hover:shadow-[0_24px_60px_rgba(15,23,42,0.2)]",
-                      "sm:h-40 lg:h-48",
-                      index === 0 || index === 4 ? "lg:translate-y-6" : "",
-                      index === 2 ? "lg:-translate-y-3" : "",
+                      "group relative -ml-3 block h-44 w-28 shrink-0 overflow-hidden rounded-t-[24px] border border-white/80 bg-white/78 shadow-[0_22px_55px_rgba(15,23,42,0.16)] backdrop-blur transition hover:z-20 hover:-translate-y-2 first:ml-0",
+                      "sm:h-52 sm:w-32 lg:-ml-5 lg:h-[300px] lg:w-[106px]",
+                      index % 2 === 0 ? "lg:translate-y-5" : "lg:-translate-y-1",
+                      index === 3 ? "lg:h-[328px] lg:w-[118px] lg:z-10" : "",
                     ].join(" ")}
                     aria-label={`預約${doctor.nameZh}`}
                   >
@@ -119,18 +119,19 @@ export default async function Home() {
                       src={doctor.avatarSrc!}
                       alt={doctor.nameZh}
                       fill
-                      sizes="(min-width: 1024px) 150px, 33vw"
+                      sizes="(min-width: 1024px) 148px, 32vw"
                       className="object-cover transition duration-300 group-hover:scale-105"
                       style={{ objectPosition: doctor.avatarObjectPosition || "center" }}
                     />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/75 to-transparent px-2 pb-2 pt-8">
-                      <p className="text-[11px] font-semibold leading-tight text-white sm:text-xs">
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-primary/85 via-primary/38 to-transparent px-2 pb-3 pt-16">
+                      <p className="text-center text-[11px] font-semibold leading-tight text-white drop-shadow sm:text-xs">
                         {doctor.nameZh}
                       </p>
                     </div>
                   </Link>
                 ))}
               </div>
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-primary-pale/95 to-transparent" />
             </div>
           </div>
         </div>
