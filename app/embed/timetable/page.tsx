@@ -281,20 +281,10 @@ function getDoctorTone(doctorId: string): string {
   return DOCTOR_TONES[doctorId]?.text ?? '#334155';
 }
 
-function buildMonthRibbonLabel() {
-  const formatter = new Intl.DateTimeFormat('zh-HK', {
-    timeZone: 'Asia/Hong_Kong',
-    year: 'numeric',
-    month: 'numeric',
-  });
-  const now = new Date();
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const currentParts = formatter.formatToParts(now);
-  const nextParts = formatter.formatToParts(nextMonth);
-  const year = currentParts.find((part) => part.type === 'year')?.value ?? `${now.getFullYear()}`;
-  const currentMonth = currentParts.find((part) => part.type === 'month')?.value ?? `${now.getMonth() + 1}`;
-  const nextMonthValue = nextParts.find((part) => part.type === 'month')?.value ?? `${nextMonth.getMonth() + 1}`;
-  return `${year}年${currentMonth}-${nextMonthValue}月`;
+function buildMonthRibbonLabel(monthStartIso: string) {
+  const month = Number(monthStartIso.split('-')[1]);
+  const monthText = Number.isFinite(month) ? `${month}` : '未指定';
+  return `${monthStartIso.slice(0, 4)}年${monthText}月`;
 }
 
 function getPrimaryTimeLabel(card: TimetableClinicCard, rowId: 'morning' | 'afternoon') {
@@ -323,9 +313,8 @@ function rowHasTimeException(card: TimetableClinicCard, rowId: 'morning' | 'afte
   );
 }
 
-function ClinicCard({ card }: { card: TimetableClinicCard }) {
+function ClinicCard({ card, versionLabel }: { card: TimetableClinicCard; versionLabel: string }) {
   const theme = CLINIC_THEMES[card.clinicId];
-  const versionLabel = buildMonthRibbonLabel();
   const morningLabel = getPrimaryTimeLabel(card, 'morning');
   const afternoonLabel = getPrimaryTimeLabel(card, 'afternoon');
   const hasException = rowHasTimeException(card, 'morning') || rowHasTimeException(card, 'afternoon');
@@ -597,6 +586,7 @@ export default async function TimetableEmbedPage({
   const { cards, generatedAtLabel, notices } = await getPublicTimetableData(sourceMonth);
   const visibleCards = clinicFilter ? cards.filter((card) => card.clinicId === clinicFilter) : cards;
   const activeMonthLabel = monthLabel(selectedMonth);
+  const versionLabel = buildMonthRibbonLabel(selectedMonth);
 
   return (
     <main
@@ -687,7 +677,7 @@ export default async function TimetableEmbedPage({
 
         <div className="space-y-8">
           {visibleCards.map((card) => (
-            <ClinicCard key={card.clinicId} card={card} />
+            <ClinicCard key={card.clinicId} card={card} versionLabel={versionLabel} />
           ))}
         </div>
         </div>
