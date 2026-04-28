@@ -1453,7 +1453,7 @@ export function BookingTabFlow({
                 onChange={(event) => handleDoctorChange(event.target.value)}
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
               >
-                <option value="">請選擇醫師或協作服務</option>
+                <option value="">請選擇醫師及服務</option>
                 {primaryDoctorOptions.length > 0 ? (
                   <optgroup label="中醫主診醫師">
                     {primaryDoctorOptions.map((doctor) => (
