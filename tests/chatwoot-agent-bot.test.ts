@@ -5,6 +5,7 @@ import {
   CHATWOOT_MAIN_MENU_ITEMS,
   CHATWOOT_GENERAL_INQUIRY_PROMPT,
   CHATWOOT_MAIN_MENU_MESSAGE,
+  CHATWOOT_MAIN_MENU_PROMPT,
   ChatwootClient,
   buildChatwootRuntimeCopy,
   buildChatwootSystemMessageSet,
@@ -19,6 +20,7 @@ import {
   resolveMenuSelection,
   sendChatwootBookingDoctorReply,
   shouldAllowGeneralAiReply,
+  shouldDeferToHumanAfterAgentReply,
 } from '@/lib/chatwoot-agent-bot';
 import { DEFAULT_WIDGET_CHATBOT_SETTINGS } from '@/lib/widget-chatbot-settings';
 
@@ -314,6 +316,55 @@ test('getPreviousVisibleConversationMessage falls back to the latest visible mes
     getPreviousVisibleConversationMessage(messages, 999)?.content,
     CHATWOOT_GENERAL_INQUIRY_PROMPT,
   );
+});
+
+test('shouldDeferToHumanAfterAgentReply suppresses menu replies after a visible staff message', () => {
+  const messages = [
+    {
+      id: 501,
+      content: CHATWOOT_MAIN_MENU_MESSAGE,
+      created_at: 100,
+      message_type: 'outgoing',
+      sender_type: 'agent',
+    },
+    {
+      id: 502,
+      content: '我幫你跟進，請稍等。',
+      created_at: 200,
+      message_type: 'outgoing',
+      sender_type: 'agent',
+    },
+    {
+      id: 503,
+      content: '好呀，唔該',
+      created_at: 300,
+      message_type: 'incoming',
+      sender_type: 'contact',
+    },
+  ];
+
+  assert.equal(shouldDeferToHumanAfterAgentReply(messages, 503), true);
+});
+
+test('shouldDeferToHumanAfterAgentReply keeps menu prompts active', () => {
+  const messages = [
+    {
+      id: 601,
+      content: CHATWOOT_MAIN_MENU_PROMPT,
+      created_at: 100,
+      message_type: 'outgoing',
+      sender_type: 'agent',
+    },
+    {
+      id: 602,
+      content: '想問價錢',
+      created_at: 200,
+      message_type: 'incoming',
+      sender_type: 'contact',
+    },
+  ];
+
+  assert.equal(shouldDeferToHumanAfterAgentReply(messages, 602), false);
 });
 
 test('chatwoot runtime copy follows customized widget labels for menu resolution', () => {

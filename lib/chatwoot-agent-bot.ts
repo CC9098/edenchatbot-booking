@@ -1091,6 +1091,34 @@ export function shouldAllowGeneralAiReply(
   return previousVisibleMessage?.content?.trim() === expectedPrompt;
 }
 
+function isOutgoingMessage(message: ChatwootMessage | null | undefined): boolean {
+  const messageType = message?.message_type;
+  return (
+    messageType === 1 ||
+    messageType === '1' ||
+    messageType === 'outgoing'
+  );
+}
+
+export function shouldDeferToHumanAfterAgentReply(
+  messages: ChatwootMessage[] | undefined,
+  incomingMessageId: number,
+  systemMessages: Iterable<string> = DEFAULT_CHATWOOT_SYSTEM_MESSAGES,
+): boolean {
+  const previousVisibleMessage = getPreviousVisibleConversationMessage(messages, incomingMessageId);
+  const content = previousVisibleMessage?.content?.trim();
+  if (!content || !isOutgoingMessage(previousVisibleMessage)) return false;
+
+  const hiddenSystemMessages = systemMessages instanceof Set
+    ? systemMessages
+    : new Set(systemMessages);
+
+  if (hiddenSystemMessages.has(content)) return false;
+  if (isPureSelection(content)) return false;
+
+  return true;
+}
+
 export function mapConversationMessagesToLegacyChat(
   messages: ChatwootMessage[] | undefined,
   systemMessages: Iterable<string> = DEFAULT_CHATWOOT_SYSTEM_MESSAGES,

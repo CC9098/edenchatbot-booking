@@ -22,6 +22,7 @@ import {
   resolveMenuSelection,
   sendChatwootBookingDoctorReply,
   shouldAllowGeneralAiReply,
+  shouldDeferToHumanAfterAgentReply,
   verifyChatwootSignature,
 } from '@/lib/chatwoot-agent-bot';
 import { generateLegacyChatResponse } from '@/lib/legacy-chat-response';
@@ -122,10 +123,18 @@ export async function POST(request: NextRequest) {
     const bookingSelection = currentState === 'booking_menu'
       ? resolveBookingMenuSelection(event.content)
       : null;
+    const shouldDeferToHuman = !rootSelection && !bookingSelection && shouldDeferToHumanAfterAgentReply(
+      conversation.messages,
+      event.messageId,
+      runtimeSystemMessages,
+    );
     let nextState = currentState;
     let reply: string | ChatwootOutgoingMessagePayload | null = null;
 
-    if (rootSelection?.kind === 'human') {
+    if (shouldDeferToHuman) {
+      nextState = 'human';
+      reply = null;
+    } else if (rootSelection?.kind === 'human') {
       nextState = 'human';
       reply = CHATWOOT_HUMAN_ACK;
     } else if (rootSelection?.kind === 'general') {
