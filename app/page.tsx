@@ -1,4 +1,5 @@
 import ChatWidget from '@/components/ChatWidget';
+import Image from 'next/image';
 import Link from 'next/link';
 import { createServerClient } from "@/lib/supabase-server";
 import { isNativeAppUserAgent } from "@/lib/platform";
@@ -23,65 +24,81 @@ export default async function Home() {
 
   return (
     <main className="relative min-h-screen bg-primary-pale text-slate-800">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 pb-24 pt-16 sm:px-10 sm:pb-32 sm:pt-20">
-        <div className="flex items-center justify-between gap-4">
-          <Link
-            href="https://edenclinic.hk"
-            className="text-sm font-medium text-slate-500 transition hover:text-primary"
-          >
-            edenclinic.hk
-          </Link>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Link
-              href="/login"
-              className="inline-flex items-center rounded-lg border border-primary/20 bg-white px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary-light"
-            >
-              登入
-            </Link>
-            <Link
-              href="/doctor"
-              className="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-white/80 hover:text-primary"
-            >
-              醫師入口
-            </Link>
-          </div>
-        </div>
+      <section className="relative isolate min-h-[720px] overflow-hidden bg-white sm:min-h-[760px]">
+        <Image
+          src="/images/eden-doctor-team-hero.webp"
+          alt="醫天圓醫師團隊合照"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-[58%_center]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/50 sm:bg-gradient-to-r sm:from-white/95 sm:via-white/40 sm:to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-primary-pale via-primary-pale/10 to-transparent" />
 
-        <section className="rounded-[32px] border border-primary/10 bg-white/90 p-8 shadow-sm sm:p-12">
-          <div className="max-w-4xl space-y-6">
-            <p className="text-sm font-medium tracking-wide text-primary">
-              醫天圓病人服務平台
-            </p>
-            <h1 className="max-w-3xl text-4xl font-semibold leading-tight text-primary sm:text-6xl">
-              體質諮詢與預約服務
-            </h1>
-            <p className="max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg">
-              由了解自己開始，安排合適的調理與門診服務。體質諮詢、網上預約、預約管理與診後跟進，都可在此完成。
-            </p>
-            <div className="flex flex-wrap gap-3">
+        <div className="relative z-10 mx-auto flex min-h-[720px] max-w-6xl flex-col px-6 pb-16 pt-8 sm:min-h-[760px] sm:px-10 sm:pb-20">
+          <div className="flex items-center justify-between gap-4">
+            <Link
+              href="https://edenclinic.hk"
+              className="text-sm font-medium text-slate-600 transition hover:text-primary"
+            >
+              edenclinic.hk
+            </Link>
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <Link
-                href="/chat"
-                className="inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-white transition hover:bg-primary-hover"
+                href="/login"
+                className="inline-flex items-center rounded-lg border border-primary/20 bg-white/90 px-3 py-1.5 text-sm font-medium text-primary shadow-sm transition hover:bg-primary-light"
               >
-                開始體質諮詢
+                登入
               </Link>
               <Link
-                href="/booking"
-                className="inline-flex min-h-11 items-center rounded-xl border border-primary/20 bg-white px-5 py-2.5 text-sm font-medium text-primary transition hover:bg-primary-light"
+                href="/doctor"
+                className="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-white/80 hover:text-primary"
               >
-                預約服務
+                醫師入口
               </Link>
             </div>
-            <p className="text-sm text-slate-500">
-              已有帳號？
-              {' '}
-              <Link href="/login" className="font-medium text-primary hover:underline">
-                登入後繼續使用
-              </Link>
-            </p>
           </div>
-        </section>
 
+          <div className="flex flex-1 items-center py-16">
+            <div className="max-w-xl space-y-6">
+              <p className="text-sm font-semibold text-primary">
+                醫天圓病人服務平台
+              </p>
+              <h1 className="text-4xl font-semibold leading-tight text-primary sm:text-6xl">
+                <span className="block">醫天圓</span>
+                <span className="block">醫師團隊</span>
+              </h1>
+              <p className="max-w-lg text-base leading-relaxed text-slate-600 sm:text-lg">
+                由了解自己開始，安排合適的調理與門診服務。體質諮詢、網上預約、預約管理與診後跟進，都可在此完成。
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/chat"
+                  className="inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-primary-hover"
+                >
+                  開始體質諮詢
+                </Link>
+                <Link
+                  href="/booking"
+                  className="inline-flex min-h-11 items-center rounded-xl border border-primary/20 bg-white/90 px-5 py-2.5 text-sm font-medium text-primary shadow-sm transition hover:bg-primary-light"
+                >
+                  預約醫師
+                </Link>
+              </div>
+              <p className="text-sm text-slate-600">
+                已有帳號？
+                {' '}
+                <Link href="/login" className="font-medium text-primary hover:underline">
+                  登入後繼續使用
+                </Link>
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 pb-24 pt-8 sm:px-10 sm:pb-32">
         <section className="grid gap-4 lg:grid-cols-3">
           <article className="rounded-2xl border border-primary/10 bg-white/90 p-5 shadow-sm">
             <p className="text-sm font-semibold text-slate-900">體質諮詢</p>
