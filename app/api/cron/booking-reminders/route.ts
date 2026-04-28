@@ -1,20 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { formatInTimeZone } from 'date-fns-tz';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 
-import { buildBookingReminderPayloadFromIntake } from '@/lib/booking-reminder-payload';
+import {
+  buildBookingReminderPayload,
+  buildBookingReminderPayloadFromIntake,
+  type BookingReminderPayload,
+} from '@/lib/booking-reminder-payload';
 import { listConfirmedBookingReminderCandidatesByDate } from '@/lib/booking-intake-storage';
-import { getEvent, patchEventPrivateMetadata } from '@/lib/google-calendar';
+import { getEvent, listEventsInRange, patchEventPrivateMetadata } from '@/lib/google-calendar';
 import { sendBookingReminderWhatsapp } from '@/lib/chatwoot-whatsapp';
 import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import { getClinicWhatsappPhone } from '@/lib/whatsapp-booking';
 import { createManageAccessToken } from '@/lib/widget-booking-management';
 import { authorizeBookingReminderCronRequest } from '@/lib/booking-reminder-cron-auth';
+import { getActiveCalendarIds } from '@/lib/doctor-schedule-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const WHATSAPP_REMINDER_SENT_KEY = 'eden_reminder_24h_whatsapp_sent_at';
+
+type ReminderWorkItem = {
+  source: 'intake' | 'calendar';
+  payload: BookingReminderPayload;
+  event?: any;
+  notificationClinicId?: string;
+};
 
 export async function GET(request: NextRequest) {
   const dryRun = request.nextUrl.searchParams.get('dryRun') === '1';
@@ -47,6 +59,9 @@ export async function GET(request: NextRequest) {
     dryRun,
     authMode: authResult.mode,
     intakeCandidates: 0,
+    calendarIdsScanned: 0,
+    calendarEventsScanned: 0,
+    calendarCandidates: 0,
     eventChecks: 0,
     eventMissing: 0,
     eventCancelled: 0,
@@ -60,6 +75,7 @@ export async function GET(request: NextRequest) {
     marked: 0,
     markFailed: 0,
     intakeErrors: [] as string[],
+    calendarErrors: [] as string[],
     eventErrors: [] as string[],
     sendErrors: [] as string[],
   };
@@ -79,14 +95,74 @@ export async function GET(request: NextRequest) {
 
   summary.intakeCandidates = intakeResult.items.length;
 
+  const workItems: ReminderWorkItem[] = [];
+  const seenEventKeys = new Set<string>();
+
   for (const candidate of intakeResult.items) {
     const payload = buildBookingReminderPayloadFromIntake(candidate);
     if (!payload) {
       summary.skippedInvalid += 1;
       continue;
     }
+    const eventKey = `${payload.calendarId}:${payload.eventId}`;
+    seenEventKeys.add(eventKey);
+    workItems.push({
+      source: 'intake',
+      payload,
+      notificationClinicId: candidate.notificationClinicId,
+    });
+  }
 
-    const eventResult = await getEvent(payload.calendarId, payload.eventId);
+  const targetDayStart = fromZonedTime(`${targetDate}T00:00:00`, HONG_KONG_TIMEZONE);
+  const targetDayEnd = fromZonedTime(`${targetDate}T23:59:59.999`, HONG_KONG_TIMEZONE);
+  const calendarIds = await getActiveCalendarIds();
+  summary.calendarIdsScanned = calendarIds.length;
+
+  const calendarResults = await Promise.all(
+    calendarIds.map(async (calendarId) => ({
+      calendarId,
+      result: await listEventsInRange(calendarId, targetDayStart, targetDayEnd),
+    })),
+  );
+
+  for (const { calendarId, result } of calendarResults) {
+    if (!result.success) {
+      if (summary.calendarErrors.length < 10) {
+        summary.calendarErrors.push(`${calendarId}: ${result.error || 'calendar list failed'}`);
+      }
+      continue;
+    }
+
+    summary.calendarEventsScanned += result.events.length;
+
+    for (const event of result.events) {
+      const payload = buildBookingReminderPayload(event, calendarId);
+      if (!payload) {
+        summary.skippedInvalid += 1;
+        continue;
+      }
+
+      const eventKey = `${payload.calendarId}:${payload.eventId}`;
+      if (seenEventKeys.has(eventKey)) {
+        continue;
+      }
+
+      seenEventKeys.add(eventKey);
+      summary.calendarCandidates += 1;
+      workItems.push({
+        source: 'calendar',
+        payload,
+        event,
+      });
+    }
+  }
+
+  for (const item of workItems) {
+    const { payload } = item;
+
+    const eventResult = item.event
+      ? { success: true, event: item.event }
+      : await getEvent(payload.calendarId, payload.eventId);
     if (!eventResult.success || !eventResult.event) {
       summary.eventMissing += 1;
       if (summary.eventErrors.length < 10) {
@@ -134,7 +210,7 @@ export async function GET(request: NextRequest) {
     } else {
       const phoneDigits = normalizePhoneForSearch(payload.patientPhone);
       const manageAccessToken = phoneDigits ? createManageAccessToken(phoneDigits) : undefined;
-      const reminderClinicId = candidate.notificationClinicId || payload.clinicId;
+      const reminderClinicId = item.notificationClinicId || payload.clinicId;
 
       const whatsappResult = await sendBookingReminderWhatsapp({
         bookingId: payload.eventId,

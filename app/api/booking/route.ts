@@ -15,12 +15,42 @@ import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { syncPatientProfileContact } from '@/lib/profile-contact-sync';
 import {
+                createPendingBookingIntake,
                 markBookingIntakeCancelledByEvent,
+                markBookingIntakeConfirmed,
+                markBookingIntakeFailed,
                 markBookingIntakeRescheduledByEvent,
+                type BookingReceiptType,
+                type BookingVisitType,
 } from '@/lib/booking-intake-storage';
+import { type BookingPickupType } from '@/shared/booking-pickup';
 import { resolveOnlineSourceMappingForSlot } from '@/lib/virtual-online-booking';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
+
+function normalizeVisitType(value: unknown): BookingVisitType {
+                return value === 'first' ? 'first' : 'followup';
+}
+
+function normalizeReceiptType(value: unknown): BookingReceiptType {
+                return value === 'yes_insurance' || value === 'yes_not_insurance' ? value : 'no';
+}
+
+function normalizeMedicationPickup(value: unknown): BookingPickupType {
+                const allowed = new Set<BookingPickupType>([
+                                'none',
+                                'lalamove',
+                                'sfexpress',
+                                'clinic_pickup',
+                                'overseas_shipping',
+                                'central_pickup',
+                                'jordan_pickup',
+                                'tsuenwan_pickup',
+                ]);
+                return typeof value === 'string' && allowed.has(value as BookingPickupType)
+                                ? (value as BookingPickupType)
+                                : 'none';
+}
 
 function formatZodIssues(error: z.ZodError) {
                 return error.issues.map((issue) => ({
@@ -180,6 +210,7 @@ const rescheduleSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+                let intakeId: string | undefined;
                 try {
                                 const user = await getCurrentUser().catch(() => null);
                                 const body = await request.json();
@@ -286,6 +317,35 @@ export async function POST(request: NextRequest) {
                                                 );
                                 }
 
+                                const intakeResult = await createPendingBookingIntake({
+                                                source: 'public_booking_page',
+                                                userId: user?.id,
+                                                doctorId: bookingData.doctorId,
+                                                doctorNameZh: bookingData.doctorNameZh,
+                                                clinicId: bookingData.clinicId,
+                                                clinicNameZh: bookingData.clinicNameZh,
+                                                appointmentDate: bookingData.date,
+                                                appointmentTime: bookingData.time,
+                                                durationMinutes,
+                                                patientName: bookingData.patientName,
+                                                phone: bookingData.phone,
+                                                email: bookingData.email,
+                                                visitType: normalizeVisitType(body.visitType),
+                                                needReceipt: normalizeReceiptType(body.needReceipt),
+                                                medicationPickup: normalizeMedicationPickup(body.medicationPickup),
+                                                notes: bookingData.notes,
+                                                bookingPayload: {
+                                                                ...body,
+                                                                durationMinutes,
+                                                                channel: 'public_booking_api',
+                                                },
+                                });
+
+                                intakeId = intakeResult.intakeId;
+                                if (!intakeResult.success) {
+                                                console.warn(`booking_intake warning: ${intakeResult.error}`);
+                                }
+
                                 // Create Google Calendar Event
                                 const calResult = await createBooking(calendarId, {
                                                 doctorId: bookingData.doctorId,
@@ -303,8 +363,28 @@ export async function POST(request: NextRequest) {
                                 });
 
                                 if (!calResult.success || !calResult.eventId) {
+                                                if (intakeId) {
+                                                                const failedSync = await markBookingIntakeFailed({
+                                                                                intakeId,
+                                                                                reason: calResult.error || 'Failed to create booking in calendar',
+                                                                });
+                                                                if (!failedSync.success) {
+                                                                                console.warn(`booking_intake failure sync warning: ${failedSync.error}`);
+                                                                }
+                                                }
                                                 console.error('Calendar creation failed:', calResult.error);
                                                 return NextResponse.json({ error: 'Failed to create booking in calendar' }, { status: 500 });
+                                }
+
+                                if (intakeId) {
+                                                const confirmSync = await markBookingIntakeConfirmed({
+                                                                intakeId,
+                                                                googleEventId: calResult.eventId,
+                                                                calendarId,
+                                                });
+                                                if (!confirmSync.success) {
+                                                                console.warn(`booking_intake confirm sync warning: ${confirmSync.error}`);
+                                                }
                                 }
 
                                 const profileSync = await syncPatientProfileContact({
@@ -340,9 +420,23 @@ export async function POST(request: NextRequest) {
                                                 }
                                 }
 
-                                return NextResponse.json({ success: true, bookingId: calResult.eventId });
+                                return NextResponse.json({
+                                                success: true,
+                                                bookingId: calResult.eventId,
+                                                intakeId: intakeId || '',
+                                                intakeSaved: intakeResult.success,
+                                });
 
                 } catch (error) {
+                                if (intakeId) {
+                                                const failedSync = await markBookingIntakeFailed({
+                                                                intakeId,
+                                                                reason: formatUnknownError(error),
+                                                });
+                                                if (!failedSync.success) {
+                                                                console.warn(`booking_intake exception sync warning: ${failedSync.error}`);
+                                                }
+                                }
                                 console.error(`Booking API Error: ${formatUnknownError(error)}`);
                                 return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
                 }
