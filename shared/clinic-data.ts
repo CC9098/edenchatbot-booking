@@ -6,7 +6,7 @@ import {
   type BookingTreatmentOptionId,
 } from '@/shared/booking-treatment-options';
 
-export const DOCTOR_IDS = ['chan', 'lee', 'hon', 'chau', 'cheung', 'leung', 'wong'] as const;
+export const DOCTOR_IDS = ['chan', 'lee', 'hon', 'chau', 'cheung', 'cheungmy', 'leung', 'wong'] as const;
 export type DoctorId = (typeof DOCTOR_IDS)[number];
 export type BookingPractitionerGroup = 'tcm' | 'support';
 
@@ -170,6 +170,15 @@ export const DOCTORS: DoctorProfile[] = [
     avatarObjectPosition: '80% center',
     bookingUrl: buildBookingUrl({ doctorId: 'cheung' }),
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
+  },
+  {
+    id: 'cheungmy',
+    nameZh: '張敏言醫師',
+    nameEn: 'Dr. Cheung',
+    bookingUrl: buildBookingUrl({ doctorId: 'cheungmy' }),
+    bookingTreatmentOptions: ['acupuncture'],
+    scheduleNote:
+      '2026年5月13日起應診：佐敦逢星期四 11:00-14:00；荃灣逢星期三 10:30-14:00、15:30-17:00。',
   },
   {
     id: 'leung',

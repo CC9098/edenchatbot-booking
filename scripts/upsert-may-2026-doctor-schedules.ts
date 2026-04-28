@@ -20,6 +20,17 @@ interface ExistingScheduleRow {
   clinic_id: string;
 }
 
+interface ExistingHolidayRow {
+  id: string;
+}
+
+interface HolidaySeed {
+  doctorId: string | null;
+  clinicId: string | null;
+  holidayDate: string;
+  reason: string;
+}
+
 function doctorTitleZh(doctorId: string): string {
   return doctorId === 'wong' ? '脊醫' : '醫師';
 }
@@ -64,6 +75,14 @@ function scheduleKey(doctorId: string, clinicId: string): string {
   return `${doctorId}:${clinicId}`;
 }
 
+function uniqueCalendarMappingsByDoctorClinic() {
+  const mappings = new Map<string, (typeof CALENDAR_MAPPINGS)[number]>();
+  for (const mapping of CALENDAR_MAPPINGS) {
+    mappings.set(scheduleKey(mapping.doctorId, mapping.clinicId), mapping);
+  }
+  return Array.from(mappings.values());
+}
+
 const MORNING_1030_1400: TimeRange = { start: '10:30', end: '14:00' };
 const AFTERNOON_1530_1900: TimeRange = { start: '15:30', end: '19:00' };
 const MORNING_1100_1400: TimeRange = { start: '11:00', end: '14:00' };
@@ -101,8 +120,11 @@ const MAY_2026_SCHEDULES: ScheduleMap = {
   [scheduleKey('chau', 'jordan')]: schedule({
     2: [AFTERNOON_1530_1930],
   }),
-  [scheduleKey('cheung', 'jordan')]: schedule({
+  [scheduleKey('cheungmy', 'jordan')]: schedule({
     4: [MORNING_1100_1400],
+  }),
+  [scheduleKey('cheungmy', 'tsuenwan')]: schedule({
+    3: [MORNING_1030_1400, { start: '15:30', end: '17:00' }],
   }),
   [scheduleKey('hon', 'jordan')]: schedule({
     3: JORDAN_FULL_DAY,
@@ -134,11 +156,96 @@ const MAY_2026_SCHEDULES: ScheduleMap = {
   }),
 };
 
+const MAY_2026_HOLIDAYS: HolidaySeed[] = [
+  {
+    doctorId: null,
+    clinicId: null,
+    holidayDate: '2026-05-01',
+    reason: '勞動節，全線休息一日',
+  },
+  {
+    doctorId: 'chan',
+    clinicId: 'tsuenwan',
+    holidayDate: '2026-05-02',
+    reason: '陳醫師休息一日',
+  },
+  {
+    doctorId: 'cheungmy',
+    clinicId: 'tsuenwan',
+    holidayDate: '2026-05-06',
+    reason: '張敏言醫師5月13日起應診',
+  },
+  {
+    doctorId: 'cheungmy',
+    clinicId: 'jordan',
+    holidayDate: '2026-05-07',
+    reason: '張敏言醫師5月13日起應診',
+  },
+];
+
 function normalizeEffectiveFrom(raw: string | undefined): string {
   if (raw && ISO_DATE_REGEX.test(raw)) {
     return raw;
   }
   return EFFECTIVE_FROM;
+}
+
+async function upsertHoliday(
+  supabase: any,
+  holiday: HolidaySeed,
+  dryRun: boolean
+): Promise<'insert' | 'update'> {
+  let query = supabase
+    .from('holidays')
+    .select('id')
+    .eq('holiday_date', holiday.holidayDate)
+    .is('start_time', null)
+    .is('end_time', null)
+    .limit(1);
+
+  query = holiday.doctorId
+    ? query.eq('doctor_id', holiday.doctorId)
+    : query.is('doctor_id', null);
+  query = holiday.clinicId
+    ? query.eq('clinic_id', holiday.clinicId)
+    : query.is('clinic_id', null);
+
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`Failed to read holidays(${holiday.holidayDate}): ${error.message}`);
+  }
+
+  const existing = ((data || []) as ExistingHolidayRow[])[0];
+  const payload = {
+    doctor_id: holiday.doctorId,
+    clinic_id: holiday.clinicId,
+    holiday_date: holiday.holidayDate,
+    start_time: null,
+    end_time: null,
+    reason: holiday.reason,
+  };
+
+  if (dryRun) {
+    console.log(`${existing ? 'update' : 'insert'} holiday ${holiday.holidayDate} doctor=${holiday.doctorId ?? 'all'} clinic=${holiday.clinicId ?? 'all'}`);
+    return existing ? 'update' : 'insert';
+  }
+
+  if (existing) {
+    const { error: updateError } = await supabase
+      .from('holidays')
+      .update(payload)
+      .eq('id', existing.id);
+    if (updateError) {
+      throw new Error(`Failed to update holiday(${holiday.holidayDate}): ${updateError.message}`);
+    }
+    return 'update';
+  }
+
+  const { error: insertError } = await supabase.from('holidays').insert(payload);
+  if (insertError) {
+    throw new Error(`Failed to insert holiday(${holiday.holidayDate}): ${insertError.message}`);
+  }
+  return 'insert';
 }
 
 async function main() {
@@ -217,7 +324,7 @@ async function main() {
   let inactiveCount = 0;
   let skippedCount = 0;
 
-  for (const mapping of CALENDAR_MAPPINGS) {
+  for (const mapping of uniqueCalendarMappingsByDoctorClinic()) {
     const key = scheduleKey(mapping.doctorId, mapping.clinicId);
     if (!registeredDoctorIds.has(mapping.doctorId)) {
       skippedCount += 1;
@@ -270,7 +377,20 @@ async function main() {
   console.log(
     `May 2026 schedules ${dryRun ? 'dry-run' : 'upsert'} completed. effectiveFrom=${effectiveFrom}, active=${activeCount}, inactive=${inactiveCount}, skipped=${skippedCount}, inserted=${insertedCount}, updated=${updatedCount}`
   );
-  console.log('Note: 張敏言醫師 appears on the source image, but no local doctor/calendar mapping exists yet, so this script does not create a bookable schedule for that doctor.');
+
+  let holidayInsertedCount = 0;
+  let holidayUpdatedCount = 0;
+  for (const holiday of MAY_2026_HOLIDAYS) {
+    const result = await upsertHoliday(supabase, holiday, dryRun);
+    if (result === 'insert') {
+      holidayInsertedCount += 1;
+    } else {
+      holidayUpdatedCount += 1;
+    }
+  }
+  console.log(
+    `May 2026 holidays ${dryRun ? 'dry-run' : 'upsert'} completed. inserted=${holidayInsertedCount}, updated=${holidayUpdatedCount}`
+  );
 }
 
 main().catch((error) => {

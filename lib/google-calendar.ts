@@ -12,6 +12,7 @@ const DOCTOR_EVENT_COLOR_ID_BY_ID: Record<string, string> = {
   hon: '6',
   chau: '9',
   cheung: '10',
+  cheungmy: '10',
   leung: '11',
   wong: '8',
 };

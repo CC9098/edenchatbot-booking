@@ -293,6 +293,40 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
     }
   },
 
+  // ===== Dr. Cheung 張敏言醫師 =====
+  {
+    doctorId: "cheungmy",
+    clinicId: "jordan",
+    calendarId: "r0ea9kabll5gdc7ll2s13n5hko@group.calendar.google.com",
+    isActive: true,
+    effectiveFrom: "2026-05-01",
+    schedule: {
+      0: null,
+      1: null,
+      2: null,
+      3: null,
+      4: [{ start: "11:00", end: "14:00" }],
+      5: null,
+      6: null,
+    }
+  },
+  {
+    doctorId: "cheungmy",
+    clinicId: "tsuenwan",
+    calendarId: "ibk3t07kqhdvp5lfvpim401vqo@group.calendar.google.com",
+    isActive: true,
+    effectiveFrom: "2026-05-01",
+    schedule: {
+      0: null,
+      1: null,
+      2: null,
+      3: [{ start: "10:30", end: "14:00" }, { start: "15:30", end: "17:00" }],
+      4: null,
+      5: null,
+      6: null,
+    }
+  },
+
   // ===== Dr. Leung 梁仲威醫師 =====
   { 
     doctorId: "leung", 

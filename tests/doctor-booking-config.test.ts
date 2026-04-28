@@ -39,6 +39,16 @@ test('other doctors keep the default treatment label and 15-minute slots', () =>
   assert.equal(getDoctorBookingSlotMinutes('cheung'), 15);
 });
 
+test('Dr. Cheung Min Yin is a separate acupuncture practitioner', () => {
+  assert.equal(DOCTOR_BY_ID.cheungmy.nameZh, '張敏言醫師');
+  assert.equal(getDoctorBookingTreatmentLabel('cheungmy'), '針灸 Acupuncture');
+  assert.deepEqual(
+    getDoctorBookingTreatmentOptions('cheungmy').map((option) => option.id),
+    ['acupuncture']
+  );
+  assert.equal(getDoctorBookingSlotMinutes('cheungmy'), 15);
+});
+
 test('Dr. Chan has a configured avatar for booking profile cards', () => {
   assert.equal(DOCTOR_BY_ID.chan.avatarSrc, '/doctor-avatars/chan.jpg');
   assert.equal(DOCTOR_BY_ID.chan.avatarObjectPosition, '82% center');

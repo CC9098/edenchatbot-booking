@@ -23,6 +23,7 @@ import type { TimeRange, WeeklySchedule } from '@/shared/schedule-config';
 import { buildVirtualOnlineScheduleFromMappings } from '@/lib/virtual-online-booking';
 
 const DAY_LABELS_ZH = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+const UPCOMING_SCHEDULE_PREVIEW_DAYS = 14;
 
 function hasAnySchedule(schedule: WeeklySchedule): boolean {
   return Object.values(schedule).some((ranges) => ranges !== null && ranges.length > 0);
@@ -76,13 +77,64 @@ function findNextScheduleChangeDate(
     .sort((left, right) => left.localeCompare(right))[0];
 }
 
+function addDaysIso(dateIso: string, days: number): string {
+  const date = new Date(`${dateIso}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function mappingKey(mapping: { doctorId: string; clinicId: string }): string {
+  return `${mapping.doctorId}:${mapping.clinicId}`;
+}
+
+function findUpcomingPreviewDate(
+  mappings: Awaited<ReturnType<typeof getScheduleVersions>>,
+  today: string
+): string | undefined {
+  const previewLimit = addDaysIso(today, UPCOMING_SCHEDULE_PREVIEW_DAYS);
+  return Array.from(
+    new Set(
+      mappings
+        .map((mapping) => mapping.effectiveFrom)
+        .filter((value): value is string => Boolean(value && value > today && value <= previewLimit))
+    )
+  ).sort((left, right) => left.localeCompare(right))[0];
+}
+
+function mergeMappingsForUpcomingPreview(
+  currentMappings: Awaited<ReturnType<typeof getActiveScheduleMappings>>,
+  previewMappings: Awaited<ReturnType<typeof getActiveScheduleMappings>>,
+  allScheduleVersions: Awaited<ReturnType<typeof getScheduleVersions>>,
+  previewDate: string
+) {
+  const keysChangedOnPreviewDate = new Set(
+    allScheduleVersions
+      .filter((mapping) => mapping.effectiveFrom === previewDate)
+      .map(mappingKey)
+  );
+
+  return [
+    ...currentMappings.filter((mapping) => !keysChangedOnPreviewDate.has(mappingKey(mapping))),
+    ...previewMappings,
+  ];
+}
+
 export async function getPublicBookableScheduleData(): Promise<BookableDoctorSchedule[]> {
   const today = getTodayIsoInHongKong();
-  const [mappings, allScheduleVersions, holidayNotices] = await Promise.all([
+  const [currentMappings, allScheduleVersions, holidayNotices] = await Promise.all([
     getActiveScheduleMappings(),
     getScheduleVersions(),
     getUpcomingHolidayNotices(),
   ]);
+  const previewDate = findUpcomingPreviewDate(allScheduleVersions, today);
+  const mappings = previewDate
+    ? mergeMappingsForUpcomingPreview(
+        currentMappings,
+        await getActiveScheduleMappings(previewDate),
+        allScheduleVersions,
+        previewDate
+      )
+    : currentMappings;
   const doctorMap = new Map<string, BookableDoctorSchedule>();
 
   for (const mapping of mappings) {
