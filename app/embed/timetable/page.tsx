@@ -151,14 +151,11 @@ function DoctorStripGroup({
 }
 
 function DoctorStrip() {
-  const primaryDoctors = DOCTORS.filter((doctor) => !isSupportBookingPractitioner(doctor.id));
-  const supportDoctors = DOCTORS.filter((doctor) => isSupportBookingPractitioner(doctor.id));
-  if (primaryDoctors.length === 0 && supportDoctors.length === 0) return null;
+  if (DOCTORS.length === 0) return null;
 
   return (
-    <section className="mb-5 space-y-4">
-      <DoctorStripGroup title="中醫師名片" doctors={primaryDoctors} />
-      <DoctorStripGroup title="協作服務" doctors={supportDoctors} />
+    <section className="mb-5">
+      <DoctorStripGroup title="中醫師" doctors={DOCTORS} />
     </section>
   );
 }
