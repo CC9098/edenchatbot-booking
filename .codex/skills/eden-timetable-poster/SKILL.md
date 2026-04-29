@@ -18,7 +18,8 @@ First check whether the active image tool exposes a model selector that can expl
 - If the selector is available, use GPT Image 2 only for the visual imagery/background/photo-like part. Then explain that exact timetable text, dates, QR codes, and booking links still need deterministic composition and validation.
 - If the selector is not available, stop before generating. Tell the user that this session cannot prove GPT Image 2 was used, and ask whether they accept the built-in `image_gen` tool with an unspecified backend model or prefer to provide a GPT Image 2 output from another chat.
 - Do not claim GPT Image 2 was used unless the tool call exposed that model choice.
-- Do not silently substitute Gemini, nano-banana, Photoshop connectors, API/CLI scripts, Python/Pillow poster generators, SVG/HTML/canvas rendering, or the deterministic workflow when the user requested GPT Image 2.
+- Hard permission rule: when the user requested GPT Image 2 or ChatGPT/OpenAI image tooling, do not use Gemini, nano-banana, Photoshop connectors, API/CLI scripts, Python/Pillow poster generators, SVG/HTML/canvas rendering, QR tools, schedule-fetch scripts, or the deterministic workflow unless the user explicitly approves that tool/workflow first.
+- If the user does not clearly approve a substitute or deterministic composition step, stop and ask. Do not generate, verify, overwrite, commit, or push a poster as if the GPT Image 2 request was satisfied.
 - If the user approves deterministic composition after the image-generation step, then the scripts in this skill may be used for schedule fetching, QR generation/validation, and exact final layout.
 
 ## Workflow
