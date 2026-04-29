@@ -1,6 +1,6 @@
 ---
 name: eden-timetable-poster
-description: Create or revise Eden TCM doctor timetable poster images from booking schedules. Use when working on doctor timetable PNG/JPG posters, monthly clinic schedules, QR booking links, clinic color balancing, or preserving the Eden timetable poster design for other doctors.
+description: Create or revise Eden TCM doctor timetable poster images from booking schedules. Use when working on doctor timetable PNG/JPG posters, monthly clinic schedules, QR booking links, clinic color balancing, preserving the Eden timetable poster design for other doctors, or handling GPT Image 2 / ChatGPT image-tool requests for timetable posters.
 ---
 
 # Eden Timetable Poster
@@ -8,6 +8,18 @@ description: Create or revise Eden TCM doctor timetable poster images from booki
 ## Purpose
 
 Use this skill to update Eden doctor timetable posters while preserving the original design language. Treat the existing poster as the visual source of truth for layout, typography, borders, shadows, QR placement, leaves, and logo treatment; treat the live booking schedule as the source of truth for times.
+
+## Required GPT Image 2 gate
+
+If the user asks to use `GPT Image 2`, `ChatGPT Image 2`, `openai:gpt-image-2`, `image_model_id`, or a ChatGPT/OpenAI image-generation tool, do not start the deterministic poster workflow automatically.
+
+First check whether the active image tool exposes a model selector that can explicitly select `openai:gpt-image-2 / GPT Image 2`.
+
+- If the selector is available, use GPT Image 2 only for the visual imagery/background/photo-like part. Then explain that exact timetable text, dates, QR codes, and booking links still need deterministic composition and validation.
+- If the selector is not available, stop before generating. Tell the user that this session cannot prove GPT Image 2 was used, and ask whether they accept the built-in `image_gen` tool with an unspecified backend model or prefer to provide a GPT Image 2 output from another chat.
+- Do not claim GPT Image 2 was used unless the tool call exposed that model choice.
+- Do not silently substitute Gemini, nano-banana, Photoshop connectors, API/CLI scripts, Python/Pillow poster generators, SVG/HTML/canvas rendering, or the deterministic workflow when the user requested GPT Image 2.
+- If the user approves deterministic composition after the image-generation step, then the scripts in this skill may be used for schedule fetching, QR generation/validation, and exact final layout.
 
 ## Workflow
 

@@ -1,4 +1,4 @@
 interface:
   display_name: "Eden Timetable Poster"
   short_description: "Build Eden doctor timetable posters"
-  default_prompt: "Update an Eden doctor timetable poster from the live booking schedule, preserve the original design, adjust clinic colors, replace QR codes, and verify the final image."
+  default_prompt: "Update an Eden doctor timetable poster from the live booking schedule, preserve the original design, replace QR codes, and verify the final image. If GPT Image 2 or ChatGPT image tooling is requested, apply the model-selection gate before using deterministic poster scripts."
