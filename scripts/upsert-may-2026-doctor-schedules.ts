@@ -173,13 +173,37 @@ const MAY_2026_HOLIDAYS: HolidaySeed[] = [
     doctorId: 'cheungmy',
     clinicId: 'tsuenwan',
     holidayDate: '2026-05-06',
-    reason: '張敏言醫師5月13日起應診',
+    reason: '張敏言醫師星期三例外休診',
+  },
+  {
+    doctorId: 'cheungmy',
+    clinicId: 'tsuenwan',
+    holidayDate: '2026-05-20',
+    reason: '張敏言醫師星期三例外休診',
   },
   {
     doctorId: 'cheungmy',
     clinicId: 'jordan',
     holidayDate: '2026-05-07',
-    reason: '張敏言醫師5月13日起應診',
+    reason: '張敏言醫師星期四例外休診',
+  },
+  {
+    doctorId: 'cheungmy',
+    clinicId: 'jordan',
+    holidayDate: '2026-05-14',
+    reason: '張敏言醫師星期四例外休診',
+  },
+  {
+    doctorId: 'cheungmy',
+    clinicId: 'jordan',
+    holidayDate: '2026-05-21',
+    reason: '張敏言醫師星期四例外休診',
+  },
+  {
+    doctorId: 'cheungmy',
+    clinicId: 'jordan',
+    holidayDate: '2026-05-28',
+    reason: '張敏言醫師星期四例外休診',
   },
 ];
 
