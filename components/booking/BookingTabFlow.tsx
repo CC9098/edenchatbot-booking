@@ -682,7 +682,7 @@ export function BookingTabFlow({
   const pageSubtitle = isStaffFlow
     ? '供姑娘或前台代病人安排時段。成功後系統會優先透過 WhatsApp 發送確認訊息，若有電郵則會一併寄出確認電郵。'
     : isMinimalPreview
-    ? '確認訊息會經 WhatsApp 發送。'
+    ? ''
     : isWhatsappFlow
     ? '成功預約後，診所會透過 WhatsApp 發送確認訊息到你提供的電話。'
     : '「每一次預約，都是照顧自己的開始。」';
@@ -1440,42 +1440,44 @@ export function BookingTabFlow({
     <div className={`patient-card mx-auto p-6 sm:p-8 ${embedMode ? 'max-w-4xl' : 'max-w-2xl'}`}>
       <div className={isMinimalPreview ? 'mb-5 space-y-2' : 'mb-8 space-y-3'}>
         <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-primary sm:text-[30px]">{pageTitle}</h1>
-        <p
-          className="text-sm leading-relaxed text-slate-400"
-          style={{ fontFamily: "var(--font-serif)" }}
-        >
-          {pageSubtitle}
-        </p>
+        {pageSubtitle ? (
+          <p
+            className="text-sm leading-relaxed text-slate-400"
+            style={{ fontFamily: "var(--font-serif)" }}
+          >
+            {pageSubtitle}
+          </p>
+        ) : null}
       </div>
 
-      <div className="mb-6 rounded-2xl border border-primary/15 bg-primary-light/40 p-3 text-xs font-medium text-primary sm:text-sm">
-        步驟：{step === 'setup' && (isMinimalPreview ? '1. 選擇診所' : '1. 醫師/協作服務與診所')}{step === 'timeslot' && '2. 日期與時間'}
-        {step === 'details' && '3. 填寫資料'}{step === 'success' && '完成'}
-      </div>
+      {!isMinimalPreview ? (
+        <div className="mb-6 rounded-2xl border border-primary/15 bg-primary-light/40 p-3 text-xs font-medium text-primary sm:text-sm">
+          步驟：{step === 'setup' && '1. 醫師/協作服務與診所'}{step === 'timeslot' && '2. 日期與時間'}
+          {step === 'details' && '3. 填寫資料'}{step === 'success' && '完成'}
+        </div>
+      ) : null}
 
       {step === 'setup' && (
         <div className="space-y-6">
           {isMinimalPreview && selectedDoctor ? (
             <div className="rounded-2xl border border-[#d5e7d8] bg-white/90 px-4 py-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <DoctorAvatar doctor={selectedDoctor} size="sm" />
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold tracking-[0.2em] text-[#5d8c67]">已選醫師</p>
-                    <p className="mt-1 truncate text-base font-semibold text-[#254430]">
-                      {selectedDoctor.doctorNameZh}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {getSlotDurationLabel(selectedDoctor.bookingSlotMinutes)}
-                    </p>
-                  </div>
+              <div className="flex min-w-0 items-center gap-4">
+                <DoctorAvatar doctor={selectedDoctor} size="lg" />
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold tracking-[0.2em] text-[#5d8c67]">已選醫師</p>
+                  <p className="mt-1 text-base font-semibold leading-snug text-[#254430]">
+                    {selectedDoctor.doctorNameZh}
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {getSlotDurationLabel(selectedDoctor.bookingSlotMinutes)}
+                  </p>
+                  <Link
+                    href="/booking-whatsapp"
+                    className="mt-2 inline-flex rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
+                  >
+                    更改醫師
+                  </Link>
                 </div>
-                <Link
-                  href="/booking-whatsapp"
-                  className="shrink-0 rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
-                >
-                  更改醫師
-                </Link>
               </div>
             </div>
           ) : (
