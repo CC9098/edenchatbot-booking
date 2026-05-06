@@ -175,6 +175,8 @@ export const DOCTORS: DoctorProfile[] = [
     id: 'cheungmy',
     nameZh: '張敏言醫師',
     nameEn: 'Dr. Cheung',
+    avatarSrc: '/doctor-avatars/cheungmy.jpg',
+    avatarObjectPosition: 'center center',
     bookingUrl: buildBookingUrl({ doctorId: 'cheungmy' }),
     bookingTreatmentOptions: ['acupuncture'],
     scheduleNote:
