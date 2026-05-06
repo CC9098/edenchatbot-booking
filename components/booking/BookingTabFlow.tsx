@@ -1806,7 +1806,7 @@ export function BookingTabFlow({
               </p>
               {usesVisitBasedServices ? (
                 <span className="text-xs font-medium text-emerald-700">
-                  首診半價試行優惠
+                  中醫聯乘優惠
                 </span>
               ) : null}
             </div>
@@ -1872,9 +1872,16 @@ export function BookingTabFlow({
               </button>
             </div>
             {usesVisitBasedServices ? (
-              <p className="text-xs leading-relaxed text-slate-500">
-                網上預約暫時只開放首診及覆診；X 光片及 X 光片講解會由脊醫到診後按需要再安排。
-              </p>
+              <div className="space-y-1">
+                {firstVisitOption?.note ? (
+                  <p className="text-xs font-medium leading-relaxed text-emerald-700">
+                    {firstVisitOption.note}
+                  </p>
+                ) : null}
+                <p className="text-xs leading-relaxed text-slate-500">
+                  網上預約暫時只開放首診及覆診；X 光片及 X 光片講解會由脊醫到診後按需要再安排。
+                </p>
+              </div>
             ) : null}
           </div>
 

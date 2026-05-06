@@ -78,7 +78,8 @@ test('Dr. Wong booking keeps two simple chiropractic services and first-visit pr
   assert.equal(firstVisit?.durationMinutes, 30);
   assert.equal(firstVisit?.priceHkd, 490);
   assert.equal(firstVisit?.originalPriceHkd, 980);
-  assert.equal(firstVisit?.promotionLabel, '首診半價試行優惠');
+  assert.equal(firstVisit?.promotionLabel, '中醫聯乘優惠');
+  assert.equal(firstVisit?.note, '凡正接受醫天圓中醫診症的病人，可享首診半價優惠。');
 
   const followUp = getDoctorBookingVisitOption('wong', 'followup');
   assert.equal(followUp?.serviceNameZh, '脊骨跟進治療');

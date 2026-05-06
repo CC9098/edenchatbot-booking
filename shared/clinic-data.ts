@@ -225,8 +225,8 @@ export const DOCTORS: DoctorProfile[] = [
         durationMinutes: 30,
         priceHkd: 490,
         originalPriceHkd: 980,
-        promotionLabel: '首診半價試行優惠',
-        note: '原價 HK$980，試行期首診半價。',
+        promotionLabel: '中醫聯乘優惠',
+        note: '凡正接受醫天圓中醫診症的病人，可享首診半價優惠。',
       },
       {
         visitType: 'followup',

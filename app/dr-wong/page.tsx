@@ -16,11 +16,6 @@ const drWongFollowUpBookingUrl =
 
 const clinicActions = [
   {
-    clinicName: "中環",
-    phone: "67333234",
-    href: `https://wa.me/85267333234?text=${whatsappMessage}`,
-  },
-  {
     clinicName: "佐敦",
     phone: "67333801",
     href: `https://wa.me/85267333801?text=${whatsappMessage}`,
@@ -40,7 +35,8 @@ const pricingRows = [
     duration: "30 minutes",
     price: "HK$490",
     originalPrice: "HK$980",
-    note: "試行半價優惠",
+    note: "中醫聯乘優惠",
+    description: "凡正接受醫天圓中醫診症的病人，可享首診半價優惠。",
     href: drWongFirstVisitBookingUrl,
   },
   {
@@ -132,6 +128,11 @@ export default function DrWongPage() {
                     </div>
                     <p className="mt-2 text-base font-semibold text-[#123f2a]">{item.title}</p>
                     <p className="text-sm text-[#496153]">{item.subtitle} · {item.duration}</p>
+                    {item.description ? (
+                      <p className="mt-1 text-xs font-medium leading-relaxed text-[#1f6b3f]">
+                        {item.description}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end sm:justify-center sm:gap-1">
                     <p className="text-xl font-semibold text-[#0d4c2d]">{item.price}</p>
@@ -156,7 +157,7 @@ export default function DrWongPage() {
               ))}
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {clinicActions.map((clinic) => (
                 <a
                   key={clinic.clinicName}
@@ -178,7 +179,7 @@ export default function DrWongPage() {
           <div className="mt-5 flex flex-wrap gap-3 text-sm text-[#536459]">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2">
               <MapPin className="h-4 w-4 text-[#1f6b3f]" />
-              中環 | 佐敦 | 荃灣
+              佐敦 | 荃灣
             </span>
             <a
               href={drWongWhatsappUrl}
