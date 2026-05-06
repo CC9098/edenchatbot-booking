@@ -10,6 +10,8 @@ import {
   getDoctorBookingSupportNote,
   getDoctorBookingTreatmentLabel,
   getDoctorBookingTreatmentOptions,
+  getDoctorBookingVisitOption,
+  getDoctorBookingVisitOptions,
   isSupportBookingPractitioner,
 } from '@/shared/clinic-data';
 
@@ -61,4 +63,30 @@ test('Dr. Wong is treated as a support chiropractic service in booking lists', (
   assert.equal(getDoctorBookingRoleLabel('wong'), '協作脊醫');
   assert.match(getDoctorBookingSupportNote('wong') || '', /協作脊醫服務/);
   assert.equal(isSupportBookingPractitioner('chan'), false);
+});
+
+test('Dr. Wong booking keeps two simple chiropractic services and first-visit promotion', () => {
+  const visitOptions = getDoctorBookingVisitOptions('wong');
+  assert.deepEqual(
+    visitOptions.map((option) => option.visitType),
+    ['first', 'followup']
+  );
+
+  const firstVisit = getDoctorBookingVisitOption('wong', 'first');
+  assert.equal(firstVisit?.serviceNameZh, '脊骨神經科檢查');
+  assert.equal(firstVisit?.serviceNameEn, 'Standard Chiropractic Examination');
+  assert.equal(firstVisit?.durationMinutes, 30);
+  assert.equal(firstVisit?.priceHkd, 490);
+  assert.equal(firstVisit?.originalPriceHkd, 980);
+  assert.equal(firstVisit?.promotionLabel, '首診半價試行優惠');
+
+  const followUp = getDoctorBookingVisitOption('wong', 'followup');
+  assert.equal(followUp?.serviceNameZh, '脊骨跟進治療');
+  assert.equal(followUp?.serviceNameEn, 'Standard Follow Up Visit');
+  assert.equal(followUp?.durationMinutes, 15);
+  assert.equal(followUp?.priceHkd, 880);
+
+  assert.equal(getDoctorBookingSlotMinutes('wong', 'first'), 30);
+  assert.equal(getDoctorBookingSlotMinutes('wong', 'followup'), 15);
+  assert.equal(getDoctorBookingSlotMinutes('wong'), 30);
 });

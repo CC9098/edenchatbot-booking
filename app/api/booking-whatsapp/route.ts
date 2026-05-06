@@ -64,7 +64,10 @@ export async function POST(request: NextRequest) {
     }
 
     const bookingData = parsed.data;
-    const durationMinutes = getDoctorBookingSlotMinutes(bookingData.doctorId);
+    const durationMinutes = getDoctorBookingSlotMinutes(
+      bookingData.doctorId,
+      bookingData.visitType,
+    );
     const groupBookingSession = findGroupBookingSession({
       doctorId: bookingData.doctorId,
       clinicId: bookingData.clinicId,

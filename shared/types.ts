@@ -16,6 +16,7 @@ export const availabilitySchema = z.object({
                 clinicId: z.string(),
                 date: z.string(), // ISO date string YYYY-MM-DD
                 durationMinutes: z.number().default(15),
+                visitType: z.enum(['first', 'followup']).optional(),
 });
 
 export const bookingSchema = z.object({

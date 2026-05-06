@@ -222,7 +222,11 @@ export async function POST(request: NextRequest) {
                                                 );
                                 }
                                 const bookingData = parsed.data;
-                                const durationMinutes = getDoctorBookingSlotMinutes(bookingData.doctorId);
+                                const visitType = normalizeVisitType(body.visitType);
+                                const durationMinutes = getDoctorBookingSlotMinutes(
+                                                bookingData.doctorId,
+                                                visitType
+                                );
 
                                 // Get Calendar ID
                                 // Note: We duplicate getMappingWithFallback here to avoid circular imports if extracted incorrectly,
@@ -330,7 +334,7 @@ export async function POST(request: NextRequest) {
                                                 patientName: bookingData.patientName,
                                                 phone: bookingData.phone,
                                                 email: bookingData.email,
-                                                visitType: normalizeVisitType(body.visitType),
+                                                visitType,
                                                 needReceipt: normalizeReceiptType(body.needReceipt),
                                                 medicationPickup: normalizeMedicationPickup(body.medicationPickup),
                                                 notes: bookingData.notes,

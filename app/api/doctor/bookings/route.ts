@@ -99,7 +99,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const durationMinutes = getDoctorBookingSlotMinutes(bookingData.doctorId);
+    const durationMinutes = getDoctorBookingSlotMinutes(
+      bookingData.doctorId,
+      bookingData.visitType,
+    );
 
     let calendarId = '';
     let notificationClinicId = bookingData.clinicId;

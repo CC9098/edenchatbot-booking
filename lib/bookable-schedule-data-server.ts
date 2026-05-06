@@ -14,6 +14,7 @@ import {
   getDoctorBookingSlotMinutes,
   getDoctorBookingTreatmentLabel,
   getDoctorBookingTreatmentOptions,
+  getDoctorBookingVisitOptions,
 } from '@/shared/clinic-data';
 import type {
   BookableClinicSchedule,
@@ -176,6 +177,7 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
         bookingTreatmentLabel: getDoctorBookingTreatmentLabel(doctor.id),
         bookingTreatmentOptions: getDoctorBookingTreatmentOptions(doctor.id),
         bookingSlotMinutes: getDoctorBookingSlotMinutes(doctor.id),
+        bookingVisitOptions: [...getDoctorBookingVisitOptions(doctor.id)],
         summary: '',
         clinics: [clinicSchedule],
       });

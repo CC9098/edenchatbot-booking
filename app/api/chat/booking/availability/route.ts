@@ -24,6 +24,7 @@ const bridgeAvailabilitySchema = z
     clinicId: z.string(),
     date: z.string(), // YYYY-MM-DD
     durationMinutes: z.number().int().positive().default(15),
+    visitType: z.enum(["first", "followup"]).optional(),
   })
   .strict(); // reject unknown keys
 
@@ -47,8 +48,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { doctorId, clinicId, date } = parsed.data;
-    const durationMinutes = getDoctorBookingSlotMinutes(doctorId);
+    const { doctorId, clinicId, date, visitType } = parsed.data;
+    const durationMinutes = getDoctorBookingSlotMinutes(doctorId, visitType);
     const slotIntervalMinutes = durationMinutes;
 
     // Validate date format

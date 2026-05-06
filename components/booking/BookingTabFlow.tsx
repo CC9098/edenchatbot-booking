@@ -32,7 +32,11 @@ import {
   type BookingTreatmentOption,
   type BookingTreatmentOptionId,
 } from '@/shared/booking-treatment-options';
-import { type ClinicId, type DoctorId } from '@/shared/clinic-data';
+import {
+  type BookingVisitOption,
+  type ClinicId,
+  type DoctorId,
+} from '@/shared/clinic-data';
 import type { TimeRange, WeeklySchedule } from '@/shared/schedule-config';
 import {
   PatientProfileSelector,
@@ -270,7 +274,8 @@ async function requestAvailabilityForDoctor(
   targetDoctorId: DoctorId,
   targetClinicId: ClinicId,
   dateIso: string,
-  durationMinutes: number
+  durationMinutes: number,
+  targetVisitType: VisitType
 ): Promise<AvailabilityRequestResult> {
   try {
     const response = await fetch('/api/availability', {
@@ -283,6 +288,7 @@ async function requestAvailabilityForDoctor(
         clinicId: targetClinicId,
         date: dateIso,
         durationMinutes,
+        visitType: targetVisitType,
       }),
     });
 
@@ -327,6 +333,38 @@ async function requestAvailabilityForDoctor(
 
 function getSlotDurationLabel(durationMinutes: number): string {
   return `每個時段 ${durationMinutes} 分鐘`;
+}
+
+function formatHkdPrice(price?: number): string {
+  if (typeof price !== 'number') return '';
+  return `HK$${price.toLocaleString('en-HK')}`;
+}
+
+function hasVisitSpecificServices(
+  doctor?: Pick<BookableDoctorSchedule, 'bookingVisitOptions'>
+): boolean {
+  return Boolean(doctor?.bookingVisitOptions.length);
+}
+
+function getVisitOptionPriceLabel(option?: BookingVisitOption): string | null {
+  if (!option?.priceHkd) return null;
+
+  const priceLabel = formatHkdPrice(option.priceHkd);
+  if (option.originalPriceHkd && option.originalPriceHkd > option.priceHkd) {
+    return `${priceLabel}（原價 ${formatHkdPrice(option.originalPriceHkd)}）`;
+  }
+
+  return priceLabel;
+}
+
+function formatVisitOptionSummary(option?: BookingVisitOption): string | null {
+  if (!option) return null;
+
+  const serviceLabel = `${option.serviceNameZh} ${option.serviceNameEn}`;
+  const priceLabel = getVisitOptionPriceLabel(option);
+  return [serviceLabel, priceLabel, getSlotDurationLabel(option.durationMinutes)]
+    .filter(Boolean)
+    .join('．');
 }
 
 function compactDetails(details: Array<string | null | undefined | false>): string[] {
@@ -589,6 +627,28 @@ export function BookingTabFlow({
     () => doctorOptions.find((doctor) => doctor.doctorId === doctorId),
     [doctorId, doctorOptions]
   );
+  const usesVisitBasedServices = hasVisitSpecificServices(selectedDoctor);
+  const selectedVisitOption = useMemo(
+    () =>
+      selectedDoctor?.bookingVisitOptions.find(
+        (option) => option.visitType === visitType
+      ),
+    [selectedDoctor, visitType]
+  );
+  const firstVisitOption = useMemo(
+    () =>
+      selectedDoctor?.bookingVisitOptions.find(
+        (option) => option.visitType === 'first'
+      ),
+    [selectedDoctor]
+  );
+  const followupVisitOption = useMemo(
+    () =>
+      selectedDoctor?.bookingVisitOptions.find(
+        (option) => option.visitType === 'followup'
+      ),
+    [selectedDoctor]
+  );
   const selectedDoctorSummaryEyebrow = getSelectedSummaryEyebrow(selectedDoctor);
   const selectedDoctorNotices = useMemo(() => {
     if (!selectedDoctor) return [];
@@ -625,10 +685,11 @@ export function BookingTabFlow({
   );
   const isOnlineConsultation = clinicId === 'online';
   const availableTreatmentOptions = !isOnlineConsultation
+    && !usesVisitBasedServices
     ? selectedDoctor?.bookingTreatmentOptions ?? []
     : [];
   const selectedTreatmentDetails = useMemo(() => {
-    if (!selectedDoctor || isOnlineConsultation) return [];
+    if (!selectedDoctor || isOnlineConsultation || usesVisitBasedServices) return [];
 
     const treatmentOptionById = new Map(
       selectedDoctor.bookingTreatmentOptions.map((option) => [option.id, option] as const)
@@ -637,7 +698,7 @@ export function BookingTabFlow({
     return selectedTreatmentOptions
       .map((optionId) => treatmentOptionById.get(optionId))
       .filter((option): option is BookingTreatmentOption => Boolean(option));
-  }, [isOnlineConsultation, selectedDoctor, selectedTreatmentOptions]);
+  }, [isOnlineConsultation, selectedDoctor, selectedTreatmentOptions, usesVisitBasedServices]);
   const selectedTreatmentSummary = selectedTreatmentDetails.length > 0
     ? formatSelectedTreatments(selectedTreatmentDetails, formValues.treatmentOtherDetails)
     : '';
@@ -651,7 +712,10 @@ export function BookingTabFlow({
           : '治療項目：未指定（可留待到診時再確認）'
         : null;
   const availableTreatmentSummaryDetail =
-    !isMinimalPreview && selectedDoctor ? `可選治療項目：${selectedDoctor.bookingTreatmentLabel}` : null;
+    !isMinimalPreview && selectedDoctor && !usesVisitBasedServices
+      ? `可選治療項目：${selectedDoctor.bookingTreatmentLabel}`
+      : null;
+  const selectedVisitOptionSummary = formatVisitOptionSummary(selectedVisitOption);
   const pickupOptions = useMemo(
     () => getBookingPickupOptions(clinicId),
     [clinicId]
@@ -661,8 +725,13 @@ export function BookingTabFlow({
   const needsClinicPickupRemarks =
     isOnlineConsultation && isClinicPickupBookingPickup(formValues.medicationPickup);
   const needsTreatmentOtherDetails =
-    !isOnlineConsultation && selectedTreatmentOptions.includes(OTHER_TREATMENT_OPTION_ID);
-  const selectedDoctorSlotMinutes = selectedDoctor?.bookingSlotMinutes ?? DEFAULT_SLOT_DURATION_MINUTES;
+    !isOnlineConsultation
+    && !usesVisitBasedServices
+    && selectedTreatmentOptions.includes(OTHER_TREATMENT_OPTION_ID);
+  const selectedDoctorSlotMinutes =
+    selectedVisitOption?.durationMinutes
+    ?? selectedDoctor?.bookingSlotMinutes
+    ?? DEFAULT_SLOT_DURATION_MINUTES;
   const groupBookingNotice =
     selectedDoctor?.doctorId === 'wong' && clinicId === 'jordan'
       ? DR_WONG_GROUP_BOOKING_NOTICE
@@ -942,7 +1011,8 @@ export function BookingTabFlow({
               doctorId,
               nextJob.clinicId,
               nextJob.dateIso,
-              selectedDoctorSlotMinutes
+              selectedDoctorSlotMinutes,
+              visitType
             );
 
             nextAvailability[nextJob.dateIso] = {
@@ -973,7 +1043,7 @@ export function BookingTabFlow({
     return () => {
       isCancelled = true;
     };
-  }, [calendarMonthKey, doctorId, maxDate, minDate, scannableClinics, selectedDoctorSlotMinutes]);
+  }, [calendarMonthKey, doctorId, maxDate, minDate, scannableClinics, selectedDoctorSlotMinutes, visitType]);
 
   useEffect(() => {
     const isCurrentPickupAvailable = pickupOptions.some(
@@ -1007,6 +1077,11 @@ export function BookingTabFlow({
   }, [clinicId]);
 
   useEffect(() => {
+    if (usesVisitBasedServices) {
+      setSelectedTreatmentOptions((prev) => (prev.length > 0 ? [] : prev));
+      return;
+    }
+
     if (!selectedDoctor) {
       setSelectedTreatmentOptions((prev) => (prev.length > 0 ? [] : prev));
       return;
@@ -1020,7 +1095,7 @@ export function BookingTabFlow({
       const next = prev.filter((optionId) => availableOptionIds.has(optionId));
       return next.length === prev.length ? prev : next;
     });
-  }, [selectedDoctor]);
+  }, [selectedDoctor, usesVisitBasedServices]);
 
   useEffect(() => {
     if (!isOnlineConsultation) return;
@@ -1118,6 +1193,7 @@ export function BookingTabFlow({
   function handleVisitTypeChange(nextVisitType: VisitType) {
     setVisitType(nextVisitType);
     setStep('setup');
+    resetSlotState();
     setFormErrors({});
     setSubmitError('');
   }
@@ -1134,7 +1210,8 @@ export function BookingTabFlow({
       doctorId,
       targetClinicId,
       dateIso,
-      selectedDoctorSlotMinutes
+      selectedDoctorSlotMinutes,
+      visitType
     );
 
     setMonthClinicAvailability((prev) => ({
@@ -1275,11 +1352,24 @@ export function BookingTabFlow({
   }
 
   function buildBookingNotes(values: BookingFormValues): string {
+    const selectedServiceLine = selectedVisitOption
+      ? `服務: ${selectedVisitOption.serviceNameZh} ${selectedVisitOption.serviceNameEn}`
+      : null;
+    const selectedPriceLine = selectedVisitOption
+      ? [
+          selectedVisitOption.promotionLabel,
+          getVisitOptionPriceLabel(selectedVisitOption)
+            ? `收費: ${getVisitOptionPriceLabel(selectedVisitOption)}`
+            : null,
+        ].filter(Boolean).join(' | ')
+      : null;
     const selectedTreatmentLine = selectedTreatmentDetails.length > 0
       ? `治療項目: ${formatSelectedTreatments(selectedTreatmentDetails, values.treatmentOtherDetails)}`
       : null;
     const notes = visitType === 'first'
       ? [
+          selectedServiceLine,
+          selectedPriceLine,
           selectedTreatmentLine,
           '[首診]',
           `出生日期: ${values.dateOfBirth.trim() || '未提供'}`,
@@ -1291,6 +1381,8 @@ export function BookingTabFlow({
           `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
         ].filter((value): value is string => Boolean(value))
       : [
+          selectedServiceLine,
+          selectedPriceLine,
           selectedTreatmentLine,
           '[覆診]',
           `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
@@ -1337,7 +1429,7 @@ export function BookingTabFlow({
     setIsSubmitting(true);
     setSubmitError('');
 
-    const treatmentOptions = isOnlineConsultation ? [] : selectedTreatmentOptions;
+    const treatmentOptions = isOnlineConsultation || usesVisitBasedServices ? [] : selectedTreatmentOptions;
     const payload = {
       doctorId,
       clinicId,
@@ -1542,11 +1634,26 @@ export function BookingTabFlow({
                         可先睇固定應診時間，再去下一步用彩色燈號比較各診所邊日有位。
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
+                        {usesVisitBasedServices ? (
+                          <>
+                            {firstVisitOption ? (
+                              <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+                                首診半價 {formatHkdPrice(firstVisitOption.priceHkd)}
+                              </span>
+                            ) : null}
+                            {followupVisitOption ? (
+                              <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
+                                覆診 {formatHkdPrice(followupVisitOption.priceHkd)}
+                              </span>
+                            ) : null}
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
+                            可選治療項目：{selectedDoctor.bookingTreatmentLabel}
+                          </span>
+                        )}
                         <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
-                          可選治療項目：{selectedDoctor.bookingTreatmentLabel}
-                        </span>
-                        <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
-                          {getSlotDurationLabel(selectedDoctor.bookingSlotMinutes)}
+                          {getSlotDurationLabel(selectedDoctorSlotMinutes)}
                         </span>
                         {isSupportBookingDoctor(selectedDoctor) ? (
                           <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
@@ -1693,7 +1800,16 @@ export function BookingTabFlow({
           )}
 
           <div className="space-y-3">
-            <p className="text-sm font-semibold text-slate-700">診症類型</p>
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <p className="text-sm font-semibold text-slate-700">
+                {usesVisitBasedServices ? '選擇服務' : '診症類型'}
+              </p>
+              {usesVisitBasedServices ? (
+                <span className="text-xs font-medium text-emerald-700">
+                  首診半價試行優惠
+                </span>
+              ) : null}
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
@@ -1705,7 +1821,24 @@ export function BookingTabFlow({
                 }`}
               >
                 <p className="font-semibold">{VISIT_TYPE_LABELS.first}</p>
-                <p className="mt-1 text-xs text-slate-500">第一次到診所就診</p>
+                {usesVisitBasedServices && firstVisitOption ? (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-sm font-semibold text-slate-700">
+                      {firstVisitOption.serviceNameZh}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {firstVisitOption.serviceNameEn}
+                    </p>
+                    <p className="text-sm font-semibold text-emerald-700">
+                      {getVisitOptionPriceLabel(firstVisitOption)}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {getSlotDurationLabel(firstVisitOption.durationMinutes)}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-500">第一次到診所就診</p>
+                )}
               </button>
 
               <button
@@ -1718,12 +1851,34 @@ export function BookingTabFlow({
                 }`}
               >
                 <p className="font-semibold">{VISIT_TYPE_LABELS.followup}</p>
-                <p className="mt-1 text-xs text-slate-500">曾經到診所就診</p>
+                {usesVisitBasedServices && followupVisitOption ? (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-sm font-semibold text-slate-700">
+                      {followupVisitOption.serviceNameZh}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {followupVisitOption.serviceNameEn}
+                    </p>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {getVisitOptionPriceLabel(followupVisitOption)}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {getSlotDurationLabel(followupVisitOption.durationMinutes)}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-500">曾經到診所就診</p>
+                )}
               </button>
             </div>
+            {usesVisitBasedServices ? (
+              <p className="text-xs leading-relaxed text-slate-500">
+                網上預約暫時只開放首診及覆診；X 光片及 X 光片講解會由脊醫到診後按需要再安排。
+              </p>
+            ) : null}
           </div>
 
-          {selectedDoctor && !isOnlineConsultation ? (
+          {selectedDoctor && !isOnlineConsultation && !usesVisitBasedServices ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-slate-700">治療項目</p>
@@ -1805,10 +1960,15 @@ export function BookingTabFlow({
             clinicNameZh={selectedClinic?.clinicNameZh || '比較全部診所'}
             eyebrow={selectedDoctorSummaryEyebrow}
             details={compactDetails([
-              !isOnlineConsultation
+              usesVisitBasedServices && selectedVisitOptionSummary
+                ? `${VISIT_TYPE_LABELS[visitType]}．${selectedVisitOptionSummary}`
+                : null,
+              !usesVisitBasedServices && !isOnlineConsultation
                 ? treatmentSummaryDetail || availableTreatmentSummaryDetail
                 : null,
-              `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`,
+              !usesVisitBasedServices
+                ? `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`
+                : null,
               selectedClinic
                 ? '日曆只顯示所選診所燈號。'
                 : '日曆會同時顯示各診所燈號，方便直接比較日期。',
@@ -2078,10 +2238,15 @@ export function BookingTabFlow({
             eyebrow="預約摘要"
             details={compactDetails([
               `${formatDateForDisplay(selectedDate)} ${selectedTime}`,
-              !isOnlineConsultation
+              usesVisitBasedServices && selectedVisitOptionSummary
+                ? `${VISIT_TYPE_LABELS[visitType]}．${selectedVisitOptionSummary}`
+                : null,
+              !usesVisitBasedServices && !isOnlineConsultation
                 ? treatmentSummaryDetail || availableTreatmentSummaryDetail
                 : null,
-              `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`,
+              !usesVisitBasedServices
+                ? `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`
+                : null,
             ])}
           />
 
@@ -2404,6 +2569,9 @@ export function BookingTabFlow({
             eyebrow="完成摘要"
             details={[
               `${formatDateForDisplay(selectedDate)} ${selectedTime}`,
+              ...(usesVisitBasedServices && selectedVisitOptionSummary
+                ? [`${VISIT_TYPE_LABELS[visitType]}．${selectedVisitOptionSummary}`]
+                : []),
               bookingId ? `${referenceLabel}：${bookingId}` : '確認資料已準備完成',
             ]}
           />

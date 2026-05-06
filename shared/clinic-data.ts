@@ -9,6 +9,18 @@ import {
 export const DOCTOR_IDS = ['chan', 'lee', 'hon', 'chau', 'cheung', 'cheungmy', 'leung', 'wong'] as const;
 export type DoctorId = (typeof DOCTOR_IDS)[number];
 export type BookingPractitionerGroup = 'tcm' | 'support';
+export type BookingVisitType = 'first' | 'followup';
+
+export type BookingVisitOption = {
+  visitType: BookingVisitType;
+  serviceNameZh: string;
+  serviceNameEn: string;
+  durationMinutes: number;
+  priceHkd?: number;
+  originalPriceHkd?: number;
+  promotionLabel?: string;
+  note?: string;
+};
 
 export const CLINIC_IDS = ['central', 'jordan', 'tsuenwan', 'online'] as const;
 export type ClinicId = (typeof CLINIC_IDS)[number];
@@ -39,6 +51,7 @@ export type DoctorProfile = {
   bookingSupportNote?: string;
   bookingTreatmentOptions?: readonly BookingTreatmentOptionId[];
   bookingSlotMinutes?: number;
+  bookingVisitOptions?: readonly BookingVisitOption[];
   onlineBookingEnabled?: boolean;
 };
 
@@ -204,6 +217,25 @@ export const DOCTORS: DoctorProfile[] = [
     bookingSupportNote: '黃浩哲脊醫為協作脊醫服務，列於中醫主診醫師之後，方便病人分辨。',
     bookingTreatmentOptions: ['manual_therapy'],
     bookingSlotMinutes: 30,
+    bookingVisitOptions: [
+      {
+        visitType: 'first',
+        serviceNameZh: '脊骨神經科檢查',
+        serviceNameEn: 'Standard Chiropractic Examination',
+        durationMinutes: 30,
+        priceHkd: 490,
+        originalPriceHkd: 980,
+        promotionLabel: '首診半價試行優惠',
+        note: '原價 HK$980，試行期首診半價。',
+      },
+      {
+        visitType: 'followup',
+        serviceNameZh: '脊骨跟進治療',
+        serviceNameEn: 'Standard Follow Up Visit',
+        durationMinutes: 15,
+        priceHkd: 880,
+      },
+    ],
     onlineBookingEnabled: false,
     scheduleNote:
       '為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以 WhatsApp 確認。',
@@ -265,7 +297,38 @@ export function getDoctorBookingTreatmentOptions(
   );
 }
 
-export function getDoctorBookingSlotMinutes(doctorId: string): number {
+export function getDoctorBookingVisitOptions(
+  doctorId: string
+): readonly BookingVisitOption[] {
+  if (!isDoctorId(doctorId)) {
+    return [];
+  }
+
+  return DOCTOR_BY_ID[doctorId].bookingVisitOptions || [];
+}
+
+export function getDoctorBookingVisitOption(
+  doctorId: string,
+  visitType?: string
+): BookingVisitOption | undefined {
+  if (visitType !== 'first' && visitType !== 'followup') {
+    return undefined;
+  }
+
+  return getDoctorBookingVisitOptions(doctorId).find(
+    (option) => option.visitType === visitType
+  );
+}
+
+export function getDoctorBookingSlotMinutes(
+  doctorId: string,
+  visitType?: string
+): number {
+  const visitOption = getDoctorBookingVisitOption(doctorId, visitType);
+  if (visitOption) {
+    return visitOption.durationMinutes;
+  }
+
   if (!isDoctorId(doctorId)) {
     return DEFAULT_DOCTOR_BOOKING_SLOT_MINUTES;
   }

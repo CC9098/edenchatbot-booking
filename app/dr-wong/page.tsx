@@ -9,6 +9,10 @@ const whatsappMessage = encodeURIComponent(
   "你好，我想預約黃浩哲 Dr. Samuel H.C. Wong 脊醫，請問最近可預約時間？"
 );
 const drWongWhatsappUrl = `https://wa.me/85295094441?text=${whatsappMessage}`;
+const drWongFirstVisitBookingUrl =
+  "/booking?doctor=wong&clinic=jordan&visitType=first&source=dr-wong";
+const drWongFollowUpBookingUrl =
+  "/booking?doctor=wong&clinic=jordan&visitType=followup&source=dr-wong";
 
 const clinicActions = [
   {
@@ -28,7 +32,26 @@ const clinicActions = [
   },
 ];
 
-const drWongBookingUrl = "/booking?doctor=wong&clinic=jordan&source=dr-wong";
+const pricingRows = [
+  {
+    label: "首診",
+    title: "脊骨神經科檢查",
+    subtitle: "Standard Chiropractic Examination",
+    duration: "30 minutes",
+    price: "HK$490",
+    originalPrice: "HK$980",
+    note: "試行半價優惠",
+    href: drWongFirstVisitBookingUrl,
+  },
+  {
+    label: "覆診",
+    title: "脊骨跟進治療",
+    subtitle: "Standard Follow Up Visit",
+    duration: "15 minutes",
+    price: "HK$880",
+    href: drWongFollowUpBookingUrl,
+  },
+];
 
 export const metadata: Metadata = {
   title: "黃浩哲脊醫 Dr. Samuel H.C. Wong | 醫天圓",
@@ -80,6 +103,7 @@ export default function DrWongPage() {
             <div className="max-w-xl space-y-3 text-base leading-relaxed text-[#365442] sm:text-lg">
               <p>脊骨神經科醫生，美國脊骨神經科醫學博士。</p>
               <p>適合希望了解脊骨、姿勢、頸肩腰背不適及日常活動功能狀態的病人預約查詢。</p>
+              <p>網上預約先簡化為首診及覆診兩項；X 光片及 X 光片講解可到診後按需要再安排。</p>
             </div>
           </div>
 
@@ -92,13 +116,45 @@ export default function DrWongPage() {
               佐敦應診時間：星期四 10:30-13:00、星期六 14:30-16:30。為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以 WhatsApp 確認。
             </p>
 
-            <Link
-              href={drWongBookingUrl}
-              className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] bg-[#0d4c2d] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0a3c24]"
-            >
-              立即網上預約
-              <ExternalLink className="h-4 w-4" />
-            </Link>
+            <div className="mt-5 divide-y divide-[#e0cfb4] border-y border-[#e0cfb4]">
+              {pricingRows.map((item) => (
+                <div key={item.label} className="grid gap-3 py-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-[#eaf5ec] px-3 py-1 text-xs font-semibold text-[#1f6b3f]">
+                        {item.label}
+                      </span>
+                      {item.note ? (
+                        <span className="rounded-full bg-[#fff4cf] px-3 py-1 text-xs font-semibold text-[#806018]">
+                          {item.note}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-base font-semibold text-[#123f2a]">{item.title}</p>
+                    <p className="text-sm text-[#496153]">{item.subtitle} · {item.duration}</p>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end sm:justify-center sm:gap-1">
+                    <p className="text-xl font-semibold text-[#0d4c2d]">{item.price}</p>
+                    {item.originalPrice ? (
+                      <p className="text-sm text-[#8b7860] line-through">{item.originalPrice}</p>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {pricingRows.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] bg-[#0d4c2d] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0a3c24]"
+                >
+                  預約{item.label}
+                  <ExternalLink className="h-4 w-4" />
+                </Link>
+              ))}
+            </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               {clinicActions.map((clinic) => (

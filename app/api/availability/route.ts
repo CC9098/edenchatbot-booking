@@ -23,6 +23,7 @@ const availabilitySchema = z.object({
                 clinicId: z.string(),
                 date: z.string(), // ISO date string
                 durationMinutes: z.number().default(15),
+                visitType: z.enum(['first', 'followup']).optional(),
 });
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
@@ -30,8 +31,8 @@ const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 export async function POST(request: NextRequest) {
                 try {
                                 const body = await request.json();
-                                const { doctorId, clinicId, date } = availabilitySchema.parse(body);
-                                const durationMinutes = getDoctorBookingSlotMinutes(doctorId);
+                                const { doctorId, clinicId, date, visitType } = availabilitySchema.parse(body);
+                                const durationMinutes = getDoctorBookingSlotMinutes(doctorId, visitType);
                                 const slotIntervalMinutes = durationMinutes;
                                 const requestedDate = date.slice(0, 10);
                                 if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {

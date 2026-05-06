@@ -1079,7 +1079,10 @@ export async function createConversationalBooking(
     if (!doctor) {
       return { success: false, error: `找不到醫師：${bookingData.doctorNameZh}` };
     }
-    const slotMinutes = getDoctorBookingSlotMinutes(doctor.id);
+    const slotMinutes = getDoctorBookingSlotMinutes(
+      doctor.id,
+      normalizedBookingData.visitType
+    );
 
     // Validate clinic
     const clinicId = CLINIC_ID_BY_NAME_ZH[normalizedBookingData.clinicNameZh];
