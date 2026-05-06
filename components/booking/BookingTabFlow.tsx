@@ -42,6 +42,7 @@ import type { PatientProfile } from '@/app/api/patient-profiles/route';
 
 type BookingStep = 'setup' | 'timeslot' | 'details' | 'success';
 type FlowVariant = 'booking' | 'whatsapp' | 'staff';
+type BookingPresentationVariant = 'default' | 'minimalPreview';
 type VisitType = 'first' | 'followup';
 type ReceiptType = 'no' | 'yes_insurance' | 'yes_not_insurance';
 type GenderType = '' | 'male' | 'female' | 'other';
@@ -94,6 +95,7 @@ type BookingTabFlowProps = {
   staffPatientUserId?: string | null;
   embedMode?: boolean;
   flowVariant?: FlowVariant;
+  presentationVariant?: BookingPresentationVariant;
 };
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
@@ -526,9 +528,11 @@ export function BookingTabFlow({
   staffPatientUserId,
   embedMode = false,
   flowVariant = 'booking',
+  presentationVariant = 'default',
 }: BookingTabFlowProps) {
   const isWhatsappFlow = flowVariant === 'whatsapp';
   const isStaffFlow = flowVariant === 'staff';
+  const isMinimalPreview = presentationVariant === 'minimalPreview';
   const [step, setStep] = useState<BookingStep>('setup');
   const [visitType, setVisitType] = useState<VisitType>(initialSelection?.visitType ?? 'first');
   const [doctorId, setDoctorId] = useState<DoctorId | ''>(initialSelection?.doctorId ?? '');
@@ -642,8 +646,12 @@ export function BookingTabFlow({
     : selectedTreatmentSummary
       ? `已選治療項目：${selectedTreatmentSummary}`
       : selectedDoctor
-        ? '治療項目：未指定（可留待到診時再確認）'
+        ? isMinimalPreview
+          ? null
+          : '治療項目：未指定（可留待到診時再確認）'
         : null;
+  const availableTreatmentSummaryDetail =
+    !isMinimalPreview && selectedDoctor ? `可選治療項目：${selectedDoctor.bookingTreatmentLabel}` : null;
   const pickupOptions = useMemo(
     () => getBookingPickupOptions(clinicId),
     [clinicId]
@@ -673,6 +681,8 @@ export function BookingTabFlow({
   const pageTitle = isStaffFlow ? '姑娘代約' : '預約服務';
   const pageSubtitle = isStaffFlow
     ? '供姑娘或前台代病人安排時段。成功後系統會優先透過 WhatsApp 發送確認訊息，若有電郵則會一併寄出確認電郵。'
+    : isMinimalPreview
+    ? '確認訊息會經 WhatsApp 發送。'
     : isWhatsappFlow
     ? '成功預約後，診所會透過 WhatsApp 發送確認訊息到你提供的電話。'
     : '「每一次預約，都是照顧自己的開始。」';
@@ -788,7 +798,7 @@ export function BookingTabFlow({
               ? clinicId
                 ? `${visibleClinics[0]?.clinicNameZh || '所選診所'}暫滿`
                 : '所有診所暫滿'
-              : '正在掃描 availability',
+              : '正在掃描時段',
       };
     });
   }, [calendarMonthKey, clinicId, maxDate, minDate, monthClinicAvailability, visibleClinics]);
@@ -834,7 +844,7 @@ export function BookingTabFlow({
 
       if (bookableDatesLoading) {
         summaries[clinic.clinicId] = {
-          label: '正在掃描本月 availability',
+          label: '正在掃描本月時段',
           tone: 'loading',
         };
         continue;
@@ -1428,7 +1438,7 @@ export function BookingTabFlow({
 
   return (
     <div className={`patient-card mx-auto p-6 sm:p-8 ${embedMode ? 'max-w-4xl' : 'max-w-2xl'}`}>
-      <div className="mb-8 space-y-3">
+      <div className={isMinimalPreview ? 'mb-5 space-y-2' : 'mb-8 space-y-3'}>
         <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-primary sm:text-[30px]">{pageTitle}</h1>
         <p
           className="text-sm leading-relaxed text-slate-400"
@@ -1439,108 +1449,142 @@ export function BookingTabFlow({
       </div>
 
       <div className="mb-6 rounded-2xl border border-primary/15 bg-primary-light/40 p-3 text-xs font-medium text-primary sm:text-sm">
-        步驟：{step === 'setup' && '1. 醫師/協作服務與診所'}{step === 'timeslot' && '2. 日期與時間'}
+        步驟：{step === 'setup' && (isMinimalPreview ? '1. 選擇診所' : '1. 醫師/協作服務與診所')}{step === 'timeslot' && '2. 日期與時間'}
         {step === 'details' && '3. 填寫資料'}{step === 'success' && '完成'}
       </div>
 
       {step === 'setup' && (
         <div className="space-y-6">
-          <div className="space-y-4">
-            <label className="space-y-2">
-              <span className="text-sm font-semibold text-slate-700">選擇醫師</span>
-              <select
-                value={doctorId}
-                onChange={(event) => handleDoctorChange(event.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-              >
-                <option value="">請選擇醫師及服務</option>
-                {primaryDoctorOptions.length > 0 ? (
-                  <optgroup label="中醫主診醫師">
-                    {primaryDoctorOptions.map((doctor) => (
-                      <option key={doctor.doctorId} value={doctor.doctorId}>
-                        {formatDoctorOptionLabel(doctor)}
-                      </option>
-                    ))}
-                  </optgroup>
-                ) : null}
-                {supportDoctorOptions.length > 0 ? (
-                  <optgroup label="協作服務">
-                    {supportDoctorOptions.map((doctor) => (
-                      <option key={doctor.doctorId} value={doctor.doctorId}>
-                        {formatDoctorOptionLabel(doctor)}
-                      </option>
-                    ))}
-                  </optgroup>
-                ) : null}
-              </select>
-            </label>
-            {supportDoctorOptions.length > 0 ? (
-              <p className="text-xs leading-relaxed text-slate-500">
-                中醫主診醫師優先顯示；協作脊醫服務列於下方。
-              </p>
-            ) : null}
-          </div>
+          {isMinimalPreview && selectedDoctor ? (
+            <div className="rounded-2xl border border-[#d5e7d8] bg-white/90 px-4 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <DoctorAvatar doctor={selectedDoctor} size="sm" />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold tracking-[0.2em] text-[#5d8c67]">已選醫師</p>
+                    <p className="mt-1 truncate text-base font-semibold text-[#254430]">
+                      {selectedDoctor.doctorNameZh}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {getSlotDurationLabel(selectedDoctor.bookingSlotMinutes)}
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href="/booking-whatsapp"
+                  className="shrink-0 rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
+                >
+                  更改醫師
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-slate-700">選擇醫師</span>
+                <select
+                  value={doctorId}
+                  onChange={(event) => handleDoctorChange(event.target.value)}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
+                >
+                  <option value="">請選擇醫師及服務</option>
+                  {primaryDoctorOptions.length > 0 ? (
+                    <optgroup label="中醫主診醫師">
+                      {primaryDoctorOptions.map((doctor) => (
+                        <option key={doctor.doctorId} value={doctor.doctorId}>
+                          {formatDoctorOptionLabel(doctor)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
+                  {supportDoctorOptions.length > 0 ? (
+                    <optgroup label="協作服務">
+                      {supportDoctorOptions.map((doctor) => (
+                        <option key={doctor.doctorId} value={doctor.doctorId}>
+                          {formatDoctorOptionLabel(doctor)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
+                </select>
+              </label>
+              {supportDoctorOptions.length > 0 ? (
+                <p className="text-xs leading-relaxed text-slate-500">
+                  中醫主診醫師優先顯示；協作脊醫服務列於下方。
+                </p>
+              ) : null}
+            </div>
+          )}
 
           {selectedDoctor && (
             <section className="rounded-[30px] border border-[#cfe1d3] bg-[linear-gradient(135deg,#f8fcf8_0%,#edf7f0_52%,#ffffff_100%)] p-4 shadow-[0_22px_56px_-42px_rgba(31,74,44,0.42)] sm:p-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <DoctorAvatar doctor={selectedDoctor} size="lg" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold tracking-[0.28em] text-[#5d8c67]">
-                      {getSelectedScheduleEyebrow(selectedDoctor)}
-                    </p>
-                    <h2 className="mt-2 text-[1.35rem] font-semibold text-[#234230] sm:text-[1.5rem]">
-                      {selectedDoctor.doctorNameZh}
-                    </h2>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-600">
-                      可先睇固定應診時間，再去下一步用彩色燈號比較各診所邊日有位。
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
-                        可選治療項目：{selectedDoctor.bookingTreatmentLabel}
-                      </span>
-                      <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
-                        {getSlotDurationLabel(selectedDoctor.bookingSlotMinutes)}
-                      </span>
-                      {isSupportBookingDoctor(selectedDoctor) ? (
-                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
-                          {selectedDoctor.bookingRoleLabel}
+              {isMinimalPreview ? (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-base font-semibold text-[#254430]">選擇診所</p>
+                    <p className="mt-1 text-xs text-slate-500">先選診所，再揀日期時間。</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-4">
+                    <DoctorAvatar doctor={selectedDoctor} size="lg" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold tracking-[0.28em] text-[#5d8c67]">
+                        {getSelectedScheduleEyebrow(selectedDoctor)}
+                      </p>
+                      <h2 className="mt-2 text-[1.35rem] font-semibold text-[#234230] sm:text-[1.5rem]">
+                        {selectedDoctor.doctorNameZh}
+                      </h2>
+                      <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                        可先睇固定應診時間，再去下一步用彩色燈號比較各診所邊日有位。
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
+                          可選治療項目：{selectedDoctor.bookingTreatmentLabel}
                         </span>
+                        <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
+                          {getSlotDurationLabel(selectedDoctor.bookingSlotMinutes)}
+                        </span>
+                        {isSupportBookingDoctor(selectedDoctor) ? (
+                          <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
+                            {selectedDoctor.bookingRoleLabel}
+                          </span>
+                        ) : null}
+                      </div>
+                      {selectedDoctor.bookingSupportNote ? (
+                        <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                          {selectedDoctor.bookingSupportNote}
+                        </p>
                       ) : null}
                     </div>
-                    {selectedDoctor.bookingSupportNote ? (
-                      <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                        {selectedDoctor.bookingSupportNote}
-                      </p>
+                  </div>
+
+                  <div className="rounded-[22px] border border-[#d5e7d8] bg-white/85 px-4 py-3 text-sm shadow-[0_12px_30px_-26px_rgba(31,74,44,0.4)] sm:max-w-[240px]">
+                    <p className="text-[11px] font-semibold tracking-[0.24em] text-[#5d8c67]">
+                      {getSelectedCardLabel(selectedDoctor)}
+                    </p>
+                    <p className="mt-1 font-semibold text-[#254430]">
+                      {selectedDoctor.doctorNameZh}
+                    </p>
+                    <p className="mt-1 text-slate-500">
+                      {selectedClinic
+                        ? `${selectedClinic.clinicNameZh} 已套用篩選，日曆只會顯示該診所燈號。`
+                        : '未鎖定診所，下一步可直接比較全部診所日期。'}
+                    </p>
+                    {selectedDoctor.doctorId === 'wong' ? (
+                      <Link
+                        href="/dr-wong"
+                        className="mt-3 inline-flex rounded-full border border-[#b8d7be] bg-[#f5fbf6] px-3 py-1.5 text-xs font-semibold text-[#1f6b3f] transition hover:border-[#71a97a] hover:bg-white"
+                      >
+                        查看 Dr Wong 專頁
+                      </Link>
                     ) : null}
                   </div>
                 </div>
+              )}
 
-                <div className="rounded-[22px] border border-[#d5e7d8] bg-white/85 px-4 py-3 text-sm shadow-[0_12px_30px_-26px_rgba(31,74,44,0.4)] sm:max-w-[240px]">
-                  <p className="text-[11px] font-semibold tracking-[0.24em] text-[#5d8c67]">
-                    {getSelectedCardLabel(selectedDoctor)}
-                  </p>
-                  <p className="mt-1 font-semibold text-[#254430]">
-                    {selectedDoctor.doctorNameZh}
-                  </p>
-                  <p className="mt-1 text-slate-500">
-                    {selectedClinic
-                      ? `${selectedClinic.clinicNameZh} 已套用篩選，日曆只會顯示該診所燈號。`
-                      : '未鎖定診所，下一步可直接比較全部診所日期。'}
-                  </p>
-                  {selectedDoctor.doctorId === 'wong' ? (
-                    <Link
-                      href="/dr-wong"
-                      className="mt-3 inline-flex rounded-full border border-[#b8d7be] bg-[#f5fbf6] px-3 py-1.5 text-xs font-semibold text-[#1f6b3f] transition hover:border-[#71a97a] hover:bg-white"
-                    >
-                      查看 Dr Wong 專頁
-                    </Link>
-                  ) : null}
-                </div>
-              </div>
-
-              {selectedDoctorNotices.length > 0 && (
+              {!isMinimalPreview && selectedDoctorNotices.length > 0 && (
                 <div className="mt-4 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
                   <div className="space-y-2">
@@ -1639,7 +1683,9 @@ export function BookingTabFlow({
                 })}
               </div>
               <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                點按診所卡即可套用篩選；如顯示「本月餘下日子暫滿」，可到下一步按右箭嘴查看下月。
+                {isMinimalPreview
+                  ? '點按診所即可篩選。'
+                  : '點按診所卡即可套用篩選；如顯示「本月餘下日子暫滿」，可到下一步按右箭嘴查看下月。'}
               </p>
             </section>
           )}
@@ -1758,7 +1804,7 @@ export function BookingTabFlow({
             eyebrow={selectedDoctorSummaryEyebrow}
             details={compactDetails([
               !isOnlineConsultation
-                ? treatmentSummaryDetail || (selectedDoctor ? `可選治療項目：${selectedDoctor.bookingTreatmentLabel}` : null)
+                ? treatmentSummaryDetail || availableTreatmentSummaryDetail
                 : null,
               `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`,
               selectedClinic
@@ -2031,7 +2077,7 @@ export function BookingTabFlow({
             details={compactDetails([
               `${formatDateForDisplay(selectedDate)} ${selectedTime}`,
               !isOnlineConsultation
-                ? treatmentSummaryDetail || (selectedDoctor ? `可選治療項目：${selectedDoctor.bookingTreatmentLabel}` : null)
+                ? treatmentSummaryDetail || availableTreatmentSummaryDetail
                 : null,
               `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`,
             ])}
