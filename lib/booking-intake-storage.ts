@@ -84,6 +84,17 @@ function parseNotificationClinicId(raw: unknown): string | undefined {
   return normalized || undefined;
 }
 
+function isMissingPatientProfileColumnError(error: unknown): boolean {
+  const message =
+    typeof error === "object" && error && "message" in error && typeof error.message === "string"
+      ? error.message
+      : error instanceof Error
+        ? error.message
+        : String(error);
+
+  return message.includes("patient_profile_id") && message.includes("schema cache");
+}
+
 export async function createPendingBookingIntake(
   input: BookingIntakeCreateInput,
 ): Promise<{ success: boolean; intakeId?: string; error?: string }> {
@@ -97,7 +108,6 @@ export async function createPendingBookingIntake(
       status: "pending" as BookingIntakeStatus,
       user_id: input.userId ?? null,
       session_id: input.sessionId ?? null,
-      patient_profile_id: input.patientProfileId ?? null,
       doctor_id: input.doctorId,
       doctor_name_zh: input.doctorNameZh,
       clinic_id: input.clinicId,
@@ -122,13 +132,26 @@ export async function createPendingBookingIntake(
       notes: input.notes ?? null,
       booking_payload: input.bookingPayload ?? {},
       updated_at: now,
+      ...(input.patientProfileId ? { patient_profile_id: input.patientProfileId } : {}),
     };
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("booking_intake")
       .insert(payload)
       .select("id")
       .single();
+
+    if (error && "patient_profile_id" in payload && isMissingPatientProfileColumnError(error)) {
+      const { patient_profile_id: _patientProfileId, ...fallbackPayload } = payload;
+      const retryResult = await supabase
+        .from("booking_intake")
+        .insert(fallbackPayload)
+        .select("id")
+        .single();
+
+      data = retryResult.data;
+      error = retryResult.error;
+    }
 
     if (error || !data?.id) {
       return {
