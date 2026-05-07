@@ -16,6 +16,7 @@ import {
 } from '@/shared/clinic-data';
 
 type SessionId = 'morning' | 'afternoon';
+const AFTERNOON_SESSION_START_MINUTES = 14 * 60 + 30;
 
 type TimetableDoctorEntry = {
   doctorId: DoctorId;
@@ -59,7 +60,7 @@ function minutesFromTime(value: string): number {
 }
 
 function resolveSessionId(startTime: string): SessionId {
-  return minutesFromTime(startTime) < 15 * 60 ? 'morning' : 'afternoon';
+  return minutesFromTime(startTime) < AFTERNOON_SESSION_START_MINUTES ? 'morning' : 'afternoon';
 }
 
 function shortDoctorName(nameZh: string): string {

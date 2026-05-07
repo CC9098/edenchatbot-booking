@@ -7,7 +7,6 @@ import { getPublicTimetableData, type TimetableClinicCard } from '@/lib/public-t
 import {
   DOCTORS,
   PHYSICAL_CLINIC_IDS,
-  getDoctorBookingRoleLabel,
   isSupportBookingPractitioner,
   type PhysicalClinicId,
 } from '@/shared/clinic-data';
@@ -73,6 +72,10 @@ function getDoctorAvatarFallback(nameZh?: string): string {
   return nameZh?.trim().slice(0, 1) || '醫';
 }
 
+function getLowProfileSupportName(nameZh: string): string {
+  return nameZh.replace(/脊醫$/, '');
+}
+
 function DoctorStripCard({
   doctor,
   isSupport,
@@ -80,7 +83,7 @@ function DoctorStripCard({
   doctor: (typeof DOCTORS)[number];
   isSupport: boolean;
 }) {
-  const roleLabel = getDoctorBookingRoleLabel(doctor.id);
+  const displayName = isSupport ? getLowProfileSupportName(doctor.nameZh) : doctor.nameZh;
 
   return (
     <a
@@ -89,17 +92,19 @@ function DoctorStripCard({
       rel="noreferrer"
       className={`group relative flex min-w-[104px] flex-col items-center gap-1 rounded-[16px] border px-3 py-2 transition ${
         isSupport
-          ? 'border-amber-200/90 bg-amber-50/75 text-amber-900'
+          ? 'min-w-[86px] border-slate-200/70 bg-white/60 px-2 py-1.5 text-slate-600 opacity-85'
           : 'border-slate-200/80 bg-white/85 text-slate-700'
       } hover:-translate-y-0.5 hover:shadow-[0_14px_30px_-24px_rgba(15,23,42,0.6)]`}
     >
-      <div className="relative h-14 w-14 overflow-hidden rounded-full border-4 border-white bg-[#edf7ef] shadow-[0_12px_28px_-20px_rgba(31,74,44,0.45)]">
+      <div className={`relative overflow-hidden rounded-full border-white bg-[#edf7ef] shadow-[0_12px_28px_-20px_rgba(31,74,44,0.45)] ${
+        isSupport ? 'h-10 w-10 border-2' : 'h-14 w-14 border-4'
+      }`}>
         {doctor.avatarSrc ? (
           <Image
             src={doctor.avatarSrc}
             alt={`${doctor.nameZh}頭像`}
             fill
-            sizes="56px"
+            sizes={isSupport ? '40px' : '56px'}
             className="object-cover"
             style={{ objectPosition: doctor.avatarObjectPosition || 'center' }}
           />
@@ -111,14 +116,10 @@ function DoctorStripCard({
       </div>
 
       <div className="text-center">
-        <p className="text-[11px] leading-tight font-semibold tracking-[0.02em]">{doctor.nameZh}</p>
+        <p className={`leading-tight font-semibold tracking-[0.02em] ${isSupport ? 'text-[10px]' : 'text-[11px]'}`}>
+          {displayName}
+        </p>
       </div>
-
-      {isSupport ? (
-        <span className="inline-flex items-center rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[10px] font-bold tracking-[0.12em]">
-          {roleLabel}
-        </span>
-      ) : null}
     </a>
   );
 }
@@ -128,7 +129,7 @@ function DoctorStripGroup({
   doctors,
 }: {
   title: string;
-  doctors: typeof DOCTORS;
+  doctors: Array<(typeof DOCTORS)[number]>;
 }) {
   if (doctors.length === 0) return null;
 
@@ -152,10 +153,28 @@ function DoctorStripGroup({
 
 function DoctorStrip() {
   if (DOCTORS.length === 0) return null;
+  const primaryDoctors = DOCTORS.filter((doctor) => !isSupportBookingPractitioner(doctor.id));
+  const supportDoctors = DOCTORS.filter((doctor) => isSupportBookingPractitioner(doctor.id));
 
   return (
     <section className="mb-5">
-      <DoctorStripGroup title="中醫師" doctors={DOCTORS} />
+      <DoctorStripGroup title="中醫師" doctors={primaryDoctors} />
+      {supportDoctors.length > 0 ? (
+        <div className="mt-3">
+          <p className="text-xs font-semibold tracking-[0.04em] text-slate-500">
+            其他服務
+          </p>
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+            {supportDoctors.map((doctor) => (
+              <DoctorStripCard
+                key={doctor.id}
+                doctor={doctor}
+                isSupport
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -350,28 +369,34 @@ function ClinicCard({ card, versionLabel }: { card: TimetableClinicCard; version
                       {entries.map((entry) => {
                         const tone = getDoctorTone(entry.doctorId);
                         const isSupport = isSupportBookingPractitioner(entry.doctorId);
-                        const roleLabel = getDoctorBookingRoleLabel(entry.doctorId);
+                        const supportName = getLowProfileSupportName(entry.shortNameZh);
                         return (
                           <a
                             key={`mc-${card.clinicId}-${row.id}-${col.day}-${entry.doctorId}`}
                             href={entry.bookingUrl || buildBookingUrl({ doctorId: entry.doctorId, clinicId: card.clinicId })}
                             target="_top"
                             rel="noreferrer"
-                            aria-label={`${isSupport ? `${roleLabel} ` : ''}${entry.shortNameZh}${card.clinicNameZh}預約`}
-                            title={`${isSupport ? `${roleLabel} ` : ''}${entry.shortNameZh}${card.clinicNameZh}預約`}
-                            className={`flex flex-1 flex-col items-center justify-center py-2 transition hover:bg-white/50 ${
-                              isSupport ? 'bg-amber-50/70' : ''
+                            aria-label={`${entry.shortNameZh}${card.clinicNameZh}預約`}
+                            title={`${entry.shortNameZh}${card.clinicNameZh}預約`}
+                            className={`flex flex-1 flex-col items-center justify-center transition hover:bg-white/50 ${
+                              isSupport ? 'bg-white/35 px-0.5 py-1 opacity-85' : 'py-2'
                             }`}
                             style={{ minHeight: '52px' }}
                           >
-                            <span className="text-xl font-black leading-none" style={{ color: tone }}>
-                              {entry.shortNameZh.charAt(0)}
-                            </span>
                             {isSupport ? (
-                              <span className="mt-0.5 text-[8px] font-bold leading-none text-amber-800">
-                                {roleLabel}
+                              <>
+                                <span className="text-[10px] font-semibold leading-tight text-slate-700">
+                                  {supportName}
+                                </span>
+                                <span className="mt-0.5 text-[8px] font-medium leading-none text-slate-500">
+                                  脊醫
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-xl font-black leading-none" style={{ color: tone }}>
+                                {entry.shortNameZh.charAt(0)}
                               </span>
-                            ) : null}
+                            )}
                             <ExternalLink className="mt-1 h-2.5 w-2.5" style={{ color: tone }} />
                           </a>
                         );
@@ -436,8 +461,8 @@ function ClinicCard({ card, versionLabel }: { card: TimetableClinicCard; version
                               const isException = rowTimeLabel && entry.timeLabel !== rowTimeLabel;
                               const doctorTone = getDoctorTone(entry.doctorId);
                               const isSupport = isSupportBookingPractitioner(entry.doctorId);
-                              const roleLabel = getDoctorBookingRoleLabel(entry.doctorId);
-                              const doctorLabel = `${isSupport ? `${roleLabel} ` : ''}${entry.shortNameZh}${card.clinicNameZh}預約`;
+                              const doctorLabel = `${entry.shortNameZh}${card.clinicNameZh}預約`;
+                              const supportName = getLowProfileSupportName(entry.shortNameZh);
 
                               return (
                                 <a
@@ -448,34 +473,47 @@ function ClinicCard({ card, versionLabel }: { card: TimetableClinicCard; version
                                   aria-label={doctorLabel}
                                   title={doctorLabel}
                                   className={`group flex min-h-[80px] min-w-[56px] cursor-pointer flex-col items-center justify-center rounded-[14px] px-1.5 py-2 text-center transition duration-200 hover:-translate-y-0.5 hover:bg-white/65 hover:shadow-[0_14px_30px_-24px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:min-h-[112px] sm:min-w-[86px] sm:rounded-[20px] sm:px-3 sm:py-3 ${
-                                    isSupport ? 'bg-amber-50/70 ring-1 ring-amber-200/70' : ''
+                                    isSupport ? 'min-h-[56px] min-w-[68px] bg-white/35 px-2 py-2 opacity-85 ring-1 ring-white/60 sm:min-h-[72px] sm:min-w-[76px] sm:px-2 sm:py-2' : ''
                                   }`}
                                 >
-                                  <div
-                                    className="text-3xl font-black leading-none sm:text-5xl"
-                                    style={{ color: doctorTone }}
-                                  >
-                                    {doctorName.surname}
-                                  </div>
-                                  <div
-                                    className="mt-0.5 text-xl font-bold leading-none tracking-[0.02em] sm:mt-1 sm:text-[2rem] sm:tracking-[0.04em]"
-                                    style={{ color: doctorTone }}
-                                  >
-                                    {doctorName.given}
-                                    {isException ? '*' : ''}
-                                  </div>
+                                  {isSupport ? (
+                                    <>
+                                      <div className="text-xs font-semibold leading-tight text-slate-700 sm:text-sm">
+                                        {supportName}
+                                        {isException ? '*' : ''}
+                                      </div>
+                                      <div className="mt-0.5 text-[10px] font-medium text-slate-500">
+                                        脊醫
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div
+                                        className="text-3xl font-black leading-none sm:text-5xl"
+                                        style={{ color: doctorTone }}
+                                      >
+                                        {doctorName.surname}
+                                      </div>
+                                      <div
+                                        className="mt-0.5 text-xl font-bold leading-none tracking-[0.02em] sm:mt-1 sm:text-[2rem] sm:tracking-[0.04em]"
+                                        style={{ color: doctorTone }}
+                                      >
+                                        {doctorName.given}
+                                        {isException ? '*' : ''}
+                                      </div>
+                                    </>
+                                  )}
                                   <span
-                                    className="mt-1.5 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] transition group-hover:bg-white sm:mt-2 sm:px-2 sm:py-1 sm:text-[10px] sm:tracking-[0.16em]"
+                                    className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-bold uppercase transition group-hover:bg-white ${
+                                      isSupport
+                                        ? 'mt-1 text-[8px] tracking-[0.08em] sm:text-[9px]'
+                                        : 'mt-1.5 text-[9px] tracking-[0.1em] sm:mt-2 sm:px-2 sm:py-1 sm:text-[10px] sm:tracking-[0.16em]'
+                                    }`}
                                     style={{ borderColor: `${doctorTone}33`, color: doctorTone }}
                                   >
                                     預約
                                     <ExternalLink className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                                   </span>
-                                  {isSupport ? (
-                                    <span className="mt-1 rounded-full border border-amber-200 bg-white/80 px-2 py-0.5 text-[9px] font-bold tracking-[0.08em] text-amber-800 sm:text-[10px]">
-                                      {roleLabel}
-                                    </span>
-                                  ) : null}
                                   {isException ? (
                                     <div className="mt-1 text-[9px] font-semibold tracking-[0.06em] text-slate-500 sm:mt-2 sm:text-[11px] sm:tracking-[0.08em]">
                                       {entry.timeLabel}
