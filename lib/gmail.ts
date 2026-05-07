@@ -20,8 +20,25 @@ interface ConfirmationEmailData {
   clinicAddress: string;
   date: string;
   time: string;
+  durationMinutes?: number;
+  meetLink?: string;
   eventId?: string;
   calendarId?: string;
+}
+
+interface DoctorOnlineBookingNotificationData {
+  bookingId: string;
+  calendarId: string;
+  doctorId?: string;
+  doctorName: string;
+  doctorNameZh: string;
+  patientName: string;
+  patientPhone: string;
+  patientEmail?: string;
+  date: string;
+  time: string;
+  durationMinutes?: number;
+  meetLink: string;
 }
 
 interface ConsultationEmailData {
@@ -69,8 +86,67 @@ const CLINIC_GOOGLE_MAP_BY_NAME_ZH: Record<string, string> = {
   中環: 'https://maps.app.goo.gl/G3S73hfG6qk5o3cs8?g_st=ic',
 };
 
+function getConfiguredDoctorNotificationEmail(doctorId?: string): string {
+  const normalizedRawDoctorId = doctorId?.trim().toLowerCase();
+  const normalizedDoctorId = normalizedRawDoctorId?.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+  const doctorSpecificEmail = normalizedDoctorId
+    ? process.env[`DOCTOR_NOTIFICATION_EMAIL_${normalizedDoctorId}`]?.trim()
+    : '';
+  const legacyCheungEmail = normalizedRawDoctorId === 'cheung'
+    ? process.env.CHEUNG_DOCTOR_EMAIL?.trim()
+    : '';
+
+  return (
+    doctorSpecificEmail ||
+    legacyCheungEmail ||
+    process.env.CLINIC_NOTIFICATION_EMAIL?.trim() ||
+    ''
+  );
+}
+
 function getBaseUrl(): string {
   return getPublicBaseUrl();
+}
+
+async function sendHtmlEmail(to: string, subject: string, htmlBody: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const normalizedTo = to.trim();
+    if (!normalizedTo) {
+      return { success: false, error: 'No email address provided' };
+    }
+
+    const gmail = await getUncachableGmailClient();
+    const messageParts = [
+      `To: ${normalizedTo}`,
+      `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      Buffer.from(htmlBody).toString('base64')
+    ];
+
+    const rawMessage = Buffer.from(messageParts.join('\r\n'))
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: rawMessage,
+      },
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Detailed Gmail Error:', error);
+    if (error.response) {
+      console.error('Gmail API Response Error:', error.response.data);
+    }
+    return { success: false, error: error.message || 'Failed to send email' };
+  }
 }
 
 function getBookingActionUrl(path: string, eventId: string, calendarId: string): string {
@@ -101,15 +177,22 @@ function buildClinicGoogleMapHtml(clinicNameZh: string): string {
 
 function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
   const isOnlineConsultation = data.clinicNameZh === '網上';
+  const meetLinkHtml = data.meetLink
+    ? `<div style="background:#eef7ee; border:1px solid #cfe4cf; border-radius:8px; padding:16px; margin:16px 0;">
+        <strong>Google Meet 網上應診連結</strong><br>
+        <a href="${data.meetLink}" style="color:#0b6b35; word-break:break-all;" target="_blank">${data.meetLink}</a>
+      </div>`
+    : '';
   const clinicInfoHtml = isOnlineConsultation
     ? `<p>💻 <strong>網上應診 Online Consultation</strong><br>
-請於預約時間前保持電話暢通，我們會按安排透過 Zoom / WhatsApp Video 與你聯絡。</p>`
+${data.meetLink ? '請於預約時間前 5 分鐘按以下 Google Meet 連結進入網上應診。' : '請於預約時間前保持電話暢通，我們會按安排透過 Zoom / WhatsApp Video 與你聯絡。'}</p>
+${meetLinkHtml}`
     : getClinicInfoHtmlSections();
   const clinicWhatsappLinksHtml = isOnlineConsultation ? '' : buildClinicWhatsappLinksHtml();
   const clinicGoogleMapHtml = isOnlineConsultation ? '' : buildClinicGoogleMapHtml(data.clinicNameZh);
   const googleCalendarStart = data.date.replace(/-/g, '') + 'T' + data.time.replace(':', '') + '00';
   const [h, m] = data.time.split(':').map(Number);
-  const endMinutes = h * 60 + m + 15;
+  const endMinutes = h * 60 + m + (data.durationMinutes || 15);
   const endH = String(Math.floor(endMinutes / 60)).padStart(2, '0');
   const endM = String(endMinutes % 60).padStart(2, '0');
   const googleCalendarEnd = data.date.replace(/-/g, '') + 'T' + endH + endM + '00';
@@ -202,7 +285,9 @@ function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
         
         ${
           isOnlineConsultation
-            ? '<p>如需協助安排網上應診連結或流程，歡迎透過 WhatsApp 聯絡我們。</p>'
+            ? data.meetLink
+              ? '<p>如進入 Google Meet 時遇到問題，歡迎透過 WhatsApp 聯絡我們。</p>'
+              : '<p>如需協助安排網上應診連結或流程，歡迎透過 WhatsApp 聯絡我們。</p>'
             : `<p>🔗 附上診所路綫圖，方便你參考：<br>
         <a href="https://www.edenclinic.hk/eden/關於我們/診所地址及聯絡方法/" style="color:#5c8d4d;">https://www.edenclinic.hk/eden/關於我們/診所地址及聯絡方法/</a></p>`
         }
@@ -233,13 +318,10 @@ function buildConfirmationEmailHtml(data: ConfirmationEmailData): string {
 }
 
 export async function sendBookingConfirmationEmail(data: ConfirmationEmailData): Promise<{ success: boolean; error?: string }> {
+  if (!data.patientEmail) {
+    return { success: false, error: 'No email address provided' };
+  }
   try {
-    if (!data.patientEmail) {
-      return { success: false, error: 'No email address provided' };
-    }
-
-    const gmail = await getUncachableGmailClient();
-
     const dateObj = new Date(data.date + 'T00:00:00');
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -250,29 +332,10 @@ export async function sendBookingConfirmationEmail(data: ConfirmationEmailData):
     const subject = `確認預約: 與${data.doctorNameZh} ${data.doctorName}｜${data.clinicNameZh} ${data.clinicName} ${dateFormatted} ${data.time} 的預約`;
 
     const htmlBody = buildConfirmationEmailHtml(data);
-
-    const messageParts = [
-      `To: ${data.patientEmail}`,
-      `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
-      'MIME-Version: 1.0',
-      'Content-Type: text/html; charset=UTF-8',
-      'Content-Transfer-Encoding: base64',
-      '',
-      Buffer.from(htmlBody).toString('base64')
-    ];
-
-    const rawMessage = Buffer.from(messageParts.join('\r\n'))
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-
-    await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: {
-        raw: rawMessage,
-      },
-    });
+    const result = await sendHtmlEmail(data.patientEmail, subject, htmlBody);
+    if (!result.success) {
+      return result;
+    }
 
     console.log(`Confirmation email sent to ${data.patientEmail}`);
     return { success: true };
@@ -283,6 +346,42 @@ export async function sendBookingConfirmationEmail(data: ConfirmationEmailData):
     }
     return { success: false, error: error.message || 'Failed to send email' };
   }
+}
+
+export async function sendDoctorOnlineBookingNotificationEmail(
+  data: DoctorOnlineBookingNotificationData
+): Promise<{ success: boolean; error?: string }> {
+  const to = getConfiguredDoctorNotificationEmail(data.doctorId);
+  if (!to) {
+    return { success: false, error: 'Missing doctor notification email' };
+  }
+
+  const durationText = data.durationMinutes ? `${data.durationMinutes} 分鐘` : '網上應診';
+  const subject = `新網上應診預約：${data.patientName}｜${data.date} ${data.time}`;
+  const htmlBody = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+</head>
+<body style="font-family: Arial, 'Noto Sans TC', sans-serif; color:#333; line-height:1.6;">
+  <h2>新網上應診預約</h2>
+  <table style="border-collapse:collapse;">
+    <tr><td style="padding:4px 12px 4px 0; color:#777;">醫師</td><td>${data.doctorNameZh} ${data.doctorName}</td></tr>
+    <tr><td style="padding:4px 12px 4px 0; color:#777;">病人</td><td>${data.patientName}</td></tr>
+    <tr><td style="padding:4px 12px 4px 0; color:#777;">電話</td><td>${data.patientPhone}</td></tr>
+    <tr><td style="padding:4px 12px 4px 0; color:#777;">電郵</td><td>${data.patientEmail || '-'}</td></tr>
+    <tr><td style="padding:4px 12px 4px 0; color:#777;">時間</td><td>${data.date} ${data.time}（${durationText}）</td></tr>
+    <tr><td style="padding:4px 12px 4px 0; color:#777;">預約編號</td><td>${data.bookingId}</td></tr>
+  </table>
+  <div style="background:#eef7ee; border:1px solid #cfe4cf; border-radius:8px; padding:16px; margin:16px 0;">
+    <strong>Google Meet 連結</strong><br>
+    <a href="${data.meetLink}" style="color:#0b6b35; word-break:break-all;">${data.meetLink}</a>
+  </div>
+  <p style="font-size:13px; color:#777;">此通知由 Eden booking system 自動發出。</p>
+</body>
+</html>`;
+
+  return sendHtmlEmail(to, subject, htmlBody);
 }
 
 function buildCancellationEmailHtml(data: CancellationEmailData): string {

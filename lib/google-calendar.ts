@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { randomUUID } from 'crypto';
 
 import { getGoogleAuthClient } from './google-auth';
 import { getSafeErrorMessage } from './error-sanitizer';
@@ -17,6 +18,14 @@ const DOCTOR_EVENT_COLOR_ID_BY_ID: Record<string, string> = {
   wong: '8',
 };
 
+type CreateBookingResult = {
+  success: boolean;
+  eventId?: string;
+  meetLink?: string;
+  eventHtmlLink?: string;
+  error?: string;
+};
+
 function buildBookingEventSummary(details: {
   doctorNameZh: string;
   clinicNameZh: string;
@@ -28,6 +37,25 @@ function buildBookingEventSummary(details: {
 function getBookingEventColorId(doctorId?: string): string {
   if (!doctorId) return DEFAULT_BOOKING_COLOR_ID;
   return DOCTOR_EVENT_COLOR_ID_BY_ID[doctorId] || DEFAULT_BOOKING_COLOR_ID;
+}
+
+function isOnlineBooking(details: { clinicId?: string; clinicNameZh: string }): boolean {
+  return details.clinicId === 'online' || details.clinicNameZh === '網上';
+}
+
+function getMeetLinkFromEvent(event: any): string | undefined {
+  const hangoutLink = typeof event?.hangoutLink === 'string' ? event.hangoutLink.trim() : '';
+  if (hangoutLink) {
+    return hangoutLink;
+  }
+
+  const entryPoints = Array.isArray(event?.conferenceData?.entryPoints)
+    ? event.conferenceData.entryPoints
+    : [];
+  const videoEntry = entryPoints.find(
+    (entry: any) => entry?.entryPointType === 'video' && typeof entry?.uri === 'string'
+  );
+  return videoEntry?.uri?.trim() || undefined;
 }
 
 function buildBookingEventPrivateMetadata(details: {
@@ -210,10 +238,11 @@ export async function createBooking(
     email?: string;
     notes?: string;
   }
-): Promise<{ success: boolean; eventId?: string; error?: string }> {
+): Promise<CreateBookingResult> {
   try {
     const calendar = await getUncachableGoogleCalendarClient();
     const privateMetadata = buildBookingEventPrivateMetadata(details);
+    const shouldCreateMeet = isOnlineBooking(details);
 
     const event = {
       summary: buildBookingEventSummary(details),
@@ -239,16 +268,29 @@ export async function createBooking(
             private: privateMetadata,
           }
         : undefined,
+      conferenceData: shouldCreateMeet
+        ? {
+            createRequest: {
+              requestId: `eden-${randomUUID()}`,
+              conferenceSolutionKey: {
+                type: 'hangoutsMeet',
+              },
+            },
+          }
+        : undefined,
     };
 
     const response = await calendar.events.insert({
       calendarId: calendarId,
       requestBody: event,
+      conferenceDataVersion: shouldCreateMeet ? 1 : undefined,
     });
 
     return {
       success: true,
       eventId: response.data.id || undefined,
+      meetLink: getMeetLinkFromEvent(response.data),
+      eventHtmlLink: response.data.htmlLink || undefined,
     };
   } catch (error: any) {
     console.error(`Failed to create calendar event: ${getSafeErrorMessage(error)}`);

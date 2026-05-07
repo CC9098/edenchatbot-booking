@@ -19,6 +19,7 @@ import {
 import { sendBookingConfirmationWhatsapp } from '@/lib/chatwoot-whatsapp';
 import { normalizePhoneForSearch, toHKE164 } from '@/lib/contact-utils';
 import { getSafeErrorMessage } from '@/lib/error-sanitizer';
+import { sendDoctorOnlineBookingNotificationEmail } from '@/lib/gmail';
 import { ensureSupabaseUserForPhone } from '@/lib/whatsapp-auth-bridge';
 import { createBooking, getFreeBusy } from '@/lib/google-calendar';
 import { createServiceClient } from '@/lib/supabase';
@@ -342,6 +343,7 @@ export async function POST(request: NextRequest) {
       appointmentDate: bookingData.date,
       appointmentTime: bookingData.time,
       visitType: bookingData.visitType as BookingVisitType,
+      meetLink: calResult.meetLink,
       clinicWhatsappPhone: getClinicWhatsappPhone(notificationClinicId),
       manageAccessToken,
       groupBookingNotice: groupBookingNotice || undefined,
@@ -353,6 +355,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (calResult.meetLink) {
+      try {
+        const doctorEmailResult = await sendDoctorOnlineBookingNotificationEmail({
+          bookingId: calResult.eventId,
+          calendarId,
+          doctorId: bookingData.doctorId,
+          doctorName: bookingData.doctorName,
+          doctorNameZh: bookingData.doctorNameZh,
+          patientName: bookingData.patientName,
+          patientPhone: bookingData.phone,
+          patientEmail: bookingData.email,
+          date: bookingData.date,
+          time: bookingData.time,
+          durationMinutes,
+          meetLink: calResult.meetLink,
+        });
+        if (!doctorEmailResult.success) {
+          console.warn(`[booking-whatsapp] Doctor online booking notification warning: ${doctorEmailResult.error}`);
+        }
+      } catch (doctorEmailError) {
+        console.error(
+          `[booking-whatsapp] Doctor online booking notification failed: ${getSafeErrorMessage(doctorEmailError)}`,
+        );
+      }
+    }
+
     return NextResponse.json({
       success: true,
       bookingId: calResult.eventId,
@@ -360,6 +388,7 @@ export async function POST(request: NextRequest) {
       intakeSaved: intakeResult.success,
       whatsappSent: whatsappResult.success,
       whatsappConversationId: whatsappResult.conversationId,
+      meetLink: calResult.meetLink,
       groupBookingNotice: groupBookingNotice || undefined,
     });
   } catch (error) {

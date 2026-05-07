@@ -3,7 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { createBooking, getFreeBusy, getEvent, deleteEvent, moveEventToCalendar, updateEvent } from '@/lib/google-calendar';
-import { sendBookingCancellationEmail, sendBookingConfirmationEmail } from '@/lib/gmail';
+import {
+                sendBookingCancellationEmail,
+                sendBookingConfirmationEmail,
+                sendDoctorOnlineBookingNotificationEmail,
+} from '@/lib/gmail';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { bookingSchema } from '@/shared/types';
 import { CLINIC_BY_ID, CLINIC_ID_BY_NAME_ZH, DOCTOR_ID_BY_NAME_ZH, getClinicAddress, getDoctorBookingSlotMinutes } from '@/shared/clinic-data';
@@ -415,6 +419,8 @@ export async function POST(request: NextRequest) {
                                                                                 clinicAddress: getClinicAddress(bookingData.clinicId),
                                                                                 date: bookingData.date,
                                                                                 time: bookingData.time,
+                                                                                durationMinutes,
+                                                                                meetLink: calResult.meetLink,
                                                                                 eventId: calResult.eventId,
                                                                                 calendarId: calendarId
                                                                 });
@@ -424,11 +430,36 @@ export async function POST(request: NextRequest) {
                                                 }
                                 }
 
+                                if (calResult.meetLink) {
+                                                try {
+                                                                const doctorEmailResult = await sendDoctorOnlineBookingNotificationEmail({
+                                                                                bookingId: calResult.eventId,
+                                                                                calendarId,
+                                                                                doctorId: bookingData.doctorId,
+                                                                                doctorName: bookingData.doctorName,
+                                                                                doctorNameZh: bookingData.doctorNameZh,
+                                                                                patientName: bookingData.patientName,
+                                                                                patientPhone: bookingData.phone,
+                                                                                patientEmail: bookingData.email,
+                                                                                date: bookingData.date,
+                                                                                time: bookingData.time,
+                                                                                durationMinutes,
+                                                                                meetLink: calResult.meetLink,
+                                                                });
+                                                                if (!doctorEmailResult.success) {
+                                                                                console.warn(`Doctor online booking notification warning: ${doctorEmailResult.error}`);
+                                                                }
+                                                } catch (doctorEmailError) {
+                                                                console.error(`Doctor online booking notification failed: ${getSafeErrorMessage(doctorEmailError)}`);
+                                                }
+                                }
+
                                 return NextResponse.json({
                                                 success: true,
                                                 bookingId: calResult.eventId,
                                                 intakeId: intakeId || '',
                                                 intakeSaved: intakeResult.success,
+                                                meetLink: calResult.meetLink,
                                 });
 
                 } catch (error) {

@@ -5,7 +5,10 @@ import {
   createBooking,
   getFreeBusy,
 } from "@/lib/google-calendar";
-import { sendBookingConfirmationEmail } from "@/lib/gmail";
+import {
+  sendBookingConfirmationEmail,
+  sendDoctorOnlineBookingNotificationEmail,
+} from "@/lib/gmail";
 import { getMappingWithFallback } from "@/lib/storage-helpers";
 import {
   isSlotAfterClinicLastBookingCutoffUtc,
@@ -216,12 +219,42 @@ export async function POST(request: NextRequest) {
           clinicAddress: getClinicAddress(bookingData.clinicId),
           date: bookingData.date,
           time: bookingData.time,
+          durationMinutes,
+          meetLink: calResult.meetLink,
           eventId: calResult.eventId,
           calendarId: calendarId,
         });
       } catch (emailError) {
         console.error(
           `[chat/booking/create] Email sending failed: ${getSafeErrorMessage(emailError)}`
+        );
+      }
+    }
+
+    if (calResult.meetLink) {
+      try {
+        const doctorEmailResult = await sendDoctorOnlineBookingNotificationEmail({
+          bookingId: calResult.eventId,
+          calendarId,
+          doctorId: bookingData.doctorId,
+          doctorName: bookingData.doctorName,
+          doctorNameZh: bookingData.doctorNameZh,
+          patientName: bookingData.patientName,
+          patientPhone: bookingData.phone,
+          patientEmail: bookingData.email,
+          date: bookingData.date,
+          time: bookingData.time,
+          durationMinutes,
+          meetLink: calResult.meetLink,
+        });
+        if (!doctorEmailResult.success) {
+          console.warn(
+            `[chat/booking/create] Doctor online booking notification warning: ${doctorEmailResult.error}`
+          );
+        }
+      } catch (doctorEmailError) {
+        console.error(
+          `[chat/booking/create] Doctor online booking notification failed: ${getSafeErrorMessage(doctorEmailError)}`
         );
       }
     }
@@ -277,6 +310,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       bookingId: calResult.eventId,
+      meetLink: calResult.meetLink,
     });
   } catch (error: unknown) {
     console.error(`[chat/booking/create] Error: ${getSafeErrorMessage(error)}`);

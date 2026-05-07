@@ -17,6 +17,7 @@ export interface BookingWhatsappConfirmationInput {
   appointmentDate: string;
   appointmentTime: string;
   visitType: BookingVisitType;
+  meetLink?: string;
   groupBookingNotice?: string;
 }
 
@@ -89,6 +90,7 @@ export function buildWhatsappConfirmationText(
     `診所：${input.clinicNameZh}`,
     `日期：${formatDateForWhatsapp(input.appointmentDate)}`,
     `時間：${input.appointmentTime}`,
+    input.meetLink ? `Google Meet 網上應診連結：${input.meetLink}` : '',
     `診症類型：${VISIT_TYPE_LABELS[input.visitType]}`,
     `預約編號：${input.bookingId}`,
     input.groupBookingNotice ? '' : '',
@@ -112,6 +114,9 @@ export function buildWhatsappTemplateBodyParams(
     visit_type: VISIT_TYPE_LABELS[input.visitType],
     booking_id: input.bookingId,
     manage_url: manageUrl,
+    ...(input.meetLink && process.env.CHATWOOT_WHATSAPP_CONFIRMATION_TEMPLATE_INCLUDE_MEET_LINK === 'true'
+      ? { meet_link: input.meetLink }
+      : {}),
   };
 }
 

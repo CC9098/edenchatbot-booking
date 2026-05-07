@@ -27,7 +27,10 @@ import { getMappingWithFallback } from '@/lib/storage-helpers';
 import { getFreeBusy } from './google-calendar';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { createBooking, deleteEvent, listEventsInRange } from './google-calendar';
-import { sendBookingConfirmationEmail } from './gmail';
+import {
+  sendBookingConfirmationEmail,
+  sendDoctorOnlineBookingNotificationEmail,
+} from './gmail';
 import { createServiceClient } from './supabase';
 import { z } from 'zod';
 import {
@@ -1295,6 +1298,8 @@ export async function createConversationalBooking(
       clinicAddress: clinicAddress,
       date: normalizedBookingData.date,
       time: normalizedBookingData.time,
+      durationMinutes: slotMinutes,
+      meetLink: result.meetLink,
       eventId: result.eventId,
       calendarId: mapping.calendarId,
     });
@@ -1304,6 +1309,29 @@ export async function createConversationalBooking(
         "[createConversationalBooking] Failed to send email:",
         emailResult.error
       );
+    }
+
+    if (result.meetLink) {
+      const doctorEmailResult = await sendDoctorOnlineBookingNotificationEmail({
+        bookingId: result.eventId,
+        calendarId: mapping.calendarId,
+        doctorId: doctor.id,
+        doctorName: doctor.nameEn,
+        doctorNameZh: doctor.nameZh,
+        patientName: normalizedBookingData.patientName,
+        patientPhone: normalizedBookingData.phone,
+        patientEmail: normalizedBookingData.email,
+        date: normalizedBookingData.date,
+        time: normalizedBookingData.time,
+        durationMinutes: slotMinutes,
+        meetLink: result.meetLink,
+      });
+
+      if (!doctorEmailResult.success) {
+        console.warn(
+          `[createConversationalBooking] Doctor online booking notification warning: ${doctorEmailResult.error}`,
+        );
+      }
     }
 
     return {

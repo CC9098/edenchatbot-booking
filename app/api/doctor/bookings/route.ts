@@ -19,7 +19,10 @@ import {
 import { sendBookingConfirmationWhatsapp } from '@/lib/chatwoot-whatsapp';
 import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import { getSafeErrorMessage } from '@/lib/error-sanitizer';
-import { sendBookingConfirmationEmail } from '@/lib/gmail';
+import {
+  sendBookingConfirmationEmail,
+  sendDoctorOnlineBookingNotificationEmail,
+} from '@/lib/gmail';
 import { createBooking, getFreeBusy } from '@/lib/google-calendar';
 import { syncPatientProfileContact } from '@/lib/profile-contact-sync';
 import { createServiceClient } from '@/lib/supabase';
@@ -302,6 +305,7 @@ export async function POST(request: NextRequest) {
       appointmentDate: bookingData.date,
       appointmentTime: bookingData.time,
       visitType: bookingData.visitType as BookingVisitType,
+      meetLink: calResult.meetLink,
       clinicWhatsappPhone: getClinicWhatsappPhone(notificationClinicId),
       manageAccessToken,
     });
@@ -326,6 +330,8 @@ export async function POST(request: NextRequest) {
           clinicAddress: getClinicAddress(bookingData.clinicId),
           date: bookingData.date,
           time: bookingData.time,
+          durationMinutes,
+          meetLink: calResult.meetLink,
           eventId: calResult.eventId,
           calendarId,
         });
@@ -333,6 +339,32 @@ export async function POST(request: NextRequest) {
       } catch (emailError) {
         console.error(
           `[doctor/bookings] Email sending failed: ${getSafeErrorMessage(emailError)}`,
+        );
+      }
+    }
+
+    if (calResult.meetLink) {
+      try {
+        const doctorEmailResult = await sendDoctorOnlineBookingNotificationEmail({
+          bookingId: calResult.eventId,
+          calendarId,
+          doctorId: bookingData.doctorId,
+          doctorName: bookingData.doctorName,
+          doctorNameZh: bookingData.doctorNameZh,
+          patientName: bookingData.patientName,
+          patientPhone: bookingData.phone,
+          patientEmail: normalizedEmail || bookingData.email,
+          date: bookingData.date,
+          time: bookingData.time,
+          durationMinutes,
+          meetLink: calResult.meetLink,
+        });
+        if (!doctorEmailResult.success) {
+          console.warn(`[doctor/bookings] Doctor online booking notification warning: ${doctorEmailResult.error}`);
+        }
+      } catch (doctorEmailError) {
+        console.error(
+          `[doctor/bookings] Doctor online booking notification failed: ${getSafeErrorMessage(doctorEmailError)}`,
         );
       }
     }
@@ -345,6 +377,7 @@ export async function POST(request: NextRequest) {
       whatsappSent: whatsappResult.success,
       whatsappConversationId: whatsappResult.conversationId,
       emailSent,
+      meetLink: calResult.meetLink,
     });
   } catch (error) {
     if (error instanceof AuthError) {
