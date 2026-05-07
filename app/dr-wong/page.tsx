@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, ChevronDown, ExternalLink, MapPin, MessageCircle, ShieldCheck } from "lucide-react";
+import { CalendarDays, ChevronDown, ExternalLink, MessageCircle, ShieldCheck } from "lucide-react";
 
 const posterSrc = "/images/dr-samuel-wong-promo-poster-2026.png";
 const timetablePosterSrc = "/images/dr-samuel-wong-chiropractor-may-2026.png";
@@ -9,7 +9,6 @@ const timetablePosterSrc = "/images/dr-samuel-wong-chiropractor-may-2026.png";
 const whatsappMessage = encodeURIComponent(
   "你好，我想預約黃浩哲 Dr. Samuel H.C. Wong 脊醫，請問最近可預約時間？"
 );
-const drWongWhatsappUrl = `https://wa.me/85295094441?text=${whatsappMessage}`;
 const drWongFirstVisitBookingUrl =
   "/booking?doctor=wong&clinic=jordan&visitType=first&source=dr-wong";
 const drWongFollowUpBookingUrl =
@@ -198,28 +197,6 @@ export default function DrWongPage() {
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-3 text-sm text-[#536459]">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2">
-              <MapPin className="h-4 w-4 text-[#1f6b3f]" />
-              佐敦
-            </span>
-            <a
-              href={drWongWhatsappUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2 font-semibold text-[#1f6b3f] transition hover:bg-white"
-            >
-              Dr Wong WhatsApp：9509 4441
-              <ExternalLink className="h-4 w-4" />
-            </a>
-            <Link
-              href="/embed/timetable"
-              className="inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2 font-semibold text-[#1f6b3f] transition hover:bg-white"
-            >
-              查看診所時間表
-              <ExternalLink className="h-4 w-4" />
-            </Link>
-          </div>
         </div>
       </section>
     </main>
