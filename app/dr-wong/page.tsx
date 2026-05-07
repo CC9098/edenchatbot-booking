@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, ExternalLink, MapPin, MessageCircle, ShieldCheck } from "lucide-react";
+import { CalendarDays, ChevronDown, ExternalLink, MapPin, MessageCircle, ShieldCheck } from "lucide-react";
 
-const posterSrc = "/images/dr-samuel-wong-chiropractor-may-2026.png";
+const posterSrc = "/images/dr-samuel-wong-promo-poster-2026.png";
+const timetablePosterSrc = "/images/dr-samuel-wong-chiropractor-may-2026.png";
 
 const whatsappMessage = encodeURIComponent(
   "你好，我想預約黃浩哲 Dr. Samuel H.C. Wong 脊醫，請問最近可預約時間？"
@@ -19,11 +20,6 @@ const clinicActions = [
     clinicName: "佐敦",
     phone: "67333801",
     href: `https://wa.me/85267333801?text=${whatsappMessage}`,
-  },
-  {
-    clinicName: "荃灣",
-    phone: "51899065",
-    href: `https://wa.me/85251899065?text=${whatsappMessage}`,
   },
 ];
 
@@ -62,8 +58,8 @@ export default function DrWongPage() {
           <Image
             src={posterSrc}
             alt="黃浩哲 Dr. Samuel H.C. Wong 脊醫介紹"
-            width={1254}
-            height={1254}
+            width={998}
+            height={1576}
             priority
             className="h-auto w-full"
           />
@@ -157,7 +153,33 @@ export default function DrWongPage() {
               ))}
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <details className="group mt-5 overflow-hidden rounded-[18px] border border-[#d7c6a7] bg-[#fbf7ef]">
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[#0d4c2d] transition hover:bg-white [&::-webkit-details-marker]:hidden">
+                <span className="inline-flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-[#1f6b3f]" />
+                  展開 Dr Wong 五月時間表
+                </span>
+                <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+              </summary>
+              <div className="border-t border-[#e0cfb4] bg-white p-3">
+                <Image
+                  src={timetablePosterSrc}
+                  alt="黃浩哲 Dr. Samuel H.C. Wong 2026 年五月佐敦應診時間表"
+                  width={1254}
+                  height={1254}
+                  className="h-auto w-full rounded-[14px] border border-[#eadcc3]"
+                />
+                <Link
+                  href="/embed/timetable"
+                  className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[#1f6b3f] transition hover:text-[#0f4227]"
+                >
+                  查看完整診所時間表
+                  <ExternalLink className="h-4 w-4" />
+                </Link>
+              </div>
+            </details>
+
+            <div className="mt-4 grid gap-3">
               {clinicActions.map((clinic) => (
                 <a
                   key={clinic.clinicName}
@@ -179,7 +201,7 @@ export default function DrWongPage() {
           <div className="mt-5 flex flex-wrap gap-3 text-sm text-[#536459]">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2">
               <MapPin className="h-4 w-4 text-[#1f6b3f]" />
-              佐敦 | 荃灣
+              佐敦
             </span>
             <a
               href={drWongWhatsappUrl}
