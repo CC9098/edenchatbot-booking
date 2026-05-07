@@ -220,7 +220,7 @@ export const DOCTORS: DoctorProfile[] = [
     bookingVisitOptions: [
       {
         visitType: 'first',
-        serviceNameZh: '脊骨神經科檢查及治療',
+        serviceNameZh: '脊醫首診： 檢查及治療',
         serviceNameEn: 'Standard Chiropractic Examination',
         durationMinutes: 30,
         priceHkd: 490,
@@ -230,7 +230,7 @@ export const DOCTORS: DoctorProfile[] = [
       },
       {
         visitType: 'followup',
-        serviceNameZh: '脊骨跟進治療',
+        serviceNameZh: '脊醫覆診： 跟進治療',
         serviceNameEn: 'Standard Follow Up Visit',
         durationMinutes: 15,
         priceHkd: 880,

@@ -30,7 +30,7 @@ const clinicActions = [
 const pricingRows = [
   {
     label: "首診",
-    title: "脊骨神經科檢查及治療",
+    title: "脊醫首診： 檢查及治療",
     subtitle: "Standard Chiropractic Examination",
     duration: "30 minutes",
     price: "HK$490",
@@ -41,7 +41,7 @@ const pricingRows = [
   },
   {
     label: "覆診",
-    title: "脊骨跟進治療",
+    title: "脊醫覆診： 跟進治療",
     subtitle: "Standard Follow Up Visit",
     duration: "15 minutes",
     price: "HK$880",

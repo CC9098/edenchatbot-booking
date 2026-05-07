@@ -73,7 +73,7 @@ test('Dr. Wong booking keeps two simple chiropractic services and first-visit pr
   );
 
   const firstVisit = getDoctorBookingVisitOption('wong', 'first');
-  assert.equal(firstVisit?.serviceNameZh, '脊骨神經科檢查及治療');
+  assert.equal(firstVisit?.serviceNameZh, '脊醫首診： 檢查及治療');
   assert.equal(firstVisit?.serviceNameEn, 'Standard Chiropractic Examination');
   assert.equal(firstVisit?.durationMinutes, 30);
   assert.equal(firstVisit?.priceHkd, 490);
@@ -82,7 +82,7 @@ test('Dr. Wong booking keeps two simple chiropractic services and first-visit pr
   assert.equal(firstVisit?.note, '凡正接受醫天圓中醫診症的病人，可享首次半價優惠。');
 
   const followUp = getDoctorBookingVisitOption('wong', 'followup');
-  assert.equal(followUp?.serviceNameZh, '脊骨跟進治療');
+  assert.equal(followUp?.serviceNameZh, '脊醫覆診： 跟進治療');
   assert.equal(followUp?.serviceNameEn, 'Standard Follow Up Visit');
   assert.equal(followUp?.durationMinutes, 15);
   assert.equal(followUp?.priceHkd, 880);
