@@ -18,7 +18,6 @@ import {
 import type { CalendarMapping, TimeRange, WeeklySchedule } from '@/shared/schedule-config';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
-const SLOT_INCREMENT_MINUTES = 15;
 const SAME_DAY_BUFFER_MINUTES = 60;
 
 export type VirtualOnlineAvailability = {
@@ -205,6 +204,7 @@ async function getAvailableSlotsForMapping(params: {
 
   const busySlots = await getFreeBusy(mapping.calendarId, requestedDayUtc);
   const availableSlots: string[] = [];
+  const slotIncrementMinutes = durationMinutes > 0 ? durationMinutes : 15;
 
   for (const range of daySchedule) {
     let currentSlot = fromZonedTime(`${requestedDate}T${range.start}:00`, HONG_KONG_TIMEZONE);
@@ -212,7 +212,7 @@ async function getAvailableSlotsForMapping(params: {
 
     while (currentSlot < rangeEnd) {
       if (isPastSameDayCutoff(requestedDate, currentSlot, nowUtc)) {
-        currentSlot = new Date(currentSlot.getTime() + SLOT_INCREMENT_MINUTES * 60 * 1000);
+        currentSlot = new Date(currentSlot.getTime() + slotIncrementMinutes * 60 * 1000);
         continue;
       }
 
@@ -228,7 +228,7 @@ async function getAvailableSlotsForMapping(params: {
         availableSlots.push(formatInTimeZone(currentSlot, HONG_KONG_TIMEZONE, 'HH:mm'));
       }
 
-      currentSlot = new Date(currentSlot.getTime() + SLOT_INCREMENT_MINUTES * 60 * 1000);
+      currentSlot = new Date(currentSlot.getTime() + slotIncrementMinutes * 60 * 1000);
     }
   }
 
