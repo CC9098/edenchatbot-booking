@@ -120,6 +120,23 @@ export function buildWhatsappTemplateBodyParams(
   };
 }
 
+export function buildWhatsappOnlineTemplateBodyParams(
+  input: BookingWhatsappConfirmationInput & { manageAccessToken?: string },
+): Record<string, string> {
+  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
+
+  return {
+    patient_name: input.patientName,
+    doctor_name: input.doctorNameZh,
+    clinic_name: input.clinicNameZh,
+    appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
+    meet_link: input.meetLink || '',
+    visit_type: VISIT_TYPE_LABELS[input.visitType],
+    booking_id: input.bookingId,
+    manage_url: manageUrl,
+  };
+}
+
 export function buildWhatsappReminderText(
   input: BookingWhatsappReminderInput & { manageAccessToken?: string },
 ): string {

@@ -10,6 +10,7 @@ import {
   buildWhatsappCancellationTemplateBodyParams,
   buildWhatsappCancellationText,
   buildWhatsappConfirmationText,
+  buildWhatsappOnlineTemplateBodyParams,
   buildWhatsappReminderTemplateBodyParams,
   buildWhatsappReminderText,
   buildWhatsappRescheduleTemplateBodyParams,
@@ -520,6 +521,24 @@ function getTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
     configuredLanguage: process.env.CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE,
     configuredCategory: process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY,
     fallbackNames: ['booking_confirm'],
+    defaultCategory: 'UTILITY',
+  });
+}
+
+function hasOnlineConfirmationTemplateConfig(): boolean {
+  return Boolean((process.env.CHATWOOT_WHATSAPP_ONLINE_TEMPLATE_NAME || '').trim());
+}
+
+function getOnlineTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
+  return getNamedTemplateConfigs(inbox, {
+    configuredName: process.env.CHATWOOT_WHATSAPP_ONLINE_TEMPLATE_NAME,
+    configuredLanguage:
+      process.env.CHATWOOT_WHATSAPP_ONLINE_TEMPLATE_LANGUAGE ||
+      process.env.CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE,
+    configuredCategory:
+      process.env.CHATWOOT_WHATSAPP_ONLINE_TEMPLATE_CATEGORY ||
+      process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY,
+    fallbackNames: ['booking_confirm_online'],
     defaultCategory: 'UTILITY',
   });
 }
@@ -1055,10 +1074,15 @@ export async function sendBookingConfirmationWhatsapp(
   input: BookingWhatsappNotificationInput,
 ): Promise<SendWhatsappBookingConfirmationResult> {
   try {
+    const shouldUseOnlineTemplate = Boolean(input.meetLink && hasOnlineConfirmationTemplateConfig());
+
     return await sendBookingWhatsappNotification(input, {
       buildContent: () => buildWhatsappConfirmationText(input),
-      buildBodyParams: () => buildWhatsappTemplateBodyParams(input),
-      getTemplateConfigs,
+      buildBodyParams: () =>
+        shouldUseOnlineTemplate
+          ? buildWhatsappOnlineTemplateBodyParams(input)
+          : buildWhatsappTemplateBodyParams(input),
+      getTemplateConfigs: shouldUseOnlineTemplate ? getOnlineTemplateConfigs : getTemplateConfigs,
       preferTemplateIfAvailable: !input.groupBookingNotice,
     });
   } catch (error) {
