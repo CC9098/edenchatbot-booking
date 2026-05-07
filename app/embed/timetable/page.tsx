@@ -1,4 +1,4 @@
-import { CalendarClock, CalendarDays, Clock3, ExternalLink } from 'lucide-react';
+import { CalendarClock, CalendarDays, ExternalLink } from 'lucide-react';
 import Image from "next/image";
 
 import { EmbedAutoHeightReporter } from '@/components/embed/EmbedAutoHeightReporter';
@@ -567,7 +567,7 @@ export default async function TimetableEmbedPage({
   ];
 
   const sourceDate = selectedMonth === currentMonth ? todayIso : selectedMonth;
-  const { cards, generatedAtLabel, notices } = await getPublicTimetableData(sourceDate);
+  const { cards, generatedAtLabel } = await getPublicTimetableData(sourceDate);
   const visibleCards = clinicFilter ? cards.filter((card) => card.clinicId === clinicFilter) : cards;
   const activeMonthLabel = monthLabel(selectedMonth);
   const versionLabel = buildMonthRibbonLabel(selectedMonth);
@@ -598,31 +598,6 @@ export default async function TimetableEmbedPage({
               </p>
             </div>
             <DoctorStrip />
-
-            {notices.length > 0 ? (
-              <div className="mt-6 rounded-[28px] border border-white/75 bg-white/72 px-5 py-5 shadow-[0_22px_55px_-42px_rgba(15,23,42,0.38)] backdrop-blur-sm">
-                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.34em] text-slate-500">
-                  <Clock3 className="h-4 w-4" />
-                  近期特別休診
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-3">
-                  {notices.map((notice) => (
-                    <div
-                      key={notice.id}
-                      className="rounded-full border border-slate-200 bg-[#faf8f1] px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_12px_26px_-24px_rgba(15,23,42,0.45)]"
-                    >
-                      {[notice.doctorNameZh, notice.clinicNameZh].filter(Boolean).join(' ・ ') || '全診所安排'}
-                      <span className="mx-2 text-slate-300">|</span>
-                      {notice.dateLabel}
-                      {notice.timeLabel ? ` ${notice.timeLabel}` : ' 全日休診'}
-                      <span className="mx-2 text-slate-300">|</span>
-                      {notice.reason}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
 
             <div className="mt-6">
               <p className="text-center text-sm font-semibold text-slate-600">選擇時間表月份（按入先可入）：</p>
