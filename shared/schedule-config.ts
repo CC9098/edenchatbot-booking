@@ -386,7 +386,7 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
       1: null,
       2: null,
       3: null,
-      4: [{ start: "10:30", end: "13:00" }],
+      4: [{ start: "11:00", end: "14:00" }],
       5: null,
       6: [{ start: "14:30", end: "16:30" }],
     }

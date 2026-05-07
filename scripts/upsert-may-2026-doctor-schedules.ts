@@ -137,7 +137,7 @@ const MAY_2026_SCHEDULES: ScheduleMap = {
     6: [MORNING_1100_1400, { start: '15:30', end: '18:30' }],
   }),
   [scheduleKey('wong', 'jordan')]: schedule({
-    4: [{ start: '10:30', end: '13:00' }],
+    4: [MORNING_1100_1400],
     6: [{ start: '14:30', end: '16:30' }],
   }),
 

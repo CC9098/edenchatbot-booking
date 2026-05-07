@@ -33,7 +33,7 @@ export const GROUP_BOOKING_POLICIES: readonly GroupBookingPolicy[] = [
     cancelHoursBeforeStart: 24,
     notice: DR_WONG_GROUP_BOOKING_NOTICE,
     sessions: [
-      { dayOfWeek: 4, start: "10:30", end: "13:00" },
+      { dayOfWeek: 4, start: "11:00", end: "14:00" },
       { dayOfWeek: 6, start: "14:30", end: "16:30" },
     ],
   },

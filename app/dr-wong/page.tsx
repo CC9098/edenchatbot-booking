@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, ExternalLink, MapPin, MessageCircle, ShieldCheck } from "lucide-react";
 
-const posterSrc = "/images/dr-samuel-wong-chiropractor.png";
+const posterSrc = "/images/dr-samuel-wong-chiropractor-may-2026.png";
 
 const whatsappMessage = encodeURIComponent(
   "你好，我想預約黃浩哲 Dr. Samuel H.C. Wong 脊醫，請問最近可預約時間？"
@@ -62,8 +62,8 @@ export default function DrWongPage() {
           <Image
             src={posterSrc}
             alt="黃浩哲 Dr. Samuel H.C. Wong 脊醫介紹"
-            width={1290}
-            height={1536}
+            width={1254}
+            height={1254}
             priority
             className="h-auto w-full"
           />
@@ -109,7 +109,7 @@ export default function DrWongPage() {
               預約 Dr Wong
             </div>
             <p className="mt-3 text-sm leading-relaxed text-[#496153]">
-              佐敦應診時間：星期四 10:30-13:00、星期六 14:30-16:30。為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以 WhatsApp 確認。
+              佐敦應診時間：星期四 11:00-14:00、星期六 14:30-16:30。為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以 WhatsApp 確認。
             </p>
 
             <div className="mt-5 divide-y divide-[#e0cfb4] border-y border-[#e0cfb4]">

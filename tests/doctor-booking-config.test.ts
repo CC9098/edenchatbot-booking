@@ -14,6 +14,8 @@ import {
   getDoctorBookingVisitOptions,
   isSupportBookingPractitioner,
 } from '@/shared/clinic-data';
+import { GROUP_BOOKING_POLICIES } from '@/lib/group-booking-policy';
+import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
 
 test('Dr. Lee shows acupuncture only on booking pages', () => {
   assert.equal(getDoctorBookingTreatmentLabel('lee'), '針灸 Acupuncture');
@@ -90,4 +92,20 @@ test('Dr. Wong booking keeps two simple chiropractic services and first-visit pr
   assert.equal(getDoctorBookingSlotMinutes('wong', 'first'), 30);
   assert.equal(getDoctorBookingSlotMinutes('wong', 'followup'), 15);
   assert.equal(getDoctorBookingSlotMinutes('wong'), 30);
+});
+
+test('Dr. Wong Jordan schedule matches the May 2026 poster hours', () => {
+  const mapping = CALENDAR_MAPPINGS.find(
+    (candidate) => candidate.doctorId === 'wong' && candidate.clinicId === 'jordan'
+  );
+  assert.deepEqual(mapping?.schedule[4], [{ start: '11:00', end: '14:00' }]);
+  assert.deepEqual(mapping?.schedule[6], [{ start: '14:30', end: '16:30' }]);
+
+  const policy = GROUP_BOOKING_POLICIES.find(
+    (candidate) => candidate.doctorId === 'wong' && candidate.clinicId === 'jordan'
+  );
+  assert.deepEqual(policy?.sessions, [
+    { dayOfWeek: 4, start: '11:00', end: '14:00' },
+    { dayOfWeek: 6, start: '14:30', end: '16:30' },
+  ]);
 });
