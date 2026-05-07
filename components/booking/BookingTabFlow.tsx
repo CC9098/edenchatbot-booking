@@ -111,6 +111,10 @@ const WEEKDAY_SHORT_LABELS_ZH = ['日', '一', '二', '三', '四', '五', '六'
 const OTHER_TREATMENT_OPTION_ID: BookingTreatmentOptionId = 'other';
 const DR_WONG_GROUP_BOOKING_NOTICE =
   '為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以 WhatsApp 確認。';
+const HOLIDAY_NOTICE_SUMMARY_LINES = [
+  '休診或特別安排會在你選擇診所及日期後顯示。',
+  '未能選擇的日期代表暫未開放或已滿，可改選其他日子。',
+];
 
 const VISIT_TYPE_LABELS: Record<VisitType, string> = {
   first: '首診',
@@ -391,12 +395,6 @@ function getSelectedScheduleEyebrow(
   return isSupportBookingDoctor(doctor) ? '協作脊醫時段' : '醫師應診時間';
 }
 
-function getSelectedCardLabel(
-  doctor?: Pick<BookableDoctorSchedule, 'bookingPractitionerGroup'>
-): string {
-  return isSupportBookingDoctor(doctor) ? '協作服務卡片' : '醫師卡片';
-}
-
 function getSelectedSummaryEyebrow(
   doctor?: Pick<BookableDoctorSchedule, 'bookingPractitionerGroup'>
 ): string {
@@ -552,6 +550,31 @@ function formatCompactClinicSchedule(
 function getCompactSchedulePreviewClinics(doctor: BookableDoctorSchedule) {
   const physicalClinics = doctor.clinics.filter((clinic) => clinic.clinicId !== 'online');
   return physicalClinics.length > 0 ? physicalClinics : doctor.clinics;
+}
+
+function CompactScheduleSummaryCard({
+  doctor,
+  className = '',
+}: {
+  doctor: BookableDoctorSchedule;
+  className?: string;
+}) {
+  return (
+    <div className={`w-full rounded-xl border border-[#e2efe4] bg-[#f7fbf8] px-3 py-3 text-xs leading-relaxed text-slate-600 sm:max-w-[20rem] sm:shrink-0 ${className}`}>
+      <p className="font-semibold text-[#254430]">應診時間</p>
+      <div className="mt-2 space-y-1.5">
+        {getCompactSchedulePreviewClinics(doctor).map((clinic) => (
+          <p
+            key={`compact-schedule-${doctor.doctorId}-${clinic.clinicId}`}
+            className="grid grid-cols-[2.75rem_1fr] gap-2"
+          >
+            <span className="font-semibold text-[#5d8c67]">{clinic.clinicNameZh}</span>
+            <span>{formatCompactClinicSchedule(clinic)}</span>
+          </p>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function getDoctorAvatarFallback(nameZh?: string): string {
@@ -719,16 +742,7 @@ export function BookingTabFlow({
       text: string;
       clinicId?: ClinicId;
       clinicNameZh?: string;
-      isStatic?: boolean;
     }> = [];
-
-    if (selectedDoctor.scheduleNote) {
-      notices.push({
-        id: `static:${selectedDoctor.doctorId}`,
-        text: selectedDoctor.scheduleNote,
-        isStatic: true,
-      });
-    }
 
     for (const notice of selectedDoctor.bookingNotices ?? []) {
       if (clinicId && notice.clinicId && notice.clinicId !== clinicId) {
@@ -1633,20 +1647,7 @@ export function BookingTabFlow({
                     </Link>
                   </div>
                 </div>
-                <div className="w-full rounded-xl border border-[#e2efe4] bg-[#f7fbf8] px-3 py-3 text-xs leading-relaxed text-slate-600 sm:max-w-[20rem] sm:shrink-0">
-                  <p className="font-semibold text-[#254430]">應診時間</p>
-                  <div className="mt-2 space-y-1.5">
-                    {getCompactSchedulePreviewClinics(selectedDoctor).map((clinic) => (
-                      <p
-                        key={`minimal-preview-${clinic.clinicId}`}
-                        className="grid grid-cols-[2.75rem_1fr] gap-2"
-                      >
-                        <span className="font-semibold text-[#5d8c67]">{clinic.clinicNameZh}</span>
-                        <span>{formatCompactClinicSchedule(clinic)}</span>
-                      </p>
-                    ))}
-                  </div>
-                </div>
+                <CompactScheduleSummaryCard doctor={selectedDoctor} />
               </div>
             </div>
           ) : (
@@ -1707,9 +1708,6 @@ export function BookingTabFlow({
                       <h2 className="mt-2 text-[1.35rem] font-semibold text-[#234230] sm:text-[1.5rem]">
                         {selectedDoctor.doctorNameZh}
                       </h2>
-                      <p className="mt-1 text-sm leading-relaxed text-slate-600">
-                        可先睇固定應診時間，再去下一步用彩色燈號比較各診所邊日有位。
-                      </p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {usesVisitBasedServices ? (
                           <>
@@ -1746,43 +1744,16 @@ export function BookingTabFlow({
                     </div>
                   </div>
 
-                  <div className="rounded-[22px] border border-[#d5e7d8] bg-white/85 px-4 py-3 text-sm shadow-[0_12px_30px_-26px_rgba(31,74,44,0.4)] sm:max-w-[240px]">
-                    <p className="text-[11px] font-semibold tracking-[0.24em] text-[#5d8c67]">
-                      {getSelectedCardLabel(selectedDoctor)}
-                    </p>
-                    <p className="mt-1 font-semibold text-[#254430]">
-                      {selectedDoctor.doctorNameZh}
-                    </p>
-                    <p className="mt-1 text-slate-500">
-                      {selectedClinic
-                        ? `${selectedClinic.clinicNameZh} 已套用篩選，日曆只會顯示該診所燈號。`
-                        : '未鎖定診所，下一步可直接比較全部診所日期。'}
-                    </p>
-                    {selectedDoctor.doctorId === 'wong' ? (
-                      <Link
-                        href="/dr-wong"
-                        className="mt-3 inline-flex rounded-full border border-[#b8d7be] bg-[#f5fbf6] px-3 py-1.5 text-xs font-semibold text-[#1f6b3f] transition hover:border-[#71a97a] hover:bg-white"
-                      >
-                        查看 Dr Wong 專頁
-                      </Link>
-                    ) : null}
-                  </div>
+                  <CompactScheduleSummaryCard doctor={selectedDoctor} className="sm:max-w-[18rem]" />
                 </div>
               )}
 
               {!isMinimalPreview && selectedDoctorNotices.length > 0 && (
                 <div className="mt-4 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                  <div className="space-y-2">
-                    {selectedDoctorNotices.map((notice) => (
-                      <div key={notice.id} className="flex flex-wrap items-start gap-2">
-                        {!clinicId && notice.clinicNameZh && !notice.isStatic ? (
-                          <span className="rounded-full border border-amber-300/80 bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
-                            {notice.clinicNameZh}
-                          </span>
-                        ) : null}
-                        <p className="flex-1">{notice.text}</p>
-                      </div>
+                  <div className="space-y-1">
+                    {HOLIDAY_NOTICE_SUMMARY_LINES.map((line) => (
+                      <p key={line}>{line}</p>
                     ))}
                   </div>
                 </div>
