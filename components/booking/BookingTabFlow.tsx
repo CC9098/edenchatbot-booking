@@ -1552,24 +1552,26 @@ export function BookingTabFlow({
       {step === 'setup' && (
         <div className="space-y-6">
           {isMinimalPreview && selectedDoctor ? (
-            <div className="w-full rounded-2xl border border-[#d5e7d8] bg-white/90 px-4 py-4 sm:w-fit sm:min-w-[28rem] sm:max-w-full">
-              <div className="flex min-w-0 items-center gap-4">
-                <DoctorAvatar doctor={selectedDoctor} size="lg" />
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold tracking-[0.2em] text-[#5d8c67]">已選醫師</p>
-                  <p className="mt-1 text-base font-semibold leading-snug text-[#254430]">
-                    {selectedDoctor.doctorNameZh}
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    {getSlotDurationLabel(selectedDoctor.bookingSlotMinutes)}
-                  </p>
-                  <Link
-                    href="/booking-whatsapp"
-                    className="mt-2 inline-flex rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
-                  >
-                    更改醫師
-                  </Link>
+            <div className="w-full rounded-2xl border border-[#d5e7d8] bg-white/90 px-4 py-4 sm:px-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-4">
+                  <DoctorAvatar doctor={selectedDoctor} size="lg" />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold tracking-[0.2em] text-[#5d8c67]">已選醫師</p>
+                    <p className="mt-1 text-base font-semibold leading-snug text-[#254430]">
+                      {selectedDoctor.doctorNameZh}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {getSlotDurationLabel(selectedDoctor.bookingSlotMinutes)}
+                    </p>
+                  </div>
                 </div>
+                <Link
+                  href="/booking-whatsapp"
+                  className="inline-flex w-fit rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light sm:shrink-0"
+                >
+                  更改醫師
+                </Link>
               </div>
             </div>
           ) : (
