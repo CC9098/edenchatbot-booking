@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, ChevronDown, ExternalLink, MessageCircle, ShieldCheck } from "lucide-react";
 
-const posterSrc = "/images/dr-samuel-wong-promo-poster-2026.png";
+const posterSrc = "/images/dr-samuel-wong-promo-poster-2026-board-fixed.png";
 const timetablePosterSrc = "/images/dr-samuel-wong-chiropractor-may-2026.png";
 
 const whatsappMessage = encodeURIComponent(
