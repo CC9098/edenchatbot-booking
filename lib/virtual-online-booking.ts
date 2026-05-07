@@ -36,6 +36,10 @@ function isPhysicalClinicId(clinicId: string): clinicId is PhysicalClinicId {
   return PHYSICAL_CLINIC_IDS.includes(clinicId as PhysicalClinicId);
 }
 
+function isOnlineClinicId(clinicId: string): clinicId is 'online' {
+  return clinicId === 'online';
+}
+
 function createEmptyWeeklySchedule(): WeeklySchedule {
   return {
     0: null,
@@ -72,6 +76,26 @@ function mergeTimeRanges(ranges: TimeRange[]): TimeRange[] {
   }
 
   return merged;
+}
+
+function hasAnySchedule(schedule: WeeklySchedule): boolean {
+  return Object.values(schedule).some((ranges) => ranges !== null && ranges.length > 0);
+}
+
+function buildMergedWeeklyScheduleFromMappings(mappings: CalendarMapping[]): WeeklySchedule | null {
+  if (mappings.length === 0) {
+    return null;
+  }
+
+  const mergedSchedule = createEmptyWeeklySchedule();
+
+  for (let day = 0; day <= 6; day += 1) {
+    const allRanges = mappings.flatMap((mapping) => mapping.schedule[day] ?? []);
+    const mergedRanges = mergeTimeRanges(allRanges);
+    mergedSchedule[day] = mergedRanges.length > 0 ? mergedRanges : null;
+  }
+
+  return hasAnySchedule(mergedSchedule) ? mergedSchedule : null;
 }
 
 function getRequestedDayContext(requestedDate: string) {
@@ -130,7 +154,17 @@ async function getPhysicalMappingsForDoctor(
   );
 }
 
-async function getAvailableSlotsForPhysicalMapping(params: {
+async function getActiveOnlineMappingsForDoctor(
+  doctorId: DoctorId,
+  targetDate?: string
+): Promise<CalendarMapping[]> {
+  const mappings = await getActiveScheduleMappings(targetDate);
+  return mappings.filter(
+    (mapping) => mapping.doctorId === doctorId && mapping.isActive && isOnlineClinicId(mapping.clinicId)
+  );
+}
+
+async function getAvailableSlotsForMapping(params: {
   mapping: CalendarMapping;
   requestedDate: string;
   durationMinutes: number;
@@ -210,13 +244,32 @@ async function getOnlineCandidateMappingsForDate(
   doctorId: DoctorId,
   requestedDate: string
 ): Promise<CalendarMapping[]> {
-  const physicalMappings = await getPhysicalMappingsForDoctor(doctorId, requestedDate);
+  const [onlineMappings, physicalMappings] = await Promise.all([
+    getActiveOnlineMappingsForDoctor(doctorId, requestedDate),
+    getPhysicalMappingsForDoctor(doctorId, requestedDate),
+  ]);
   const { dayOfWeek } = getRequestedDayContext(requestedDate);
+
+  const explicitOnlineCandidates = onlineMappings.filter((mapping) => {
+    const daySchedule = getScheduleForDayFromWeekly(mapping.schedule, dayOfWeek);
+    return Boolean(daySchedule && daySchedule.length > 0);
+  });
+  if (explicitOnlineCandidates.length > 0) {
+    return explicitOnlineCandidates;
+  }
 
   return physicalMappings.filter((mapping) => {
     const daySchedule = getScheduleForDayFromWeekly(mapping.schedule, dayOfWeek);
     return Boolean(daySchedule && daySchedule.length > 0);
   });
+}
+
+function getClinicSortIndex(clinicId: string): number {
+  if (isOnlineClinicId(clinicId)) {
+    return -1;
+  }
+
+  return PHYSICAL_CLINIC_IDS.indexOf(clinicId as PhysicalClinicId);
 }
 
 function sortMappingsForSelection(
@@ -229,8 +282,7 @@ function sortMappingsForSelection(
       if (right.calendarId === preferredCalendarId) return 1;
     }
 
-    return PHYSICAL_CLINIC_IDS.indexOf(left.clinicId as PhysicalClinicId)
-      - PHYSICAL_CLINIC_IDS.indexOf(right.clinicId as PhysicalClinicId);
+    return getClinicSortIndex(left.clinicId) - getClinicSortIndex(right.clinicId);
   });
 }
 
@@ -278,22 +330,18 @@ export function buildVirtualOnlineScheduleFromMappings(
   mappings: CalendarMapping[],
   doctorId: DoctorId
 ): WeeklySchedule | null {
-  const physicalMappings = mappings.filter(
-    (mapping) => mapping.doctorId === doctorId && mapping.isActive && isPhysicalClinicId(mapping.clinicId)
+  const explicitOnlineSchedule = buildMergedWeeklyScheduleFromMappings(
+    mappings.filter(
+      (mapping) => mapping.doctorId === doctorId && mapping.isActive && isOnlineClinicId(mapping.clinicId)
+    )
   );
-  if (physicalMappings.length === 0) {
-    return null;
+  if (explicitOnlineSchedule) {
+    return explicitOnlineSchedule;
   }
 
-  const mergedSchedule = createEmptyWeeklySchedule();
-
-  for (let day = 0; day <= 6; day += 1) {
-    const allRanges = physicalMappings.flatMap((mapping) => mapping.schedule[day] ?? []);
-    const mergedRanges = mergeTimeRanges(allRanges);
-    mergedSchedule[day] = mergedRanges.length > 0 ? mergedRanges : null;
-  }
-
-  return mergedSchedule;
+  return buildMergedWeeklyScheduleFromMappings(mappings.filter(
+    (mapping) => mapping.doctorId === doctorId && mapping.isActive && isPhysicalClinicId(mapping.clinicId)
+  ));
 }
 
 export async function getVirtualOnlineScheduleForDoctor(
@@ -321,11 +369,15 @@ export async function getVirtualOnlineAvailability(params: {
 
   const candidateMappings = await getOnlineCandidateMappingsForDate(doctorId, requestedDate);
   if (candidateMappings.length === 0) {
-    const hasAnyPhysicalMapping = (await getPhysicalMappingsForDoctor(doctorId, requestedDate)).length > 0;
+    const [onlineMappings, physicalMappings] = await Promise.all([
+      getActiveOnlineMappingsForDoctor(doctorId, requestedDate),
+      getPhysicalMappingsForDoctor(doctorId, requestedDate),
+    ]);
+    const hasAnyMapping = onlineMappings.length > 0 || physicalMappings.length > 0;
     return {
-      mappingFound: hasAnyPhysicalMapping,
+      mappingFound: hasAnyMapping,
       slots: [],
-      isClosed: hasAnyPhysicalMapping,
+      isClosed: hasAnyMapping,
       isHoliday: false,
     };
   }
@@ -333,7 +385,7 @@ export async function getVirtualOnlineAvailability(params: {
   const nowUtc = new Date();
   const results = await Promise.all(
     candidateMappings.map((mapping) =>
-      getAvailableSlotsForPhysicalMapping({
+      getAvailableSlotsForMapping({
         mapping,
         requestedDate,
         durationMinutes,

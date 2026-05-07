@@ -161,7 +161,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarObjectPosition: '38% center',
     bookingUrl: buildBookingUrl({ doctorId: 'hon' }),
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
-    bookingSlotMinutes: 30,
+    bookingSlotMinutes: 15,
     scheduleNote:
       '2026年3月1日至2026年3月9日如欲預約，請致電或 WhatsApp 聯絡診所；2026年3月10日至2026年4月30日韓醫師進修休診，會由張天慧醫師及梁仲威醫師駐診。',
   },
@@ -173,7 +173,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarObjectPosition: '82% center',
     bookingUrl: buildBookingUrl({ doctorId: 'chau' }),
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
-    bookingSlotMinutes: 30,
+    bookingSlotMinutes: 15,
   },
   {
     id: 'cheung',
@@ -181,8 +181,9 @@ export const DOCTORS: DoctorProfile[] = [
     nameEn: 'Dr. Cheung',
     avatarSrc: '/doctor-avatars/cheung.jpg',
     avatarObjectPosition: '80% center',
-    bookingUrl: buildBookingUrl({ doctorId: 'cheung' }),
+    bookingUrl: buildBookingUrl({ doctorId: 'cheung', clinicId: 'online' }),
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
+    bookingSlotMinutes: 20,
   },
   {
     id: 'cheungmy',

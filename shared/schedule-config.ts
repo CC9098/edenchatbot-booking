@@ -292,6 +292,22 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
       6: null,
     }
   },
+  {
+    doctorId: "cheung",
+    clinicId: "online",
+    calendarId: "r0ea9kabll5gdc7ll2s13n5hko@group.calendar.google.com",
+    isActive: true,
+    effectiveFrom: "2026-05-01",
+    schedule: {
+      0: null,
+      1: null,
+      2: null,
+      3: [{ start: "21:30", end: "23:30" }],
+      4: [{ start: "21:30", end: "23:30" }],
+      5: null,
+      6: null,
+    }
+  },
 
   // ===== Dr. Cheung 張敏言醫師 =====
   {

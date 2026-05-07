@@ -88,6 +88,30 @@ function mappingKey(mapping: { doctorId: string; clinicId: string }): string {
   return `${mapping.doctorId}:${mapping.clinicId}`;
 }
 
+function buildBookableDoctorSchedule(
+  doctor: (typeof DOCTORS)[number],
+  clinics: BookableClinicSchedule[] = []
+): BookableDoctorSchedule {
+  return {
+    doctorId: doctor.id,
+    doctorNameZh: doctor.nameZh,
+    doctorNameEn: doctor.nameEn,
+    avatarSrc: doctor.avatarSrc,
+    avatarObjectPosition: doctor.avatarObjectPosition,
+    bookingPractitionerGroup: getDoctorBookingPractitionerGroup(doctor.id),
+    bookingGroupLabel: getDoctorBookingGroupLabel(doctor.id),
+    bookingRoleLabel: getDoctorBookingRoleLabel(doctor.id),
+    bookingSupportNote: getDoctorBookingSupportNote(doctor.id),
+    scheduleNote: doctor.scheduleNote,
+    bookingTreatmentLabel: getDoctorBookingTreatmentLabel(doctor.id),
+    bookingTreatmentOptions: getDoctorBookingTreatmentOptions(doctor.id),
+    bookingSlotMinutes: getDoctorBookingSlotMinutes(doctor.id),
+    bookingVisitOptions: [...getDoctorBookingVisitOptions(doctor.id)],
+    summary: '',
+    clinics,
+  };
+}
+
 function findUpcomingPreviewDate(
   mappings: Awaited<ReturnType<typeof getScheduleVersions>>,
   today: string
@@ -163,24 +187,7 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
 
     const existing = doctorMap.get(doctor.id);
     if (!existing) {
-      doctorMap.set(doctor.id, {
-        doctorId: doctor.id,
-        doctorNameZh: doctor.nameZh,
-        doctorNameEn: doctor.nameEn,
-        avatarSrc: doctor.avatarSrc,
-        avatarObjectPosition: doctor.avatarObjectPosition,
-        bookingPractitionerGroup: getDoctorBookingPractitionerGroup(doctor.id),
-        bookingGroupLabel: getDoctorBookingGroupLabel(doctor.id),
-        bookingRoleLabel: getDoctorBookingRoleLabel(doctor.id),
-        bookingSupportNote: getDoctorBookingSupportNote(doctor.id),
-        scheduleNote: doctor.scheduleNote,
-        bookingTreatmentLabel: getDoctorBookingTreatmentLabel(doctor.id),
-        bookingTreatmentOptions: getDoctorBookingTreatmentOptions(doctor.id),
-        bookingSlotMinutes: getDoctorBookingSlotMinutes(doctor.id),
-        bookingVisitOptions: [...getDoctorBookingVisitOptions(doctor.id)],
-        summary: '',
-        clinics: [clinicSchedule],
-      });
+      doctorMap.set(doctor.id, buildBookableDoctorSchedule(doctor, [clinicSchedule]));
       continue;
     }
 
@@ -188,16 +195,21 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
   }
 
   return DOCTORS
-    .map((doctor) => doctorMap.get(doctor.id))
-    .filter((doctor): doctor is BookableDoctorSchedule => Boolean(doctor))
-    .map((doctor) => {
+    .map((doctorProfile): BookableDoctorSchedule | null => {
+      const onlineSchedule =
+        doctorProfile.onlineBookingEnabled === false
+          ? null
+          : buildVirtualOnlineScheduleFromMappings(mappings, doctorProfile.id);
+      const existingDoctor = doctorMap.get(doctorProfile.id);
+
+      if (!existingDoctor && (!onlineSchedule || !hasAnySchedule(onlineSchedule))) {
+        return null;
+      }
+
+      const doctor = existingDoctor ?? buildBookableDoctorSchedule(doctorProfile);
       const clinics: BookableClinicSchedule[] = PHYSICAL_CLINIC_IDS
         .map((clinicId) => doctor.clinics.find((clinic) => clinic.clinicId === clinicId))
         .filter((clinic): clinic is BookableClinicSchedule => Boolean(clinic));
-      const onlineSchedule =
-        DOCTORS.find((candidate) => candidate.id === doctor.doctorId)?.onlineBookingEnabled === false
-          ? null
-          : buildVirtualOnlineScheduleFromMappings(mappings, doctor.doctorId);
 
       if (onlineSchedule && hasAnySchedule(onlineSchedule)) {
         const onlineClinic = CLINIC_BY_ID.online;
@@ -235,5 +247,6 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
           .map((clinic) => `${clinic.clinicNameZh}：${clinic.summary}`)
           .join('\n'),
       };
-    });
+    })
+    .filter((doctor): doctor is BookableDoctorSchedule => Boolean(doctor));
 }

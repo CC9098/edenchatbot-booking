@@ -25,9 +25,9 @@ test('Dr. Lee shows acupuncture only on booking pages', () => {
   );
 });
 
-test('Dr. Hon and Dr. Chau use 30-minute booking slots', () => {
-  assert.equal(getDoctorBookingSlotMinutes('hon'), 30);
-  assert.equal(getDoctorBookingSlotMinutes('chau'), 30);
+test('Dr. Hon and Dr. Chau use 15-minute booking slots', () => {
+  assert.equal(getDoctorBookingSlotMinutes('hon'), 15);
+  assert.equal(getDoctorBookingSlotMinutes('chau'), 15);
 });
 
 test('other doctors keep the default treatment label and 15-minute slots', () => {
@@ -40,7 +40,18 @@ test('other doctors keep the default treatment label and 15-minute slots', () =>
     ['acupuncture', 'manual_therapy', 'herbal_prescription', 'other']
   );
   assert.equal(getDoctorBookingSlotMinutes('chan'), 15);
-  assert.equal(getDoctorBookingSlotMinutes('cheung'), 15);
+});
+
+test('Dr. Cheung Tin Wai online consultation uses 20-minute evening slots', () => {
+  assert.equal(DOCTOR_BY_ID.cheung.nameZh, '張天慧醫師');
+  assert.equal(getDoctorBookingSlotMinutes('cheung'), 20);
+
+  const mapping = CALENDAR_MAPPINGS.find(
+    (candidate) => candidate.doctorId === 'cheung' && candidate.clinicId === 'online'
+  );
+  assert.equal(mapping?.effectiveFrom, '2026-05-01');
+  assert.deepEqual(mapping?.schedule[3], [{ start: '21:30', end: '23:30' }]);
+  assert.deepEqual(mapping?.schedule[4], [{ start: '21:30', end: '23:30' }]);
 });
 
 test('Dr. Cheung Min Yin is a separate acupuncture practitioner', () => {
