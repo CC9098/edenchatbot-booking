@@ -107,6 +107,7 @@ const DEFAULT_SLOT_DURATION_MINUTES = 15;
 const MAX_BOOKING_WINDOW_DAYS = 90;
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const;
 const WEEKDAY_LABELS_ZH = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'] as const;
+const WEEKDAY_SHORT_LABELS_ZH = ['日', '一', '二', '三', '四', '五', '六'] as const;
 const OTHER_TREATMENT_OPTION_ID: BookingTreatmentOptionId = 'other';
 const DR_WONG_GROUP_BOOKING_NOTICE =
   '為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以 WhatsApp 確認。';
@@ -491,6 +492,66 @@ function formatScheduleLines(schedule: WeeklySchedule): string[] {
   }
 
   return lines;
+}
+
+function formatCompactTimeRanges(ranges: TimeRange[]): string {
+  return ranges.map((range) => `${range.start}-${range.end}`).join(' / ');
+}
+
+function formatCompactWeekdays(days: number[]): string {
+  if (days.length === 0) return '';
+
+  const sortedDays = [...days].sort((left, right) => left - right);
+  const chunks: number[][] = [];
+  let currentChunk: number[] = [];
+
+  for (const day of sortedDays) {
+    const previousDay = currentChunk[currentChunk.length - 1];
+    if (currentChunk.length === 0 || day === previousDay + 1) {
+      currentChunk.push(day);
+      continue;
+    }
+
+    chunks.push(currentChunk);
+    currentChunk = [day];
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk);
+  }
+
+  const labels = chunks.map((chunk) => {
+    if (chunk.length >= 3) {
+      return `${WEEKDAY_SHORT_LABELS_ZH[chunk[0]]}至${WEEKDAY_SHORT_LABELS_ZH[chunk[chunk.length - 1]]}`;
+    }
+
+    return chunk.map((day) => WEEKDAY_SHORT_LABELS_ZH[day]).join('、');
+  });
+
+  return `週${labels.join('、')}`;
+}
+
+function formatCompactClinicSchedule(
+  clinic: BookableDoctorSchedule['clinics'][number]
+): string {
+  const groupedByTime = new Map<string, number[]>();
+
+  for (let day = 0; day <= 6; day += 1) {
+    const ranges = clinic.schedule[day];
+    if (!ranges || ranges.length === 0) continue;
+
+    const timeLabel = formatCompactTimeRanges(ranges);
+    groupedByTime.set(timeLabel, [...(groupedByTime.get(timeLabel) ?? []), day]);
+  }
+
+  return Array.from(groupedByTime.entries())
+    .map(([timeLabel, days]) => `${formatCompactWeekdays(days)} ${timeLabel}`)
+    .join('；');
+}
+
+function getCompactSchedulePreviewClinics(doctor: BookableDoctorSchedule) {
+  const physicalClinics = doctor.clinics.filter((clinic) => clinic.clinicId !== 'online');
+  return physicalClinics.length > 0 ? physicalClinics : doctor.clinics;
 }
 
 function getDoctorAvatarFallback(nameZh?: string): string {
@@ -1553,7 +1614,7 @@ export function BookingTabFlow({
         <div className="space-y-6">
           {isMinimalPreview && selectedDoctor ? (
             <div className="w-full rounded-2xl border border-[#d5e7d8] bg-white/90 px-4 py-4 sm:px-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 items-center gap-4">
                   <DoctorAvatar doctor={selectedDoctor} size="lg" />
                   <div className="min-w-0">
@@ -1564,14 +1625,28 @@ export function BookingTabFlow({
                     <p className="mt-0.5 text-xs text-slate-500">
                       {getSlotDurationLabel(selectedDoctor.bookingSlotMinutes)}
                     </p>
+                    <Link
+                      href="/booking-whatsapp"
+                      className="mt-2 inline-flex w-fit rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
+                    >
+                      更改醫師
+                    </Link>
                   </div>
                 </div>
-                <Link
-                  href="/booking-whatsapp"
-                  className="inline-flex w-fit rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light sm:shrink-0"
-                >
-                  更改醫師
-                </Link>
+                <div className="w-full rounded-xl border border-[#e2efe4] bg-[#f7fbf8] px-3 py-3 text-xs leading-relaxed text-slate-600 sm:max-w-[20rem] sm:shrink-0">
+                  <p className="font-semibold text-[#254430]">應診時間</p>
+                  <div className="mt-2 space-y-1.5">
+                    {getCompactSchedulePreviewClinics(selectedDoctor).map((clinic) => (
+                      <p
+                        key={`minimal-preview-${clinic.clinicId}`}
+                        className="grid grid-cols-[2.75rem_1fr] gap-2"
+                      >
+                        <span className="font-semibold text-[#5d8c67]">{clinic.clinicNameZh}</span>
+                        <span>{formatCompactClinicSchedule(clinic)}</span>
+                      </p>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
