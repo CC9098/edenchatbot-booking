@@ -1552,7 +1552,7 @@ export function BookingTabFlow({
       {step === 'setup' && (
         <div className="space-y-6">
           {isMinimalPreview && selectedDoctor ? (
-            <div className="rounded-2xl border border-[#d5e7d8] bg-white/90 px-4 py-4">
+            <div className="w-full rounded-2xl border border-[#d5e7d8] bg-white/90 px-4 py-4 sm:w-fit sm:min-w-[28rem] sm:max-w-full">
               <div className="flex min-w-0 items-center gap-4">
                 <DoctorAvatar doctor={selectedDoctor} size="lg" />
                 <div className="min-w-0">
