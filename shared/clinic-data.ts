@@ -220,13 +220,13 @@ export const DOCTORS: DoctorProfile[] = [
     bookingVisitOptions: [
       {
         visitType: 'first',
-        serviceNameZh: '脊骨神經科檢查',
+        serviceNameZh: '脊骨神經科檢查及治療',
         serviceNameEn: 'Standard Chiropractic Examination',
         durationMinutes: 30,
         priceHkd: 490,
         originalPriceHkd: 980,
         promotionLabel: '中醫聯乘優惠',
-        note: '凡正接受醫天圓中醫診症的病人，可享首診半價優惠。',
+        note: '凡正接受醫天圓中醫診症的病人，可享首次半價優惠。',
       },
       {
         visitType: 'followup',

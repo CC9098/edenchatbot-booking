@@ -30,13 +30,13 @@ const clinicActions = [
 const pricingRows = [
   {
     label: "首診",
-    title: "脊骨神經科檢查",
+    title: "脊骨神經科檢查及治療",
     subtitle: "Standard Chiropractic Examination",
     duration: "30 minutes",
     price: "HK$490",
     originalPrice: "HK$980",
     note: "中醫聯乘優惠",
-    description: "凡正接受醫天圓中醫診症的病人，可享首診半價優惠。",
+    description: "凡正接受醫天圓中醫診症的病人，可享首次半價優惠。",
     href: drWongFirstVisitBookingUrl,
   },
   {
