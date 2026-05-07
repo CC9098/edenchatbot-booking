@@ -111,10 +111,6 @@ const WEEKDAY_SHORT_LABELS_ZH = ['日', '一', '二', '三', '四', '五', '六'
 const OTHER_TREATMENT_OPTION_ID: BookingTreatmentOptionId = 'other';
 const DR_WONG_GROUP_BOOKING_NOTICE =
   '為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以 WhatsApp 確認。';
-const HOLIDAY_NOTICE_SUMMARY_LINES = [
-  '休診或特別安排會在你選擇診所及日期後顯示。',
-  '未能選擇的日期代表暫未開放或已滿，可改選其他日子。',
-];
 
 const VISIT_TYPE_LABELS: Record<VisitType, string> = {
   first: '首診',
@@ -550,6 +546,33 @@ function formatCompactClinicSchedule(
 function getCompactSchedulePreviewClinics(doctor: BookableDoctorSchedule) {
   const physicalClinics = doctor.clinics.filter((clinic) => clinic.clinicId !== 'online');
   return physicalClinics.length > 0 ? physicalClinics : doctor.clinics;
+}
+
+function formatNoticeClinicList(notices: Array<{ clinicNameZh?: string }>): string {
+  const clinicNames = Array.from(
+    new Set(
+      notices
+        .map((notice) => notice.clinicNameZh?.trim())
+        .filter((clinicName): clinicName is string => Boolean(clinicName))
+    )
+  );
+
+  if (clinicNames.length === 0) return '';
+  if (clinicNames.length <= 3) return clinicNames.join('、');
+  return `${clinicNames.slice(0, 3).join('、')}等診所`;
+}
+
+function getDoctorHolidaySummaryLines(
+  doctor: Pick<BookableDoctorSchedule, 'doctorNameZh'>,
+  notices: Array<{ clinicNameZh?: string }>
+): string[] {
+  const clinicList = formatNoticeClinicList(notices);
+  const clinicScope = clinicList ? `於${clinicList}` : '';
+
+  return [
+    `${doctor.doctorNameZh}${clinicScope}近日有休診或特別安排，已反映在下方日曆。`,
+    '你只需選可約日子；休診日不會開放預約。',
+  ];
 }
 
 function CompactScheduleSummaryCard({
@@ -1752,7 +1775,7 @@ export function BookingTabFlow({
                 <div className="mt-4 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
                   <div className="space-y-1">
-                    {HOLIDAY_NOTICE_SUMMARY_LINES.map((line) => (
+                    {getDoctorHolidaySummaryLines(selectedDoctor, selectedDoctorNotices).map((line) => (
                       <p key={line}>{line}</p>
                     ))}
                   </div>
