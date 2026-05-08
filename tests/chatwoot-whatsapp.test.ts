@@ -1028,7 +1028,7 @@ test('sendBookingConfirmationWhatsapp falls back to active conversation text whe
   }
 });
 
-test('sendBookingConfirmationWhatsapp sends online booking as text first for active conversations so Meet link is visible', async () => {
+test('sendBookingConfirmationWhatsapp uses online template for active conversations so manage link can stay as a button', async () => {
   const originalFetch = global.fetch;
   const originalEnv = {
     CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
@@ -1115,6 +1115,15 @@ test('sendBookingConfirmationWhatsapp sends online booking as text first for act
       return jsonResponse({ id: 701, status: 'sent' });
     }
 
+    if (method === 'GET' && path === '/api/v1/accounts/1/conversations/42/messages') {
+      return jsonResponse({
+        payload: [{
+          id: 701,
+          status: 'delivered',
+        }],
+      });
+    }
+
     throw new Error(`Unexpected fetch: ${method} ${path}`);
   }) as typeof global.fetch;
 
@@ -1137,8 +1146,15 @@ test('sendBookingConfirmationWhatsapp sends online booking as text first for act
     assert.equal(result.whatsappSent, true);
     assert.equal(result.conversationId, 42);
     assert.equal(sentMessagePayloads.length, 1);
-    assert.equal(sentMessagePayloads[0]?.template_params, undefined);
-    assert.match(sentMessagePayloads[0]?.content, /Google Meet 網上應診連結：https:\/\/meet\.google\.com\/uud-rdxb-crk/);
+    assert.equal(sentMessagePayloads[0]?.template_params?.name, 'booking_confirm_online');
+    assert.equal(
+      sentMessagePayloads[0]?.template_params?.processed_params?.body?.meet_link,
+      'https://meet.google.com/uud-rdxb-crk',
+    );
+    assert.equal(
+      sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter,
+      '/manage-booking?token=abc123',
+    );
   } finally {
     global.fetch = originalFetch;
 
@@ -1152,7 +1168,7 @@ test('sendBookingConfirmationWhatsapp sends online booking as text first for act
   }
 });
 
-test('sendBookingConfirmationWhatsapp follows online templates with Meet link text when no active conversation exists', async () => {
+test('sendBookingConfirmationWhatsapp uses online templates when no active conversation exists', async () => {
   const originalFetch = global.fetch;
   const originalEnv = {
     CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
@@ -1236,7 +1252,7 @@ test('sendBookingConfirmationWhatsapp follows online templates with Meet link te
     if (method === 'POST' && path === '/api/v1/accounts/1/conversations/42/messages') {
       const payload = JSON.parse(String(init?.body || '{}'));
       sentMessagePayloads.push(payload);
-      return jsonResponse({ id: sentMessagePayloads.length === 1 ? 801 : 802, status: 'sent' });
+      return jsonResponse({ id: 801, status: 'sent' });
     }
 
     if (method === 'GET' && path === '/api/v1/accounts/1/conversations/42/messages') {
@@ -1269,14 +1285,16 @@ test('sendBookingConfirmationWhatsapp follows online templates with Meet link te
     assert.equal(result.success, true);
     assert.equal(result.whatsappSent, true);
     assert.equal(result.conversationId, 42);
-    assert.equal(sentMessagePayloads.length, 2);
+    assert.equal(sentMessagePayloads.length, 1);
     assert.equal(sentMessagePayloads[0]?.template_params?.name, 'booking_confirm_online');
     assert.equal(
       sentMessagePayloads[0]?.template_params?.processed_params?.body?.meet_link,
       'https://meet.google.com/uud-rdxb-crk',
     );
-    assert.equal(sentMessagePayloads[1]?.template_params, undefined);
-    assert.match(sentMessagePayloads[1]?.content, /網上應診 Google Meet 連結：\nhttps:\/\/meet\.google\.com\/uud-rdxb-crk/);
+    assert.equal(
+      sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter,
+      '/manage-booking?token=abc123',
+    );
   } finally {
     global.fetch = originalFetch;
 
@@ -1388,7 +1406,7 @@ test('sendBookingConfirmationWhatsapp uses online fallback template when Meet li
     if (method === 'POST' && path === '/api/v1/accounts/1/conversations/42/messages') {
       const payload = JSON.parse(String(init?.body || '{}'));
       sentMessagePayloads.push(payload);
-      return jsonResponse({ id: sentMessagePayloads.length === 1 ? 901 : 902, status: 'sent' });
+      return jsonResponse({ id: 901, status: 'sent' });
     }
 
     if (method === 'GET' && path === '/api/v1/accounts/1/conversations/42/messages') {
@@ -1421,14 +1439,16 @@ test('sendBookingConfirmationWhatsapp uses online fallback template when Meet li
     assert.equal(result.success, true);
     assert.equal(result.whatsappSent, true);
     assert.equal(result.conversationId, 42);
-    assert.equal(sentMessagePayloads.length, 2);
+    assert.equal(sentMessagePayloads.length, 1);
     assert.equal(sentMessagePayloads[0]?.template_params?.name, 'booking_confirm_online');
     assert.equal(
       sentMessagePayloads[0]?.template_params?.processed_params?.body?.meet_link,
       'https://meet.google.com/uud-rdxb-crk',
     );
-    assert.equal(sentMessagePayloads[1]?.template_params, undefined);
-    assert.match(sentMessagePayloads[1]?.content, /網上應診 Google Meet 連結：\nhttps:\/\/meet\.google\.com\/uud-rdxb-crk/);
+    assert.equal(
+      sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter,
+      '/manage-booking?token=abc123',
+    );
   } finally {
     global.fetch = originalFetch;
 

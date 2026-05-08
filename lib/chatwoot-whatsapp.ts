@@ -927,7 +927,6 @@ async function sendBookingWhatsappNotification(
     buildBodyParams: () => Record<string, string>;
     getTemplateConfigs: (inbox: ChatwootInbox) => TemplateConfig[];
     preferTemplateIfAvailable?: boolean;
-    afterTemplateSuccessContent?: string;
   },
 ): Promise<SendWhatsappBookingConfirmationResult> {
   const baseUrl = (process.env.CHATWOOT_BASE_URL || '').trim().replace(/\/$/, '');
@@ -1004,16 +1003,6 @@ async function sendBookingWhatsappNotification(
         templateConfigs,
         bodyParams,
       );
-
-      if (options.afterTemplateSuccessContent) {
-        await client.createMessage(accountId, conversationId, {
-          content: options.afterTemplateSuccessContent,
-        }).catch((error) => {
-          console.warn(
-            `[chatwoot-whatsapp] Template sent but follow-up text failed: ${getSafeErrorMessage(error)}`,
-          );
-        });
-      }
     } catch (error) {
       if (!isActiveConversation(existingConversation)) {
         throw error;
@@ -1062,16 +1051,6 @@ async function sendBookingWhatsappNotification(
       templateConfigs,
       bodyParams,
     );
-
-    if (options.afterTemplateSuccessContent) {
-      await client.createMessage(accountId, conversationId, {
-        content: options.afterTemplateSuccessContent,
-      }).catch((error) => {
-        console.warn(
-          `[chatwoot-whatsapp] Template sent but follow-up text failed: ${getSafeErrorMessage(error)}`,
-        );
-      });
-    }
   } else {
     await client.createMessage(accountId, conversationId, {
       content,
@@ -1085,24 +1064,11 @@ async function sendBookingWhatsappNotification(
   };
 }
 
-function buildOnlineMeetLinkFollowUp(meetLink: string | undefined): string | undefined {
-  const normalizedMeetLink = meetLink?.trim();
-  if (!normalizedMeetLink) return undefined;
-
-  return [
-    '網上應診 Google Meet 連結：',
-    normalizedMeetLink,
-    '',
-    '請於預約時間前 5 分鐘按以上連結進入網上應診。',
-  ].join('\n');
-}
-
 export async function sendBookingConfirmationWhatsapp(
   input: BookingWhatsappNotificationInput,
 ): Promise<SendWhatsappBookingConfirmationResult> {
   try {
     const shouldUseOnlineTemplate = Boolean(input.meetLink);
-    const onlineFollowUpContent = buildOnlineMeetLinkFollowUp(input.meetLink);
 
     return await sendBookingWhatsappNotification(input, {
       buildContent: () => buildWhatsappConfirmationText(input),
@@ -1111,8 +1077,7 @@ export async function sendBookingConfirmationWhatsapp(
           ? buildWhatsappOnlineTemplateBodyParams(input)
           : buildWhatsappTemplateBodyParams(input),
       getTemplateConfigs: shouldUseOnlineTemplate ? getOnlineTemplateConfigs : getTemplateConfigs,
-      preferTemplateIfAvailable: !input.groupBookingNotice && !input.meetLink,
-      afterTemplateSuccessContent: onlineFollowUpContent,
+      preferTemplateIfAvailable: !input.groupBookingNotice,
     });
   } catch (error) {
     return {
