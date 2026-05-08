@@ -771,30 +771,92 @@ function buildTemplateProcessedParamCandidates(
   };
 
   const manageUrl = normalizedBody.manage_url?.trim();
-  if (manageUrl) {
-    const { manage_url: _manageUrl, ...bodyWithoutManageUrl } = normalizedBody;
+  const onlineConsultUrl = normalizedBody.online_consult_url?.trim();
+  if (manageUrl || onlineConsultUrl) {
+    const {
+      manage_url: _manageUrl,
+      online_consult_url: _onlineConsultUrl,
+      ...bodyWithoutActionUrls
+    } = normalizedBody;
 
-    const bodyCandidates = Object.keys(bodyWithoutManageUrl).length > 0
-      ? [bodyWithoutManageUrl, toNumericBodyParams(bodyWithoutManageUrl)]
+    const bodyCandidates = Object.keys(bodyWithoutActionUrls).length > 0
+      ? [bodyWithoutActionUrls, toNumericBodyParams(bodyWithoutActionUrls)]
       : [null];
 
     for (const bodyCandidate of bodyCandidates) {
-      for (const manageButtonParameter of extractManageButtonParameters(manageUrl)) {
-        pushCandidate({
-          ...(bodyCandidate ? { body: bodyCandidate } : {}),
-          buttons: [{ type: 'url', parameter: manageButtonParameter }],
-        });
+      if (onlineConsultUrl && manageUrl) {
+        for (const onlineConsultButtonParameter of extractUrlButtonParameters(onlineConsultUrl)) {
+          for (const manageButtonParameter of extractUrlButtonParameters(manageUrl)) {
+            pushCandidate({
+              ...(bodyCandidate ? { body: bodyCandidate } : {}),
+              buttons: [
+                { type: 'url', parameter: onlineConsultButtonParameter },
+                { type: 'url', parameter: manageButtonParameter },
+              ],
+            });
+          }
+        }
+      }
+
+      if (onlineConsultUrl) {
+        for (const onlineConsultButtonParameter of extractUrlButtonParameters(onlineConsultUrl)) {
+          pushCandidate({
+            ...(bodyCandidate ? { body: bodyCandidate } : {}),
+            buttons: [{ type: 'url', parameter: onlineConsultButtonParameter }],
+          });
+        }
+      }
+
+      if (manageUrl) {
+        for (const manageButtonParameter of extractUrlButtonParameters(manageUrl)) {
+          pushCandidate({
+            ...(bodyCandidate ? { body: bodyCandidate } : {}),
+            buttons: [{ type: 'url', parameter: manageButtonParameter }],
+          });
+        }
       }
     }
 
-    // Support confirmation templates that removed the dynamic URL button and
+    if (onlineConsultUrl && manageUrl) {
+      const { online_consult_url: _onlineOnly, ...bodyWithoutOnlineConsultUrl } = normalizedBody;
+      const bodyCandidatesWithManageUrl = Object.keys(bodyWithoutOnlineConsultUrl).length > 0
+        ? [bodyWithoutOnlineConsultUrl, toNumericBodyParams(bodyWithoutOnlineConsultUrl)]
+        : [null];
+
+      for (const bodyCandidate of bodyCandidatesWithManageUrl) {
+        for (const onlineConsultButtonParameter of extractUrlButtonParameters(onlineConsultUrl)) {
+          pushCandidate({
+            ...(bodyCandidate ? { body: bodyCandidate } : {}),
+            buttons: [{ type: 'url', parameter: onlineConsultButtonParameter }],
+          });
+        }
+      }
+    }
+
+    if (onlineConsultUrl && manageUrl) {
+      const { manage_url: _manageOnly, ...bodyWithoutManageUrl } = normalizedBody;
+      const bodyCandidatesWithOnlineConsultUrl = Object.keys(bodyWithoutManageUrl).length > 0
+        ? [bodyWithoutManageUrl, toNumericBodyParams(bodyWithoutManageUrl)]
+        : [null];
+
+      for (const bodyCandidate of bodyCandidatesWithOnlineConsultUrl) {
+        for (const manageButtonParameter of extractUrlButtonParameters(manageUrl)) {
+          pushCandidate({
+            ...(bodyCandidate ? { body: bodyCandidate } : {}),
+            buttons: [{ type: 'url', parameter: manageButtonParameter }],
+          });
+        }
+      }
+    }
+
+    // Support confirmation templates that removed the dynamic URL buttons and
     // now only accept the body placeholders that remain in Meta.
     for (const bodyCandidate of bodyCandidates) {
       pushCandidate(bodyCandidate ? { body: bodyCandidate } : {});
     }
   }
 
-  // Keep the complete body params as a fallback for templates where manage_url
+  // Keep the complete body params as a fallback for templates where URL params
   // or other variables are body placeholders rather than buttons.
   if (Object.keys(normalizedBody).length > 0) {
     pushCandidate({ body: normalizedBody });
@@ -828,8 +890,8 @@ function buildTemplateProcessedParamCandidates(
   return candidates;
 }
 
-function extractManageButtonParameters(manageUrl: string): string[] {
-  const normalizedUrl = manageUrl.trim();
+function extractUrlButtonParameters(url: string): string[] {
+  const normalizedUrl = url.trim();
   if (!normalizedUrl) return [];
 
   const candidates: string[] = [];

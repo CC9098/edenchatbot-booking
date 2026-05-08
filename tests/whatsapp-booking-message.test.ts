@@ -58,9 +58,11 @@ test('WhatsApp online template params include Google Meet link', () => {
     appointmentTime: '21:30',
     visitType: 'followup',
     meetLink: 'https://meet.google.com/abc-defg-hij',
+    onlineConsultUrl: 'https://edenchatbot-booking.vercel.app/online-consult?token=online123',
   });
 
   assert.equal(params.meet_link, 'https://meet.google.com/abc-defg-hij');
+  assert.equal(params.online_consult_url, 'https://edenchatbot-booking.vercel.app/online-consult?token=online123');
   assert.equal(params.doctor_name, '張天慧醫師');
   assert.equal(params.clinic_name, '網上');
 });

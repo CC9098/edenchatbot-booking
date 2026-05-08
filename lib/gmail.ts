@@ -41,6 +41,10 @@ interface DoctorOnlineBookingNotificationData {
   meetLink: string;
 }
 
+interface DoctorOnlineConsultReadyNotificationData extends DoctorOnlineBookingNotificationData {
+  notifiedAtIso?: string;
+}
+
 interface ConsultationEmailData {
   patientName: string;
   patientEmail: string;
@@ -378,6 +382,47 @@ export async function sendDoctorOnlineBookingNotificationEmail(
     <a href="${data.meetLink}" style="color:#0b6b35; word-break:break-all;">${data.meetLink}</a>
   </div>
   <p style="font-size:13px; color:#777;">此通知由 Eden booking system 自動發出。</p>
+</body>
+</html>`;
+
+  return sendHtmlEmail(to, subject, htmlBody);
+}
+
+export async function sendDoctorOnlineConsultReadyEmail(
+  data: DoctorOnlineConsultReadyNotificationData
+): Promise<{ success: boolean; error?: string }> {
+  const to = getConfiguredDoctorNotificationEmail(data.doctorId);
+  if (!to) {
+    return { success: false, error: 'Missing doctor notification email' };
+  }
+
+  const notifiedAt = data.notifiedAtIso
+    ? new Date(data.notifiedAtIso).toLocaleString('zh-HK', { timeZone: 'Asia/Hong_Kong' })
+    : new Date().toLocaleString('zh-HK', { timeZone: 'Asia/Hong_Kong' });
+  const durationText = data.durationMinutes ? `${data.durationMinutes} 分鐘` : '網上應診';
+  const subject = `病人已進入網上候診：${data.patientName}｜${data.date} ${data.time}`;
+  const htmlBody = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+</head>
+<body style="font-family: Arial, 'Noto Sans TC', sans-serif; color:#333; line-height:1.6;">
+  <h2>病人已準備進入網上診症</h2>
+  <p style="font-size:16px;">病人已打開網上診症入口，請盡快進入 Google Meet。</p>
+  <table style="border-collapse:collapse;">
+    <tr><td style="padding:4px 12px 4px 0; color:#777;">醫師</td><td>${data.doctorNameZh} ${data.doctorName}</td></tr>
+    <tr><td style="padding:4px 12px 4px 0; color:#777;">病人</td><td>${data.patientName}</td></tr>
+    <tr><td style="padding:4px 12px 4px 0; color:#777;">電話</td><td>${data.patientPhone}</td></tr>
+    <tr><td style="padding:4px 12px 4px 0; color:#777;">電郵</td><td>${data.patientEmail || '-'}</td></tr>
+    <tr><td style="padding:4px 12px 4px 0; color:#777;">預約時間</td><td>${data.date} ${data.time}（${durationText}）</td></tr>
+    <tr><td style="padding:4px 12px 4px 0; color:#777;">通知時間</td><td>${notifiedAt}</td></tr>
+    <tr><td style="padding:4px 12px 4px 0; color:#777;">預約編號</td><td>${data.bookingId}</td></tr>
+  </table>
+  <div style="background:#eef7ee; border:1px solid #cfe4cf; border-radius:8px; padding:16px; margin:16px 0;">
+    <strong>Google Meet 連結</strong><br>
+    <a href="${data.meetLink}" style="color:#0b6b35; word-break:break-all;">${data.meetLink}</a>
+  </div>
+  <p style="font-size:13px; color:#777;">此通知由病人打開網上診症入口時自動發出。</p>
 </body>
 </html>`;
 

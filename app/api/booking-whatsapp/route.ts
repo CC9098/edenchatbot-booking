@@ -23,6 +23,8 @@ import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import { sendDoctorOnlineBookingNotificationEmail } from '@/lib/gmail';
 import { ensureSupabaseUserForPhone } from '@/lib/whatsapp-auth-bridge';
 import { createBooking, getFreeBusy } from '@/lib/google-calendar';
+import { createOnlineConsultToken } from '@/lib/online-consult-token';
+import { buildOnlineConsultUrl } from '@/lib/public-url';
 import { createServiceClient } from '@/lib/supabase';
 import { syncPatientProfileContact } from '@/lib/profile-contact-sync';
 import { getDoctorBookingSlotMinutes } from '@/shared/clinic-data';
@@ -340,6 +342,19 @@ export async function POST(request: NextRequest) {
     // directly from the WhatsApp confirmation link without OTP
     const phoneDigits = normalizePhoneForSearch(bookingData.phone);
     const manageAccessToken = phoneDigits ? createManageAccessToken(phoneDigits) : undefined;
+    const onlineConsultUrl = calResult.meetLink
+      ? buildOnlineConsultUrl({
+          token: createOnlineConsultToken({
+            bookingId: calResult.eventId,
+            calendarId,
+            doctorId: bookingData.doctorId,
+            doctorNameZh: bookingData.doctorNameZh,
+            appointmentDate: bookingData.date,
+            appointmentTime: bookingData.time,
+            meetLink: calResult.meetLink,
+          }),
+        })
+      : undefined;
 
     const whatsappResult = await sendBookingConfirmationWhatsapp({
       bookingId: calResult.eventId,
@@ -352,6 +367,7 @@ export async function POST(request: NextRequest) {
       appointmentTime: bookingData.time,
       visitType: bookingData.visitType as BookingVisitType,
       meetLink: calResult.meetLink,
+      onlineConsultUrl,
       clinicWhatsappPhone: getClinicWhatsappPhone(notificationClinicId),
       manageAccessToken,
       groupBookingNotice: groupBookingNotice || undefined,
@@ -397,6 +413,7 @@ export async function POST(request: NextRequest) {
       whatsappSent: whatsappResult.success,
       whatsappConversationId: whatsappResult.conversationId,
       meetLink: calResult.meetLink,
+      onlineConsultUrl,
       groupBookingNotice: groupBookingNotice || undefined,
     });
   } catch (error) {

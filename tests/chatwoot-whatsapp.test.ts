@@ -1139,6 +1139,7 @@ test('sendBookingConfirmationWhatsapp uses online template for active conversati
       appointmentTime: '21:50',
       visitType: 'followup',
       meetLink: 'https://meet.google.com/uud-rdxb-crk',
+      onlineConsultUrl: 'https://edenchatbot-booking.vercel.app/online-consult?token=online123',
       manageAccessToken: 'abc123',
     });
 
@@ -1153,6 +1154,10 @@ test('sendBookingConfirmationWhatsapp uses online template for active conversati
     );
     assert.equal(
       sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter,
+      '/online-consult?token=online123',
+    );
+    assert.equal(
+      sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[1]?.parameter,
       '/manage-booking?token=abc123',
     );
   } finally {
@@ -1279,6 +1284,7 @@ test('sendBookingConfirmationWhatsapp uses online templates when no active conve
       appointmentTime: '21:50',
       visitType: 'followup',
       meetLink: 'https://meet.google.com/uud-rdxb-crk',
+      onlineConsultUrl: 'https://edenchatbot-booking.vercel.app/online-consult?token=online123',
       manageAccessToken: 'abc123',
     });
 
@@ -1293,6 +1299,10 @@ test('sendBookingConfirmationWhatsapp uses online templates when no active conve
     );
     assert.equal(
       sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter,
+      '/online-consult?token=online123',
+    );
+    assert.equal(
+      sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[1]?.parameter,
       '/manage-booking?token=abc123',
     );
   } finally {
@@ -1433,6 +1443,7 @@ test('sendBookingConfirmationWhatsapp uses online fallback template when Meet li
       appointmentTime: '21:50',
       visitType: 'followup',
       meetLink: 'https://meet.google.com/uud-rdxb-crk',
+      onlineConsultUrl: 'https://edenchatbot-booking.vercel.app/online-consult?token=online123',
       manageAccessToken: 'abc123',
     });
 
@@ -1447,6 +1458,10 @@ test('sendBookingConfirmationWhatsapp uses online fallback template when Meet li
     );
     assert.equal(
       sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter,
+      '/online-consult?token=online123',
+    );
+    assert.equal(
+      sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[1]?.parameter,
       '/manage-booking?token=abc123',
     );
   } finally {

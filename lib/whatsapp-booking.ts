@@ -18,6 +18,7 @@ export interface BookingWhatsappConfirmationInput {
   appointmentTime: string;
   visitType: BookingVisitType;
   meetLink?: string;
+  onlineConsultUrl?: string;
   groupBookingNotice?: string;
 }
 
@@ -131,6 +132,7 @@ export function buildWhatsappOnlineTemplateBodyParams(
     clinic_name: input.clinicNameZh,
     appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
     meet_link: input.meetLink || '',
+    ...(input.onlineConsultUrl ? { online_consult_url: input.onlineConsultUrl } : {}),
     visit_type: VISIT_TYPE_LABELS[input.visitType],
     booking_id: input.bookingId,
     manage_url: manageUrl,

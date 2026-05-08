@@ -165,3 +165,9 @@ export function buildManageBookingUrl(options?: {
   const query = params.toString();
   return buildPublicUrl(query ? `${pathname}?${query}` : pathname);
 }
+
+export function buildOnlineConsultUrl(options: { token: string }): string {
+  const params = new URLSearchParams();
+  params.set("token", options.token);
+  return buildPublicUrl(`/online-consult?${params.toString()}`);
+}
