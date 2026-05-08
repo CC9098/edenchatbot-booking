@@ -218,6 +218,12 @@ export async function listStaffKnowledgeDocuments(): Promise<StaffKnowledgeDocum
   });
 }
 
+export function isVisibleStaffHandbookDocument(document: StaffKnowledgeDocument): boolean {
+  if (document.id === "00-intake-index") return false;
+  if (document.id === "security-and-credentials") return false;
+  return true;
+}
+
 export async function searchStaffKnowledge(
   query: string,
   options: { includePlaceholders?: boolean; limit?: number } = {},
@@ -226,7 +232,7 @@ export async function searchStaffKnowledge(
   if (!trimmed) return [];
 
   const terms = buildSearchTerms(trimmed);
-  const documents = await listStaffKnowledgeDocuments();
+  const documents = (await listStaffKnowledgeDocuments()).filter(isVisibleStaffHandbookDocument);
 
   return documents
     .filter((document) => options.includePlaceholders || document.status !== "placeholder")

@@ -4,48 +4,17 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
-  CheckCircle2,
   ClipboardCopy,
   FileText,
   Loader2,
   MessageCircle,
   Search,
-  ShieldAlert,
 } from "lucide-react";
 
 import MarkdownContent from "@/components/content/MarkdownContent";
 import type {
   StaffKnowledgeDocument,
-  StaffKnowledgeSensitivity,
-  StaffKnowledgeStatus,
 } from "@/lib/staff-knowledge-base-types";
-
-function statusLabel(status: StaffKnowledgeStatus) {
-  if (status === "seed") return "已整理";
-  if (status === "placeholder") return "待補";
-  if (status === "reviewed") return "已覆核";
-  return "草稿";
-}
-
-function statusClass(status: StaffKnowledgeStatus) {
-  if (status === "placeholder") return "border-amber-200 bg-amber-50 text-amber-800";
-  if (status === "reviewed") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (status === "seed") return "border-sky-200 bg-sky-50 text-sky-800";
-  return "border-slate-200 bg-slate-50 text-slate-700";
-}
-
-function sensitivityLabel(sensitivity: StaffKnowledgeSensitivity) {
-  if (sensitivity === "restricted") return "Restricted";
-  if (sensitivity === "public") return "Public";
-  return "Internal";
-}
-
-function sensitivityClass(sensitivity: StaffKnowledgeSensitivity) {
-  if (sensitivity === "restricted") return "border-rose-200 bg-rose-50 text-rose-800";
-  if (sensitivity === "public") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  return "border-slate-200 bg-white text-slate-700";
-}
 
 function normalizeText(value: string) {
   return value.toLowerCase().replace(/\s+/g, " ").trim();
@@ -131,6 +100,9 @@ export function StaffKnowledgeBaseClient() {
           <div>
             <p className="text-sm font-medium text-emerald-700">姑娘內部手冊</p>
             <h1 className="mt-1 text-2xl font-semibold text-slate-950">知識庫</h1>
+            <p className="mt-2 text-sm text-slate-500">
+              內容直接來自 Google Doc「分類頁面手冊」，先放姑娘已填入的實際話術和流程。
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
@@ -189,10 +161,7 @@ export function StaffKnowledgeBaseClient() {
                 載入中
               </div>
             ) : error ? (
-              <div className="flex items-start gap-2 p-4 text-sm text-rose-700">
-                <AlertTriangle className="mt-0.5 h-4 w-4" />
-                <span>{error}</span>
-              </div>
+              <div className="p-4 text-sm text-rose-700">{error}</div>
             ) : filteredDocuments.length === 0 ? (
               <div className="p-4 text-sm text-slate-500">未找到相關內容</div>
             ) : (
@@ -229,18 +198,9 @@ export function StaffKnowledgeBaseClient() {
             <div className="space-y-5">
               <div className="flex flex-col gap-3 border-b border-slate-100 pb-5 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap gap-2">
-                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(selectedDocument.status)}`}>
-                      {statusLabel(selectedDocument.status)}
-                    </span>
-                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${sensitivityClass(selectedDocument.sensitivity)}`}>
-                      {sensitivityLabel(selectedDocument.sensitivity)}
-                    </span>
-                  </div>
-                  <h2 className="mt-3 text-2xl font-semibold text-slate-950">{selectedDocument.title}</h2>
-                  <p className="mt-2 text-sm text-slate-500">
-                    {selectedDocument.category} · {selectedDocument.updatedAt} · {selectedDocument.sourcePath}
-                  </p>
+                  <p className="text-sm font-medium text-emerald-700">{selectedDocument.category}</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-slate-950">{selectedDocument.title}</h2>
+                  <p className="mt-2 text-sm text-slate-500">來源：Google Doc「分類頁面手冊」</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {selectedDocument.patientReplyMd ? (
@@ -265,16 +225,8 @@ export function StaffKnowledgeBaseClient() {
               </div>
 
               {copied ? (
-                <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
-                  <CheckCircle2 className="h-4 w-4" />
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
                   已複製
-                </div>
-              ) : null}
-
-              {selectedDocument.sensitivity === "restricted" ? (
-                <div className="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm leading-6 text-rose-800">
-                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                  Restricted 內容不可複製到公開頁、病人 chatbot 或非受控文件。
                 </div>
               ) : null}
 

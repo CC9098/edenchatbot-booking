@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { AuthError, getCurrentUser, requireStaffRole } from "@/lib/auth-helpers";
 import {
+  isVisibleStaffHandbookDocument,
   listStaffKnowledgeDocuments,
   searchStaffKnowledge,
 } from "@/lib/staff-knowledge-base";
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const documents = await listStaffKnowledgeDocuments();
+    const documents = (await listStaffKnowledgeDocuments()).filter(isVisibleStaffHandbookDocument);
     return NextResponse.json({ items: documents });
   } catch (error) {
     if (error instanceof AuthError) {
