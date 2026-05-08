@@ -14,6 +14,7 @@ import { CLINIC_BY_ID, CLINIC_ID_BY_NAME_ZH, DOCTOR_ID_BY_NAME_ZH, getClinicAddr
 import {
                 isSlotAfterClinicLastBookingCutoffUtc,
                 isSlotAvailableUtc,
+                isSlotBlockedBySameDayEveningCutoffUtc,
 } from '@/lib/booking-helpers';
 import { getSafeErrorMessage } from '@/lib/error-sanitizer';
 import { getCurrentUser } from '@/lib/auth-helpers';
@@ -288,6 +289,13 @@ export async function POST(request: NextRequest) {
                                 // Check if valid date
                                 if (isNaN(startDate.getTime())) {
                                                 return NextResponse.json({ error: 'Invalid date/time' }, { status: 400 });
+                                }
+
+                                if (isSlotBlockedBySameDayEveningCutoffUtc(startDate)) {
+                                                return NextResponse.json(
+                                                                { error: '今日晚上時段已截止預約，請選擇其他日期或較早時段。' },
+                                                                { status: 409 }
+                                                );
                                 }
 
                                 if (bookingData.clinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, bookingData.clinicId)) {
@@ -598,6 +606,13 @@ export async function PATCH(request: NextRequest) {
                                                 ? formatInTimeZone(new Date(existingStartDateTime), HONG_KONG_TIMEZONE, 'yyyy-MM-dd') === date
                                                                 && formatInTimeZone(new Date(existingStartDateTime), HONG_KONG_TIMEZONE, 'HH:mm') === time
                                                 : false;
+
+                                if (!sameAsCurrentSlot && isSlotBlockedBySameDayEveningCutoffUtc(startDate)) {
+                                                return NextResponse.json(
+                                                                { error: '今日晚上時段已截止預約，請選擇其他日期或較早時段。' },
+                                                                { status: 409 }
+                                                );
+                                }
 
                                 if (!sameAsCurrentSlot && effectiveClinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, effectiveClinicId)) {
                                                 return NextResponse.json(

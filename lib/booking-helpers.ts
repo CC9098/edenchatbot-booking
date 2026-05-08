@@ -6,6 +6,7 @@ import { getHolidaysForDate } from './holiday-store';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const AFTERNOON_SESSION_START_MINUTES = 15 * 60;
+const SAME_DAY_EVENING_BOOKING_CUTOFF_MINUTES = 19 * 60;
 const CLINIC_LAST_BOOKING_CUTOFFS: Record<
   PhysicalClinicId,
   { lunch: string; evening: string }
@@ -118,6 +119,30 @@ export function isSlotAfterClinicLastBookingCutoffUtc(
   }
 
   return slotStartMinutes > cutoffMinutes;
+}
+
+export function isSlotBlockedBySameDayEveningCutoffUtc(
+  slotStartUtc: Date,
+  nowUtc: Date = new Date()
+): boolean {
+  const todayInHk = formatInTimeZone(nowUtc, HONG_KONG_TIMEZONE, 'yyyy-MM-dd');
+  const slotDateInHk = formatInTimeZone(slotStartUtc, HONG_KONG_TIMEZONE, 'yyyy-MM-dd');
+  if (slotDateInHk !== todayInHk) {
+    return false;
+  }
+
+  const nowLabel = formatInTimeZone(nowUtc, HONG_KONG_TIMEZONE, 'HH:mm');
+  const slotStartLabel = formatInTimeZone(slotStartUtc, HONG_KONG_TIMEZONE, 'HH:mm');
+  const nowMinutes = toMinutes(nowLabel);
+  const slotStartMinutes = toMinutes(slotStartLabel);
+  if (nowMinutes === null || slotStartMinutes === null) {
+    return false;
+  }
+
+  return (
+    nowMinutes >= SAME_DAY_EVENING_BOOKING_CUTOFF_MINUTES &&
+    slotStartMinutes >= SAME_DAY_EVENING_BOOKING_CUTOFF_MINUTES
+  );
 }
 
 // Helper: Check if a date is blocked by all-day holidays

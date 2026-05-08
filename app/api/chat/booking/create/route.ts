@@ -13,6 +13,7 @@ import { getMappingWithFallback } from "@/lib/storage-helpers";
 import {
   isSlotAfterClinicLastBookingCutoffUtc,
   isSlotAvailableUtc,
+  isSlotBlockedBySameDayEveningCutoffUtc,
 } from "@/lib/booking-helpers";
 import { getClinicAddress } from "@/shared/clinic-data";
 import { getCurrentUser } from "@/lib/auth-helpers";
@@ -124,6 +125,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Invalid date/time" },
         { status: 400 }
+      );
+    }
+
+    if (isSlotBlockedBySameDayEveningCutoffUtc(startDate)) {
+      return NextResponse.json(
+        { error: "今日晚上時段已截止預約，請選擇其他日期或較早時段。" },
+        { status: 409 }
       );
     }
 

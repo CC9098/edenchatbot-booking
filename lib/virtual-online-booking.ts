@@ -5,6 +5,7 @@ import {
   getScheduleForDayFromWeekly,
   isSlotAvailableUtc,
   isSlotBlockedByHolidaysUtc,
+  isSlotBlockedBySameDayEveningCutoffUtc,
 } from '@/lib/booking-helpers';
 import { getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
 import { getFreeBusy } from '@/lib/google-calendar';
@@ -212,6 +213,11 @@ async function getAvailableSlotsForMapping(params: {
 
     while (currentSlot < rangeEnd) {
       if (isPastSameDayCutoff(requestedDate, currentSlot, nowUtc)) {
+        currentSlot = new Date(currentSlot.getTime() + slotIncrementMinutes * 60 * 1000);
+        continue;
+      }
+
+      if (isSlotBlockedBySameDayEveningCutoffUtc(currentSlot, nowUtc)) {
         currentSlot = new Date(currentSlot.getTime() + slotIncrementMinutes * 60 * 1000);
         continue;
       }

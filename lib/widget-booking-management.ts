@@ -14,6 +14,7 @@ import { normalizePhoneForSearch } from "@/lib/contact-utils";
 import {
   isSlotAfterClinicLastBookingCutoffUtc,
   isSlotAvailableUtc,
+  isSlotBlockedBySameDayEveningCutoffUtc,
 } from "@/lib/booking-helpers";
 import {
   markBookingIntakeCancelledByEvent,
@@ -1120,6 +1121,14 @@ export async function rescheduleWidgetBooking(params: {
     row.appointment_date === params.date &&
     row.appointment_time === params.time &&
     effectiveClinicId === row.clinic_id;
+  if (!sameAsCurrentSlot && isSlotBlockedBySameDayEveningCutoffUtc(startDate)) {
+    return {
+      success: false,
+      error: "今日晚上時段已截止預約，請選擇其他日期或較早時段。",
+      clinicWhatsappUrl: targetClinicWhatsappUrl,
+    };
+  }
+
   if (!sameAsCurrentSlot && effectiveClinicId !== "online" && isSlotAfterClinicLastBookingCutoffUtc(startDate, effectiveClinicId)) {
     return {
       success: false,

@@ -11,6 +11,7 @@ import {
                 isSlotAfterClinicLastBookingCutoffUtc,
                 isSlotAvailableUtc,
                 isSlotBlockedByHolidaysUtc,
+                isSlotBlockedBySameDayEveningCutoffUtc,
 } from '@/lib/booking-helpers';
 import { getDoctorBookingSlotMinutes } from '@/shared/clinic-data';
 import { type Holiday } from '@/shared/schema';
@@ -128,6 +129,11 @@ export async function POST(request: NextRequest) {
                                                                 while (currentSlot < endData) {
                                                                                 // If booking for today, skip past times
                                                                                 if (isToday && currentSlot < bookingCutoffUtc) {
+                                                                                                currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
+                                                                                                continue;
+                                                                                }
+
+                                                                                if (isSlotBlockedBySameDayEveningCutoffUtc(currentSlot, nowUtc)) {
                                                                                                 currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
                                                                                                 continue;
                                                                                 }

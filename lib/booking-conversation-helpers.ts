@@ -42,7 +42,10 @@ import {
   type BookingReceiptType,
   type BookingVisitType,
 } from './booking-intake-storage';
-import { isSlotAfterClinicLastBookingCutoffUtc } from './booking-helpers';
+import {
+  isSlotAfterClinicLastBookingCutoffUtc,
+  isSlotBlockedBySameDayEveningCutoffUtc,
+} from './booking-helpers';
 import { getSafeErrorMessage } from './error-sanitizer';
 import { syncPatientProfileContact } from './profile-contact-sync';
 import { normalizePhoneForSearch, toHKE164 } from './contact-utils';
@@ -989,6 +992,15 @@ export async function getAvailableTimeSlots(
 
         // Check if this slot is available
         const slotStart = fromZonedTime(`${date}T${timeStr}:00`, HONG_KONG_TIMEZONE);
+        if (isSlotBlockedBySameDayEveningCutoffUtc(slotStart)) {
+          currentMinute += slotMinutes;
+          if (currentMinute >= 60) {
+            currentMinute -= 60;
+            currentHour += 1;
+          }
+          continue;
+        }
+
         if (isSlotAfterClinicLastBookingCutoffUtc(slotStart, clinicId)) {
           currentMinute += slotMinutes;
           if (currentMinute >= 60) {
@@ -1120,6 +1132,13 @@ export async function createConversationalBooking(
 
     if (isNaN(startDate.getTime())) {
       return { success: false, error: "無效的日期或時間" };
+    }
+
+    if (isSlotBlockedBySameDayEveningCutoffUtc(startDate)) {
+      return {
+        success: false,
+        error: '今日晚上時段已截止預約，請選擇其他日期或較早時段。',
+      };
     }
 
     if (clinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, clinicId)) {

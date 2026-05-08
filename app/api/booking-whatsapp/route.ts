@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth-helpers';
 import {
   isSlotAfterClinicLastBookingCutoffUtc,
   isSlotAvailableUtc,
+  isSlotBlockedBySameDayEveningCutoffUtc,
 } from '@/lib/booking-helpers';
 import {
   createPendingBookingIntake,
@@ -131,6 +132,13 @@ export async function POST(request: NextRequest) {
 
     if (Number.isNaN(startDate.getTime())) {
       return NextResponse.json({ error: 'Invalid date/time' }, { status: 400 });
+    }
+
+    if (isSlotBlockedBySameDayEveningCutoffUtc(startDate)) {
+      return NextResponse.json(
+        { error: '今日晚上時段已截止預約，請選擇其他日期或較早時段。' },
+        { status: 409 },
+      );
     }
 
     if (bookingData.clinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, bookingData.clinicId)) {
