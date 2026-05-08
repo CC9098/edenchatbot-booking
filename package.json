@@ -33,7 +33,9 @@
     "ios:add": "npx cap add ios",
     "ios:sync": "npx cap sync ios",
     "ios:open": "npx cap open ios",
-    "ios:run": "npx cap run ios"
+    "ios:run": "npx cap run ios",
+    "video:preview": "remotion preview remotion/index.ts",
+    "video:render:booking-intro": "remotion render remotion/index.ts BookingSystemIntroZH out/booking-intro-zh.mp4"
   },
   "dependencies": {
     "@capacitor/app": "^8.0.1",
@@ -79,6 +81,8 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.7.1",
-    "typescript": "^5.4.3"
+    "typescript": "^5.4.3",
+    "remotion": "^4.0.340",
+    "@remotion/cli": "^4.0.340"
   }
 }
