@@ -811,7 +811,7 @@ export function BookingTabFlow({
         : null;
   const availableTreatmentSummaryDetail =
     !isMinimalPreview && selectedDoctor && !usesVisitBasedServices
-      ? `可選治療項目：${selectedDoctor.bookingTreatmentLabel}`
+      ? null
       : null;
   const selectedVisitOptionSummary = formatVisitOptionSummary(selectedVisitOption);
   const pickupOptions = useMemo(
@@ -1745,11 +1745,7 @@ export function BookingTabFlow({
                               </span>
                             ) : null}
                           </>
-                        ) : (
-                          <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
-                            可選治療項目：{selectedDoctor.bookingTreatmentLabel}
-                          </span>
-                        )}
+                        ) : null}
                         <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
                           {getSlotDurationLabel(selectedDoctorSlotMinutes)}
                         </span>
