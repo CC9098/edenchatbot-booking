@@ -13,6 +13,8 @@ const KNOWLEDGE_ROOT = path.join(process.cwd(), "docs", "staff-knowledge-base");
 
 const CATEGORY_BY_PREFIX: Array<[string, string]> = [
   ["patient-enquiries/", "病人查詢回覆"],
+  ["notion-import/eden-series/", "EDEN姑娘系列"],
+  ["notion-import/edengram/", "EDENGRAM"],
   ["00-intake-index", "知識庫目錄"],
   ["security-and-credentials", "安全與權限"],
 ];

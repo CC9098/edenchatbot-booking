@@ -8,6 +8,8 @@
 
 - Google Doc: `分類頁面手冊`
 - 文件 ID: `1wjOwNF2EIB-53bYwxlVjVuzPrP1poNtH_N65EGZV7HI`
+- Notion export: `Eden Series Export.zip`
+- Notion export: `EDENGRAM Export Block.zip`
 - 首次整理日期: `2026-05-09`
 
 ## 使用原則
@@ -27,6 +29,15 @@
 | [patient-enquiries/seminars.md](./patient-enquiries/seminars.md) | 講座查詢流程 | 已整理自 Google Doc |
 | [patient-enquiries/weight-management.md](./patient-enquiries/weight-management.md) | 減重治療查詢 | 只有標題，待補內容 |
 | [security-and-credentials.md](./security-and-credentials.md) | 帳號密碼類資料保存規則 | 初版安全規則 |
+| [notion-import/eden-series](./notion-import/eden-series) | EDEN 姑娘系列 Notion export | 已原文匯入 |
+| [notion-import/edengram](./notion-import/edengram) | EDENGRAM Notion export | 已原文匯入 |
+
+## 目前已匯入數量
+
+- Google Doc 主題：3 篇
+- EDEN 姑娘系列：18 篇
+- EDENGRAM：11 篇
+- 圖片 / 附件：放在 `public/staff-knowledge-assets/notion-import/`
 
 ## 建議下一步
 

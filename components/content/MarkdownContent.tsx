@@ -48,6 +48,14 @@ export default function MarkdownContent({ content, className }: MarkdownContentP
               </Link>
             );
           },
+          img: ({ src = "", alt = "" }) => (
+            <img
+              src={src}
+              alt={alt}
+              className="mt-4 max-h-[640px] w-auto max-w-full rounded-lg border border-slate-200 bg-white object-contain"
+              loading="lazy"
+            />
+          ),
           pre: ({ children }) => (
             <pre className="mt-4 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm leading-6 text-slate-100">
               {children}
