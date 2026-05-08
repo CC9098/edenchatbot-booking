@@ -774,15 +774,6 @@ function buildTemplateProcessedParamCandidates(
     candidates.push(candidate);
   };
 
-  // Try full named body params first — handles templates where manage_url (or any
-  // other variable) lives in the body rather than as a URL button. Doing this early
-  // avoids burning several seconds on button-format attempts that will always fail
-  // for body-only templates (important on platforms with tight function timeouts).
-  if (Object.keys(normalizedBody).length > 0) {
-    pushCandidate({ body: normalizedBody });
-    pushCandidate({ body: toNumericBodyParams(normalizedBody) });
-  }
-
   const manageUrl = normalizedBody.manage_url?.trim();
   if (manageUrl) {
     const { manage_url: _manageUrl, ...bodyWithoutManageUrl } = normalizedBody;
@@ -805,6 +796,13 @@ function buildTemplateProcessedParamCandidates(
     for (const bodyCandidate of bodyCandidates) {
       pushCandidate(bodyCandidate ? { body: bodyCandidate } : {});
     }
+  }
+
+  // Keep the complete body params as a fallback for templates where manage_url
+  // or other variables are body placeholders rather than buttons.
+  if (Object.keys(normalizedBody).length > 0) {
+    pushCandidate({ body: normalizedBody });
+    pushCandidate({ body: toNumericBodyParams(normalizedBody) });
   }
 
   const verificationCode = normalizedBody.verification_code?.trim();
@@ -933,6 +931,7 @@ async function sendBookingWhatsappNotification(
     buildBodyParams: () => Record<string, string>;
     getTemplateConfigs: (inbox: ChatwootInbox) => TemplateConfig[];
     preferTemplateIfAvailable?: boolean;
+    afterTemplateSuccessContent?: string;
   },
 ): Promise<SendWhatsappBookingConfirmationResult> {
   const baseUrl = (process.env.CHATWOOT_BASE_URL || '').trim().replace(/\/$/, '');
@@ -1009,6 +1008,16 @@ async function sendBookingWhatsappNotification(
         templateConfigs,
         bodyParams,
       );
+
+      if (options.afterTemplateSuccessContent) {
+        await client.createMessage(accountId, conversationId, {
+          content: options.afterTemplateSuccessContent,
+        }).catch((error) => {
+          console.warn(
+            `[chatwoot-whatsapp] Template sent but follow-up text failed: ${getSafeErrorMessage(error)}`,
+          );
+        });
+      }
     } catch (error) {
       if (!isActiveConversation(existingConversation)) {
         throw error;
@@ -1057,6 +1066,16 @@ async function sendBookingWhatsappNotification(
       templateConfigs,
       bodyParams,
     );
+
+    if (options.afterTemplateSuccessContent) {
+      await client.createMessage(accountId, conversationId, {
+        content: options.afterTemplateSuccessContent,
+      }).catch((error) => {
+        console.warn(
+          `[chatwoot-whatsapp] Template sent but follow-up text failed: ${getSafeErrorMessage(error)}`,
+        );
+      });
+    }
   } else {
     await client.createMessage(accountId, conversationId, {
       content,
@@ -1070,11 +1089,24 @@ async function sendBookingWhatsappNotification(
   };
 }
 
+function buildOnlineMeetLinkFollowUp(meetLink: string | undefined): string | undefined {
+  const normalizedMeetLink = meetLink?.trim();
+  if (!normalizedMeetLink) return undefined;
+
+  return [
+    '網上應診 Google Meet 連結：',
+    normalizedMeetLink,
+    '',
+    '請於預約時間前 5 分鐘按以上連結進入網上應診。',
+  ].join('\n');
+}
+
 export async function sendBookingConfirmationWhatsapp(
   input: BookingWhatsappNotificationInput,
 ): Promise<SendWhatsappBookingConfirmationResult> {
   try {
     const shouldUseOnlineTemplate = Boolean(input.meetLink && hasOnlineConfirmationTemplateConfig());
+    const onlineFollowUpContent = buildOnlineMeetLinkFollowUp(input.meetLink);
 
     return await sendBookingWhatsappNotification(input, {
       buildContent: () => buildWhatsappConfirmationText(input),
@@ -1083,7 +1115,8 @@ export async function sendBookingConfirmationWhatsapp(
           ? buildWhatsappOnlineTemplateBodyParams(input)
           : buildWhatsappTemplateBodyParams(input),
       getTemplateConfigs: shouldUseOnlineTemplate ? getOnlineTemplateConfigs : getTemplateConfigs,
-      preferTemplateIfAvailable: !input.groupBookingNotice,
+      preferTemplateIfAvailable: !input.groupBookingNotice && !input.meetLink,
+      afterTemplateSuccessContent: shouldUseOnlineTemplate ? onlineFollowUpContent : undefined,
     });
   } catch (error) {
     return {
