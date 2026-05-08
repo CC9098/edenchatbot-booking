@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { createServiceClient } from "@/lib/supabase";
 import type {
   StaffKnowledgeChatAnswer,
   StaffKnowledgeDocument,
@@ -10,6 +11,10 @@ import type {
 } from "@/lib/staff-knowledge-base-types";
 
 const KNOWLEDGE_ROOT = path.join(process.cwd(), "docs", "staff-knowledge-base");
+const STAFF_KNOWLEDGE_NOTE_TAG = "staff-knowledge";
+const STAFF_KNOWLEDGE_SOURCE_HASH = "staff-knowledge-note";
+const STAFF_CATEGORY_TAG_PREFIX = "staff-category:";
+const STAFF_SENSITIVITY_TAG_PREFIX = "staff-sensitivity:";
 
 const CATEGORY_BY_PREFIX: Array<[string, string]> = [
   ["patient-enquiries/", "病人查詢回覆"],
@@ -90,6 +95,11 @@ function compactMarkdown(value: string, maxChars = 160): string {
 
   if (normalized.length <= maxChars) return normalized;
   return `${normalized.slice(0, maxChars - 1).trimEnd()}…`;
+}
+
+function toIsoDateLabel(value: string | null | undefined): string {
+  if (!value) return "未標記";
+  return value.slice(0, 10);
 }
 
 function extractSection(contentMd: string, headingPattern: RegExp): string | null {
@@ -190,9 +200,236 @@ async function collectMarkdownFiles(dir: string): Promise<string[]> {
   return files;
 }
 
+interface StaffKnowledgeNoteRow {
+  id: string;
+  title: string;
+  body_md: string;
+  status: "inbox" | "drafting" | "ready" | "published" | "archived";
+  source: "manual" | "article_sync" | "ai_assist";
+  tags: string[] | null;
+  is_active: boolean;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StaffKnowledgeNoteInput {
+  title: string;
+  category: string;
+  contentMd: string;
+  sensitivity: StaffKnowledgeSensitivity;
+}
+
+function normalizeNoteField(value: string, fallback: string, maxLength: number): string {
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  if (!trimmed) return fallback;
+  return trimmed.slice(0, maxLength);
+}
+
+function normalizeNoteContent(value: string): string {
+  return value.replace(/\r/g, "").trim().slice(0, 50000);
+}
+
+function parseNoteCategory(tags: string[] | null): string {
+  const tag = tags?.find((item) => item.startsWith(STAFF_CATEGORY_TAG_PREFIX));
+  return tag?.slice(STAFF_CATEGORY_TAG_PREFIX.length).trim() || "姑娘新增 Note";
+}
+
+function parseNoteSensitivity(tags: string[] | null): StaffKnowledgeSensitivity {
+  const tag = tags?.find((item) => item.startsWith(STAFF_SENSITIVITY_TAG_PREFIX));
+  const raw = tag?.slice(STAFF_SENSITIVITY_TAG_PREFIX.length).trim();
+  if (raw && SENSITIVITY_VALUES.has(raw as StaffKnowledgeSensitivity)) {
+    return raw as StaffKnowledgeSensitivity;
+  }
+  return "internal";
+}
+
+function toNoteStatus(status: StaffKnowledgeNoteRow["status"]): StaffKnowledgeStatus {
+  if (status === "published" || status === "ready") return "reviewed";
+  if (status === "archived") return "draft";
+  return "draft";
+}
+
+function buildNoteTags(category: string, sensitivity: StaffKnowledgeSensitivity, existingTags: string[] = []): string[] {
+  const preserved = existingTags
+    .filter((tag) => {
+      return (
+        tag !== STAFF_KNOWLEDGE_NOTE_TAG &&
+        !tag.startsWith(STAFF_CATEGORY_TAG_PREFIX) &&
+        !tag.startsWith(STAFF_SENSITIVITY_TAG_PREFIX)
+      );
+    })
+    .map((tag) => tag.trim().slice(0, 80))
+    .filter(Boolean);
+
+  return Array.from(new Set([
+    STAFF_KNOWLEDGE_NOTE_TAG,
+    `${STAFF_CATEGORY_TAG_PREFIX}${category}`,
+    `${STAFF_SENSITIVITY_TAG_PREFIX}${sensitivity}`,
+    ...preserved,
+  ])).slice(0, 12);
+}
+
+function mapNoteRowToDocument(row: StaffKnowledgeNoteRow): StaffKnowledgeDocument {
+  const category = parseNoteCategory(row.tags);
+  const sensitivity = parseNoteSensitivity(row.tags);
+  const contentMd = row.body_md || "";
+  const patientReplyMd = extractSection(
+    contentMd,
+    /^##\s+(病人|病人\/客戶).*可見回覆/,
+  );
+
+  return {
+    id: `note:${row.id}`,
+    noteId: row.id,
+    title: row.title,
+    category,
+    status: toNoteStatus(row.status),
+    sensitivity,
+    source: "姑娘新增 Note",
+    updatedAt: toIsoDateLabel(row.updated_at),
+    createdAt: row.created_at,
+    updatedBy: row.updated_by,
+    excerpt: compactMarkdown(contentMd),
+    contentMd,
+    patientReplyMd,
+    sourcePath: `knowledge_cards:${row.id}`,
+    tags: Array.from(new Set([category, "editable", sensitivity, ...(row.tags || [])])),
+    editable: true,
+    imported: false,
+  };
+}
+
+async function listStaffKnowledgeNoteDocuments(): Promise<StaffKnowledgeDocument[]> {
+  try {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+      .from("knowledge_cards")
+      .select("id, title, body_md, status, source, tags, is_active, created_by, updated_by, created_at, updated_at")
+      .contains("tags", [STAFF_KNOWLEDGE_NOTE_TAG])
+      .eq("is_active", true)
+      .order("updated_at", { ascending: false })
+      .limit(500);
+
+    if (error) {
+      console.error("[staff-knowledge] failed to list editable notes:", error.message);
+      return [];
+    }
+
+    return ((data || []) as StaffKnowledgeNoteRow[]).map(mapNoteRowToDocument);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Missing SUPABASE_")) {
+      return [];
+    }
+    console.error("[staff-knowledge] editable notes unavailable:", error);
+    return [];
+  }
+}
+
+function prepareNoteInput(input: StaffKnowledgeNoteInput) {
+  const title = normalizeNoteField(input.title, "", 180);
+  if (!title) {
+    throw new Error("請輸入標題");
+  }
+
+  const category = normalizeNoteField(input.category, "姑娘新增 Note", 80);
+  const contentMd = normalizeNoteContent(input.contentMd);
+  if (!contentMd) {
+    throw new Error("請輸入內容");
+  }
+
+  const sensitivity = SENSITIVITY_VALUES.has(input.sensitivity)
+    ? input.sensitivity
+    : "internal";
+
+  return {
+    title,
+    category,
+    contentMd,
+    sensitivity,
+  };
+}
+
+export async function createStaffKnowledgeNote(
+  input: StaffKnowledgeNoteInput,
+  userId: string,
+): Promise<StaffKnowledgeDocument> {
+  const prepared = prepareNoteInput(input);
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("knowledge_cards")
+    .insert({
+      title: prepared.title,
+      body_md: prepared.contentMd,
+      status: "ready",
+      source: "manual",
+      tags: buildNoteTags(prepared.category, prepared.sensitivity),
+      source_hash: STAFF_KNOWLEDGE_SOURCE_HASH,
+      sort_order: 0,
+      is_active: true,
+      created_by: userId,
+      updated_by: userId,
+    })
+    .select("id, title, body_md, status, source, tags, is_active, created_by, updated_by, created_at, updated_at")
+    .single();
+
+  if (error || !data) {
+    console.error("[staff-knowledge] create note failed:", error?.message);
+    throw new Error("未能建立 Note");
+  }
+
+  return mapNoteRowToDocument(data as StaffKnowledgeNoteRow);
+}
+
+export async function updateStaffKnowledgeNote(
+  noteId: string,
+  input: StaffKnowledgeNoteInput,
+  userId: string,
+): Promise<StaffKnowledgeDocument> {
+  const prepared = prepareNoteInput(input);
+  const supabase = createServiceClient();
+
+  const { data: existing, error: existingError } = await supabase
+    .from("knowledge_cards")
+    .select("id, tags")
+    .eq("id", noteId)
+    .contains("tags", [STAFF_KNOWLEDGE_NOTE_TAG])
+    .maybeSingle();
+
+  if (existingError) {
+    console.error("[staff-knowledge] fetch note before update failed:", existingError.message);
+    throw new Error("未能讀取 Note");
+  }
+  if (!existing) {
+    throw new Error("找不到可編輯 Note");
+  }
+
+  const { data, error } = await supabase
+    .from("knowledge_cards")
+    .update({
+      title: prepared.title,
+      body_md: prepared.contentMd,
+      tags: buildNoteTags(prepared.category, prepared.sensitivity, Array.isArray(existing.tags) ? existing.tags : []),
+      updated_by: userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", noteId)
+    .contains("tags", [STAFF_KNOWLEDGE_NOTE_TAG])
+    .select("id, title, body_md, status, source, tags, is_active, created_by, updated_by, created_at, updated_at")
+    .single();
+
+  if (error || !data) {
+    console.error("[staff-knowledge] update note failed:", error?.message);
+    throw new Error("未能更新 Note");
+  }
+
+  return mapNoteRowToDocument(data as StaffKnowledgeNoteRow);
+}
+
 export async function listStaffKnowledgeDocuments(): Promise<StaffKnowledgeDocument[]> {
   const filePaths = await collectMarkdownFiles(KNOWLEDGE_ROOT);
-  const documents = await Promise.all(
+  const importedDocuments = await Promise.all(
     filePaths.map(async (filePath) => {
       const contentMd = await fs.readFile(filePath, "utf8");
       const relativePath = path.relative(KNOWLEDGE_ROOT, filePath).replace(/\\/g, "/");
@@ -216,11 +453,16 @@ export async function listStaffKnowledgeDocuments(): Promise<StaffKnowledgeDocum
         patientReplyMd,
         sourcePath: `docs/staff-knowledge-base/${relativePath}`,
         tags: Array.from(new Set([toCategory(relativePath), parseStatus(contentMd), parseSensitivity(contentMd)])),
+        editable: false,
+        imported: true,
       } satisfies StaffKnowledgeDocument;
     }),
   );
+  const noteDocuments = await listStaffKnowledgeNoteDocuments();
+  const documents = [...noteDocuments, ...importedDocuments];
 
   return documents.sort((a, b) => {
+    if (a.editable !== b.editable) return a.editable ? -1 : 1;
     if (a.category !== b.category) return a.category.localeCompare(b.category, "zh-HK");
     return a.title.localeCompare(b.title, "zh-HK");
   });
