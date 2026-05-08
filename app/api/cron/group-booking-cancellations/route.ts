@@ -224,7 +224,7 @@ export async function GET(request: NextRequest) {
               clinicNameZh: item.clinicNameZh,
               appointmentDate: item.appointmentDate,
               appointmentTime: item.appointmentTime,
-              cancellationReason: "因未滿三位病人，未能開診，系統已自動取消預約。",
+              cancellationReason: "診所未能安排此節預約，系統已自動取消預約。",
               clinicWhatsappPhone: getClinicWhatsappPhone(item.clinicId),
               manageAccessToken: phoneDigits ? createManageAccessToken(phoneDigits) : undefined,
             });

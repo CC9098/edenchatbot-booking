@@ -109,9 +109,6 @@ const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as cons
 const WEEKDAY_LABELS_ZH = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'] as const;
 const WEEKDAY_SHORT_LABELS_ZH = ['日', '一', '二', '三', '四', '五', '六'] as const;
 const OTHER_TREATMENT_OPTION_ID: BookingTreatmentOptionId = 'other';
-const DR_WONG_GROUP_BOOKING_NOTICE =
-  '為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以 WhatsApp 確認。';
-
 const VISIT_TYPE_LABELS: Record<VisitType, string> = {
   first: '首診',
   followup: '覆診',
@@ -830,10 +827,7 @@ export function BookingTabFlow({
     selectedVisitOption?.durationMinutes
     ?? selectedDoctor?.bookingSlotMinutes
     ?? DEFAULT_SLOT_DURATION_MINUTES;
-  const groupBookingNotice =
-    selectedDoctor?.doctorId === 'wong' && clinicId === 'jordan'
-      ? DR_WONG_GROUP_BOOKING_NOTICE
-      : '';
+  const groupBookingNotice = '';
   const scannableClinics = useMemo(
     () => selectedDoctor?.clinics ?? [],
     [selectedDoctor]
@@ -1736,7 +1730,7 @@ export function BookingTabFlow({
                           <>
                             {firstVisitOption ? (
                               <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
-                                首診半價 {formatHkdPrice(firstVisitOption.priceHkd)}
+                                首診 {formatHkdPrice(firstVisitOption.priceHkd)}
                               </span>
                             ) : null}
                             {followupVisitOption ? (
@@ -1873,7 +1867,7 @@ export function BookingTabFlow({
               </p>
               {usesVisitBasedServices ? (
                 <span className="text-xs font-medium text-emerald-700">
-                  中醫聯乘優惠
+                  脊醫服務
                 </span>
               ) : null}
             </div>

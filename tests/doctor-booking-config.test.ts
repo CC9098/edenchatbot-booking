@@ -78,7 +78,7 @@ test('Dr. Wong is treated as a support chiropractic service in booking lists', (
   assert.equal(isSupportBookingPractitioner('chan'), false);
 });
 
-test('Dr. Wong booking keeps two simple chiropractic services and first-visit promotion', () => {
+test('Dr. Wong booking keeps two simple chiropractic services without public discount copy', () => {
   const visitOptions = getDoctorBookingVisitOptions('wong');
   assert.deepEqual(
     visitOptions.map((option) => option.visitType),
@@ -89,10 +89,10 @@ test('Dr. Wong booking keeps two simple chiropractic services and first-visit pr
   assert.equal(firstVisit?.serviceNameZh, '脊醫首診： 檢查及治療');
   assert.equal(firstVisit?.serviceNameEn, 'Standard Chiropractic Examination');
   assert.equal(firstVisit?.durationMinutes, 30);
-  assert.equal(firstVisit?.priceHkd, 490);
-  assert.equal(firstVisit?.originalPriceHkd, 980);
-  assert.equal(firstVisit?.promotionLabel, '中醫聯乘優惠');
-  assert.equal(firstVisit?.note, '凡正接受醫天圓中醫診症的病人，可享首次半價優惠。');
+  assert.equal(firstVisit?.priceHkd, 980);
+  assert.equal(firstVisit?.originalPriceHkd, undefined);
+  assert.equal(firstVisit?.promotionLabel, undefined);
+  assert.equal(firstVisit?.note, undefined);
 
   const followUp = getDoctorBookingVisitOption('wong', 'followup');
   assert.equal(followUp?.serviceNameZh, '脊醫覆診： 跟進治療');
@@ -105,7 +105,7 @@ test('Dr. Wong booking keeps two simple chiropractic services and first-visit pr
   assert.equal(getDoctorBookingSlotMinutes('wong'), 30);
 });
 
-test('Dr. Wong Jordan schedule matches the May 2026 poster hours', () => {
+test('Dr. Wong Jordan schedule matches the May 2026 poster hours without group minimum policy', () => {
   const mapping = CALENDAR_MAPPINGS.find(
     (candidate) => candidate.doctorId === 'wong' && candidate.clinicId === 'jordan'
   );
@@ -115,8 +115,5 @@ test('Dr. Wong Jordan schedule matches the May 2026 poster hours', () => {
   const policy = GROUP_BOOKING_POLICIES.find(
     (candidate) => candidate.doctorId === 'wong' && candidate.clinicId === 'jordan'
   );
-  assert.deepEqual(policy?.sessions, [
-    { dayOfWeek: 4, start: '11:00', end: '14:00' },
-    { dayOfWeek: 6, start: '14:30', end: '16:30' },
-  ]);
+  assert.equal(policy, undefined);
 });

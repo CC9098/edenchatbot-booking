@@ -28,10 +28,7 @@ const pricingRows = [
     title: "脊醫首診： 檢查及治療",
     subtitle: "Standard Chiropractic Examination",
     duration: "30 minutes",
-    price: "HK$490",
-    originalPrice: "HK$980",
-    note: "中醫聯乘優惠",
-    description: "凡正接受醫天圓中醫診症的病人，可享首次半價優惠。",
+    price: "HK$980",
     href: drWongFirstVisitBookingUrl,
   },
   {
@@ -104,7 +101,7 @@ export default function DrWongPage() {
               預約 Dr Wong
             </div>
             <p className="mt-3 text-sm leading-relaxed text-[#496153]">
-              佐敦應診時間：星期四 11:00-14:00、星期六 14:30-16:30。為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以 WhatsApp 確認。
+              佐敦應診時間：星期四 11:00-14:00、星期六 14:30-16:30。預約成功後，診所會以 WhatsApp 確認。
             </p>
 
             <div className="mt-5 divide-y divide-[#e0cfb4] border-y border-[#e0cfb4]">
@@ -115,25 +112,12 @@ export default function DrWongPage() {
                       <span className="rounded-full bg-[#eaf5ec] px-3 py-1 text-xs font-semibold text-[#1f6b3f]">
                         {item.label}
                       </span>
-                      {item.note ? (
-                        <span className="rounded-full bg-[#fff4cf] px-3 py-1 text-xs font-semibold text-[#806018]">
-                          {item.note}
-                        </span>
-                      ) : null}
                     </div>
                     <p className="mt-2 text-base font-semibold text-[#123f2a]">{item.title}</p>
                     <p className="text-sm text-[#496153]">{item.subtitle} · {item.duration}</p>
-                    {item.description ? (
-                      <p className="mt-1 text-xs font-medium leading-relaxed text-[#1f6b3f]">
-                        {item.description}
-                      </p>
-                    ) : null}
                   </div>
                   <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end sm:justify-center sm:gap-1">
                     <p className="text-xl font-semibold text-[#0d4c2d]">{item.price}</p>
-                    {item.originalPrice ? (
-                      <p className="text-sm text-[#8b7860] line-through">{item.originalPrice}</p>
-                    ) : null}
                   </div>
                 </div>
               ))}

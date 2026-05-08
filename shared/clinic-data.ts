@@ -224,10 +224,7 @@ export const DOCTORS: DoctorProfile[] = [
         serviceNameZh: '脊醫首診： 檢查及治療',
         serviceNameEn: 'Standard Chiropractic Examination',
         durationMinutes: 30,
-        priceHkd: 490,
-        originalPriceHkd: 980,
-        promotionLabel: '中醫聯乘優惠',
-        note: '凡正接受醫天圓中醫診症的病人，可享首次半價優惠。',
+        priceHkd: 980,
       },
       {
         visitType: 'followup',
@@ -239,7 +236,7 @@ export const DOCTORS: DoctorProfile[] = [
     ],
     onlineBookingEnabled: false,
     scheduleNote:
-      '為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以 WhatsApp 確認。',
+      '佐敦應診時間：星期四 11:00-14:00、星期六 14:30-16:30。',
   },
 ];
 

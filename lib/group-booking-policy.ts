@@ -20,24 +20,12 @@ export type GroupBookingSession = GroupBookingPolicy["sessions"][number] & {
 };
 
 export const DR_WONG_GROUP_BOOKING_NOTICE =
-  "為方便醫生安排時間，每節需要最少三位病人才會開診。若未滿三人，系統會自動取消預約。若果人數足夠確認預約，會前一天以 WhatsApp 確認。";
+  "";
 
 export const DR_WONG_GROUP_BOOKING_CONFIRMED_NOTICE =
-  "此節人數已足夠，預約已確認。請按時到診。";
+  "預約已確認。請按時到診。";
 
-export const GROUP_BOOKING_POLICIES: readonly GroupBookingPolicy[] = [
-  {
-    doctorId: "wong",
-    clinicId: "jordan",
-    minPatients: 3,
-    cancelHoursBeforeStart: 24,
-    notice: DR_WONG_GROUP_BOOKING_NOTICE,
-    sessions: [
-      { dayOfWeek: 4, start: "11:00", end: "14:00" },
-      { dayOfWeek: 6, start: "14:30", end: "16:30" },
-    ],
-  },
-];
+export const GROUP_BOOKING_POLICIES: readonly GroupBookingPolicy[] = [];
 
 function toMinutes(value: string): number {
   const [hour, minute] = value.split(":").map(Number);
