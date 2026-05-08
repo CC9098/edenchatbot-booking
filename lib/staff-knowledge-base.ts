@@ -166,6 +166,12 @@ function pickSnippets(document: StaffKnowledgeDocument, terms: string[], query: 
     .map((item) => compactMarkdown(item.block, 260));
 }
 
+function documentSearchWeight(documentId: string): number {
+  if (documentId === "00-intake-index") return 0.3;
+  if (documentId === "security-and-credentials") return 0.3;
+  return 1;
+}
+
 async function collectMarkdownFiles(dir: string): Promise<string[]> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const files: string[] = [];
@@ -221,8 +227,7 @@ export async function listStaffKnowledgeDocuments(): Promise<StaffKnowledgeDocum
 }
 
 export function isVisibleStaffHandbookDocument(document: StaffKnowledgeDocument): boolean {
-  if (document.id === "00-intake-index") return false;
-  if (document.id === "security-and-credentials") return false;
+  void document;
   return true;
 }
 
@@ -251,26 +256,13 @@ export async function searchStaffKnowledge(
       );
       return {
         document,
-        score: titleScore * 3 + bodyScore,
+        score: Math.round((titleScore * 3 + bodyScore) * documentSearchWeight(document.id)),
         snippets: pickSnippets(document, terms, trimmed),
       };
     })
     .filter((result) => result.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, options.limit ?? 6);
-}
-
-function hasCredentialRequest(query: string): boolean {
-  const normalized = normalizeText(query);
-  return (
-    normalized.includes("密碼") ||
-    normalized.includes("password") ||
-    normalized.includes("otp") ||
-    normalized.includes("戶口號碼") ||
-    normalized.includes("銀行戶口") ||
-    normalized.includes("fps") ||
-    normalized.includes("快速識別碼")
-  );
 }
 
 function wantsPatientReply(query: string): boolean {
@@ -281,6 +273,27 @@ function wantsPatientReply(query: string): boolean {
     normalized.includes("whatsapp") ||
     normalized.includes("病人") ||
     normalized.includes("客戶")
+  );
+}
+
+function wantsCredentialLookup(query: string): boolean {
+  const normalized = normalizeText(query);
+  return (
+    normalized.includes("密碼") ||
+    normalized.includes("password") ||
+    normalized.includes("登入") ||
+    normalized.includes("帳號") ||
+    normalized.includes("賬號") ||
+    normalized.includes("戶口")
+  );
+}
+
+function hasCredentialDetails(document: StaffKnowledgeDocument): boolean {
+  return (
+    /(密碼|password)\s*[:：]/i.test(document.contentMd) ||
+    /(帳號|賬號|account)\s*[:：]/i.test(document.contentMd) ||
+    /密碼\s+[0-9a-z!_]/i.test(document.contentMd) ||
+    /\|\s*[^|\n]*(密碼|password)[^|\n]*\|/i.test(document.contentMd)
   );
 }
 
@@ -320,29 +333,16 @@ export async function answerStaffKnowledgeQuestion(query: string): Promise<Staff
     limit: 4,
   });
 
-  if (hasCredentialRequest(trimmed)) {
-    const securityResult = results.find((item) => item.document.id === "security-and-credentials");
-    const security = securityResult?.document
-      || (await listStaffKnowledgeDocuments()).find((item) => item.id === "security-and-credentials");
+  let specificResults = results.filter((item) => {
+    return item.document.id !== "00-intake-index" && item.document.id !== "security-and-credentials";
+  });
 
-    return {
-      answer: [
-        "這類資料屬 restricted。知識庫規則是不由 AI 提供密碼、OTP、銀行戶口或後台憑證。",
-        "可查的是登入位置、用途、操作步驟和負責人；真正密碼應放在受控密碼管理工具或由主管確認。",
-      ].join("\n\n"),
-      confidence: "blocked",
-      sources: security
-        ? [{
-            id: security.id,
-            title: security.title,
-            category: security.category,
-            snippets: [security.excerpt],
-          }]
-        : [],
-    };
+  if (wantsCredentialLookup(trimmed)) {
+    const credentialResults = specificResults.filter((item) => hasCredentialDetails(item.document));
+    if (credentialResults.length > 0) {
+      specificResults = credentialResults;
+    }
   }
-
-  const specificResults = results.filter((item) => item.document.id !== "00-intake-index");
   const usableResults = (specificResults.length > 0 ? specificResults : results).filter((item) => item.score >= 6);
   if (usableResults.length === 0) {
     return {
