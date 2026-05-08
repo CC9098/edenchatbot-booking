@@ -525,10 +525,6 @@ function getTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
   });
 }
 
-function hasOnlineConfirmationTemplateConfig(): boolean {
-  return Boolean((process.env.CHATWOOT_WHATSAPP_ONLINE_TEMPLATE_NAME || '').trim());
-}
-
 function getOnlineTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
   return getNamedTemplateConfigs(inbox, {
     configuredName: process.env.CHATWOOT_WHATSAPP_ONLINE_TEMPLATE_NAME,
@@ -1105,7 +1101,7 @@ export async function sendBookingConfirmationWhatsapp(
   input: BookingWhatsappNotificationInput,
 ): Promise<SendWhatsappBookingConfirmationResult> {
   try {
-    const shouldUseOnlineTemplate = Boolean(input.meetLink && hasOnlineConfirmationTemplateConfig());
+    const shouldUseOnlineTemplate = Boolean(input.meetLink);
     const onlineFollowUpContent = buildOnlineMeetLinkFollowUp(input.meetLink);
 
     return await sendBookingWhatsappNotification(input, {
@@ -1116,7 +1112,7 @@ export async function sendBookingConfirmationWhatsapp(
           : buildWhatsappTemplateBodyParams(input),
       getTemplateConfigs: shouldUseOnlineTemplate ? getOnlineTemplateConfigs : getTemplateConfigs,
       preferTemplateIfAvailable: !input.groupBookingNotice && !input.meetLink,
-      afterTemplateSuccessContent: shouldUseOnlineTemplate ? onlineFollowUpContent : undefined,
+      afterTemplateSuccessContent: onlineFollowUpContent,
     });
   } catch (error) {
     return {
