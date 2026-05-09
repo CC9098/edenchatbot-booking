@@ -25,7 +25,7 @@ const SUGGESTIONS = [
   "上門出診點覆病人？",
   "講座查詢要收集咩資料？",
   "減重治療有冇標準回覆？",
-  "Lalamove 密碼係咩？",
+  "寄藥要收集咩資料？",
 ];
 
 function confidenceLabel(confidence: StaffKnowledgeChatAnswer["confidence"]) {

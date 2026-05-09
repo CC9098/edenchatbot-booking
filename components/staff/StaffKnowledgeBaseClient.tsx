@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
+  ArrowRight,
+  BookOpenCheck,
+  CheckCircle2,
   ClipboardCopy,
   ClipboardList,
   FileText,
@@ -89,6 +93,39 @@ function editorTitle(mode: NoteEditorMode) {
   return "新增 Note";
 }
 
+const QUICK_START_TASKS = [
+  {
+    label: "分單 / 補收據",
+    query: "收據 分單 病假紙",
+    detail: "先查可否補發、收費、取單方式",
+  },
+  {
+    label: "食藥方法",
+    query: "食藥 藥袋 西藥",
+    detail: "按處方講，不自行改醫師指示",
+  },
+  {
+    label: "寄藥安排",
+    query: "寄藥 Lalamove 順豐",
+    detail: "先收地址、電話、時間，不承諾即日",
+  },
+  {
+    label: "醫療券",
+    query: "醫療券 使用步驟",
+    detail: "跟步驟做，有問題先問主管",
+  },
+  {
+    label: "開診前工作",
+    query: "開診前",
+    detail: "返工先做的檢查事項",
+  },
+  {
+    label: "颱風 / 醫師請假",
+    query: "颱風 醫師病假",
+    detail: "只按已確認安排回覆病人",
+  },
+];
+
 export function StaffKnowledgeBaseClient() {
   const searchParams = useSearchParams();
   const initialDocId = searchParams.get("doc");
@@ -168,6 +205,21 @@ export function StaffKnowledgeBaseClient() {
     setEditor(document.editable && document.noteId ? editDocument(document) : copyFromDocument(document));
   }
 
+  function focusTask(nextQuery: string) {
+    setCategory("all");
+    setQuery(nextQuery);
+    const matchedDocument = documents.find((document) => documentMatches(document, nextQuery));
+    if (matchedDocument) {
+      setSelectedId(matchedDocument.id);
+    }
+    window.setTimeout(() => {
+      document.getElementById("staff-knowledge-browser")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
+  }
+
   async function saveNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editor || saving) return;
@@ -215,10 +267,10 @@ export function StaffKnowledgeBaseClient() {
       <section className="rounded-lg border border-emerald-100 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-emerald-700">姑娘內部手冊</p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-950">知識庫</h1>
-            <p className="mt-2 text-sm text-slate-500">
-              內容直接來自 Google Doc「分類頁面手冊」，先放姑娘已填入的實際話術和流程。
+            <p className="text-sm font-medium text-emerald-700">新姑娘上手流程</p>
+            <h1 className="mt-1 text-2xl font-semibold text-slate-950">今日先跟 3 步做</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              新同事不用一開始讀完整手冊。先看對答示範、做 role-play，再按病人問題查常用 SOP。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -241,37 +293,76 @@ export function StaffKnowledgeBaseClient() {
         </div>
       </section>
 
-      <section className="grid gap-4 rounded-lg border border-emerald-100 bg-emerald-50/60 p-4 shadow-sm lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="rounded-md border border-emerald-100 bg-white p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
-            <GraduationCap className="h-4 w-4" />
-            前台對答訓練
+      <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 p-4 shadow-sm">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-md border border-emerald-100 bg-white p-4">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-700 text-sm font-bold text-white">1</div>
+              <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-emerald-800">
+                <PlayCircle className="h-4 w-4" />
+                先看示範
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                只看病人最常問的幾類：分單、食藥、補收據、寄藥。
+              </p>
+              <a
+                href="/staff-training/staff-knowledge-onboarding.mp4"
+                className="mt-4 inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+              >
+                開啟影片
+                <ArrowRight className="h-4 w-4" />
+              </a>
+            </div>
+
+            <div className="rounded-md border border-emerald-100 bg-white p-4">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-700 text-sm font-bold text-white">2</div>
+              <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-emerald-800">
+                <ClipboardList className="h-4 w-4" />
+                再做 Role-play
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Trainer 扮病人，通過 Level 0-3 先處理普通查詢。
+              </p>
+              <Link
+                href="/nurse/knowledge/training"
+                className="mt-4 inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+              >
+                開始測試
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="rounded-md border border-emerald-100 bg-white p-4">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-700 text-sm font-bold text-white">3</div>
+              <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-emerald-800">
+                <BookOpenCheck className="h-4 w-4" />
+                最後查 SOP
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                病人問到哪件事，就按下面常用任務查，不用逐篇讀。
+              </p>
+              <button
+                type="button"
+                onClick={() => focusTask("收據 分單 病假紙")}
+                className="mt-4 inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+              >
+                去常用 SOP
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          <h2 className="mt-2 text-xl font-semibold text-slate-950">
-            兼職姑娘先學點答病人，再做 Role-play Test
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            這段 90 秒影片示範：病人問分單、食藥、補收據或寄藥時，姑娘應該點講、收咩資料、邊啲要問主管。
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <a
-              href="/staff-training/staff-knowledge-onboarding.mp4"
-              className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
-            >
-              <PlayCircle className="h-4 w-4" />
-              開啟對答影片
-            </a>
-            <Link
-              href="/nurse/knowledge/training"
-              className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
-            >
-              <ClipboardList className="h-4 w-4" />
-              做 Role-play Test
-            </Link>
+
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <div className="flex items-start gap-2 text-sm leading-6 text-amber-900">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                新姑娘遇到收費、醫療判斷、保險承諾、密碼或後台操作，先用「我幫您確認清楚再回覆」收口。
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-md border border-emerald-100 bg-slate-950">
+        <div className="overflow-hidden rounded-lg border border-emerald-100 bg-slate-950 shadow-sm">
           <video
             className="aspect-video h-full w-full bg-slate-950"
             controls
@@ -281,6 +372,38 @@ export function StaffKnowledgeBaseClient() {
             <source src="/staff-training/staff-knowledge-onboarding.mp4" type="video/mp4" />
             你的瀏覽器未能播放此影片。
           </video>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm font-medium text-emerald-700">常用任務</p>
+            <h2 className="mt-1 text-xl font-semibold text-slate-950">病人問到先按，不用一頁頁搵</h2>
+          </div>
+          <Link
+            href="/nurse/knowledge/chat"
+            className="inline-flex items-center gap-2 rounded-md border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+          >
+            <MessageCircle className="h-4 w-4" />
+            問 AI
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {QUICK_START_TASKS.map((task) => (
+            <button
+              key={task.label}
+              type="button"
+              onClick={() => focusTask(task.query)}
+              className="rounded-md border border-slate-200 bg-slate-50 p-3 text-left hover:border-emerald-200 hover:bg-emerald-50"
+            >
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+                {task.label}
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-500">{task.detail}</p>
+            </button>
+          ))}
         </div>
       </section>
 
@@ -390,7 +513,7 @@ export function StaffKnowledgeBaseClient() {
         </section>
       ) : null}
 
-      <section className="grid gap-4 lg:grid-cols-[280px_1fr]">
+      <section id="staff-knowledge-browser" className="grid scroll-mt-24 gap-4 lg:grid-cols-[280px_1fr]">
         <aside className="space-y-3">
           <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
             <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
