@@ -5,11 +5,14 @@ import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ClipboardCopy,
+  ClipboardList,
   FileText,
   FilePlus,
+  GraduationCap,
   Loader2,
   MessageCircle,
   Pencil,
+  PlayCircle,
   Plus,
   Save,
   Search,
@@ -235,6 +238,49 @@ export function StaffKnowledgeBaseClient() {
               AI 問答
             </Link>
           </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 rounded-lg border border-emerald-100 bg-emerald-50/60 p-4 shadow-sm lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-md border border-emerald-100 bg-white p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
+            <GraduationCap className="h-4 w-4" />
+            新手訓練
+          </div>
+          <h2 className="mt-2 text-xl font-semibold text-slate-950">
+            兼職姑娘先看片，再做 Level Test
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            這段 90 秒影片示範：遇到病人問題、搜尋知識庫、用 AI 問答、檢查來源、升級主管、再補 Note。
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <a
+              href="/staff-training/staff-knowledge-onboarding.mp4"
+              className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+            >
+              <PlayCircle className="h-4 w-4" />
+              開啟訓練影片
+            </a>
+            <Link
+              href="/nurse/knowledge/training"
+              className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+            >
+              <ClipboardList className="h-4 w-4" />
+              做 Level Test
+            </Link>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-md border border-emerald-100 bg-slate-950">
+          <video
+            className="aspect-video h-full w-full bg-slate-950"
+            controls
+            preload="metadata"
+            poster="/staff-training/staff-knowledge-onboarding-frame.png"
+          >
+            <source src="/staff-training/staff-knowledge-onboarding.mp4" type="video/mp4" />
+            你的瀏覽器未能播放此影片。
+          </video>
         </div>
       </section>
 
