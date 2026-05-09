@@ -18,6 +18,7 @@ const STAFF_SENSITIVITY_TAG_PREFIX = "staff-sensitivity:";
 
 const CATEGORY_BY_PREFIX: Array<[string, string]> = [
   ["patient-enquiries/", "病人查詢回覆"],
+  ["notion-live/whatsapp-replies/", "WhatsApp 回覆範本"],
   ["notion-import/eden-series/", "EDEN姑娘系列"],
   ["notion-import/edengram/", "EDENGRAM"],
   ["00-intake-index", "知識庫目錄"],

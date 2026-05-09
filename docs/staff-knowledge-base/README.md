@@ -10,6 +10,7 @@
 - 文件 ID: `1wjOwNF2EIB-53bYwxlVjVuzPrP1poNtH_N65EGZV7HI`
 - Notion export: `Eden Series Export.zip`
 - Notion export: `EDENGRAM Export Block.zip`
+- Notion page: `醫天圓對答範本20240322`
 - 首次整理日期: `2026-05-09`
 
 ## 使用原則
@@ -43,12 +44,14 @@
 | [security-and-credentials.md](./security-and-credentials.md) | 帳號密碼類資料保存規則 | 初版安全規則 |
 | [notion-import/eden-series](./notion-import/eden-series) | EDEN 姑娘系列 Notion export | 已原文匯入 |
 | [notion-import/edengram](./notion-import/edengram) | EDENGRAM Notion export | 已原文匯入 |
+| [notion-live/whatsapp-replies/eden-response-template-20240322.md](./notion-live/whatsapp-replies/eden-response-template-20240322.md) | 醫天圓 WhatsApp 對答範本 | 已由 Notion connector 匯入 |
 
 ## 目前已匯入數量
 
 - Google Doc 主題：3 篇
 - EDEN 姑娘系列：18 篇
 - EDENGRAM：11 篇
+- WhatsApp 回覆範本：1 篇
 - 目錄 / 權限備忘：2 篇
 - 圖片 / 附件：放在 `public/staff-knowledge-assets/notion-import/`
 
