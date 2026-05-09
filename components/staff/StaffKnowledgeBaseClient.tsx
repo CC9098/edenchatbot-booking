@@ -245,13 +245,13 @@ export function StaffKnowledgeBaseClient() {
         <div className="rounded-md border border-emerald-100 bg-white p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
             <GraduationCap className="h-4 w-4" />
-            新手訓練
+            前台對答訓練
           </div>
           <h2 className="mt-2 text-xl font-semibold text-slate-950">
-            兼職姑娘先看片，再做 Level Test
+            兼職姑娘先學點答病人，再做 Role-play Test
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            這段 90 秒影片示範：遇到病人問題、搜尋知識庫、用 AI 問答、檢查來源、升級主管、再補 Note。
+            這段 90 秒影片示範：病人問分單、食藥、補收據或寄藥時，姑娘應該點講、收咩資料、邊啲要問主管。
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <a
@@ -259,14 +259,14 @@ export function StaffKnowledgeBaseClient() {
               className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
             >
               <PlayCircle className="h-4 w-4" />
-              開啟訓練影片
+              開啟對答影片
             </a>
             <Link
               href="/nurse/knowledge/training"
               className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
             >
               <ClipboardList className="h-4 w-4" />
-              做 Level Test
+              做 Role-play Test
             </Link>
           </div>
         </div>

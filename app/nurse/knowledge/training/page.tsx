@@ -30,12 +30,12 @@ export default async function NurseKnowledgeTrainingPage() {
         </Link>
         <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-emerald-700">姑娘知識庫訓練</p>
+            <p className="text-sm font-medium text-emerald-700">姑娘前台對答訓練</p>
             <h1 className="mt-1 text-2xl font-semibold text-slate-950">
-              兼職姑娘 Level Test
+              兼職姑娘 Role-play Test
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              先看訓練影片，再按 Level 0-5 完成測試。
+              先看對答影片，再按 Level 0-6 即場練習病人查詢。
             </p>
           </div>
           <a
@@ -43,7 +43,7 @@ export default async function NurseKnowledgeTrainingPage() {
             className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
           >
             <PlayCircle className="h-4 w-4" />
-            開啟訓練影片
+            開啟對答影片
           </a>
         </div>
       </section>
