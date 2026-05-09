@@ -1,0 +1,22 @@
+{
+  "name": "eden-staff-knowledge-onboarding-video",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts StaffKnowledgeOnboarding renders/staff-knowledge-onboarding.mp4 --codec=h264 --crf=23",
+    "still": "remotion still src/index.ts StaffKnowledgeOnboarding renders/staff-knowledge-onboarding-frame.png --frame=900 --scale=0.5"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.459",
+    "remotion": "4.0.459",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "18.2.73",
+    "@types/react-dom": "18.2.23",
+    "typescript": "5.4.3"
+  }
+}
+
