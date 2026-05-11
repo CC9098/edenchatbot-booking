@@ -4,18 +4,29 @@ import {
   ArrowRight,
   BookOpenCheck,
   Bot,
+  CalendarCheck2,
   CheckCircle2,
   ChevronDown,
   CircleAlert,
   Clock3,
   ClipboardCheck,
+  ClipboardList,
+  FileText,
   Flag,
+  GraduationCap,
   MessageCircle,
+  NotebookPen,
+  PackageCheck,
+  PlayCircle,
+  Search,
   ShieldAlert,
   ShieldCheck,
+  Stethoscope,
   UserCheck,
   Users,
+  WalletCards,
   XCircle,
+  type LucideIcon,
 } from "lucide-react";
 
 import {
@@ -407,6 +418,26 @@ function tileShortLabel(code: string) {
   return labels[code] ?? code;
 }
 
+function tileIcon(code: string): LucideIcon {
+  const icons: Record<string, LucideIcon> = {
+    "D1-01": PlayCircle,
+    "D1-02": MessageCircle,
+    "D1-03": ClipboardList,
+    "D1-04": Stethoscope,
+    "D2-01": Search,
+    "D2-02": GraduationCap,
+    "D3-01": CalendarCheck2,
+    "D3-02": NotebookPen,
+    "D4-01": FileText,
+    "D4-02": PackageCheck,
+    "D4-03": WalletCards,
+    "D5-01": Bot,
+    "D5-02": ShieldCheck,
+  };
+
+  return icons[code] ?? CheckCircle2;
+}
+
 function dayShortLabel(day: number) {
   if (day === 1) return "開工準備";
   if (day === 2) return "常見10問";
@@ -417,22 +448,22 @@ function dayShortLabel(day: number) {
 
 function BoardTile({ card, day, isToday }: { card: BoardCard; day: number; isToday: boolean }) {
   const mustEscalate = card.release === "red" || card.supervisor === "always";
-  const TileIcon = mustEscalate
-    ? ShieldAlert
-    : card.release === "yellow"
-      ? CircleAlert
-      : CheckCircle2;
+  const TileIcon = tileIcon(card.code);
 
   return (
     <details
-      className={`group rounded-lg border p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-        isToday ? "border-emerald-200 bg-white" : "border-slate-200 bg-white/70"
+      className={`group rounded-xl border p-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+        isToday ? "border-emerald-200 bg-white/95" : "border-slate-200 bg-white/75"
       }`}
     >
-      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-1 items-start gap-2">
+      <summary className="relative flex min-h-28 cursor-pointer list-none flex-col items-center justify-center gap-2 text-center">
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">
+          {card.code}
+        </span>
+        <ChevronDown className="absolute right-1.5 top-1.5 h-4 w-4 text-slate-400 transition group-open:rotate-180" />
+        <div className="flex min-w-0 flex-col items-center gap-2">
           <div
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md border ${
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border shadow-sm ${
               mustEscalate
                 ? "border-rose-200 bg-rose-50 text-rose-700"
                 : card.release === "yellow"
@@ -440,10 +471,9 @@ function BoardTile({ card, day, isToday }: { card: BoardCard; day: number; isTod
                   : "border-emerald-200 bg-emerald-50 text-emerald-700"
             }`}
           >
-            <TileIcon className="h-5 w-5" />
+            <TileIcon className="h-6 w-6" />
           </div>
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold text-slate-400">{card.code}</div>
             <h3 className="text-sm font-semibold leading-5 text-slate-950">
               {tileShortLabel(card.code)}
             </h3>
@@ -455,7 +485,6 @@ function BoardTile({ card, day, isToday }: { card: BoardCard; day: number; isTod
             />
           </div>
         </div>
-        <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" />
       </summary>
 
       <CardDetails card={card} />
@@ -494,11 +523,11 @@ function RailCard({
 }
 
 function boardRowClass(day: number) {
-  if (day === 1) return "border-emerald-300 bg-emerald-50/90";
-  if (day === 2) return "border-cyan-200 bg-cyan-50/70";
-  if (day === 3) return "border-orange-200 bg-orange-50/70";
-  if (day === 4) return "border-lime-200 bg-lime-50/70";
-  return "border-teal-200 bg-teal-50/70";
+  if (day === 1) return "border-emerald-300 bg-emerald-50/90 shadow-[inset_0_-3px_0_rgba(74,123,82,0.15)]";
+  if (day === 2) return "border-cyan-200 bg-cyan-50/75 shadow-[inset_0_-3px_0_rgba(8,145,178,0.12)]";
+  if (day === 3) return "border-orange-200 bg-orange-50/75 shadow-[inset_0_-3px_0_rgba(234,88,12,0.12)]";
+  if (day === 4) return "border-lime-200 bg-lime-50/75 shadow-[inset_0_-3px_0_rgba(77,124,15,0.12)]";
+  return "border-teal-200 bg-teal-50/75 shadow-[inset_0_-3px_0_rgba(13,148,136,0.12)]";
 }
 
 export default function NurseOnboardingPage() {
@@ -510,7 +539,7 @@ export default function NurseOnboardingPage() {
   return (
     <div className="space-y-5">
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="rounded-lg border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
+        <div className="overflow-hidden rounded-[26px] border border-emerald-100 bg-[#fbfaf2] p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
               <p className="text-sm font-medium text-emerald-700">新姑娘上手路線</p>
@@ -541,19 +570,20 @@ export default function NurseOnboardingPage() {
             </div>
           </div>
 
-          <div className="mt-5 space-y-3">
+          <div className="mt-5 rounded-[24px] border border-emerald-100 bg-white/55 p-3 shadow-inner">
+            <div className="space-y-3">
             {boardDays.map((day) => {
               const isToday = day.day === 1;
               return (
                 <div
                   key={day.day}
-                  className={`grid gap-3 rounded-lg border p-3 ${
+                  className={`grid gap-3 rounded-[24px] border p-3 ${
                     isToday ? "shadow-sm" : ""
                   } ${boardRowClass(day.day)} lg:grid-cols-[180px_minmax(0,1fr)]`}
                 >
                   <div className="flex items-start gap-3 lg:block">
                     <div
-                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm ${
+                      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm ring-4 ring-white/80 ${
                         isToday ? "bg-emerald-700 text-white" : "bg-white text-slate-600"
                       }`}
                     >
@@ -580,7 +610,7 @@ export default function NurseOnboardingPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     {day.cards.map((card) => (
                       <BoardTile key={card.code} card={card} day={day.day} isToday={isToday} />
                     ))}
@@ -588,6 +618,7 @@ export default function NurseOnboardingPage() {
                 </div>
               );
             })}
+            </div>
           </div>
         </div>
 
