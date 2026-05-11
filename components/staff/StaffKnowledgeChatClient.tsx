@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -43,6 +44,8 @@ function confidenceClass(confidence: StaffKnowledgeChatAnswer["confidence"]) {
 }
 
 export function StaffKnowledgeChatClient() {
+  const searchParams = useSearchParams();
+  const prompt = searchParams.get("prompt");
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "intro",
@@ -50,10 +53,14 @@ export function StaffKnowledgeChatClient() {
       content: "可以問我姑娘手冊入面已有的 SOP、話術或待補資料。",
     },
   ]);
-  const [question, setQuestion] = useState("");
+  const [question, setQuestion] = useState(prompt ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (prompt) setQuestion(prompt);
+  }, [prompt]);
 
   const canSubmit = useMemo(() => question.trim().length > 0 && !loading, [loading, question]);
 
