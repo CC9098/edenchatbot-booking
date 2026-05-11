@@ -279,6 +279,46 @@ const releaseMeta: Record<ReleaseLevel, { label: string; className: string; icon
   },
 };
 
+const overlayBoardSpots = [
+  { code: "D1-01", day: 1, left: "22.4%", top: "18.5%", width: "7.4%" },
+  { code: "D1-02", day: 1, left: "31.5%", top: "17.2%", width: "7.5%" },
+  { code: "D1-03", day: 1, left: "40.5%", top: "17.1%", width: "7.7%" },
+  { code: "D1-04", day: 1, left: "49.6%", top: "17.2%", width: "7.6%" },
+  { code: "D2-01", day: 2, left: "20.4%", top: "37.3%", width: "8.3%" },
+  { code: "D2-02", day: 2, left: "31.3%", top: "36.2%", width: "8.3%" },
+  { code: "D3-01", day: 3, left: "24.3%", top: "54.0%", width: "8.4%" },
+  { code: "D3-02", day: 3, left: "35.1%", top: "52.5%", width: "8.5%" },
+  { code: "D4-01", day: 4, left: "31.3%", top: "69.0%", width: "8.4%" },
+  { code: "D4-02", day: 4, left: "42.6%", top: "68.0%", width: "8.2%" },
+  { code: "D4-03", day: 4, left: "53.7%", top: "67.6%", width: "8.0%" },
+  { code: "D5-01", day: 5, left: "42.5%", top: "84.0%", width: "8.0%" },
+  { code: "D5-02", day: 5, left: "52.5%", top: "83.3%", width: "8.0%" },
+];
+
+const overlayRailSpots = [
+  { code: "D1-02", title: "今日必學", command: "學收口", left: "79.9%", top: "16.8%", width: "15.2%" },
+  { code: "D4-03", title: "不可亂答", command: "密碼交主管", left: "79.9%", top: "45.0%", width: "15.2%" },
+  { code: "D5-01", title: "問 AI 主任", command: "先問五項", left: "79.9%", top: "73.5%", width: "15.2%" },
+];
+
+const overlayDayLabels = [
+  { day: 1, label: "開工", left: "58.8%", top: "11.8%", tone: "border-emerald-200 bg-emerald-700 text-white" },
+  { day: 2, label: "10問", left: "6.7%", top: "35.0%", tone: "border-cyan-200 bg-cyan-600 text-white" },
+  { day: 3, label: "預約", left: "6.7%", top: "52.6%", tone: "border-orange-200 bg-orange-600 text-white" },
+  { day: 4, label: "文件", left: "6.7%", top: "68.4%", tone: "border-lime-200 bg-emerald-600 text-white" },
+  { day: 5, label: "放行", left: "6.7%", top: "83.0%", tone: "border-teal-200 bg-teal-700 text-white" },
+];
+
+const boardCardByCode = new Map<string, BoardCard>(
+  boardDays.flatMap((day) => day.cards.map((card) => [card.code, card] as const)),
+);
+
+function getBoardCard(code: string) {
+  const card = boardCardByCode.get(code);
+  if (!card) throw new Error(`Missing onboarding card ${code}`);
+  return card;
+}
+
 function aiChatHref(prompt: string) {
   return `/nurse/knowledge/chat?prompt=${encodeURIComponent(prompt)}`;
 }
@@ -446,6 +486,169 @@ function dayShortLabel(day: number) {
   return "AI + 主管";
 }
 
+function overlayButtonClass(card: BoardCard) {
+  if (card.release === "red" || card.supervisor === "always") {
+    return "border-rose-200 bg-white/95 text-rose-800 hover:bg-rose-50";
+  }
+  if (card.release === "yellow") {
+    return "border-amber-200 bg-white/95 text-amber-900 hover:bg-amber-50";
+  }
+  return "border-emerald-200 bg-white/95 text-emerald-900 hover:bg-emerald-50";
+}
+
+function releaseDotClass(card: BoardCard) {
+  if (card.release === "red" || card.supervisor === "always") return "bg-rose-500";
+  if (card.release === "yellow") return "bg-amber-400";
+  return "bg-emerald-500";
+}
+
+function OverlayTile({
+  code,
+  day,
+  left,
+  top,
+  width,
+}: {
+  code: string;
+  day: number;
+  left: string;
+  top: string;
+  width: string;
+}) {
+  const card = getBoardCard(code);
+  const TileIcon = tileIcon(code);
+  const popupAlign = Number.parseFloat(left) > 58 ? "right-0" : "left-0";
+
+  return (
+    <details
+      className="absolute z-20"
+      style={{ left, top, width }}
+    >
+      <summary className={`flex aspect-square cursor-pointer list-none flex-col items-center justify-center rounded-2xl border px-2 py-2 text-center shadow-lg backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-xl ${overlayButtonClass(card)}`}>
+        <TileIcon className="h-5 w-5" />
+        <span className="mt-1 text-[11px] font-semibold leading-4">{tileShortLabel(code)}</span>
+        <span className={`mt-1.5 h-1.5 w-8 rounded-full ${releaseDotClass(card)}`} />
+      </summary>
+      <div className={`absolute ${popupAlign} top-full z-40 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="text-sm font-semibold text-slate-950">{card.title}</div>
+          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${releaseMeta[card.release].className}`}>
+            {releaseMeta[card.release].label.split(" ")[0]}
+          </span>
+        </div>
+        <NurseOnboardingProgress
+          cardCode={code}
+          day={day}
+          release={card.release}
+          supervisor={card.supervisor}
+        />
+        <CardDetails card={card} />
+      </div>
+    </details>
+  );
+}
+
+function OverlayRailTile({
+  code,
+  title,
+  command,
+  left,
+  top,
+  width,
+}: {
+  code: string;
+  title: string;
+  command: string;
+  left: string;
+  top: string;
+  width: string;
+}) {
+  const card = getBoardCard(code);
+
+  return (
+    <details className="absolute z-20" style={{ left, top, width }}>
+      <summary className={`flex min-h-24 cursor-pointer list-none flex-col justify-center rounded-2xl border px-3 py-3 shadow-lg backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-xl ${overlayButtonClass(card)}`}>
+        <span className="text-xs font-semibold opacity-80">{title}</span>
+        <span className="mt-1 text-base font-semibold leading-5">{command}</span>
+        <span className={`mt-3 h-1.5 w-10 rounded-full ${releaseDotClass(card)}`} />
+      </summary>
+      <div className="absolute right-0 top-full z-40 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl">
+        <div className="text-sm font-semibold text-slate-950">{card.title}</div>
+        <NurseOnboardingProgress
+          cardCode={code}
+          day={Number(code.slice(1, 2))}
+          release={card.release}
+          supervisor={card.supervisor}
+        />
+        <CardDetails card={card} />
+      </div>
+    </details>
+  );
+}
+
+function IllustratedOverlayBoard() {
+  return (
+    <div className="relative rounded-[28px] border border-emerald-100 bg-[#fbfaf2] shadow-sm">
+      <img
+        src="/nurse-onboarding-board.png"
+        alt="新姑娘上手棋盤插畫背景"
+        className="block w-full select-none rounded-[28px]"
+      />
+      <div className="absolute left-[14%] top-[5.2%] z-10 rounded-2xl bg-white/80 px-5 py-3 shadow-sm backdrop-blur-sm">
+        <p className="text-sm font-semibold text-emerald-700">新姑娘上手棋盤</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-normal text-emerald-900">
+          今日新姑娘路線
+        </h1>
+      </div>
+      <div className="absolute left-[4.8%] top-[19.2%] z-10 flex h-[10%] w-[9.6%] items-center justify-center rounded-full border border-emerald-200 bg-white/85 text-sm font-bold text-emerald-800 shadow-lg backdrop-blur-sm">
+        START
+      </div>
+      <div className="absolute left-[66.8%] top-[82.4%] z-10 flex h-[11.5%] w-[7.2%] items-center justify-center rounded-full border border-teal-200 bg-emerald-700/90 text-sm font-bold text-white shadow-lg backdrop-blur-sm">
+        FINISH
+      </div>
+      {overlayDayLabels.map((item) => (
+        <div
+          key={item.day}
+          className={`absolute z-10 flex h-[7.2%] w-[8.2%] items-center justify-center rounded-full border text-center text-xs font-bold leading-4 shadow-lg ring-4 ring-white/75 ${item.tone}`}
+          style={{ left: item.left, top: item.top }}
+        >
+          <span>
+            Day {item.day}
+            <br />
+            {item.label}
+          </span>
+        </div>
+      ))}
+      {overlayBoardSpots.map((spot) => (
+        <OverlayTile key={spot.code} {...spot} />
+      ))}
+      {overlayRailSpots.map((spot) => (
+        <OverlayRailTile key={spot.code} {...spot} />
+      ))}
+      <div className="absolute bottom-[3.2%] left-[18%] z-20 flex items-center gap-3 rounded-full border border-emerald-100 bg-white/85 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur-sm">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+          Green
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+          Yellow
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+          Red
+        </span>
+      </div>
+      <Link
+        href="/nurse/knowledge"
+        className="absolute bottom-[3.2%] left-[38.8%] z-20 rounded-full border border-emerald-200 bg-white/85 px-4 py-2 text-sm font-semibold text-emerald-800 shadow-sm backdrop-blur-sm hover:bg-emerald-50"
+      >
+        完整知識庫
+      </Link>
+    </div>
+  );
+}
+
 function BoardTile({ card, day, isToday }: { card: BoardCard; day: number; isToday: boolean }) {
   const mustEscalate = card.release === "red" || card.supervisor === "always";
   const TileIcon = tileIcon(card.code);
@@ -538,7 +741,11 @@ export default function NurseOnboardingPage() {
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <section className="hidden xl:block">
+        <IllustratedOverlayBoard />
+      </section>
+
+      <section className="grid gap-4 xl:hidden">
         <div className="overflow-hidden rounded-[26px] border border-emerald-100 bg-[#fbfaf2] p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
