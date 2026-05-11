@@ -4,19 +4,13 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
-  ArrowRight,
-  BookOpenCheck,
   CheckCircle2,
   ClipboardCopy,
-  ClipboardList,
   FileText,
   FilePlus,
-  GraduationCap,
   Loader2,
   MessageCircle,
   Pencil,
-  PlayCircle,
   Plus,
   Save,
   Search,
@@ -114,16 +108,6 @@ const QUICK_START_TASKS = [
     query: "醫療券 使用步驟",
     detail: "跟步驟做，有問題先問主管",
   },
-  {
-    label: "開診前工作",
-    query: "開診前",
-    detail: "返工先做的檢查事項",
-  },
-  {
-    label: "颱風 / 醫師請假",
-    query: "颱風 醫師病假",
-    detail: "只按已確認安排回覆病人",
-  },
 ];
 
 export function StaffKnowledgeBaseClient() {
@@ -153,7 +137,7 @@ export function StaffKnowledgeBaseClient() {
       setDocuments(items);
       setSelectedId((current) => {
         if (current && items.some((item: StaffKnowledgeDocument) => item.id === current)) return current;
-        return items[0]?.id ?? null;
+        return null;
       });
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "未能載入知識庫");
@@ -185,9 +169,9 @@ export function StaffKnowledgeBaseClient() {
   );
 
   const selectedDocument = useMemo(() => {
-    if (!selectedId) return filteredDocuments[0] ?? null;
-    return documents.find((item) => item.id === selectedId) ?? filteredDocuments[0] ?? null;
-  }, [documents, filteredDocuments, selectedId]);
+    if (!selectedId) return null;
+    return documents.find((item) => item.id === selectedId) ?? null;
+  }, [documents, selectedId]);
 
   async function copyText(label: string, text: string) {
     await navigator.clipboard.writeText(text);
@@ -265,114 +249,35 @@ export function StaffKnowledgeBaseClient() {
   return (
     <div className="space-y-5">
       <section className="rounded-lg border border-emerald-100 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-emerald-700">新姑娘上手流程</p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-950">今日先跟 3 步做</h1>
+            <p className="text-sm font-medium text-emerald-700">姑娘知識庫</p>
+            <h1 className="mt-1 text-2xl font-semibold text-slate-950">病人問到先按任務查</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              新同事不用一開始讀完整手冊。先看對答示範、做 role-play，再按病人問題查常用 SOP。
+              不用一開始讀完整手冊。先用下面 4 個常用任務，搵不到才搜尋或問 AI。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={openCreateEditor}
-              className="inline-flex items-center gap-2 rounded-md border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+              onClick={() => focusTask("收據 分單 病假紙")}
+              className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
             >
-              <Plus className="h-4 w-4" />
-              新增 Note
+              <Search className="h-4 w-4" />
+              先查分單 / 補收據
             </button>
             <Link
               href="/nurse/knowledge/chat"
-              className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+              className="inline-flex items-center gap-2 rounded-md border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
             >
               <MessageCircle className="h-4 w-4" />
               AI 問答
             </Link>
           </div>
         </div>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 p-4 shadow-sm">
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-md border border-emerald-100 bg-white p-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-700 text-sm font-bold text-white">1</div>
-              <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-emerald-800">
-                <PlayCircle className="h-4 w-4" />
-                先看示範
-              </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                只看病人最常問的幾類：分單、食藥、補收據、寄藥。
-              </p>
-              <a
-                href="/staff-training/staff-knowledge-onboarding.mp4"
-                className="mt-4 inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
-              >
-                開啟影片
-                <ArrowRight className="h-4 w-4" />
-              </a>
-            </div>
-
-            <div className="rounded-md border border-emerald-100 bg-white p-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-700 text-sm font-bold text-white">2</div>
-              <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-emerald-800">
-                <ClipboardList className="h-4 w-4" />
-                再做 Role-play
-              </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Trainer 扮病人，通過 Level 0-3 先處理普通查詢。
-              </p>
-              <Link
-                href="/nurse/knowledge/training"
-                className="mt-4 inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
-              >
-                開始測試
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-
-            <div className="rounded-md border border-emerald-100 bg-white p-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-700 text-sm font-bold text-white">3</div>
-              <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-emerald-800">
-                <BookOpenCheck className="h-4 w-4" />
-                最後查 SOP
-              </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                病人問到哪件事，就按下面常用任務查，不用逐篇讀。
-              </p>
-              <button
-                type="button"
-                onClick={() => focusTask("收據 分單 病假紙")}
-                className="mt-4 inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
-              >
-                去常用 SOP
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
-            <div className="flex items-start gap-2 text-sm leading-6 text-amber-900">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                新姑娘遇到收費、醫療判斷、保險承諾、密碼或後台操作，先用「我幫您確認清楚再回覆」收口。
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-hidden rounded-lg border border-emerald-100 bg-slate-950 shadow-sm">
-          <video
-            className="aspect-video h-full w-full bg-slate-950"
-            controls
-            preload="metadata"
-            poster="/staff-training/staff-knowledge-onboarding-frame.png"
-          >
-            <source src="/staff-training/staff-knowledge-onboarding.mp4" type="video/mp4" />
-            你的瀏覽器未能播放此影片。
-          </video>
-        </div>
+        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
+          收費、醫療判斷、保險承諾、密碼或後台操作，先用「我幫您確認清楚再回覆」收口。
+        </p>
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -381,15 +286,8 @@ export function StaffKnowledgeBaseClient() {
             <p className="text-sm font-medium text-emerald-700">常用任務</p>
             <h2 className="mt-1 text-xl font-semibold text-slate-950">病人問到先按，不用一頁頁搵</h2>
           </div>
-          <Link
-            href="/nurse/knowledge/chat"
-            className="inline-flex items-center gap-2 rounded-md border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
-          >
-            <MessageCircle className="h-4 w-4" />
-            問 AI
-          </Link>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {QUICK_START_TASKS.map((task) => (
             <button
               key={task.label}
@@ -513,14 +411,33 @@ export function StaffKnowledgeBaseClient() {
         </section>
       ) : null}
 
-      <section id="staff-knowledge-browser" className="grid scroll-mt-24 gap-4 lg:grid-cols-[280px_1fr]">
-        <aside className="space-y-3">
+      <section id="staff-knowledge-browser" className="scroll-mt-24 space-y-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm font-medium text-emerald-700">完整 SOP</p>
+            <h2 className="mt-1 text-xl font-semibold text-slate-950">需要時才搜尋全文</h2>
+          </div>
+          <button
+            type="button"
+            onClick={openCreateEditor}
+            className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <Plus className="h-4 w-4" />
+            新增 Note
+          </button>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+          <aside className="space-y-3">
           <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
             <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
               <Search className="h-4 w-4 text-slate-500" />
               <input
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setSelectedId(null);
+                }}
                 placeholder="搜尋上門、講座、減重..."
                 className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
@@ -533,7 +450,10 @@ export function StaffKnowledgeBaseClient() {
                 <button
                   key={item}
                   type="button"
-                  onClick={() => setCategory(item)}
+                  onClick={() => {
+                    setCategory(item);
+                    setSelectedId(null);
+                  }}
                   className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm font-medium ${
                     category === item
                       ? "bg-emerald-50 text-emerald-800"
@@ -586,11 +506,13 @@ export function StaffKnowledgeBaseClient() {
               </div>
             )}
           </div>
-        </aside>
+          </aside>
 
-        <article className="min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <article className="min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           {!selectedDocument ? (
-            <div className="py-16 text-center text-sm text-slate-500">未選擇文件</div>
+            <div className="py-16 text-center text-sm leading-6 text-slate-500">
+              先按上方常用任務，或在左邊搜尋後選擇一篇 SOP。
+            </div>
           ) : (
             <div className="space-y-5">
               <div className="flex flex-col gap-3 border-b border-slate-100 pb-5 md:flex-row md:items-start md:justify-between">
@@ -644,7 +566,8 @@ export function StaffKnowledgeBaseClient() {
               />
             </div>
           )}
-        </article>
+          </article>
+        </div>
       </section>
     </div>
   );
