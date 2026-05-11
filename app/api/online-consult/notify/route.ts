@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
+import { sendDoctorOnlineConsultReadyWhatsapp } from '@/lib/chatwoot-whatsapp';
 import { sendDoctorOnlineConsultReadyEmail } from '@/lib/gmail';
 import { verifyOnlineConsultToken } from '@/lib/online-consult-token';
 import { createServiceClient } from '@/lib/supabase';
@@ -11,6 +12,8 @@ export const runtime = 'nodejs';
 const notifySchema = z.object({
   token: z.string().trim().min(1),
 });
+
+const CHEUNG_DOCTOR_WHATSAPP_FALLBACK = '+85260260716';
 
 type BookingIntakeReadyRow = {
   id: string;
@@ -39,6 +42,26 @@ function isBookingIntakeReadyRow(value: unknown): value is BookingIntakeReadyRow
       typeof row.patient_name === 'string' &&
       typeof row.phone === 'string' &&
       typeof row.email === 'string',
+  );
+}
+
+function normalizeDoctorEnvKey(doctorId: string): string {
+  return doctorId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '_');
+}
+
+function getConfiguredDoctorNotificationWhatsapp(doctorId: string): string {
+  const normalizedRawDoctorId = doctorId.trim().toLowerCase();
+  const normalizedDoctorId = normalizeDoctorEnvKey(doctorId);
+  const doctorSpecificWhatsapp = process.env[`DOCTOR_NOTIFICATION_WHATSAPP_${normalizedDoctorId}`]?.trim();
+  const legacyCheungWhatsapp = normalizedRawDoctorId === 'cheung'
+    ? process.env.CHEUNG_DOCTOR_WHATSAPP?.trim() || CHEUNG_DOCTOR_WHATSAPP_FALLBACK
+    : '';
+
+  return (
+    doctorSpecificWhatsapp ||
+    legacyCheungWhatsapp ||
+    process.env.CLINIC_NOTIFICATION_WHATSAPP?.trim() ||
+    ''
   );
 }
 
@@ -77,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     const doctor = DOCTOR_BY_ID[data.doctor_id as DoctorId];
-    const emailResult = await sendDoctorOnlineConsultReadyEmail({
+    const notificationPayload = {
       bookingId: payload.bookingId,
       calendarId: payload.calendarId,
       doctorId: data.doctor_id,
@@ -91,16 +114,38 @@ export async function POST(request: NextRequest) {
       durationMinutes: data.duration_minutes || undefined,
       meetLink: payload.meetLink,
       notifiedAtIso: new Date().toISOString(),
-    });
+    };
+
+    const doctorWhatsappPhone = getConfiguredDoctorNotificationWhatsapp(data.doctor_id);
+    let whatsappError = '';
+    if (doctorWhatsappPhone) {
+      const whatsappResult = await sendDoctorOnlineConsultReadyWhatsapp({
+        ...notificationPayload,
+        doctorWhatsappPhone,
+      });
+
+      if (whatsappResult.success) {
+        return NextResponse.json({
+          success: true,
+          channel: 'whatsapp',
+          conversationId: whatsappResult.conversationId,
+        });
+      }
+
+      whatsappError = whatsappResult.error || '未能透過 WhatsApp 通知醫師。';
+      console.warn(`[online-consult/notify] doctor WhatsApp notification failed: ${whatsappError}`);
+    }
+
+    const emailResult = await sendDoctorOnlineConsultReadyEmail(notificationPayload);
 
     if (!emailResult.success) {
       return NextResponse.json(
-        { error: emailResult.error || '未能通知醫師。' },
+        { error: whatsappError || emailResult.error || '未能通知醫師。' },
         { status: 502 },
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, channel: 'email' });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : '通知醫師時發生錯誤。' },

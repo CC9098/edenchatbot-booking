@@ -5,6 +5,7 @@ import {
   sendBookingCancellationWhatsapp,
   sendBookingConfirmationWhatsapp,
   sendBookingRescheduleWhatsapp,
+  sendDoctorOnlineConsultReadyWhatsapp,
 } from '@/lib/chatwoot-whatsapp';
 
 function jsonResponse(body: unknown, status = 200) {
@@ -1741,6 +1742,156 @@ test('sendBookingRescheduleWhatsapp uses tokenized manage-booking path for Whats
       sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter,
       '/manage-booking?token=res-abc123',
     );
+  } finally {
+    global.fetch = originalFetch;
+
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (typeof value === 'undefined') {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});
+
+test('sendDoctorOnlineConsultReadyWhatsapp sends the doctor ready notification to WhatsApp', async () => {
+  const originalFetch = global.fetch;
+  const originalEnv = {
+    CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
+    CHATWOOT_API_ACCESS_TOKEN: process.env.CHATWOOT_API_ACCESS_TOKEN,
+    CHATWOOT_ACCOUNT_ID: process.env.CHATWOOT_ACCOUNT_ID,
+    CHATWOOT_WHATSAPP_INBOX_ID: process.env.CHATWOOT_WHATSAPP_INBOX_ID,
+    CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_NAME: process.env.CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_NAME,
+    CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_LANGUAGE: process.env.CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_LANGUAGE,
+    CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_CATEGORY: process.env.CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_CATEGORY,
+  };
+
+  const sentMessagePayloads: Array<Record<string, any>> = [];
+
+  process.env.CHATWOOT_BASE_URL = 'https://chatwoot.example';
+  process.env.CHATWOOT_API_ACCESS_TOKEN = 'test-token';
+  process.env.CHATWOOT_ACCOUNT_ID = '';
+  process.env.CHATWOOT_WHATSAPP_INBOX_ID = '';
+  process.env.CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_NAME = 'doctor_online_consult_ready';
+  process.env.CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_LANGUAGE = 'zh_HK';
+  process.env.CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_CATEGORY = 'UTILITY';
+
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const parsedUrl = new URL(requestUrl);
+    const method = init?.method || 'GET';
+    const path = `${parsedUrl.pathname}${parsedUrl.search}`;
+
+    if (method === 'GET' && path === '/api/v1/profile') {
+      return jsonResponse({ account_id: 1 });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/inboxes') {
+      return jsonResponse({
+        payload: [{
+          id: 7,
+          channel_type: 'Channel::Whatsapp',
+          phone_number: '+85267333801',
+          message_templates: [{
+            name: 'doctor_online_consult_ready',
+            language: 'zh_HK',
+            status: 'approved',
+            category: 'UTILITY',
+          }],
+        }],
+      });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/inboxes/7/sync_templates') {
+      return jsonResponse({ message: 'ok' });
+    }
+
+    if (method === 'GET' && path.startsWith('/api/v1/accounts/1/contacts/search?')) {
+      const query = parsedUrl.searchParams.get('q') || '';
+      assert.match(query, /60260716|85260260716|\+85260260716/);
+      return jsonResponse({
+        payload: [{
+          id: 602,
+          phone_number: '+85260260716',
+          email: '',
+        }],
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/602/contactable_inboxes') {
+      return jsonResponse({
+        payload: [{
+          source_id: '85260260716',
+          inbox: { id: 7 },
+        }],
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/602/conversations') {
+      return jsonResponse({
+        payload: [{
+          id: 6020,
+          inbox_id: 7,
+          status: 'open',
+        }],
+      });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/conversations/6020/messages') {
+      const payload = JSON.parse(String(init?.body || '{}'));
+      sentMessagePayloads.push(payload);
+      return jsonResponse({ id: 920, status: 'sent' });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/conversations/6020/messages') {
+      return jsonResponse({
+        payload: [{
+          id: 920,
+          status: 'delivered',
+        }],
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${method} ${path}`);
+  }) as typeof global.fetch;
+
+  try {
+    const result = await sendDoctorOnlineConsultReadyWhatsapp({
+      bookingId: '7rqc6fcjkjhsikq5basiae3g6o',
+      calendarId: 'r0ea9kabll5gdc7ll2s13n5hko@group.calendar.google.com',
+      doctorId: 'cheung',
+      doctorName: 'Dr. Cheung',
+      doctorNameZh: '張天慧醫師',
+      doctorWhatsappPhone: '+85260260716',
+      patientName: '小明',
+      patientPhone: '96322476',
+      patientEmail: '',
+      date: '2026-05-13',
+      time: '21:30',
+      durationMinutes: 20,
+      meetLink: 'https://meet.google.com/rkk-jrzp-pqh',
+      notifiedAtIso: '2026-05-11T15:32:00.000Z',
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.whatsappSent, true);
+    assert.equal(result.conversationId, 6020);
+    assert.equal(sentMessagePayloads.length, 1);
+    assert.equal(sentMessagePayloads[0]?.template_params?.name, 'doctor_online_consult_ready');
+    assert.equal(
+      sentMessagePayloads[0]?.template_params?.processed_params?.body?.doctor_name,
+      '張天慧醫師',
+    );
+    assert.equal(
+      sentMessagePayloads[0]?.template_params?.processed_params?.body?.patient_phone,
+      '96322476',
+    );
+    assert.equal(
+      sentMessagePayloads[0]?.template_params?.processed_params?.body?.meet_link,
+      'https://meet.google.com/rkk-jrzp-pqh',
+    );
+    assert.match(sentMessagePayloads[0]?.content, /病人已打開網上診症入口/);
   } finally {
     global.fetch = originalFetch;
 

@@ -139,6 +139,24 @@ interface BookingManageWhatsappAccessNotificationInput extends BookingManageWhat
   clinicWhatsappPhone?: string | null;
 }
 
+interface DoctorOnlineConsultReadyWhatsappInput {
+  bookingId: string;
+  calendarId: string;
+  doctorId?: string;
+  doctorName: string;
+  doctorNameZh: string;
+  doctorWhatsappPhone: string;
+  patientName: string;
+  patientPhone: string;
+  patientEmail?: string;
+  date: string;
+  time: string;
+  durationMinutes?: number;
+  meetLink: string;
+  notifiedAtIso?: string;
+  clinicWhatsappPhone?: string | null;
+}
+
 interface SendWhatsappBookingConfirmationResult {
   success: boolean;
   conversationId?: number;
@@ -617,6 +635,20 @@ function getManageLinkTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
   });
 }
 
+function getDoctorOnlineConsultReadyTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
+  return getNamedTemplateConfigs(inbox, {
+    configuredName: process.env.CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_NAME,
+    configuredLanguage:
+      process.env.CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_LANGUAGE ||
+      process.env.CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE,
+    configuredCategory:
+      process.env.CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_CATEGORY ||
+      process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY,
+    fallbackNames: ['doctor_online_consult_ready'],
+    defaultCategory: 'UTILITY',
+  });
+}
+
 function getNamedTemplateConfigs(
   inbox: ChatwootInbox,
   options: {
@@ -888,6 +920,57 @@ function buildTemplateProcessedParamCandidates(
   }
 
   return candidates;
+}
+
+function formatDoctorReadyNotifiedAt(notifiedAtIso?: string): string {
+  const date = notifiedAtIso ? new Date(notifiedAtIso) : new Date();
+  if (Number.isNaN(date.getTime())) {
+    return notifiedAtIso || '';
+  }
+
+  return date.toLocaleString('zh-HK', { timeZone: 'Asia/Hong_Kong' });
+}
+
+function buildDoctorOnlineConsultReadyWhatsappText(
+  input: DoctorOnlineConsultReadyWhatsappInput,
+): string {
+  const durationText = input.durationMinutes ? `${input.durationMinutes} 分鐘` : '網上應診';
+  const notifiedAt = formatDoctorReadyNotifiedAt(input.notifiedAtIso);
+
+  return [
+    '醫天圓網上診症提醒',
+    '',
+    `${input.doctorNameZh}，病人已打開網上診症入口，請盡快進入 Google Meet。`,
+    '',
+    `病人：${input.patientName}`,
+    `電話：${input.patientPhone}`,
+    input.patientEmail ? `電郵：${input.patientEmail}` : '',
+    `預約時間：${input.date} ${input.time}（${durationText}）`,
+    notifiedAt ? `通知時間：${notifiedAt}` : '',
+    `預約編號：${input.bookingId}`,
+    '',
+    'Google Meet：',
+    input.meetLink,
+  ].filter(Boolean).join('\n');
+}
+
+function buildDoctorOnlineConsultReadyTemplateBodyParams(
+  input: DoctorOnlineConsultReadyWhatsappInput,
+): Record<string, string> {
+  const durationText = input.durationMinutes ? `${input.durationMinutes} 分鐘` : '網上應診';
+  const notifiedAt = formatDoctorReadyNotifiedAt(input.notifiedAtIso);
+
+  return {
+    doctor_name: input.doctorNameZh,
+    patient_name: input.patientName,
+    patient_phone: input.patientPhone,
+    patient_email: input.patientEmail || '',
+    appointment_datetime: `${input.date} ${input.time}`,
+    duration: durationText,
+    notified_at: notifiedAt,
+    booking_id: input.bookingId,
+    meet_link: input.meetLink,
+  };
 }
 
 function extractUrlButtonParameters(url: string): string[] {
@@ -1284,6 +1367,33 @@ export async function sendBookingManageAccessWhatsapp(
       getTemplateConfigs: getManageLinkTemplateConfigs,
       preferTemplateIfAvailable: true,
     });
+  } catch (error) {
+    return {
+      success: false,
+      whatsappSent: false,
+      error: getSafeErrorMessage(error),
+    };
+  }
+}
+
+export async function sendDoctorOnlineConsultReadyWhatsapp(
+  input: DoctorOnlineConsultReadyWhatsappInput,
+): Promise<SendWhatsappBookingConfirmationResult> {
+  try {
+    return await sendBookingWhatsappNotification(
+      {
+        patientName: input.doctorNameZh,
+        phone: input.doctorWhatsappPhone,
+        email: '',
+        clinicWhatsappPhone: input.clinicWhatsappPhone,
+      },
+      {
+        buildContent: () => buildDoctorOnlineConsultReadyWhatsappText(input),
+        buildBodyParams: () => buildDoctorOnlineConsultReadyTemplateBodyParams(input),
+        getTemplateConfigs: getDoctorOnlineConsultReadyTemplateConfigs,
+        preferTemplateIfAvailable: true,
+      },
+    );
   } catch (error) {
     return {
       success: false,

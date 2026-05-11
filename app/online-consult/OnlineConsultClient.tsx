@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ExternalLink } from "lucide-react";
 
 type NotifyState = "idle" | "notifying" | "sent" | "failed";
+type NotifyChannel = "whatsapp" | "email" | null;
 
 interface OnlineConsultClientProps {
   token: string;
@@ -12,6 +13,7 @@ interface OnlineConsultClientProps {
 
 export default function OnlineConsultClient({ token, meetLink }: OnlineConsultClientProps) {
   const [notifyState, setNotifyState] = useState<NotifyState>("idle");
+  const [notifyChannel, setNotifyChannel] = useState<NotifyChannel>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const storageKey = useMemo(() => `eden.online-consult.notified.${token.slice(0, 32)}`, [token]);
 
@@ -39,8 +41,12 @@ export default function OnlineConsultClient({ token, meetLink }: OnlineConsultCl
           throw new Error(data?.error || "未能通知醫師。");
         }
 
+        const channel = data?.channel === "whatsapp" || data?.channel === "email"
+          ? data.channel
+          : null;
         sessionStorage.setItem(storageKey, "1");
         if (!cancelled) {
+          setNotifyChannel(channel);
           setNotifyState("sent");
         }
       } catch (error) {
@@ -60,7 +66,9 @@ export default function OnlineConsultClient({ token, meetLink }: OnlineConsultCl
 
   const statusText =
     notifyState === "sent"
-      ? "已通知醫師，請開啟 Google Meet 並保持在線。"
+      ? notifyChannel === "whatsapp"
+        ? "已透過 WhatsApp 通知醫師，請開啟 Google Meet 並保持在線。"
+        : "已通知醫師，請開啟 Google Meet 並保持在線。"
       : notifyState === "failed"
         ? "暫時未能自動通知醫師，請先開啟 Google Meet。"
         : "正在通知醫師...";
