@@ -279,46 +279,6 @@ const releaseMeta: Record<ReleaseLevel, { label: string; className: string; icon
   },
 };
 
-const overlayBoardSpots = [
-  { code: "D1-01", day: 1, left: "22.4%", top: "18.5%", width: "7.4%" },
-  { code: "D1-02", day: 1, left: "31.5%", top: "17.2%", width: "7.5%" },
-  { code: "D1-03", day: 1, left: "40.5%", top: "17.1%", width: "7.7%" },
-  { code: "D1-04", day: 1, left: "49.6%", top: "17.2%", width: "7.6%" },
-  { code: "D2-01", day: 2, left: "20.4%", top: "37.3%", width: "8.3%" },
-  { code: "D2-02", day: 2, left: "31.3%", top: "36.2%", width: "8.3%" },
-  { code: "D3-01", day: 3, left: "24.3%", top: "54.0%", width: "8.4%" },
-  { code: "D3-02", day: 3, left: "35.1%", top: "52.5%", width: "8.5%" },
-  { code: "D4-01", day: 4, left: "31.3%", top: "69.0%", width: "8.4%" },
-  { code: "D4-02", day: 4, left: "42.6%", top: "68.0%", width: "8.2%" },
-  { code: "D4-03", day: 4, left: "53.7%", top: "67.6%", width: "8.0%" },
-  { code: "D5-01", day: 5, left: "42.5%", top: "84.0%", width: "8.0%" },
-  { code: "D5-02", day: 5, left: "52.5%", top: "83.3%", width: "8.0%" },
-];
-
-const overlayRailSpots = [
-  { code: "D1-02", title: "今日必學", command: "學收口", left: "79.9%", top: "16.8%", width: "15.2%" },
-  { code: "D4-03", title: "不可亂答", command: "密碼交主管", left: "79.9%", top: "45.0%", width: "15.2%" },
-  { code: "D5-01", title: "問 AI 主任", command: "先問五項", left: "79.9%", top: "73.5%", width: "15.2%" },
-];
-
-const overlayDayLabels = [
-  { day: 1, label: "開工", left: "58.8%", top: "11.8%", tone: "border-emerald-200 bg-emerald-700 text-white" },
-  { day: 2, label: "10問", left: "6.7%", top: "35.0%", tone: "border-cyan-200 bg-cyan-600 text-white" },
-  { day: 3, label: "預約", left: "6.7%", top: "52.6%", tone: "border-orange-200 bg-orange-600 text-white" },
-  { day: 4, label: "文件", left: "6.7%", top: "68.4%", tone: "border-lime-200 bg-emerald-600 text-white" },
-  { day: 5, label: "放行", left: "6.7%", top: "83.0%", tone: "border-teal-200 bg-teal-700 text-white" },
-];
-
-const boardCardByCode = new Map<string, BoardCard>(
-  boardDays.flatMap((day) => day.cards.map((card) => [card.code, card] as const)),
-);
-
-function getBoardCard(code: string) {
-  const card = boardCardByCode.get(code);
-  if (!card) throw new Error(`Missing onboarding card ${code}`);
-  return card;
-}
-
 function aiChatHref(prompt: string) {
   return `/nurse/knowledge/chat?prompt=${encodeURIComponent(prompt)}`;
 }
@@ -486,14 +446,14 @@ function dayShortLabel(day: number) {
   return "AI + 主管";
 }
 
-function overlayButtonClass(card: BoardCard) {
+function gameTileClass(card: BoardCard) {
   if (card.release === "red" || card.supervisor === "always") {
-    return "border-rose-200 bg-white/95 text-rose-800 hover:bg-rose-50";
+    return "border-rose-200 bg-rose-50/95 text-rose-800 shadow-rose-100 hover:bg-white";
   }
   if (card.release === "yellow") {
-    return "border-amber-200 bg-white/95 text-amber-900 hover:bg-amber-50";
+    return "border-amber-200 bg-amber-50/95 text-amber-900 shadow-amber-100 hover:bg-white";
   }
-  return "border-emerald-200 bg-white/95 text-emerald-900 hover:bg-emerald-50";
+  return "border-emerald-200 bg-emerald-50/95 text-emerald-900 shadow-emerald-100 hover:bg-white";
 }
 
 function releaseDotClass(card: BoardCard) {
@@ -502,34 +462,38 @@ function releaseDotClass(card: BoardCard) {
   return "bg-emerald-500";
 }
 
-function OverlayTile({
-  code,
-  day,
-  left,
-  top,
-  width,
-}: {
-  code: string;
-  day: number;
-  left: string;
-  top: string;
-  width: string;
-}) {
-  const card = getBoardCard(code);
-  const TileIcon = tileIcon(code);
-  const popupAlign = Number.parseFloat(left) > 58 ? "right-0" : "left-0";
+function dayBadgeClass(day: number) {
+  if (day === 1) return "border-emerald-200 bg-emerald-700 text-white";
+  if (day === 2) return "border-cyan-200 bg-cyan-600 text-white";
+  if (day === 3) return "border-orange-200 bg-orange-600 text-white";
+  if (day === 4) return "border-lime-200 bg-emerald-600 text-white";
+  return "border-teal-200 bg-teal-700 text-white";
+}
+
+function gameLaneClass(day: number) {
+  if (day === 1) return "border-emerald-200 bg-emerald-50/70";
+  if (day === 2) return "border-cyan-200 bg-cyan-50/70";
+  if (day === 3) return "border-orange-200 bg-orange-50/70";
+  if (day === 4) return "border-lime-200 bg-lime-50/70";
+  return "border-teal-200 bg-teal-50/70";
+}
+
+function BoardGameTile({ card, day }: { card: BoardCard; day: number }) {
+  const TileIcon = tileIcon(card.code);
+  const mustEscalate = card.release === "red" || card.supervisor === "always";
 
   return (
-    <details
-      className="absolute z-20"
-      style={{ left, top, width }}
-    >
-      <summary className={`flex aspect-square cursor-pointer list-none flex-col items-center justify-center rounded-2xl border px-2 py-2 text-center shadow-lg backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-xl ${overlayButtonClass(card)}`}>
-        <TileIcon className="h-5 w-5" />
-        <span className="mt-1 text-[11px] font-semibold leading-4">{tileShortLabel(code)}</span>
-        <span className={`mt-1.5 h-1.5 w-8 rounded-full ${releaseDotClass(card)}`} />
+    <details className="group/tile relative z-10">
+      <summary
+        className={`flex aspect-square min-h-28 cursor-pointer list-none flex-col items-center justify-center rounded-2xl border px-3 py-3 text-center shadow-md transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 ${gameTileClass(card)}`}
+      >
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/80 bg-white text-current shadow-sm">
+          <TileIcon className="h-6 w-6" />
+        </span>
+        <span className="mt-2 text-base font-semibold leading-5">{tileShortLabel(card.code)}</span>
+        <span className={`mt-2 h-2 w-11 rounded-full ${releaseDotClass(card)}`} />
       </summary>
-      <div className={`absolute ${popupAlign} top-full z-40 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl`}>
+      <div className="absolute left-1/2 top-full z-40 mt-3 w-80 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl">
         <div className="flex items-start justify-between gap-3">
           <div className="text-sm font-semibold text-slate-950">{card.title}</div>
           <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${releaseMeta[card.release].className}`}>
@@ -537,46 +501,86 @@ function OverlayTile({
           </span>
         </div>
         <NurseOnboardingProgress
-          cardCode={code}
+          cardCode={card.code}
           day={day}
           release={card.release}
           supervisor={card.supervisor}
         />
         <CardDetails card={card} />
       </div>
+      {mustEscalate ? (
+        <span className="absolute -right-1 -top-1 z-20 rounded-full bg-rose-600 px-2 py-1 text-[10px] font-bold text-white shadow-sm">
+          主管
+        </span>
+      ) : null}
     </details>
   );
 }
 
-function OverlayRailTile({
-  code,
-  title,
-  command,
-  left,
-  top,
-  width,
-}: {
-  code: string;
-  title: string;
-  command: string;
-  left: string;
-  top: string;
-  width: string;
-}) {
-  const card = getBoardCard(code);
+function BoardGameLane({ day }: { day: BoardDay }) {
+  const placeholders = Array.from({ length: Math.max(0, 4 - day.cards.length) });
 
   return (
-    <details className="absolute z-20" style={{ left, top, width }}>
-      <summary className={`flex min-h-24 cursor-pointer list-none flex-col justify-center rounded-2xl border px-3 py-3 shadow-lg backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-xl ${overlayButtonClass(card)}`}>
-        <span className="text-xs font-semibold opacity-80">{title}</span>
-        <span className="mt-1 text-base font-semibold leading-5">{command}</span>
-        <span className={`mt-3 h-1.5 w-10 rounded-full ${releaseDotClass(card)}`} />
+    <section className={`relative grid gap-3 rounded-[28px] border p-3 shadow-sm ${gameLaneClass(day.day)} lg:grid-cols-[132px_minmax(0,1fr)]`}>
+      <div className="flex items-center gap-3 lg:block">
+        <div className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-full border text-center text-sm font-bold leading-5 shadow-lg ring-4 ring-white/80 ${dayBadgeClass(day.day)}`}>
+          <span>
+            Day {day.day}
+            <br />
+            {dayShortLabel(day.day)}
+          </span>
+        </div>
+        <div className="min-w-0 lg:mt-3">
+          <p className="text-xs font-semibold text-slate-500">{day.day === 1 ? "今日必行" : "之後再開"}</p>
+          <h2 className="mt-1 text-lg font-semibold leading-5 text-slate-950">{day.title}</h2>
+        </div>
+      </div>
+      <div className="relative rounded-[24px] border border-white/80 bg-white/45 p-3 shadow-inner">
+        <div className="absolute left-8 right-8 top-1/2 h-3 -translate-y-1/2 rounded-full bg-white/75 shadow-inner" />
+        <div className="relative grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {day.cards.map((card) => (
+            <BoardGameTile key={card.code} card={card} day={day.day} />
+          ))}
+          {placeholders.map((_, index) => (
+            <div
+              key={`${day.day}-empty-${index}`}
+              className="aspect-square min-h-28 rounded-2xl border border-dashed border-white/80 bg-white/45 shadow-sm"
+              aria-hidden="true"
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BoardSideCard({
+  title,
+  icon: Icon,
+  card,
+  command,
+  tone,
+}: {
+  title: string;
+  icon: typeof ClipboardCheck;
+  card: BoardCard;
+  command: string;
+  tone: string;
+}) {
+  return (
+    <details className={`group rounded-2xl border p-4 shadow-sm ${tone}`}>
+      <summary className="flex min-h-28 cursor-pointer list-none flex-col justify-center rounded-xl focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+        <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <Icon className="h-4 w-4 text-emerald-700" />
+          {title}
+        </span>
+        <span className="mt-2 text-2xl font-semibold leading-7 text-slate-950">{command}</span>
+        <span className={`mt-4 h-2 w-12 rounded-full ${releaseDotClass(card)}`} />
       </summary>
-      <div className="absolute right-0 top-full z-40 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl">
-        <div className="text-sm font-semibold text-slate-950">{card.title}</div>
+      <div className="mt-3 border-t border-white/70 pt-3">
         <NurseOnboardingProgress
-          cardCode={code}
-          day={Number(code.slice(1, 2))}
+          cardCode={card.code}
+          day={Number(card.code.slice(1, 2))}
           release={card.release}
           supervisor={card.supervisor}
         />
@@ -586,65 +590,112 @@ function OverlayRailTile({
   );
 }
 
-function IllustratedOverlayBoard() {
+function ComponentBoardScene({
+  todayMustLearn,
+  doNotGuess,
+  askAiSupervisor,
+}: {
+  todayMustLearn: BoardCard;
+  doNotGuess: BoardCard;
+  askAiSupervisor: BoardCard;
+}) {
   return (
-    <div className="relative rounded-[28px] border border-emerald-100 bg-[#fbfaf2] shadow-sm">
-      <img
-        src="/nurse-onboarding-board.png"
-        alt="新姑娘上手棋盤插畫背景"
-        className="block w-full select-none rounded-[28px]"
-      />
-      <div className="absolute left-[14%] top-[5.2%] z-10 rounded-2xl bg-white/80 px-5 py-3 shadow-sm backdrop-blur-sm">
-        <p className="text-sm font-semibold text-emerald-700">新姑娘上手棋盤</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-normal text-emerald-900">
-          今日新姑娘路線
-        </h1>
-      </div>
-      <div className="absolute left-[4.8%] top-[19.2%] z-10 flex h-[10%] w-[9.6%] items-center justify-center rounded-full border border-emerald-200 bg-white/85 text-sm font-bold text-emerald-800 shadow-lg backdrop-blur-sm">
-        START
-      </div>
-      <div className="absolute left-[66.8%] top-[82.4%] z-10 flex h-[11.5%] w-[7.2%] items-center justify-center rounded-full border border-teal-200 bg-emerald-700/90 text-sm font-bold text-white shadow-lg backdrop-blur-sm">
-        FINISH
-      </div>
-      {overlayDayLabels.map((item) => (
-        <div
-          key={item.day}
-          className={`absolute z-10 flex h-[7.2%] w-[8.2%] items-center justify-center rounded-full border text-center text-xs font-bold leading-4 shadow-lg ring-4 ring-white/75 ${item.tone}`}
-          style={{ left: item.left, top: item.top }}
-        >
-          <span>
-            Day {item.day}
-            <br />
-            {item.label}
-          </span>
-        </div>
-      ))}
-      {overlayBoardSpots.map((spot) => (
-        <OverlayTile key={spot.code} {...spot} />
-      ))}
-      {overlayRailSpots.map((spot) => (
-        <OverlayRailTile key={spot.code} {...spot} />
-      ))}
-      <div className="absolute bottom-[3.2%] left-[18%] z-20 flex items-center gap-3 rounded-full border border-emerald-100 bg-white/85 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur-sm">
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          Green
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-          Yellow
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-          Red
-        </span>
-      </div>
-      <Link
-        href="/nurse/knowledge"
-        className="absolute bottom-[3.2%] left-[38.8%] z-20 rounded-full border border-emerald-200 bg-white/85 px-4 py-2 text-sm font-semibold text-emerald-800 shadow-sm backdrop-blur-sm hover:bg-emerald-50"
+    <div className="relative rounded-[28px] border border-emerald-100 bg-[#fbfaf2] p-5 shadow-sm">
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full text-emerald-100"
+        viewBox="0 0 100 100"
+        aria-hidden="true"
       >
-        完整知識庫
-      </Link>
+        <path d="M6 18 C26 10 47 10 68 18 S92 25 86 36 C80 48 25 32 11 45" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <path d="M10 53 C31 45 63 43 84 53 S82 72 59 68 C38 64 24 67 12 76" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+
+      <div className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1fr)_310px]">
+        <div className="space-y-4">
+          <div className="flex items-start justify-between gap-4 rounded-[24px] border border-white/80 bg-white/80 p-5 shadow-sm">
+            <div>
+              <p className="text-sm font-semibold text-emerald-700">新姑娘上手棋盤</p>
+              <h1 className="mt-1 text-4xl font-semibold tracking-normal text-emerald-950">
+                今日新姑娘路線
+              </h1>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                <div className="text-xs font-semibold text-emerald-700">今日</div>
+                <div className="mt-1 font-semibold text-slate-950">Day 1</div>
+              </div>
+              <NurseOnboardingSummary />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {boardDays.map((day) => (
+              <BoardGameLane key={day.day} day={day} />
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-[20px] border border-emerald-100 bg-white/75 px-4 py-3 shadow-sm">
+            <div className="flex items-center gap-4 text-sm font-semibold text-slate-700">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                Green
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                Yellow
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+                Red
+              </span>
+            </div>
+            <Link
+              href="/nurse/knowledge"
+              className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+            >
+              完整知識庫
+            </Link>
+          </div>
+        </div>
+
+        <aside className="space-y-3">
+          <BoardSideCard
+            title="今日必學"
+            icon={ClipboardCheck}
+            card={todayMustLearn}
+            command="學收口"
+            tone="border-emerald-200 bg-emerald-50"
+          />
+          <BoardSideCard
+            title="不可亂答"
+            icon={ShieldAlert}
+            card={doNotGuess}
+            command="密碼交主管"
+            tone="border-rose-200 bg-rose-50"
+          />
+          <BoardSideCard
+            title="問 AI 主任"
+            icon={Bot}
+            card={askAiSupervisor}
+            command="先問五項"
+            tone="border-cyan-200 bg-cyan-50"
+          />
+          <div className="rounded-2xl border border-teal-200 bg-teal-50 p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-semibold text-teal-900">
+              <UserCheck className="h-4 w-4" />
+              Finish
+            </div>
+            <p className="mt-2 text-2xl font-semibold text-teal-950">主管放行</p>
+            <a
+              href="#supervisor-gates"
+              className="mt-4 inline-flex items-center gap-2 rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+            >
+              看放行關卡
+              <ArrowRight className="h-4 w-4" />
+            </a>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }
@@ -742,7 +793,11 @@ export default function NurseOnboardingPage() {
   return (
     <div className="space-y-5">
       <section className="hidden xl:block">
-        <IllustratedOverlayBoard />
+        <ComponentBoardScene
+          todayMustLearn={todayMustLearn}
+          doNotGuess={doNotGuess}
+          askAiSupervisor={askAiSupervisor}
+        />
       </section>
 
       <section className="grid gap-4 xl:hidden">
