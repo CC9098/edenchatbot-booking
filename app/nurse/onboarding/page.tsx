@@ -306,9 +306,21 @@ function InfoLine({
 
 function CardDetails({ card }: { card: BoardCard }) {
   const mustEscalate = card.release === "red" || card.supervisor === "always";
+  const meta = releaseMeta[card.release];
+  const ReleaseIcon = meta.icon;
 
   return (
     <div className="mt-3 grid gap-2">
+      <InfoLine icon={Clock3} label="估計時間">
+        {card.minutes}
+      </InfoLine>
+      <div className={`rounded-md border p-3 ${meta.className}`}>
+        <div className="flex items-center gap-2 text-xs font-semibold">
+          <ReleaseIcon className="h-3.5 w-3.5" />
+          放行狀態
+        </div>
+        <p className="mt-1 text-sm leading-6">{meta.label}</p>
+      </div>
       <InfoLine icon={ClipboardCheck} label="要做咩">
         {card.task}
       </InfoLine>
@@ -375,43 +387,73 @@ function CardDetails({ card }: { card: BoardCard }) {
   );
 }
 
+function tileShortLabel(code: string) {
+  const labels: Record<string, string> = {
+    "D1-01": "路線",
+    "D1-02": "收口",
+    "D1-03": "開診",
+    "D1-04": "入門",
+    "D2-01": "10問",
+    "D2-02": "抽問",
+    "D3-01": "查時段",
+    "D3-02": "改取消",
+    "D4-01": "收據",
+    "D4-02": "寄藥",
+    "D4-03": "密碼",
+    "D5-01": "AI格式",
+    "D5-02": "放行",
+  };
+
+  return labels[code] ?? code;
+}
+
+function dayShortLabel(day: number) {
+  if (day === 1) return "開工準備";
+  if (day === 2) return "常見10問";
+  if (day === 3) return "預約改期";
+  if (day === 4) return "文件寄藥";
+  return "AI + 主管";
+}
+
 function BoardTile({ card, day, isToday }: { card: BoardCard; day: number; isToday: boolean }) {
-  const meta = releaseMeta[card.release];
-  const ReleaseIcon = meta.icon;
+  const mustEscalate = card.release === "red" || card.supervisor === "always";
+  const TileIcon = mustEscalate
+    ? ShieldAlert
+    : card.release === "yellow"
+      ? CircleAlert
+      : CheckCircle2;
 
   return (
     <details
-      className={`group rounded-lg border p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+      className={`group rounded-lg border p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
         isToday ? "border-emerald-200 bg-white" : "border-slate-200 bg-white/70"
       }`}
     >
       <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-              {card.code}
-            </span>
-            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${meta.className}`}>
-              <ReleaseIcon className="h-3.5 w-3.5" />
-              {meta.label}
-            </span>
+        <div className="flex min-w-0 flex-1 items-start gap-2">
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md border ${
+              mustEscalate
+                ? "border-rose-200 bg-rose-50 text-rose-700"
+                : card.release === "yellow"
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
+            }`}
+          >
+            <TileIcon className="h-5 w-5" />
           </div>
-          <h3 className="mt-2 text-sm font-semibold leading-5 text-slate-950">{card.title}</h3>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span className="inline-flex items-center gap-1">
-              <Clock3 className="h-3.5 w-3.5" />
-              {card.minutes}
-            </span>
-            <span className={`rounded-full border px-2 py-0.5 font-semibold ${supervisorClass(card.supervisor)}`}>
-              {supervisorLabel(card.supervisor)}
-            </span>
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold text-slate-400">{card.code}</div>
+            <h3 className="text-sm font-semibold leading-5 text-slate-950">
+              {tileShortLabel(card.code)}
+            </h3>
+            <NurseOnboardingProgress
+              cardCode={card.code}
+              day={day}
+              release={card.release}
+              supervisor={card.supervisor}
+            />
           </div>
-          <NurseOnboardingProgress
-            cardCode={card.code}
-            day={day}
-            release={card.release}
-            supervisor={card.supervisor}
-          />
         </div>
         <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" />
       </summary>
@@ -425,11 +467,13 @@ function RailCard({
   title,
   icon: Icon,
   card,
+  command,
   tone,
 }: {
   title: string;
   icon: typeof ClipboardCheck;
   card: BoardCard;
+  command: string;
   tone: string;
 }) {
   return (
@@ -440,7 +484,7 @@ function RailCard({
             <Icon className="h-4 w-4 text-emerald-700" />
             {title}
           </div>
-          <p className="mt-2 text-sm leading-5 text-slate-700">{card.title}</p>
+          <p className="mt-2 text-lg font-semibold leading-6 text-slate-950">{command}</p>
         </div>
         <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-slate-500 transition group-open:rotate-180" />
       </summary>
@@ -474,7 +518,7 @@ export default function NurseOnboardingPage() {
                 今日新姑娘路線
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                Day 1 先行，其他只是預覽。打開每格才看 SOP 細節，不需要一開工就面對整本手冊。
+                今日只行 Day 1 四格。細節點開先睇。
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
@@ -528,19 +572,11 @@ export default function NurseOnboardingPage() {
                           Finish
                         </div>
                       ) : null}
-                      <div
-                        className={`inline-flex rounded-full px-2 py-1 text-xs font-bold ${
-                          isToday ? "bg-emerald-700 text-white" : "bg-white text-slate-500"
-                        }`}
-                      >
-                        Day {day.day}
-                      </div>
-                      <h2 className="mt-2 text-sm font-semibold leading-5 text-slate-950">
-                        {day.title}
+                      <h2 className="text-base font-semibold leading-5 text-slate-950">
+                        {dayShortLabel(day.day)}
                       </h2>
-                      <p className="mt-2 text-xs leading-5 text-slate-600">{day.goal}</p>
-                      <p className="mt-2 rounded-md border border-white/80 bg-white/80 px-2 py-1.5 text-xs leading-5 text-slate-600">
-                        {day.independence}
+                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                        {isToday ? "今日必行" : "之後再開"}
                       </p>
                     </div>
                   </div>
@@ -560,18 +596,21 @@ export default function NurseOnboardingPage() {
             title="今日必學"
             icon={ClipboardCheck}
             card={todayMustLearn}
+            command="學收口"
             tone="border-emerald-200 bg-emerald-50"
           />
           <RailCard
             title="不可亂答"
             icon={ShieldAlert}
             card={doNotGuess}
+            command="密碼交主管"
             tone="border-rose-200 bg-rose-50"
           />
           <RailCard
             title="問 AI 主任"
             icon={Bot}
             card={askAiSupervisor}
+            command="先問五項"
             tone="border-cyan-200 bg-cyan-50"
           />
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
