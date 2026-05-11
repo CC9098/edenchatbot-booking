@@ -18,6 +18,11 @@ import {
   XCircle,
 } from "lucide-react";
 
+import {
+  NurseOnboardingProgress,
+  NurseOnboardingSummary,
+} from "@/components/staff/NurseOnboardingProgress";
+
 export const dynamic = "force-dynamic";
 
 type ReleaseLevel = "green" | "yellow" | "red";
@@ -370,7 +375,7 @@ function CardDetails({ card }: { card: BoardCard }) {
   );
 }
 
-function BoardTile({ card, isToday }: { card: BoardCard; isToday: boolean }) {
+function BoardTile({ card, day, isToday }: { card: BoardCard; day: number; isToday: boolean }) {
   const meta = releaseMeta[card.release];
   const ReleaseIcon = meta.icon;
 
@@ -401,6 +406,12 @@ function BoardTile({ card, isToday }: { card: BoardCard; isToday: boolean }) {
               {supervisorLabel(card.supervisor)}
             </span>
           </div>
+          <NurseOnboardingProgress
+            cardCode={card.code}
+            day={day}
+            release={card.release}
+            supervisor={card.supervisor}
+          />
         </div>
         <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" />
       </summary>
@@ -475,9 +486,10 @@ export default function NurseOnboardingPage() {
                 <div className="text-xs font-semibold text-slate-500">總格數</div>
                 <div className="mt-1 font-semibold text-slate-950">{totalCards} 格</div>
               </div>
+              <NurseOnboardingSummary />
               <Link
                 href="/nurse/knowledge"
-                className="col-span-2 inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:col-span-1"
+                className="col-span-2 inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:col-span-3"
               >
                 <BookOpenCheck className="h-4 w-4" />
                 知識庫
@@ -534,7 +546,7 @@ export default function NurseOnboardingPage() {
                   </div>
                   <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                     {day.cards.map((card) => (
-                      <BoardTile key={card.code} card={card} isToday={isToday} />
+                      <BoardTile key={card.code} card={card} day={day.day} isToday={isToday} />
                     ))}
                   </div>
                 </div>
