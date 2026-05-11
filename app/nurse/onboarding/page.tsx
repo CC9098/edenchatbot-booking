@@ -300,6 +300,8 @@ function InfoLine({
 }
 
 function CardDetails({ card }: { card: BoardCard }) {
+  const mustEscalate = card.release === "red" || card.supervisor === "always";
+
   return (
     <div className="mt-3 grid gap-2">
       <InfoLine icon={ClipboardCheck} label="要做咩">
@@ -311,19 +313,52 @@ function CardDetails({ card }: { card: BoardCard }) {
       <InfoLine icon={AlertTriangle} label="不可以講">
         {card.cannotSay}
       </InfoLine>
-      <div className="rounded-md border border-cyan-200 bg-cyan-50 p-3">
-        <div className="flex items-center gap-2 text-xs font-semibold text-cyan-800">
-          <Bot className="h-3.5 w-3.5" />
-          問 AI 主任
-        </div>
-        <p className="mt-1 text-sm leading-6 text-cyan-950">{card.aiPrompt}</p>
-        <Link
-          href={aiChatHref(card.aiPrompt)}
-          className="mt-3 inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+      <div
+        className={`rounded-md border p-3 ${
+          mustEscalate
+            ? "border-rose-200 bg-rose-50"
+            : "border-cyan-200 bg-cyan-50"
+        }`}
+      >
+        <div
+          className={`flex items-center gap-2 text-xs font-semibold ${
+            mustEscalate ? "text-rose-800" : "text-cyan-800"
+          }`}
         >
-          問 AI 主任
-          <ArrowRight className="h-4 w-4" />
-        </Link>
+          {mustEscalate ? (
+            <ShieldAlert className="h-3.5 w-3.5" />
+          ) : (
+            <Bot className="h-3.5 w-3.5" />
+          )}
+          {mustEscalate ? "先交主管" : "問 AI 主任"}
+        </div>
+        <p className={`mt-1 text-sm leading-6 ${mustEscalate ? "text-rose-950" : "text-cyan-950"}`}>
+          {mustEscalate
+            ? "這格屬高風險，不可由新人或 AI 主任作最後決定。先交真人主管，再用 AI 主任整理要問甚麼。"
+            : card.aiPrompt}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {mustEscalate ? (
+            <a
+              href="#supervisor-gates"
+              className="inline-flex items-center gap-2 rounded-md bg-rose-700 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-800"
+            >
+              交主管確認
+              <ArrowRight className="h-4 w-4" />
+            </a>
+          ) : null}
+          <Link
+            href={aiChatHref(card.aiPrompt)}
+            className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold ${
+              mustEscalate
+                ? "border border-rose-200 bg-white text-rose-800 hover:bg-rose-50"
+                : "bg-emerald-700 text-white hover:bg-emerald-800"
+            }`}
+          >
+            {mustEscalate ? "用 AI 整理問題" : "問 AI 主任"}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
       <InfoLine icon={Users} label="是否要主管">
         {supervisorLabel(card.supervisor)}
@@ -403,6 +438,14 @@ function RailCard({
   );
 }
 
+function boardRowClass(day: number) {
+  if (day === 1) return "border-emerald-300 bg-emerald-50/90";
+  if (day === 2) return "border-cyan-200 bg-cyan-50/70";
+  if (day === 3) return "border-orange-200 bg-orange-50/70";
+  if (day === 4) return "border-lime-200 bg-lime-50/70";
+  return "border-teal-200 bg-teal-50/70";
+}
+
 export default function NurseOnboardingPage() {
   const totalCards = boardDays.reduce((count, day) => count + day.cards.length, 0);
   const todayMustLearn = boardDays[0].cards[1];
@@ -417,10 +460,10 @@ export default function NurseOnboardingPage() {
             <div>
               <p className="text-sm font-medium text-emerald-700">新姑娘上手路線</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal text-slate-950 sm:text-3xl">
-                Day 1 先行，其他只是預覽
+                今日新姑娘路線
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                第一屏只放路徑。打開每格才看 SOP 細節，不需要一開工就面對整本手冊。
+                Day 1 先行，其他只是預覽。打開每格才看 SOP 細節，不需要一開工就面對整本手冊。
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
@@ -442,27 +485,37 @@ export default function NurseOnboardingPage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 lg:grid-cols-[84px_repeat(5,minmax(0,1fr))_84px]">
-            <div className="flex min-h-24 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-800">
-              <Flag className="mr-2 h-4 w-4" />
-              Start
-            </div>
+          <div className="mt-5 space-y-3">
             {boardDays.map((day) => {
               const isToday = day.day === 1;
               return (
                 <div
                   key={day.day}
-                  className={`relative rounded-lg border p-3 ${
-                    isToday
-                      ? "border-emerald-300 bg-emerald-50/90 shadow-sm"
-                      : "border-slate-200 bg-slate-50/70"
-                  }`}
+                  className={`grid gap-3 rounded-lg border p-3 ${
+                    isToday ? "shadow-sm" : ""
+                  } ${boardRowClass(day.day)} lg:grid-cols-[180px_minmax(0,1fr)]`}
                 >
-                  {day.day < 5 ? (
-                    <div className="absolute -right-3 top-10 z-10 hidden h-px w-6 bg-emerald-200 lg:block" />
-                  ) : null}
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
+                  <div className="flex items-start gap-3 lg:block">
+                    <div
+                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm ${
+                        isToday ? "bg-emerald-700 text-white" : "bg-white text-slate-600"
+                      }`}
+                    >
+                      Day {day.day}
+                    </div>
+                    <div className="min-w-0 lg:mt-3">
+                      {day.day === 1 ? (
+                        <div className="mb-2 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-1 text-xs font-semibold text-emerald-800">
+                          <Flag className="h-3.5 w-3.5" />
+                          Start here
+                        </div>
+                      ) : null}
+                      {day.day === 5 ? (
+                        <div className="mb-2 inline-flex items-center gap-1 rounded-full border border-teal-200 bg-white px-2 py-1 text-xs font-semibold text-teal-800">
+                          <UserCheck className="h-3.5 w-3.5" />
+                          Finish
+                        </div>
+                      ) : null}
                       <div
                         className={`inline-flex rounded-full px-2 py-1 text-xs font-bold ${
                           isToday ? "bg-emerald-700 text-white" : "bg-white text-slate-500"
@@ -473,14 +526,13 @@ export default function NurseOnboardingPage() {
                       <h2 className="mt-2 text-sm font-semibold leading-5 text-slate-950">
                         {day.title}
                       </h2>
+                      <p className="mt-2 text-xs leading-5 text-slate-600">{day.goal}</p>
+                      <p className="mt-2 rounded-md border border-white/80 bg-white/80 px-2 py-1.5 text-xs leading-5 text-slate-600">
+                        {day.independence}
+                      </p>
                     </div>
-                    {isToday ? <CheckCircle2 className="h-5 w-5 text-emerald-700" /> : null}
                   </div>
-                  <p className="mt-2 min-h-10 text-xs leading-5 text-slate-600">{day.goal}</p>
-                  <p className="mt-2 rounded-md border border-white/80 bg-white/80 px-2 py-1.5 text-xs leading-5 text-slate-600">
-                    {day.independence}
-                  </p>
-                  <div className="mt-3 space-y-2">
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                     {day.cards.map((card) => (
                       <BoardTile key={card.code} card={card} isToday={isToday} />
                     ))}
@@ -488,10 +540,6 @@ export default function NurseOnboardingPage() {
                 </div>
               );
             })}
-            <div className="flex min-h-24 items-center justify-center rounded-lg border border-teal-200 bg-teal-50 text-sm font-semibold text-teal-800">
-              <UserCheck className="mr-2 h-4 w-4" />
-              Finish
-            </div>
           </div>
         </div>
 
