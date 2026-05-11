@@ -461,12 +461,12 @@ function dayShortLabel(day: number) {
 
 function gameTileClass(card: BoardCard) {
   if (card.release === "red" || card.supervisor === "always") {
-    return "border-rose-200 bg-rose-50/95 text-rose-800 shadow-rose-100 hover:bg-white";
+    return "border-rose-300 bg-[#fff5f5] text-rose-800";
   }
   if (card.release === "yellow") {
-    return "border-amber-200 bg-amber-50/95 text-amber-900 shadow-amber-100 hover:bg-white";
+    return "border-amber-300 bg-[#fff9df] text-amber-950";
   }
-  return "border-emerald-200 bg-emerald-50/95 text-emerald-900 shadow-emerald-100 hover:bg-white";
+  return "border-emerald-300 bg-[#f4fff8] text-emerald-950";
 }
 
 function releaseDotClass(card: BoardCard) {
@@ -506,16 +506,19 @@ function BoardGameTile({
       <Link
         href={boardCardHref(card.code)}
         scroll={false}
-        className={`flex aspect-square min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border px-3 py-3 text-center shadow-md transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 ${gameTileClass(card)} ${
-          selected ? "ring-4 ring-emerald-200" : ""
+        className={`group/tile relative flex aspect-[1.18] min-h-24 cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 px-3 py-3 text-center shadow-[inset_0_-5px_0_rgba(77,63,20,0.08)] transition-colors hover:border-emerald-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 ${gameTileClass(card)} ${
+          selected ? "outline outline-4 outline-emerald-200" : ""
         }`}
         aria-current={selected ? "step" : undefined}
       >
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/80 bg-white text-current shadow-sm">
-          <TileIcon className="h-6 w-6" />
+        <span className="absolute left-2 top-2 rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-slate-400">
+          {card.code.replace("D", "")}
         </span>
-        <span className="mt-2 text-base font-semibold leading-5">{tileShortLabel(card.code)}</span>
-        <span className={`mt-2 h-2 w-11 rounded-full ${releaseDotClass(card)}`} />
+        <span className="text-current">
+          <TileIcon className="h-7 w-7" />
+        </span>
+        <span className="mt-2 text-sm font-semibold leading-5">{tileShortLabel(card.code)}</span>
+        <span className={`mt-2 h-1.5 w-10 rounded-full ${releaseDotClass(card)}`} />
       </Link>
       {mustEscalate ? (
         <span className="absolute -right-1 -top-1 z-20 rounded-full bg-rose-600 px-2 py-1 text-[10px] font-bold text-white shadow-sm">
@@ -544,16 +547,16 @@ function BoardGameLane({ day, selectedCode }: { day: BoardDay; selectedCode: str
           <h2 className="mt-1 text-lg font-semibold leading-5 text-slate-950">{day.title}</h2>
         </div>
       </div>
-      <div className="relative rounded-[24px] border border-white/80 bg-white/45 p-3 shadow-inner">
-        <div className="absolute left-8 right-8 top-1/2 h-3 -translate-y-1/2 rounded-full bg-white/75 shadow-inner" />
-        <div className="relative grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="relative rounded-[28px] border border-white/80 bg-white/45 p-2 shadow-inner">
+        <div className="absolute left-8 right-8 top-1/2 h-4 -translate-y-1/2 rounded-full bg-white/70 shadow-inner" />
+        <div className="relative grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
           {day.cards.map((card) => (
             <BoardGameTile key={card.code} card={card} selected={selectedCode === card.code} />
           ))}
           {placeholders.map((_, index) => (
             <div
               key={`${day.day}-empty-${index}`}
-              className="aspect-square min-h-28 rounded-2xl border border-dashed border-white/80 bg-white/45 shadow-sm"
+              className="aspect-[1.18] min-h-24 rounded-[22px] border-2 border-white/70 bg-white/40 shadow-[inset_0_-5px_0_rgba(77,63,20,0.04)]"
               aria-hidden="true"
             />
           ))}
