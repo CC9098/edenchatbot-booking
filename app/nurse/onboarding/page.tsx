@@ -22,7 +22,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   Stethoscope,
-  UserCheck,
   Users,
   WalletCards,
   XCircle,
@@ -70,26 +69,26 @@ const boardDays: BoardDay[] = [
     cards: [
       {
         code: "D1-01",
-        title: "今日只行這條路",
+        title: "唔肯定先收口",
         minutes: "2 分鐘",
-        task: "打開棋盤，指出今日下一格，知道完整知識庫只是後備查資料。",
-        canSay: "今日我先跟住 onboarding path 做，不確定的我會先問主管或 AI 主任。",
-        cannotSay: "我第一日已經要自己讀完整手冊。",
-        aiPrompt: "新姑娘第一日應該先行哪幾步？",
+        task: "先背熟一句安全回覆。病人問到你不肯定，就不要即場答。",
+        canSay: "我先幫您確認清楚，再 WhatsApp 回覆您。",
+        cannotSay: "一定 claim 到、一定有位、密碼係...",
+        aiPrompt: "病人問我不肯定的事，第一句應該點講？",
         supervisor: "no",
-        passCondition: "能指出今日下一格，不被完整知識庫嚇住。",
+        passCondition: "講得出安全收口句，知道要記低問題和聯絡資料。",
         release: "green",
       },
       {
         code: "D1-02",
-        title: "安全收口句",
+        title: "記低病人問題",
         minutes: "5 分鐘",
-        task: "遇到醫療、收費、保險、密碼、投訴，先收口，再記低問題和聯絡資料。",
-        canSay: "我先幫您確認清楚，再 WhatsApp 回覆您。",
-        cannotSay: "一定 claim 到、醫師一定會加位、密碼係...",
-        aiPrompt: "病人問的問題我不肯定，可以怎樣安全收口？",
+        task: "記低姓名、電話、問題、想聯絡的分店或醫師，再交當值同事跟進。",
+        canSay: "我記低資料，確認清楚後再回覆您。",
+        cannotSay: "我無留資料都可以幫你跟進。",
+        aiPrompt: "病人問完問題，我要記低哪些資料？",
         supervisor: "yes",
-        passCondition: "能自然講出安全收口句，並分辨不可即答問題。",
+        passCondition: "能收齊姓名、電話、問題和回覆渠道。",
         release: "green",
         defaultOpen: true,
       },
@@ -139,14 +138,14 @@ const boardDays: BoardDay[] = [
       },
       {
         code: "D2-02",
-        title: "抽 3 問 Pass Gate",
+        title: "抽 3 問過關",
         minutes: "6 分鐘",
         task: "Trainer 抽 3 題，新人先安全回覆，再講要收集甚麼、不可承諾甚麼。",
         canSay: "我先核對資料，再按診所流程回覆您。",
         cannotSay: "無查紀錄就即口答。",
         aiPrompt: "請扮病人抽問我三條前台常見問題。",
         supervisor: "yes",
-        passCondition: "3 題至少 2 題 Green，不可有 Red。",
+        passCondition: "3 題至少 2 題可自己答，不可有高風險亂答。",
         release: "green",
       },
     ],
@@ -222,37 +221,37 @@ const boardDays: BoardDay[] = [
         cannotSay: "密碼係...、OTP 可以俾你、完整銀行資料係...",
         aiPrompt: "病人或同事問 restricted 資料時，我應該點處理？",
         supervisor: "always",
-        passCondition: "不在 AI 主任或病人對話洩漏密碼、OTP、銀行或後台憑證。",
+        passCondition: "不在 AI 或病人對話洩漏密碼、OTP、銀行或後台憑證。",
         release: "red",
       },
     ],
   },
   {
     day: 5,
-    title: "AI 主任保底 + 真人主管放行",
-    goal: "識用 AI 主任保底、識升級、識留下待補 SOP。",
+    title: "AI 幫手 + 真人主管確認",
+    goal: "識用 AI 整理問題、識升級、識留下待補流程。",
     independence: "Role-play 後可做半日 supervised shift。",
     cards: [
       {
         code: "D5-01",
-        title: "AI 主任回答格式",
+        title: "AI 幫手整理問題",
         minutes: "6 分鐘",
-        task: "每次問 AI 主任，都要看：可對病人講、先查、風險、是否問主管、來源。",
+        task: "每次問 AI，都要看：可否對病人講、要先查甚麼、是否要問主管。",
         canSay: "我先幫您按紀錄核對，再用診所流程確認下一步。",
         cannotSay: "AI 話得就一定得。",
         aiPrompt: "請用可以對病人講、先查、風險、是否要問主管、來源五項回答。",
         supervisor: "no",
-        passCondition: "能用 AI 主任做初步判斷，但不把 AI 當最終批准。",
+        passCondition: "能用 AI 做初步整理，但不把 AI 當最終批准。",
         release: "green",
       },
       {
         code: "D5-02",
         title: "真人主管放行",
         minutes: "10 分鐘",
-        task: "完成 Green / Yellow / Red 評級；Red 不可獨立，Yellow 要旁聽或抽查。",
+        task: "完成可以自己答、先問同事、一定交主管三類判斷。",
         canSay: "這個情況我先交主管確認，確認後再回覆您。",
         cannotSay: "我未通過都可以自己處理高風險問題。",
-        aiPrompt: "請幫我用 Green / Yellow / Red 評估這段病人回覆。",
+        aiPrompt: "請幫我判斷這段病人回覆：可以自己答、先問同事，定一定交主管？",
         supervisor: "yes",
         passCondition: "必須安全收口、不保證保險、不給醫療建議、不講 restricted 資料。",
         release: "green",
@@ -263,17 +262,17 @@ const boardDays: BoardDay[] = [
 
 const releaseMeta: Record<ReleaseLevel, { label: string; className: string; icon: typeof CheckCircle2 }> = {
   green: {
-    label: "Green 可處理",
+    label: "可自己答",
     className: "border-emerald-200 bg-emerald-50 text-emerald-800",
     icon: CheckCircle2,
   },
   yellow: {
-    label: "Yellow 要抽查",
+    label: "先問同事",
     className: "border-amber-200 bg-amber-50 text-amber-900",
     icon: CircleAlert,
   },
   red: {
-    label: "Red 不可獨立",
+    label: "一定交主管",
     className: "border-rose-200 bg-rose-50 text-rose-800",
     icon: XCircle,
   },
@@ -285,7 +284,7 @@ const boardCardByCode = new Map<string, { card: BoardCard; day: number }>(
 
 function getSelectedBoardCard(cardParam?: string | string[]) {
   const requestedCode = Array.isArray(cardParam) ? cardParam[0] : cardParam;
-  return boardCardByCode.get(requestedCode ?? "") ?? { card: boardDays[0].cards[1], day: 1 };
+  return boardCardByCode.get(requestedCode ?? "") ?? { card: boardDays[0].cards[0], day: 1 };
 }
 
 function boardCardHref(cardCode: string) {
@@ -297,15 +296,9 @@ function aiChatHref(prompt: string) {
 }
 
 function supervisorLabel(value: SupervisorNeed) {
-  if (value === "always") return "主管：必須";
-  if (value === "yes") return "主管：視情況";
-  return "主管：暫不用";
-}
-
-function supervisorClass(value: SupervisorNeed) {
-  if (value === "always") return "border-rose-200 bg-rose-50 text-rose-800";
-  if (value === "yes") return "border-amber-200 bg-amber-50 text-amber-900";
-  return "border-slate-200 bg-slate-50 text-slate-700";
+  if (value === "always") return "一定交主管";
+  if (value === "yes") return "唔肯定就問同事";
+  return "可以先自己做";
 }
 
 function InfoLine({
@@ -330,28 +323,16 @@ function InfoLine({
 
 function CardDetails({ card }: { card: BoardCard }) {
   const mustEscalate = card.release === "red" || card.supervisor === "always";
-  const meta = releaseMeta[card.release];
-  const ReleaseIcon = meta.icon;
 
   return (
     <div className="mt-3 grid gap-2">
-      <InfoLine icon={Clock3} label="估計時間">
-        {card.minutes}
-      </InfoLine>
-      <div className={`rounded-md border p-3 ${meta.className}`}>
-        <div className="flex items-center gap-2 text-xs font-semibold">
-          <ReleaseIcon className="h-3.5 w-3.5" />
-          放行狀態
-        </div>
-        <p className="mt-1 text-sm leading-6">{meta.label}</p>
-      </div>
-      <InfoLine icon={ClipboardCheck} label="要做咩">
+      <InfoLine icon={ClipboardCheck} label="照做">
         {card.task}
       </InfoLine>
-      <InfoLine icon={MessageCircle} label="可以講">
+      <InfoLine icon={MessageCircle} label="照講">
         {card.canSay}
       </InfoLine>
-      <InfoLine icon={AlertTriangle} label="不可以講">
+      <InfoLine icon={AlertTriangle} label="不要講">
         {card.cannotSay}
       </InfoLine>
       <div
@@ -371,11 +352,11 @@ function CardDetails({ card }: { card: BoardCard }) {
           ) : (
             <Bot className="h-3.5 w-3.5" />
           )}
-          {mustEscalate ? "先交主管" : "問 AI 主任"}
+          {mustEscalate ? "先交主管" : "問 AI 幫手"}
         </div>
         <p className={`mt-1 text-sm leading-6 ${mustEscalate ? "text-rose-950" : "text-cyan-950"}`}>
           {mustEscalate
-            ? "這格屬高風險，不可由新人或 AI 主任作最後決定。先交真人主管，再用 AI 主任整理要問甚麼。"
+            ? "這件事不要自己決定。先交當值同事或主管，再用 AI 幫你整理要問甚麼。"
             : card.aiPrompt}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -396,25 +377,32 @@ function CardDetails({ card }: { card: BoardCard }) {
                 : "bg-emerald-700 text-white hover:bg-emerald-800"
             }`}
           >
-            {mustEscalate ? "用 AI 整理問題" : "問 AI 主任"}
+            {mustEscalate ? "整理要問咩" : "問 AI"}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </div>
-      <InfoLine icon={Users} label="是否要主管">
-        {supervisorLabel(card.supervisor)}
-      </InfoLine>
-      <InfoLine icon={Flag} label="過關條件">
+      <InfoLine icon={Flag} label="做完要識">
         {card.passCondition}
       </InfoLine>
+      <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
+        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1">
+          <Clock3 className="h-3.5 w-3.5" />
+          約 {card.minutes}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1">
+          <Users className="h-3.5 w-3.5" />
+          {supervisorLabel(card.supervisor)}
+        </span>
+      </div>
     </div>
   );
 }
 
 function tileShortLabel(code: string) {
   const labels: Record<string, string> = {
-    "D1-01": "路線",
-    "D1-02": "收口",
+    "D1-01": "收口",
+    "D1-02": "記低",
     "D1-03": "開診",
     "D1-04": "入門",
     "D2-01": "10問",
@@ -424,7 +412,7 @@ function tileShortLabel(code: string) {
     "D4-01": "收據",
     "D4-02": "寄藥",
     "D4-03": "密碼",
-    "D5-01": "AI格式",
+    "D5-01": "整理",
     "D5-02": "放行",
   };
 
@@ -566,55 +554,16 @@ function BoardGameLane({ day, selectedCode }: { day: BoardDay; selectedCode: str
   );
 }
 
-function BoardSideCard({
-  title,
-  icon: Icon,
-  card,
-  command,
-  tone,
-}: {
-  title: string;
-  icon: typeof ClipboardCheck;
-  card: BoardCard;
-  command: string;
-  tone: string;
-}) {
-  return (
-    <details className={`group rounded-2xl border p-4 shadow-sm ${tone}`}>
-      <summary className="flex min-h-28 cursor-pointer list-none flex-col justify-center rounded-xl focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
-        <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <Icon className="h-4 w-4 text-emerald-700" />
-          {title}
-        </span>
-        <span className="mt-2 text-2xl font-semibold leading-7 text-slate-950">{command}</span>
-        <span className={`mt-4 h-2 w-12 rounded-full ${releaseDotClass(card)}`} />
-      </summary>
-      <div className="mt-3 border-t border-white/70 pt-3">
-        <NurseOnboardingProgress
-          cardCode={card.code}
-          day={Number(card.code.slice(1, 2))}
-          release={card.release}
-          supervisor={card.supervisor}
-        />
-        <CardDetails card={card} />
-      </div>
-    </details>
-  );
-}
-
 function ComponentBoardScene({
-  todayMustLearn,
-  doNotGuess,
-  askAiSupervisor,
   selectedCard,
   selectedDay,
 }: {
-  todayMustLearn: BoardCard;
-  doNotGuess: BoardCard;
-  askAiSupervisor: BoardCard;
   selectedCard: BoardCard;
   selectedDay: number;
 }) {
+  const todayDays = boardDays.filter((day) => day.day === 1);
+  const laterDays = boardDays.filter((day) => day.day !== 1);
+
   return (
     <div className="relative rounded-[28px] border border-emerald-100 bg-[#fbfaf2] p-5 shadow-sm">
       <svg
@@ -630,9 +579,9 @@ function ComponentBoardScene({
         <div className="space-y-4">
           <div className="flex items-start justify-between gap-4 rounded-[24px] border border-white/80 bg-white/80 p-5 shadow-sm">
             <div>
-              <p className="text-sm font-semibold text-emerald-700">新姑娘上手棋盤</p>
+              <p className="text-sm font-semibold text-emerald-700">今日返工</p>
               <h1 className="mt-1 text-4xl font-semibold tracking-normal text-emerald-950">
-                今日新姑娘路線
+                先做好下一步
               </h1>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm">
@@ -645,31 +594,33 @@ function ComponentBoardScene({
           </div>
 
           <div className="space-y-3">
-            {boardDays.map((day) => (
+            {todayDays.map((day) => (
               <BoardGameLane key={day.day} day={day} selectedCode={selectedCard.code} />
             ))}
+            <details
+              className="rounded-[24px] border border-slate-200 bg-white/65 p-3 shadow-sm"
+              open={selectedDay > 1}
+            >
+              <summary className="cursor-pointer list-none text-sm font-semibold text-slate-600">
+                之後先做：第 2-5 日
+              </summary>
+              <div className="mt-3 space-y-3">
+                {laterDays.map((day) => (
+                  <BoardGameLane key={day.day} day={day} selectedCode={selectedCard.code} />
+                ))}
+              </div>
+            </details>
           </div>
 
           <div className="flex items-center justify-between gap-3 rounded-[20px] border border-emerald-100 bg-white/75 px-4 py-3 shadow-sm">
-            <div className="flex items-center gap-4 text-sm font-semibold text-slate-700">
-              <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                Green
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-                Yellow
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-                Red
-              </span>
-            </div>
+            <p className="text-sm font-semibold text-slate-700">
+              不肯定就不要估，先記低資料再問人。
+            </p>
             <Link
               href="/nurse/knowledge"
               className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
             >
-              完整知識庫
+              查資料
             </Link>
           </div>
         </div>
@@ -681,7 +632,7 @@ function ComponentBoardScene({
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-emerald-700">目前格子</p>
+                <p className="text-sm font-semibold text-emerald-700">而家做呢步</p>
                 <h2 className="mt-1 text-xl font-semibold leading-6 text-slate-950">
                   {selectedCard.title}
                 </h2>
@@ -698,38 +649,17 @@ function ComponentBoardScene({
             />
             <CardDetails card={selectedCard} />
           </section>
-          <BoardSideCard
-            title="今日必學"
-            icon={ClipboardCheck}
-            card={todayMustLearn}
-            command="學收口"
-            tone="border-emerald-200 bg-emerald-50"
-          />
-          <BoardSideCard
-            title="不可亂答"
-            icon={ShieldAlert}
-            card={doNotGuess}
-            command="密碼交主管"
-            tone="border-rose-200 bg-rose-50"
-          />
-          <BoardSideCard
-            title="問 AI 主任"
-            icon={Bot}
-            card={askAiSupervisor}
-            command="先問五項"
-            tone="border-cyan-200 bg-cyan-50"
-          />
           <div className="rounded-2xl border border-teal-200 bg-teal-50 p-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-teal-900">
-              <UserCheck className="h-4 w-4" />
-              Finish
+              <ShieldCheck className="h-4 w-4" />
+              唔識就停
             </div>
-            <p className="mt-2 text-2xl font-semibold text-teal-950">主管放行</p>
+            <p className="mt-2 text-xl font-semibold text-teal-950">不要估，記低資料，交當值同事。</p>
             <a
               href="#supervisor-gates"
               className="mt-4 inline-flex items-center gap-2 rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
             >
-              看放行關卡
+              邊啲要問主管
               <ArrowRight className="h-4 w-4" />
             </a>
           </div>
@@ -785,36 +715,6 @@ function BoardTile({ card, day, isToday }: { card: BoardCard; day: number; isTod
   );
 }
 
-function RailCard({
-  title,
-  icon: Icon,
-  card,
-  command,
-  tone,
-}: {
-  title: string;
-  icon: typeof ClipboardCheck;
-  card: BoardCard;
-  command: string;
-  tone: string;
-}) {
-  return (
-    <details className={`group rounded-lg border p-4 shadow-sm ${tone}`}>
-      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-            <Icon className="h-4 w-4 text-emerald-700" />
-            {title}
-          </div>
-          <p className="mt-2 text-lg font-semibold leading-6 text-slate-950">{command}</p>
-        </div>
-        <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-slate-500 transition group-open:rotate-180" />
-      </summary>
-      <CardDetails card={card} />
-    </details>
-  );
-}
-
 function boardRowClass(day: number) {
   if (day === 1) return "border-emerald-300 bg-emerald-50/90 shadow-[inset_0_-3px_0_rgba(74,123,82,0.15)]";
   if (day === 2) return "border-cyan-200 bg-cyan-50/75 shadow-[inset_0_-3px_0_rgba(8,145,178,0.12)]";
@@ -830,19 +730,12 @@ export default function NurseOnboardingPage({
     card?: string | string[];
   };
 }) {
-  const totalCards = boardDays.reduce((count, day) => count + day.cards.length, 0);
-  const todayMustLearn = boardDays[0].cards[1];
-  const doNotGuess = boardDays[3].cards[2];
-  const askAiSupervisor = boardDays[4].cards[0];
   const selected = getSelectedBoardCard(searchParams?.card);
 
   return (
     <div className="space-y-5">
       <section className="hidden xl:block">
         <ComponentBoardScene
-          todayMustLearn={todayMustLearn}
-          doNotGuess={doNotGuess}
-          askAiSupervisor={askAiSupervisor}
           selectedCard={selected.card}
           selectedDay={selected.day}
         />
@@ -852,12 +745,12 @@ export default function NurseOnboardingPage({
         <div className="overflow-hidden rounded-[26px] border border-emerald-100 bg-[#fbfaf2] p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <p className="text-sm font-medium text-emerald-700">新姑娘上手路線</p>
+              <p className="text-sm font-medium text-emerald-700">今日返工</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal text-slate-950 sm:text-3xl">
-                今日新姑娘路線
+                先做好下一步
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                今日只行 Day 1 四格。細節點開先睇。
+                今日只做 Day 1。其他之後先理。
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
@@ -866,8 +759,8 @@ export default function NurseOnboardingPage({
                 <div className="mt-1 font-semibold text-slate-950">Day 1</div>
               </div>
               <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                <div className="text-xs font-semibold text-slate-500">總格數</div>
-                <div className="mt-1 font-semibold text-slate-950">{totalCards} 格</div>
+                <div className="text-xs font-semibold text-slate-500">今日</div>
+                <div className="mt-1 font-semibold text-slate-950">4 步</div>
               </div>
               <NurseOnboardingSummary />
               <Link
@@ -875,14 +768,14 @@ export default function NurseOnboardingPage({
                 className="col-span-2 inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:col-span-3"
               >
                 <BookOpenCheck className="h-4 w-4" />
-                知識庫
+                查資料
               </Link>
             </div>
           </div>
 
           <div className="mt-5 rounded-[24px] border border-emerald-100 bg-white/55 p-3 shadow-inner">
             <div className="space-y-3">
-            {boardDays.map((day) => {
+            {boardDays.filter((day) => day.day === 1).map((day) => {
               const isToday = day.day === 1;
               return (
                 <div
@@ -903,13 +796,7 @@ export default function NurseOnboardingPage({
                       {day.day === 1 ? (
                         <div className="mb-2 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-1 text-xs font-semibold text-emerald-800">
                           <Flag className="h-3.5 w-3.5" />
-                          Start here
-                        </div>
-                      ) : null}
-                      {day.day === 5 ? (
-                        <div className="mb-2 inline-flex items-center gap-1 rounded-full border border-teal-200 bg-white px-2 py-1 text-xs font-semibold text-teal-800">
-                          <UserCheck className="h-3.5 w-3.5" />
-                          Finish
+                          由呢度開始
                         </div>
                       ) : null}
                       <h2 className="text-base font-semibold leading-5 text-slate-950">
@@ -928,60 +815,49 @@ export default function NurseOnboardingPage({
                 </div>
               );
             })}
+            <details className="rounded-[24px] border border-slate-200 bg-white/65 p-3">
+              <summary className="cursor-pointer list-none text-sm font-semibold text-slate-600">
+                之後先做：第 2-5 日
+              </summary>
+              <div className="mt-3 space-y-3">
+                {boardDays.filter((day) => day.day !== 1).map((day) => (
+                  <div
+                    key={day.day}
+                    className={`grid gap-3 rounded-[24px] border p-3 ${boardRowClass(day.day)} lg:grid-cols-[180px_minmax(0,1fr)]`}
+                  >
+                    <div className="flex items-start gap-3 lg:block">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-slate-600 shadow-sm ring-4 ring-white/80">
+                        Day {day.day}
+                      </div>
+                      <div className="min-w-0 lg:mt-3">
+                        <h2 className="text-base font-semibold leading-5 text-slate-950">
+                          {dayShortLabel(day.day)}
+                        </h2>
+                        <p className="mt-1 text-xs font-semibold text-slate-500">之後再開</p>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                      {day.cards.map((card) => (
+                        <BoardTile key={card.code} card={card} day={day.day} isToday={false} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
             </div>
           </div>
         </div>
 
         <aside className="space-y-3">
-          <RailCard
-            title="今日必學"
-            icon={ClipboardCheck}
-            card={todayMustLearn}
-            command="學收口"
-            tone="border-emerald-200 bg-emerald-50"
-          />
-          <RailCard
-            title="不可亂答"
-            icon={ShieldAlert}
-            card={doNotGuess}
-            command="密碼交主管"
-            tone="border-rose-200 bg-rose-50"
-          />
-          <RailCard
-            title="問 AI 主任"
-            icon={Bot}
-            card={askAiSupervisor}
-            command="先問五項"
-            tone="border-cyan-200 bg-cyan-50"
-          />
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
               <ShieldCheck className="h-4 w-4 text-emerald-700" />
-              放行信號
+              唔識就停
             </div>
-            <div className="mt-3 grid gap-2">
-              {Object.entries(releaseMeta).map(([key, item]) => {
-                const Icon = item.icon;
-                return (
-                  <div
-                    key={key}
-                    className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${item.className}`}
-                  >
-                    <Icon className="mt-0.5 h-4 w-4 shrink-0" />
-                    <div>
-                      <div className="font-semibold">{item.label}</div>
-                      <p className="mt-0.5 text-xs leading-5">
-                        {key === "green"
-                          ? "普通情況可處理。"
-                          : key === "yellow"
-                            ? "可旁聽或主管抽查。"
-                            : "不可獨立，必須升級。"}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <p className="mt-2 text-sm leading-6 text-slate-700">
+              不肯定就不要估。先記低資料，再問當值同事或主管。
+            </p>
           </div>
         </aside>
       </section>
@@ -993,16 +869,16 @@ export default function NurseOnboardingPage({
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-sm font-medium text-emerald-700">真人主管放行</p>
-            <h2 className="mt-1 text-xl font-semibold text-slate-950">必須 Green 的關卡</h2>
+            <h2 className="mt-1 text-xl font-semibold text-slate-950">一定要主管確認的事</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              完成所有格不等於立即獨立；以下幾項未 Green，就繼續旁聽或由主管抽查。
+              以下幾項未做到，就繼續由當值同事或主管陪住做。
             </p>
           </div>
           <Link
             href="/nurse/knowledge/training"
             className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
           >
-            去 Role-play Test
+            去對答練習
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

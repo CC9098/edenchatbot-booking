@@ -8,7 +8,13 @@ type SupervisorNeed = "no" | "yes" | "always";
 
 const STORAGE_KEY = "eden-nurse-onboarding-completed-v1";
 const PROGRESS_EVENT = "eden-nurse-onboarding-progress";
-const DAY_ONE_CODES = ["D1-01", "D1-02", "D1-03", "D1-04"];
+const DAY_ONE_STEPS = [
+  { code: "D1-01", label: "唔肯定先收口" },
+  { code: "D1-02", label: "記低病人問題" },
+  { code: "D1-03", label: "開診前檢查" },
+  { code: "D1-04", label: "病人入門口" },
+];
+const DAY_ONE_CODES = DAY_ONE_STEPS.map((step) => step.code);
 
 function readCompleted(): string[] {
   if (typeof window === "undefined") return [];
@@ -83,12 +89,12 @@ export function NurseOnboardingProgress({
   const label = status === "done"
     ? "已完成"
     : status === "next"
-      ? "下一格"
+      ? "而家做"
       : status === "blocked"
-        ? "要主管"
+        ? "問主管"
         : status === "locked"
-          ? "預覽"
-          : "未開始";
+          ? "之後先做"
+          : "稍後";
   const Icon = status === "done"
     ? CheckCircle2
     : status === "next"
@@ -123,7 +129,7 @@ export function NurseOnboardingProgress({
           }`}
         >
           {isComplete ? <RotateCcw className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-          {isComplete ? "重開" : "完成"}
+          {isComplete ? "重做" : "做完"}
         </button>
       ) : null}
     </div>
@@ -150,6 +156,7 @@ export function NurseOnboardingSummary() {
 
   const completedDayOneCount = DAY_ONE_CODES.filter((code) => completed.includes(code)).length;
   const nextCode = DAY_ONE_CODES.find((code) => !completed.includes(code));
+  const nextStep = DAY_ONE_STEPS.find((step) => step.code === nextCode);
 
   return (
     <div className="rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2">
@@ -158,7 +165,7 @@ export function NurseOnboardingSummary() {
         {completedDayOneCount}/{DAY_ONE_CODES.length} 格
       </div>
       <div className="mt-1 text-xs leading-5 text-slate-600">
-        {nextCode ? `下一格：${nextCode}` : "Day 1 已完成"}
+        {nextStep ? `下一步：${nextStep.label}` : "今日已完成"}
       </div>
     </div>
   );
