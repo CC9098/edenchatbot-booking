@@ -192,7 +192,7 @@ const boardDays: BoardDay[] = [
         task: "收姓名、電話、完整地址、方便收件時間；運費偏高或海外先確認。",
         canSay: "我先同您確認收件人姓名、電話、完整地址和方便收件時間，再睇 Lalamove 或順豐是否合適。",
         cannotSay: "一定今日送到、海外一定寄到、地址不清楚都可以送。",
-        aiPrompt: "寄藥前我要收集甚麼資料？",
+        aiPrompt: "寄藥前我需要收集甚麼資料？",
         supervisor: "yes",
         passCondition: "能完整收集寄送資料，遇到投訴或貴重藥物會升級。",
         release: "yellow",
@@ -263,14 +263,6 @@ const releaseMeta: Record<ReleaseLevel, { label: string; className: string; icon
   },
 };
 
-const dayToneClasses: Record<number, string> = {
-  1: "border-emerald-200 bg-emerald-50/80",
-  2: "border-cyan-200 bg-cyan-50/80",
-  3: "border-orange-200 bg-orange-50/80",
-  4: "border-lime-200 bg-lime-50/80",
-  5: "border-teal-200 bg-teal-50/80",
-};
-
 function aiChatHref(prompt: string) {
   return `/nurse/knowledge/chat?prompt=${encodeURIComponent(prompt)}`;
 }
@@ -307,27 +299,64 @@ function InfoLine({
   );
 }
 
-function BoardCardPanel({ card }: { card: BoardCard }) {
+function CardDetails({ card }: { card: BoardCard }) {
+  return (
+    <div className="mt-3 grid gap-2">
+      <InfoLine icon={ClipboardCheck} label="要做咩">
+        {card.task}
+      </InfoLine>
+      <InfoLine icon={MessageCircle} label="可以講">
+        {card.canSay}
+      </InfoLine>
+      <InfoLine icon={AlertTriangle} label="不可以講">
+        {card.cannotSay}
+      </InfoLine>
+      <div className="rounded-md border border-cyan-200 bg-cyan-50 p-3">
+        <div className="flex items-center gap-2 text-xs font-semibold text-cyan-800">
+          <Bot className="h-3.5 w-3.5" />
+          問 AI 主任
+        </div>
+        <p className="mt-1 text-sm leading-6 text-cyan-950">{card.aiPrompt}</p>
+        <Link
+          href={aiChatHref(card.aiPrompt)}
+          className="mt-3 inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+        >
+          問 AI 主任
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+      <InfoLine icon={Users} label="是否要主管">
+        {supervisorLabel(card.supervisor)}
+      </InfoLine>
+      <InfoLine icon={Flag} label="過關條件">
+        {card.passCondition}
+      </InfoLine>
+    </div>
+  );
+}
+
+function BoardTile({ card, isToday }: { card: BoardCard; isToday: boolean }) {
   const meta = releaseMeta[card.release];
   const ReleaseIcon = meta.icon;
 
   return (
     <details
-      className="group rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:border-emerald-200 hover:shadow-md"
-      open={card.defaultOpen}
+      className={`group rounded-lg border p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+        isToday ? "border-emerald-200 bg-white" : "border-slate-200 bg-white/70"
+      }`}
     >
       <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
               {card.code}
             </span>
-            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${meta.className}`}>
+            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${meta.className}`}>
               <ReleaseIcon className="h-3.5 w-3.5" />
               {meta.label}
             </span>
           </div>
-          <h3 className="mt-2 text-base font-semibold text-slate-950">{card.title}</h3>
+          <h3 className="mt-2 text-sm font-semibold leading-5 text-slate-950">{card.title}</h3>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <span className="inline-flex items-center gap-1">
               <Clock3 className="h-3.5 w-3.5" />
@@ -341,200 +370,180 @@ function BoardCardPanel({ card }: { card: BoardCard }) {
         <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" />
       </summary>
 
-      <div className="mt-3 grid gap-2">
-        <InfoLine icon={ClipboardCheck} label="要做咩">
-          {card.task}
-        </InfoLine>
-        <InfoLine icon={MessageCircle} label="可以講">
-          {card.canSay}
-        </InfoLine>
-        <InfoLine icon={AlertTriangle} label="不可以講">
-          {card.cannotSay}
-        </InfoLine>
-        <div className="rounded-md border border-cyan-200 bg-cyan-50 p-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-cyan-800">
-            <Bot className="h-3.5 w-3.5" />
-            問 AI 主任
+      <CardDetails card={card} />
+    </details>
+  );
+}
+
+function RailCard({
+  title,
+  icon: Icon,
+  card,
+  tone,
+}: {
+  title: string;
+  icon: typeof ClipboardCheck;
+  card: BoardCard;
+  tone: string;
+}) {
+  return (
+    <details className={`group rounded-lg border p-4 shadow-sm ${tone}`}>
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+            <Icon className="h-4 w-4 text-emerald-700" />
+            {title}
           </div>
-          <p className="mt-1 text-sm leading-6 text-cyan-950">{card.aiPrompt}</p>
-          <Link
-            href={aiChatHref(card.aiPrompt)}
-            className="mt-3 inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
-          >
-            問 AI 主任
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+          <p className="mt-2 text-sm leading-5 text-slate-700">{card.title}</p>
         </div>
-        <InfoLine icon={Flag} label="過關條件">
-          {card.passCondition}
-        </InfoLine>
-      </div>
+        <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-slate-500 transition group-open:rotate-180" />
+      </summary>
+      <CardDetails card={card} />
     </details>
   );
 }
 
 export default function NurseOnboardingPage() {
   const totalCards = boardDays.reduce((count, day) => count + day.cards.length, 0);
+  const todayMustLearn = boardDays[0].cards[1];
+  const doNotGuess = boardDays[3].cards[2];
+  const askAiSupervisor = boardDays[4].cards[0];
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="rounded-lg border border-emerald-100 bg-white p-5 shadow-sm">
-          <p className="text-sm font-medium text-emerald-700">新姑娘上手棋盤</p>
-          <div className="mt-2 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="space-y-5">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="rounded-lg border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">
-                今日新姑娘路線
+              <p className="text-sm font-medium text-emerald-700">新姑娘上手路線</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-normal text-slate-950 sm:text-3xl">
+                Day 1 先行，其他只是預覽
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-                一步一格，安心上手。今日只需要完成下面幾張卡，不用一次過讀完整手冊。
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                第一屏只放路徑。打開每格才看 SOP 細節，不需要一開工就面對整本手冊。
               </p>
             </div>
-            <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                Day 1
+            <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+              <div className="rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2">
+                <div className="text-xs font-semibold text-emerald-700">今日</div>
+                <div className="mt-1 font-semibold text-slate-950">Day 1</div>
               </div>
-              <div className="mt-1 text-lg font-semibold text-slate-950">下一格：安全收口句</div>
-              <div className="mt-1 text-sm text-slate-600">今日 4 格，先不用開完整知識庫。</div>
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="text-xs font-semibold text-slate-500">總格數</div>
+                <div className="mt-1 font-semibold text-slate-950">{totalCards} 格</div>
+              </div>
+              <Link
+                href="/nurse/knowledge"
+                className="col-span-2 inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:col-span-1"
+              >
+                <BookOpenCheck className="h-4 w-4" />
+                知識庫
+              </Link>
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Link
-              href={aiChatHref("病人問的問題我不肯定，可以怎樣安全收口？")}
-              className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
-            >
-              <Bot className="h-4 w-4" />
-              問 AI 主任
-            </Link>
-            <a
-              href="#supervisor-gates"
-              className="inline-flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
-            >
-              <Users className="h-4 w-4" />
-              交主管確認
-            </a>
-            <Link
-              href="/nurse/knowledge"
-              className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
-            >
-              <BookOpenCheck className="h-4 w-4" />
-              有經驗後再查完整知識庫
-            </Link>
-          </div>
-        </div>
-
-        <aside className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-            <ShieldCheck className="h-4 w-4 text-emerald-700" />
-            Green / Yellow / Red 放行
-          </div>
-          <div className="mt-3 space-y-2">
-            {Object.entries(releaseMeta).map(([key, item]) => {
-              const Icon = item.icon;
+          <div className="mt-5 grid gap-3 lg:grid-cols-[84px_repeat(5,minmax(0,1fr))_84px]">
+            <div className="flex min-h-24 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-800">
+              <Flag className="mr-2 h-4 w-4" />
+              Start
+            </div>
+            {boardDays.map((day) => {
+              const isToday = day.day === 1;
               return (
                 <div
-                  key={key}
-                  className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${item.className}`}
+                  key={day.day}
+                  className={`relative rounded-lg border p-3 ${
+                    isToday
+                      ? "border-emerald-300 bg-emerald-50/90 shadow-sm"
+                      : "border-slate-200 bg-slate-50/70"
+                  }`}
                 >
-                  <Icon className="mt-0.5 h-4 w-4 shrink-0" />
-                  <div>
-                    <div className="font-semibold">{item.label}</div>
-                    <p className="mt-0.5 text-xs leading-5">
-                      {key === "green"
-                        ? "普通情況可處理。"
-                        : key === "yellow"
-                          ? "可旁聽或主管抽查。"
-                          : "不可獨立，必須升級。"}
-                    </p>
+                  {day.day < 5 ? (
+                    <div className="absolute -right-3 top-10 z-10 hidden h-px w-6 bg-emerald-200 lg:block" />
+                  ) : null}
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div
+                        className={`inline-flex rounded-full px-2 py-1 text-xs font-bold ${
+                          isToday ? "bg-emerald-700 text-white" : "bg-white text-slate-500"
+                        }`}
+                      >
+                        Day {day.day}
+                      </div>
+                      <h2 className="mt-2 text-sm font-semibold leading-5 text-slate-950">
+                        {day.title}
+                      </h2>
+                    </div>
+                    {isToday ? <CheckCircle2 className="h-5 w-5 text-emerald-700" /> : null}
+                  </div>
+                  <p className="mt-2 min-h-10 text-xs leading-5 text-slate-600">{day.goal}</p>
+                  <p className="mt-2 rounded-md border border-white/80 bg-white/80 px-2 py-1.5 text-xs leading-5 text-slate-600">
+                    {day.independence}
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {day.cards.map((card) => (
+                      <BoardTile key={card.code} card={card} isToday={isToday} />
+                    ))}
                   </div>
                 </div>
               );
             })}
-          </div>
-        </aside>
-      </section>
-
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-emerald-700">Day 1-5 path</p>
-            <h2 className="mt-1 text-xl font-semibold text-slate-950">每日一條路，不一次過丟整個手冊</h2>
-          </div>
-          <div className="text-sm font-medium text-slate-500">共 {totalCards} 格卡片</div>
-        </div>
-
-        <div className="mt-4 grid gap-3 lg:grid-cols-5">
-          {boardDays.map((day) => (
-            <div
-              key={day.day}
-              className={`relative rounded-lg border p-4 ${dayToneClasses[day.day]}`}
-            >
-              {day.day < 5 ? (
-                <div className="absolute right-[-18px] top-8 z-10 hidden h-px w-8 bg-emerald-200 lg:block" />
-              ) : null}
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold text-emerald-800 shadow-sm ring-1 ring-emerald-200">
-                  Day {day.day}
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-sm font-semibold leading-5 text-slate-950">{day.title}</h3>
-                  <p className="mt-1 text-xs leading-5 text-slate-600">{day.cards.length} 格</p>
-                </div>
-              </div>
-              <p className="mt-3 text-xs leading-5 text-slate-600">{day.goal}</p>
-              <p className="mt-2 rounded-md border border-white/70 bg-white/70 px-2 py-1.5 text-xs leading-5 text-slate-700">
-                {day.independence}
-              </p>
+            <div className="flex min-h-24 items-center justify-center rounded-lg border border-teal-200 bg-teal-50 text-sm font-semibold text-teal-800">
+              <UserCheck className="mr-2 h-4 w-4" />
+              Finish
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-[220px_1fr]">
-        <aside className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-20 lg:self-start">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-            <Flag className="h-4 w-4 text-emerald-700" />
-            今日三件事
           </div>
-          <ol className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
-            <li className="rounded-md bg-emerald-50 px-3 py-2">1. 先學安全收口句</li>
-            <li className="rounded-md bg-amber-50 px-3 py-2">2. 不確定就問 AI 主任</li>
-            <li className="rounded-md bg-rose-50 px-3 py-2">3. 高風險交真人主管</li>
-          </ol>
-          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
-            <div className="flex items-start gap-2">
-              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>醫療、收費、保險、密碼、投訴，一律不可即口承諾。</span>
+        </div>
+
+        <aside className="space-y-3">
+          <RailCard
+            title="今日必學"
+            icon={ClipboardCheck}
+            card={todayMustLearn}
+            tone="border-emerald-200 bg-emerald-50"
+          />
+          <RailCard
+            title="不可亂答"
+            icon={ShieldAlert}
+            card={doNotGuess}
+            tone="border-rose-200 bg-rose-50"
+          />
+          <RailCard
+            title="問 AI 主任"
+            icon={Bot}
+            card={askAiSupervisor}
+            tone="border-cyan-200 bg-cyan-50"
+          />
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+              <ShieldCheck className="h-4 w-4 text-emerald-700" />
+              放行信號
+            </div>
+            <div className="mt-3 grid gap-2">
+              {Object.entries(releaseMeta).map(([key, item]) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={key}
+                    className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${item.className}`}
+                  >
+                    <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div>
+                      <div className="font-semibold">{item.label}</div>
+                      <p className="mt-0.5 text-xs leading-5">
+                        {key === "green"
+                          ? "普通情況可處理。"
+                          : key === "yellow"
+                            ? "可旁聽或主管抽查。"
+                            : "不可獨立，必須升級。"}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </aside>
-
-        <div className="space-y-4">
-          {boardDays.map((day) => (
-            <section
-              key={`cards-${day.day}`}
-              className={`rounded-lg border p-4 ${dayToneClasses[day.day]}`}
-            >
-              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-emerald-800">Day {day.day}</p>
-                  <h2 className="mt-1 text-xl font-semibold text-slate-950">{day.title}</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{day.goal}</p>
-                </div>
-                <span className="inline-flex w-fit items-center gap-2 rounded-full border border-white bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
-                  <UserCheck className="h-3.5 w-3.5 text-emerald-700" />
-                  {day.independence}
-                </span>
-              </div>
-              <div className="mt-4 grid gap-3 xl:grid-cols-2">
-                {day.cards.map((card) => (
-                  <BoardCardPanel key={card.code} card={card} />
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
       </section>
 
       <section
@@ -546,7 +555,7 @@ export default function NurseOnboardingPage() {
             <p className="text-sm font-medium text-emerald-700">真人主管放行</p>
             <h2 className="mt-1 text-xl font-semibold text-slate-950">必須 Green 的關卡</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              完成所有卡不等於立即獨立；以下幾項未 Green，就繼續旁聽或由主管抽查。
+              完成所有格不等於立即獨立；以下幾項未 Green，就繼續旁聽或由主管抽查。
             </p>
           </div>
           <Link
