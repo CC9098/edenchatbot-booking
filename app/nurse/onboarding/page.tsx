@@ -279,6 +279,19 @@ const releaseMeta: Record<ReleaseLevel, { label: string; className: string; icon
   },
 };
 
+const boardCardByCode = new Map<string, { card: BoardCard; day: number }>(
+  boardDays.flatMap((day) => day.cards.map((card) => [card.code, { card, day: day.day }] as const)),
+);
+
+function getSelectedBoardCard(cardParam?: string | string[]) {
+  const requestedCode = Array.isArray(cardParam) ? cardParam[0] : cardParam;
+  return boardCardByCode.get(requestedCode ?? "") ?? { card: boardDays[0].cards[1], day: 1 };
+}
+
+function boardCardHref(cardCode: string) {
+  return `/nurse/onboarding?card=${encodeURIComponent(cardCode)}#selected-onboarding-card`;
+}
+
 function aiChatHref(prompt: string) {
   return `/nurse/knowledge/chat?prompt=${encodeURIComponent(prompt)}`;
 }
@@ -478,46 +491,42 @@ function gameLaneClass(day: number) {
   return "border-teal-200 bg-teal-50/70";
 }
 
-function BoardGameTile({ card, day }: { card: BoardCard; day: number }) {
+function BoardGameTile({
+  card,
+  selected,
+}: {
+  card: BoardCard;
+  selected: boolean;
+}) {
   const TileIcon = tileIcon(card.code);
   const mustEscalate = card.release === "red" || card.supervisor === "always";
 
   return (
-    <details className="group/tile relative z-10">
-      <summary
-        className={`flex aspect-square min-h-28 cursor-pointer list-none flex-col items-center justify-center rounded-2xl border px-3 py-3 text-center shadow-md transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 ${gameTileClass(card)}`}
+    <div className="relative z-10">
+      <Link
+        href={boardCardHref(card.code)}
+        scroll={false}
+        className={`flex aspect-square min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border px-3 py-3 text-center shadow-md transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 ${gameTileClass(card)} ${
+          selected ? "ring-4 ring-emerald-200" : ""
+        }`}
+        aria-current={selected ? "step" : undefined}
       >
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/80 bg-white text-current shadow-sm">
           <TileIcon className="h-6 w-6" />
         </span>
         <span className="mt-2 text-base font-semibold leading-5">{tileShortLabel(card.code)}</span>
         <span className={`mt-2 h-2 w-11 rounded-full ${releaseDotClass(card)}`} />
-      </summary>
-      <div className="absolute left-1/2 top-full z-40 mt-3 w-80 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl">
-        <div className="flex items-start justify-between gap-3">
-          <div className="text-sm font-semibold text-slate-950">{card.title}</div>
-          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${releaseMeta[card.release].className}`}>
-            {releaseMeta[card.release].label.split(" ")[0]}
-          </span>
-        </div>
-        <NurseOnboardingProgress
-          cardCode={card.code}
-          day={day}
-          release={card.release}
-          supervisor={card.supervisor}
-        />
-        <CardDetails card={card} />
-      </div>
+      </Link>
       {mustEscalate ? (
         <span className="absolute -right-1 -top-1 z-20 rounded-full bg-rose-600 px-2 py-1 text-[10px] font-bold text-white shadow-sm">
           主管
         </span>
       ) : null}
-    </details>
+    </div>
   );
 }
 
-function BoardGameLane({ day }: { day: BoardDay }) {
+function BoardGameLane({ day, selectedCode }: { day: BoardDay; selectedCode: string }) {
   const placeholders = Array.from({ length: Math.max(0, 4 - day.cards.length) });
 
   return (
@@ -539,7 +548,7 @@ function BoardGameLane({ day }: { day: BoardDay }) {
         <div className="absolute left-8 right-8 top-1/2 h-3 -translate-y-1/2 rounded-full bg-white/75 shadow-inner" />
         <div className="relative grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {day.cards.map((card) => (
-            <BoardGameTile key={card.code} card={card} day={day.day} />
+            <BoardGameTile key={card.code} card={card} selected={selectedCode === card.code} />
           ))}
           {placeholders.map((_, index) => (
             <div
@@ -594,10 +603,14 @@ function ComponentBoardScene({
   todayMustLearn,
   doNotGuess,
   askAiSupervisor,
+  selectedCard,
+  selectedDay,
 }: {
   todayMustLearn: BoardCard;
   doNotGuess: BoardCard;
   askAiSupervisor: BoardCard;
+  selectedCard: BoardCard;
+  selectedDay: number;
 }) {
   return (
     <div className="relative rounded-[28px] border border-emerald-100 bg-[#fbfaf2] p-5 shadow-sm">
@@ -630,7 +643,7 @@ function ComponentBoardScene({
 
           <div className="space-y-3">
             {boardDays.map((day) => (
-              <BoardGameLane key={day.day} day={day} />
+              <BoardGameLane key={day.day} day={day} selectedCode={selectedCard.code} />
             ))}
           </div>
 
@@ -659,6 +672,29 @@ function ComponentBoardScene({
         </div>
 
         <aside className="space-y-3">
+          <section
+            id="selected-onboarding-card"
+            className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-emerald-700">目前格子</p>
+                <h2 className="mt-1 text-xl font-semibold leading-6 text-slate-950">
+                  {selectedCard.title}
+                </h2>
+              </div>
+              <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-semibold ${releaseMeta[selectedCard.release].className}`}>
+                {releaseMeta[selectedCard.release].label.split(" ")[0]}
+              </span>
+            </div>
+            <NurseOnboardingProgress
+              cardCode={selectedCard.code}
+              day={selectedDay}
+              release={selectedCard.release}
+              supervisor={selectedCard.supervisor}
+            />
+            <CardDetails card={selectedCard} />
+          </section>
           <BoardSideCard
             title="今日必學"
             icon={ClipboardCheck}
@@ -784,11 +820,18 @@ function boardRowClass(day: number) {
   return "border-teal-200 bg-teal-50/75 shadow-[inset_0_-3px_0_rgba(13,148,136,0.12)]";
 }
 
-export default function NurseOnboardingPage() {
+export default function NurseOnboardingPage({
+  searchParams,
+}: {
+  searchParams?: {
+    card?: string | string[];
+  };
+}) {
   const totalCards = boardDays.reduce((count, day) => count + day.cards.length, 0);
   const todayMustLearn = boardDays[0].cards[1];
   const doNotGuess = boardDays[3].cards[2];
   const askAiSupervisor = boardDays[4].cards[0];
+  const selected = getSelectedBoardCard(searchParams?.card);
 
   return (
     <div className="space-y-5">
@@ -797,6 +840,8 @@ export default function NurseOnboardingPage() {
           todayMustLearn={todayMustLearn}
           doNotGuess={doNotGuess}
           askAiSupervisor={askAiSupervisor}
+          selectedCard={selected.card}
+          selectedDay={selected.day}
         />
       </section>
 
