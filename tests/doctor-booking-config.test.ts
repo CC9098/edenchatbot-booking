@@ -111,6 +111,10 @@ test('Dr. Wong Jordan schedule matches the May 2026 poster hours without group m
   const mapping = CALENDAR_MAPPINGS.find(
     (candidate) => candidate.doctorId === 'wong' && candidate.clinicId === 'jordan'
   );
+  assert.equal(
+    mapping?.calendarId,
+    'bb9e3b864e99dd1dda3e828e40f2545f245c8e2fd01bd459390c3409e46db4d3@group.calendar.google.com'
+  );
   assert.deepEqual(mapping?.schedule[4], [{ start: '11:00', end: '14:00' }]);
   assert.deepEqual(mapping?.schedule[6], [{ start: '14:30', end: '16:30' }]);
 

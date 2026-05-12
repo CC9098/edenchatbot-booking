@@ -394,7 +394,7 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
   {
     doctorId: "wong",
     clinicId: "jordan",
-    calendarId: "40cb62a1e50a16724e785554027785b0b1b041a4b8dffea974d0a2d243c0985f@group.calendar.google.com",
+    calendarId: "bb9e3b864e99dd1dda3e828e40f2545f245c8e2fd01bd459390c3409e46db4d3@group.calendar.google.com",
     isActive: true,
     effectiveFrom: "2026-05-01",
     schedule: {
