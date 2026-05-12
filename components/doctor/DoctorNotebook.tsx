@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BookOpen,
   Bookmark,
@@ -25,42 +25,6 @@ type NotebookPage = {
   sections: NoteSection[];
   sideNote?: string;
 };
-
-type FontStyle = "clear" | "classic" | "annotation";
-
-type FontStyleOption = {
-  id: FontStyle;
-  label: string;
-  sample: string;
-  description: string;
-  pageClassName: string;
-};
-
-const FONT_STYLE_STORAGE_KEY = "eden-doctor-notebook-font-style-v1";
-
-const FONT_STYLE_OPTIONS: FontStyleOption[] = [
-  {
-    id: "clear",
-    label: "清雅",
-    sample: "正文字清楚",
-    description: "適合長時間閱讀和培訓 SOP。",
-    pageClassName: "doctor-notebook-font-clear",
-  },
-  {
-    id: "classic",
-    label: "書卷",
-    sample: "明體書卷",
-    description: "更似中醫手札和古籍筆記。",
-    pageClassName: "doctor-notebook-font-classic",
-  },
-  {
-    id: "annotation",
-    label: "手寫批註",
-    sample: "像醫師補筆",
-    description: "較有人味，適合慢讀和內部文化。",
-    pageClassName: "doctor-notebook-font-annotation",
-  },
-];
 
 const NOTEBOOK_PAGES: NotebookPage[] = [
   {
@@ -395,26 +359,9 @@ function splitIntoSpreads(pages: NotebookPage[]) {
   return spreads;
 }
 
-function readStoredFontStyle(): FontStyle {
-  if (typeof window === "undefined") return "clear";
-
-  const stored = window.localStorage.getItem(FONT_STYLE_STORAGE_KEY);
-  return FONT_STYLE_OPTIONS.some((option) => option.id === stored) ? (stored as FontStyle) : "clear";
-}
-
-function PageContent({
-  page,
-  pageNumber,
-  fontStyle,
-}: {
-  page: NotebookPage;
-  pageNumber: number;
-  fontStyle: FontStyle;
-}) {
-  const fontOption = FONT_STYLE_OPTIONS.find((option) => option.id === fontStyle) ?? FONT_STYLE_OPTIONS[0];
-
+function PageContent({ page, pageNumber }: { page: NotebookPage; pageNumber: number }) {
   return (
-    <article className={`relative min-h-[620px] overflow-hidden rounded-[18px] border border-[#d8c6a3] bg-[#fffaf0] px-5 py-6 text-[#3f3424] shadow-[inset_0_0_40px_rgba(123,93,49,0.08)] sm:px-7 sm:py-8 ${fontOption.pageClassName}`}>
+    <article className="relative min-h-[620px] overflow-hidden rounded-[18px] border border-[#d8c6a3] bg-[#fffaf0] px-5 py-6 text-[#3f3424] shadow-[inset_0_0_40px_rgba(123,93,49,0.08)] sm:px-7 sm:py-8">
       <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(87,67,35,0.06)_1px,transparent_1px)] [background-size:100%_30px]" />
       <div className="pointer-events-none absolute -right-16 top-10 h-48 w-48 rounded-full border border-[#d4ad5d]/25" />
       <div className="relative">
@@ -479,20 +426,10 @@ export function DoctorNotebook() {
   const spreads = useMemo(() => splitIntoSpreads(NOTEBOOK_PAGES), []);
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [direction, setDirection] = useState<"next" | "prev">("next");
-  const [fontStyle, setFontStyle] = useState<FontStyle>("clear");
 
   const [leftPage, rightPage] = spreads[spreadIndex];
   const isFirst = spreadIndex === 0;
   const isLast = spreadIndex === spreads.length - 1;
-
-  useEffect(() => {
-    setFontStyle(readStoredFontStyle());
-  }, []);
-
-  function chooseFontStyle(nextFontStyle: FontStyle) {
-    setFontStyle(nextFontStyle);
-    window.localStorage.setItem(FONT_STYLE_STORAGE_KEY, nextFontStyle);
-  }
 
   function goToSpread(nextIndex: number) {
     if (nextIndex < 0 || nextIndex >= spreads.length) return;
@@ -571,77 +508,29 @@ export function DoctorNotebook() {
                   一本真的可以揭的醫師筆記本
                 </h1>
               </div>
-              <div className="flex flex-col gap-3 sm:items-end">
-                <div className="grid grid-cols-3 gap-1 rounded-full border border-[#d6c297] bg-[#fbf0d8] p-1">
-                  {FONT_STYLE_OPTIONS.map((option) => {
-                    const active = option.id === fontStyle;
-
-                    return (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => chooseFontStyle(option.id)}
-                        aria-pressed={active}
-                        title={option.description}
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                          active
-                            ? "bg-[#263d2b] text-[#fff8ea]"
-                            : "text-[#6a512f] hover:bg-[#efe0bc]"
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => goToSpread(spreadIndex - 1)}
-                    disabled={isFirst}
-                    aria-label="上一頁"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#c5a35b] bg-[#fffaf0] text-[#5a4b35] transition-colors hover:bg-[#f4e7c7] disabled:cursor-not-allowed disabled:opacity-35"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <span className="min-w-[92px] text-center text-sm font-semibold text-[#5a4b35]">
-                    {spreadIndex + 1} / {spreads.length}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => goToSpread(spreadIndex + 1)}
-                    disabled={isLast}
-                    aria-label="下一頁"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#c5a35b] bg-[#fffaf0] text-[#5a4b35] transition-colors hover:bg-[#f4e7c7] disabled:cursor-not-allowed disabled:opacity-35"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
-                </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => goToSpread(spreadIndex - 1)}
+                  disabled={isFirst}
+                  aria-label="上一頁"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#c5a35b] bg-[#fffaf0] text-[#5a4b35] transition-colors hover:bg-[#f4e7c7] disabled:cursor-not-allowed disabled:opacity-35"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <span className="min-w-[92px] text-center text-sm font-semibold text-[#5a4b35]">
+                  {spreadIndex + 1} / {spreads.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => goToSpread(spreadIndex + 1)}
+                  disabled={isLast}
+                  aria-label="下一頁"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#c5a35b] bg-[#fffaf0] text-[#5a4b35] transition-colors hover:bg-[#f4e7c7] disabled:cursor-not-allowed disabled:opacity-35"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
               </div>
-            </div>
-
-            <div className="mb-4 grid gap-3 sm:grid-cols-3">
-              {FONT_STYLE_OPTIONS.map((option) => {
-                const active = option.id === fontStyle;
-
-                return (
-                  <button
-                    key={`sample-${option.id}`}
-                    type="button"
-                    onClick={() => chooseFontStyle(option.id)}
-                    className={`rounded-md border px-4 py-3 text-left transition-colors ${
-                      active
-                        ? "border-[#9a6a2e] bg-[#fff6df] shadow-sm"
-                        : "border-[#d7c59d] bg-[#fffaf0]/75 hover:bg-[#fff6df]"
-                    }`}
-                  >
-                    <div className={`text-lg text-[#263d2b] ${option.pageClassName}`}>
-                      <span className="doctor-notebook-page-body">{option.sample}</span>
-                    </div>
-                    <div className="mt-1 text-xs leading-5 text-[#7a6240]">{option.description}</div>
-                  </button>
-                );
-              })}
             </div>
 
             <div className="relative rounded-[26px] border border-[#8d6a35]/25 bg-[#5f3d20] p-3 shadow-2xl shadow-[#4f351d]/20 sm:p-5">
@@ -652,9 +541,9 @@ export function DoctorNotebook() {
                   direction === "next" ? "doctor-notebook-turn-next" : "doctor-notebook-turn-prev"
                 }`}
               >
-                <PageContent page={leftPage} pageNumber={spreadIndex * 2 + 1} fontStyle={fontStyle} />
+                <PageContent page={leftPage} pageNumber={spreadIndex * 2 + 1} />
                 {rightPage ? (
-                  <PageContent page={rightPage} pageNumber={spreadIndex * 2 + 2} fontStyle={fontStyle} />
+                  <PageContent page={rightPage} pageNumber={spreadIndex * 2 + 2} />
                 ) : (
                   <article className="relative min-h-[620px] overflow-hidden rounded-[18px] border border-[#d8c6a3] bg-[#fffaf0] p-8 shadow-[inset_0_0_40px_rgba(123,93,49,0.08)]">
                     <div className="flex h-full items-center justify-center text-center font-serif text-xl text-[#a38455]">
