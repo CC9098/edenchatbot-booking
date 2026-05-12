@@ -143,6 +143,51 @@ body {
   animation: doctor-notebook-turn-prev 320ms ease-out both;
 }
 
+.doctor-notebook-page-title,
+.doctor-notebook-section-title,
+.doctor-notebook-side-note {
+  font-family: var(--font-display);
+}
+
+.doctor-notebook-font-clear .doctor-notebook-page-body,
+.doctor-notebook-font-clear .doctor-notebook-page-intro {
+  font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  letter-spacing: 0;
+}
+
+.doctor-notebook-font-clear .doctor-notebook-page-body {
+  font-weight: 500;
+}
+
+.doctor-notebook-font-classic .doctor-notebook-page-title,
+.doctor-notebook-font-classic .doctor-notebook-section-title,
+.doctor-notebook-font-classic .doctor-notebook-side-note,
+.doctor-notebook-font-classic .doctor-notebook-page-body,
+.doctor-notebook-font-classic .doctor-notebook-page-intro {
+  font-family: "Noto Serif TC", "Songti TC", "PMingLiU", "MingLiU", serif;
+  letter-spacing: 0;
+}
+
+.doctor-notebook-font-classic .doctor-notebook-page-body,
+.doctor-notebook-font-classic .doctor-notebook-page-intro {
+  font-weight: 500;
+}
+
+.doctor-notebook-font-annotation .doctor-notebook-page-title,
+.doctor-notebook-font-annotation .doctor-notebook-section-title,
+.doctor-notebook-font-annotation .doctor-notebook-side-note,
+.doctor-notebook-font-annotation .doctor-notebook-page-body,
+.doctor-notebook-font-annotation .doctor-notebook-page-intro {
+  font-family: "Kaiti TC", "BiauKai", "DFKai-SB", "STKaiti", "Noto Serif TC", serif;
+  letter-spacing: 0;
+}
+
+.doctor-notebook-font-annotation .doctor-notebook-page-body,
+.doctor-notebook-font-annotation .doctor-notebook-page-intro {
+  font-size: 16px;
+  font-weight: 500;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .doctor-notebook-turn-next,
   .doctor-notebook-turn-prev {
