@@ -1,6 +1,43 @@
 import { createServerClient } from "@/lib/supabase-server";
 import { createServiceClient } from "@/lib/supabase";
 
+export type StaffRoleName = "doctor" | "assistant" | "admin";
+
+const STAFF_EMAIL_ROLE_FALLBACKS = new Map<string, StaffRoleName>([
+  ["chetleung@gmail.com", "doctor"],
+  ["drleung@edenclinic.hk", "doctor"],
+  ["cheungtinw@gmail.com", "doctor"],
+  ["cafu2046@gmail.com", "doctor"],
+  ["drchan@edenclinic.hk", "doctor"],
+  ["eden333rainie@gmail.com", "doctor"],
+  ["eden333yinhei@gmail.com", "doctor"],
+  ["edenannachan@gmail.com", "doctor"],
+  ["info@edenclinic.hk", "admin"],
+  ["admin@edenclinic.hk", "admin"],
+  ["edeninfo333@gmail.com", "assistant"],
+  ["edenkayilau@gmail.com", "assistant"],
+  ["edenling1113@gmail.com", "assistant"],
+  ["edenethel333@gmail.com", "assistant"],
+  ["edenying1204@gmail.com", "assistant"],
+  ["eden2022kiki@gmail.com", "assistant"],
+  ["edenwanyi@gmail.com", "assistant"],
+  ["graceyung1207@gmail.com", "assistant"],
+]);
+
+export function getFallbackStaffRoleForEmail(email?: string | null): StaffRoleName | null {
+  const normalizedEmail = email?.trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  const exactRole = STAFF_EMAIL_ROLE_FALLBACKS.get(normalizedEmail);
+  if (exactRole) return exactRole;
+
+  if (normalizedEmail.endsWith("@edenclinic.hk")) {
+    return "assistant";
+  }
+
+  return null;
+}
+
 /**
  * Extracts the authenticated user from the current request context.
  * Uses the cookie-based server client (for App Router Server Components / Route Handlers).
@@ -37,6 +74,21 @@ export async function requireStaffRole(userId: string) {
   }
 
   if (!data) {
+    const { data: authUserData, error: authUserError } = await supabase.auth.admin.getUserById(userId);
+    if (authUserError) {
+      console.error("[requireStaffRole] auth lookup error:", authUserError.message);
+      throw new AuthError(403, "Forbidden: staff role required");
+    }
+
+    const fallbackRole = getFallbackStaffRoleForEmail(authUserData.user?.email);
+    if (fallbackRole) {
+      return {
+        user_id: userId,
+        role: fallbackRole,
+        is_active: true,
+      };
+    }
+
     throw new AuthError(403, "Forbidden: staff role required");
   }
 
