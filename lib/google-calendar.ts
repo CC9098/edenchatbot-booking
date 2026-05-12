@@ -188,6 +188,37 @@ export async function getUncachableGoogleCalendarClient() {
   return google.calendar({ version: 'v3', auth });
 }
 
+export function extractFreeBusySlotsFromResponse(
+  responseData: {
+    calendars?: Record<
+      string,
+      {
+        busy?: Array<{ start?: string | null; end?: string | null }>;
+        errors?: Array<{ domain?: string | null; reason?: string | null }>;
+      }
+    > | null;
+  },
+  calendarId: string
+): { start: Date; end: Date }[] {
+  const calendarResult = responseData.calendars?.[calendarId];
+  const calendarErrors = calendarResult?.errors || [];
+
+  if (calendarErrors.length > 0) {
+    const reasons = calendarErrors
+      .map((error) => error.reason || error.domain)
+      .filter(Boolean)
+      .join(', ');
+    throw new Error(`Calendar not found or no access${reasons ? ` (${reasons})` : ''}`);
+  }
+
+  const busySlots = calendarResult?.busy || [];
+
+  return busySlots.map(slot => ({
+    start: new Date(slot.start!),
+    end: new Date(slot.end!),
+  }));
+}
+
 // Get busy time slots for a calendar on a specific date
 export async function getFreeBusy(calendarId: string, date: Date): Promise<{ start: Date; end: Date }[]> {
   const calendar = await getUncachableGoogleCalendarClient();
@@ -207,12 +238,7 @@ export async function getFreeBusy(calendarId: string, date: Date): Promise<{ sta
       },
     });
 
-    const busySlots = response.data.calendars?.[calendarId]?.busy || [];
-
-    return busySlots.map(slot => ({
-      start: new Date(slot.start!),
-      end: new Date(slot.end!),
-    }));
+    return extractFreeBusySlotsFromResponse(response.data, calendarId);
   } catch (error: any) {
     if (error.code === 404 || error.message?.includes('notFound')) {
       throw new Error('Calendar not found or no access');
