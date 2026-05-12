@@ -13,7 +13,7 @@ const notifySchema = z.object({
   token: z.string().trim().min(1),
 });
 
-const CHEUNG_DOCTOR_WHATSAPP_FALLBACK = '+85260260716';
+const CHEUNG_DOCTOR_WHATSAPP_FALLBACKS = ['+85260260716', '+85296322476'];
 
 type BookingIntakeReadyRow = {
   id: string;
@@ -49,20 +49,46 @@ function normalizeDoctorEnvKey(doctorId: string): string {
   return doctorId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '_');
 }
 
-function getConfiguredDoctorNotificationWhatsapp(doctorId: string): string {
+function splitWhatsappRecipients(value: string | undefined): string[] {
+  return (value || '')
+    .split(',')
+    .map((phone) => phone.trim())
+    .filter(Boolean);
+}
+
+function uniqueWhatsappRecipients(recipients: string[]): string[] {
+  const seen = new Set<string>();
+  const uniqueRecipients: string[] = [];
+
+  for (const recipient of recipients) {
+    const dedupeKey = recipient.replace(/[^\d]/g, '');
+    if (!dedupeKey || seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    uniqueRecipients.push(recipient);
+  }
+
+  return uniqueRecipients;
+}
+
+function getConfiguredDoctorNotificationWhatsapps(doctorId: string): string[] {
   const normalizedRawDoctorId = doctorId.trim().toLowerCase();
   const normalizedDoctorId = normalizeDoctorEnvKey(doctorId);
-  const doctorSpecificWhatsapp = process.env[`DOCTOR_NOTIFICATION_WHATSAPP_${normalizedDoctorId}`]?.trim();
-  const legacyCheungWhatsapp = normalizedRawDoctorId === 'cheung'
-    ? process.env.CHEUNG_DOCTOR_WHATSAPP?.trim() || CHEUNG_DOCTOR_WHATSAPP_FALLBACK
-    : '';
-
-  return (
-    doctorSpecificWhatsapp ||
-    legacyCheungWhatsapp ||
-    process.env.CLINIC_NOTIFICATION_WHATSAPP?.trim() ||
-    ''
+  const doctorSpecificWhatsapps = splitWhatsappRecipients(
+    process.env[`DOCTOR_NOTIFICATION_WHATSAPP_${normalizedDoctorId}`],
   );
+  const legacyCheungWhatsapps = normalizedRawDoctorId === 'cheung'
+    ? [
+        ...splitWhatsappRecipients(process.env.CHEUNG_DOCTOR_WHATSAPP),
+        ...CHEUNG_DOCTOR_WHATSAPP_FALLBACKS,
+      ]
+    : [];
+  const clinicNotificationWhatsapps = splitWhatsappRecipients(process.env.CLINIC_NOTIFICATION_WHATSAPP);
+
+  return uniqueWhatsappRecipients([
+    ...doctorSpecificWhatsapps,
+    ...legacyCheungWhatsapps,
+    ...clinicNotificationWhatsapps,
+  ]);
 }
 
 export async function POST(request: NextRequest) {
@@ -116,23 +142,42 @@ export async function POST(request: NextRequest) {
       notifiedAtIso: new Date().toISOString(),
     };
 
-    const doctorWhatsappPhone = getConfiguredDoctorNotificationWhatsapp(data.doctor_id);
+    const doctorWhatsappPhones = getConfiguredDoctorNotificationWhatsapps(data.doctor_id);
     let whatsappError = '';
-    if (doctorWhatsappPhone) {
-      const whatsappResult = await sendDoctorOnlineConsultReadyWhatsapp({
-        ...notificationPayload,
-        doctorWhatsappPhone,
-      });
+    if (doctorWhatsappPhones.length > 0) {
+      const whatsappResults = [];
+      for (const doctorWhatsappPhone of doctorWhatsappPhones) {
+        const whatsappResult = await sendDoctorOnlineConsultReadyWhatsapp({
+          ...notificationPayload,
+          doctorWhatsappPhone,
+        });
+        whatsappResults.push({ doctorWhatsappPhone, ...whatsappResult });
+      }
 
-      if (whatsappResult.success) {
+      const successfulWhatsappResults = whatsappResults.filter((result) => result.success);
+      if (successfulWhatsappResults.length > 0) {
+        const failedWhatsappResults = whatsappResults.filter((result) => !result.success);
+        if (failedWhatsappResults.length > 0) {
+          console.warn(
+            `[online-consult/notify] doctor WhatsApp notification partially failed: ${failedWhatsappResults
+              .map((result) => `${result.doctorWhatsappPhone}: ${result.error || 'unknown error'}`)
+              .join('; ')}`,
+          );
+        }
+
         return NextResponse.json({
           success: true,
           channel: 'whatsapp',
-          conversationId: whatsappResult.conversationId,
+          conversationId: successfulWhatsappResults[0]?.conversationId,
+          conversationIds: successfulWhatsappResults
+            .map((result) => result.conversationId)
+            .filter(Boolean),
         });
       }
 
-      whatsappError = whatsappResult.error || '未能透過 WhatsApp 通知醫師。';
+      whatsappError = whatsappResults
+        .map((result) => `${result.doctorWhatsappPhone}: ${result.error || '未能透過 WhatsApp 通知醫師。'}`)
+        .join('; ');
       console.warn(`[online-consult/notify] doctor WhatsApp notification failed: ${whatsappError}`);
     }
 
