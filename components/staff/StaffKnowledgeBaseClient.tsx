@@ -4,17 +4,21 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  CheckCircle2,
+  ClipboardCheck,
   ClipboardCopy,
   FileText,
   FilePlus,
   Loader2,
   MessageCircle,
+  PackageCheck,
   Pencil,
+  Pill,
   Plus,
   Save,
   Search,
+  WalletCards,
   X,
+  type LucideIcon,
 } from "lucide-react";
 
 import MarkdownContent from "@/components/content/MarkdownContent";
@@ -92,23 +96,47 @@ const QUICK_START_TASKS = [
     label: "分單 / 補收據",
     query: "收據 分單 病假紙",
     detail: "先查可否補發、收費、取單方式",
+    icon: ClipboardCheck,
+    cardClassName: "border-emerald-200 bg-emerald-50/90 hover:border-emerald-300 hover:bg-emerald-100/70",
+    iconClassName: "border-emerald-200 bg-white text-emerald-700",
+    railClassName: "bg-emerald-500",
   },
   {
     label: "食藥方法",
     query: "食藥 藥袋 西藥",
     detail: "按處方講，不自行改醫師指示",
+    icon: Pill,
+    cardClassName: "border-cyan-200 bg-cyan-50/90 hover:border-cyan-300 hover:bg-cyan-100/70",
+    iconClassName: "border-cyan-200 bg-white text-cyan-700",
+    railClassName: "bg-cyan-500",
   },
   {
     label: "寄藥安排",
     query: "寄藥 Lalamove 順豐",
     detail: "先收地址、電話、時間，不承諾即日",
+    icon: PackageCheck,
+    cardClassName: "border-amber-200 bg-amber-50/90 hover:border-amber-300 hover:bg-amber-100/70",
+    iconClassName: "border-amber-200 bg-white text-amber-700",
+    railClassName: "bg-amber-400",
   },
   {
     label: "醫療券",
     query: "醫療券 使用步驟",
     detail: "跟步驟做，有問題先問主管",
+    icon: WalletCards,
+    cardClassName: "border-teal-200 bg-teal-50/90 hover:border-teal-300 hover:bg-teal-100/70",
+    iconClassName: "border-teal-200 bg-white text-teal-700",
+    railClassName: "bg-teal-500",
   },
-];
+] satisfies Array<{
+  label: string;
+  query: string;
+  detail: string;
+  icon: LucideIcon;
+  cardClassName: string;
+  iconClassName: string;
+  railClassName: string;
+}>;
 
 export function StaffKnowledgeBaseClient() {
   const searchParams = useSearchParams();
@@ -248,39 +276,60 @@ export function StaffKnowledgeBaseClient() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-lg border border-emerald-100 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <section className="relative overflow-hidden rounded-[28px] border border-emerald-100 bg-[#fbfaf2] p-5 shadow-sm sm:p-6">
+        <svg
+          className="pointer-events-none absolute inset-x-0 top-0 h-28 w-full text-emerald-100"
+          viewBox="0 0 100 28"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path d="M4 18 C20 5 36 25 52 13 S79 3 96 16" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+        </svg>
+        <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm font-medium text-emerald-700">姑娘知識庫</p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-950">病人問到先按任務查</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-normal text-emerald-950 sm:text-3xl">
+              病人問到先按任務查
+            </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
               不用一開始讀完整手冊。先用下面 4 個常用任務，搵不到才搜尋或問 AI。
             </p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-emerald-800">
+                今日先做 4 個任務
+              </span>
+              <span className="rounded-full border border-cyan-200 bg-cyan-50/80 px-3 py-1 text-cyan-800">
+                可搜尋完整 SOP
+              </span>
+              <span className="rounded-full border border-amber-200 bg-amber-50/80 px-3 py-1 text-amber-900">
+                不肯定先收口
+              </span>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => focusTask("收據 分單 病假紙")}
-              className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+              className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800"
             >
               <Search className="h-4 w-4" />
               先查分單 / 補收據
             </button>
             <Link
               href="/nurse/knowledge/chat"
-              className="inline-flex items-center gap-2 rounded-md border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+              className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/90 px-4 py-2 text-sm font-semibold text-cyan-800 shadow-sm hover:bg-cyan-50"
             >
               <MessageCircle className="h-4 w-4" />
               AI 問答
             </Link>
           </div>
         </div>
-        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
+        <p className="relative z-10 mt-4 rounded-[18px] border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm leading-6 text-amber-900">
           收費、醫療判斷、保險承諾、密碼或後台操作，先用「我幫您確認清楚再回覆」收口。
         </p>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="rounded-[28px] border border-emerald-100 bg-white/90 p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-medium text-emerald-700">常用任務</p>
@@ -288,20 +337,27 @@ export function StaffKnowledgeBaseClient() {
           </div>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {QUICK_START_TASKS.map((task) => (
-            <button
-              key={task.label}
-              type="button"
-              onClick={() => focusTask(task.query)}
-              className="rounded-md border border-slate-200 bg-slate-50 p-3 text-left hover:border-emerald-200 hover:bg-emerald-50"
-            >
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                <CheckCircle2 className="h-4 w-4 text-emerald-700" />
-                {task.label}
-              </div>
-              <p className="mt-2 text-xs leading-5 text-slate-500">{task.detail}</p>
-            </button>
-          ))}
+          {QUICK_START_TASKS.map((task) => {
+            const TaskIcon = task.icon;
+
+            return (
+              <button
+                key={task.label}
+                type="button"
+                onClick={() => focusTask(task.query)}
+                className={`group relative overflow-hidden rounded-[22px] border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${task.cardClassName}`}
+              >
+                <span className={`absolute inset-x-4 bottom-3 h-1.5 rounded-full ${task.railClassName}`} aria-hidden="true" />
+                <div className="flex items-center gap-3 text-sm font-semibold text-slate-950">
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border shadow-sm ${task.iconClassName}`}>
+                    <TaskIcon className="h-5 w-5" />
+                  </span>
+                  <span>{task.label}</span>
+                </div>
+                <p className="mb-3 mt-3 text-xs leading-5 text-slate-600">{task.detail}</p>
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -420,7 +476,7 @@ export function StaffKnowledgeBaseClient() {
           <button
             type="button"
             onClick={openCreateEditor}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-full border border-teal-200 bg-white px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50"
           >
             <Plus className="h-4 w-4" />
             新增 Note
@@ -429,22 +485,22 @@ export function StaffKnowledgeBaseClient() {
 
         <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
           <aside className="space-y-3">
-          <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-            <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-              <Search className="h-4 w-4 text-slate-500" />
-              <input
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setSelectedId(null);
-                }}
-                placeholder="搜尋上門、講座、減重..."
-                className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-              />
-            </label>
-          </div>
+            <div className="rounded-[20px] border border-cyan-100 bg-cyan-50/80 p-3 shadow-sm">
+              <label className="flex items-center gap-2 rounded-[14px] border border-cyan-200 bg-white px-3 py-2">
+                <Search className="h-4 w-4 text-cyan-700" />
+                <input
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setSelectedId(null);
+                  }}
+                  placeholder="搜尋上門、講座、減重..."
+                  className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                />
+              </label>
+            </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
+          <div className="rounded-[20px] border border-emerald-100 bg-white p-2 shadow-sm">
             <div className="space-y-1">
               {categories.map((item) => (
                 <button
@@ -456,8 +512,8 @@ export function StaffKnowledgeBaseClient() {
                   }}
                   className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm font-medium ${
                     category === item
-                      ? "bg-emerald-50 text-emerald-800"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+                      ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100"
+                      : "text-slate-600 hover:bg-emerald-50/60 hover:text-emerald-900"
                   }`}
                 >
                   <span>{item === "all" ? "全部分類" : item}</span>
@@ -471,7 +527,7 @@ export function StaffKnowledgeBaseClient() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="rounded-[20px] border border-amber-100 bg-white shadow-sm">
             {loading ? (
               <div className="flex items-center gap-2 p-4 text-sm text-slate-500">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -490,8 +546,8 @@ export function StaffKnowledgeBaseClient() {
                     onClick={() => setSelectedId(item.id)}
                     className={`mb-2 w-full rounded-md border p-3 text-left ${
                       selectedDocument?.id === item.id
-                        ? "border-emerald-300 bg-emerald-50"
-                        : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-slate-50"
+                        ? "border-emerald-300 bg-emerald-50 shadow-sm"
+                        : "border-slate-200 bg-white hover:border-cyan-200 hover:bg-cyan-50/50"
                     }`}
                   >
                     <div className="flex items-start gap-2">
@@ -508,7 +564,7 @@ export function StaffKnowledgeBaseClient() {
           </div>
           </aside>
 
-          <article className="min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <article className="min-w-0 rounded-[24px] border border-emerald-100 bg-white p-5 shadow-sm">
           {!selectedDocument ? (
             <div className="py-16 text-center text-sm leading-6 text-slate-500">
               先按上方常用任務，或在左邊搜尋後選擇一篇 SOP。
