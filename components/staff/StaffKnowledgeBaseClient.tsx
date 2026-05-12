@@ -269,8 +269,7 @@ export function StaffKnowledgeBaseClient() {
       <section className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-emerald-700">姑娘知識庫</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-normal text-slate-950 sm:text-3xl">查 SOP</h1>
+            <h1 className="text-2xl font-semibold tracking-normal text-slate-950 sm:text-3xl">姑娘知識庫</h1>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -279,7 +278,7 @@ export function StaffKnowledgeBaseClient() {
               className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800"
             >
               <Search className="h-4 w-4" />
-              先查分單 / 補收據
+              分單 / 補收據
             </button>
             <Link
               href="/nurse/knowledge/chat"
@@ -421,11 +420,7 @@ export function StaffKnowledgeBaseClient() {
       ) : null}
 
       <section id="staff-knowledge-browser" className="scroll-mt-24 space-y-4">
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-medium text-emerald-700">完整 SOP</p>
-            <h2 className="mt-1 text-xl font-semibold text-slate-950">需要時才搜尋全文</h2>
-          </div>
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={openCreateEditor}
@@ -520,7 +515,7 @@ export function StaffKnowledgeBaseClient() {
           <article className="min-w-0 rounded-[24px] border border-emerald-100 bg-white p-5 shadow-sm">
           {!selectedDocument ? (
             <div className="py-16 text-center text-sm leading-6 text-slate-500">
-              先按上方常用任務，或在左邊搜尋後選擇一篇 SOP。
+              先按上方任務，或在左邊搜尋後選擇一篇。
             </div>
           ) : (
             <div className="space-y-5">
