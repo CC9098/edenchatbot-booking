@@ -21,7 +21,7 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
 
   return (
     <header className="sticky top-0 z-40 border-b border-primary/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-4 sm:gap-6">
           <Link
             href={config.homeHref}
@@ -34,7 +34,7 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
             <span className="sm:hidden">{config.brandShortLabel}</span>
           </Link>
 
-          <nav className="hidden items-center gap-1 overflow-x-auto xl:flex">
+          <nav className="hidden min-w-0 items-center gap-1 overflow-x-auto xl:flex">
             {config.navItems.map((item) => {
               const active = isWorkspacePathActive(pathname, item);
 
@@ -46,7 +46,7 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
                     active
                       ? "bg-primary/10 text-primary"
                       : "text-gray-600 hover:bg-primary/5 hover:text-primary"
-                  }`}
+                  } whitespace-nowrap`}
                 >
                   {item.label}
                 </Link>
@@ -58,7 +58,7 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
         <div className="flex items-center gap-3">
           <Link
             href={config.switchHref}
-            className="hidden rounded-md border border-primary/15 px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5 md:inline-flex"
+            className="hidden whitespace-nowrap rounded-md border border-primary/15 px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5 md:inline-flex"
           >
             {config.switchLabel}
           </Link>
@@ -75,7 +75,7 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
       </div>
 
       <div className="border-t border-primary/10 bg-white/90 px-4 py-2 xl:hidden">
-        <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto">
+        <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto">
           {config.navItems.map((item) => {
             const active = isWorkspacePathActive(pathname, item);
 

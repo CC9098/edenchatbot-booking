@@ -24,6 +24,7 @@ const DOCTOR_NAV_ITEMS: StaffWorkspaceNavItem[] = [
   },
   { href: "/doctor/chatbot", label: "養生 Chatbot" },
   { href: "/doctor/record", label: "語音記錄" },
+  { href: "/doctor/notebook", label: "醫師手札" },
   { href: "/doctor/content/articles", label: "文章管理" },
   { href: "/doctor/content/cards", label: "知識卡" },
   { href: "/doctor/timetable", label: "時間表管理" },

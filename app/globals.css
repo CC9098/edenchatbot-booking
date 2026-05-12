@@ -107,6 +107,49 @@ body {
     linear-gradient(180deg, #f7faf5 0%, #eef5ec 100%);
 }
 
+@keyframes doctor-notebook-turn-next {
+  0% {
+    opacity: 0.62;
+    transform: translateX(18px) rotateY(-8deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) rotateY(0deg);
+  }
+}
+
+@keyframes doctor-notebook-turn-prev {
+  0% {
+    opacity: 0.62;
+    transform: translateX(-18px) rotateY(8deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) rotateY(0deg);
+  }
+}
+
+.doctor-notebook {
+  perspective: 1600px;
+}
+
+.doctor-notebook-turn-next {
+  transform-origin: left center;
+  animation: doctor-notebook-turn-next 320ms ease-out both;
+}
+
+.doctor-notebook-turn-prev {
+  transform-origin: right center;
+  animation: doctor-notebook-turn-prev 320ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doctor-notebook-turn-next,
+  .doctor-notebook-turn-prev {
+    animation: none;
+  }
+}
+
 html,
 body {
   height: 100%;
