@@ -27,7 +27,6 @@ const pricingRows = [
     label: "首診",
     title: "脊醫首診： 檢查及治療",
     subtitle: "Standard Chiropractic Examination",
-    duration: "30 minutes",
     price: "HK$980",
     href: drWongFirstVisitBookingUrl,
   },
@@ -35,7 +34,6 @@ const pricingRows = [
     label: "覆診",
     title: "脊醫覆診： 跟進治療",
     subtitle: "Standard Follow Up Visit",
-    duration: "15 minutes",
     price: "HK$880",
     href: drWongFollowUpBookingUrl,
   },
@@ -114,7 +112,7 @@ export default function DrWongPage() {
                       </span>
                     </div>
                     <p className="mt-2 text-base font-semibold text-[#123f2a]">{item.title}</p>
-                    <p className="text-sm text-[#496153]">{item.subtitle} · {item.duration}</p>
+                    <p className="text-sm text-[#496153]">{item.subtitle}</p>
                   </div>
                   <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end sm:justify-center sm:gap-1">
                     <p className="text-xl font-semibold text-[#0d4c2d]">{item.price}</p>

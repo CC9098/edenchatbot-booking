@@ -16,6 +16,7 @@ export type BookingVisitOption = {
   serviceNameZh: string;
   serviceNameEn: string;
   durationMinutes: number;
+  hideDurationLabel?: boolean;
   priceHkd?: number;
   originalPriceHkd?: number;
   promotionLabel?: string;
@@ -224,6 +225,7 @@ export const DOCTORS: DoctorProfile[] = [
         serviceNameZh: '脊醫首診： 檢查及治療',
         serviceNameEn: 'Standard Chiropractic Examination',
         durationMinutes: 30,
+        hideDurationLabel: true,
         priceHkd: 980,
       },
       {
@@ -231,6 +233,7 @@ export const DOCTORS: DoctorProfile[] = [
         serviceNameZh: '脊醫覆診： 跟進治療',
         serviceNameEn: 'Standard Follow Up Visit',
         durationMinutes: 15,
+        hideDurationLabel: true,
         priceHkd: 880,
       },
     ],

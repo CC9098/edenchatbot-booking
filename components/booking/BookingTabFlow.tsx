@@ -333,6 +333,11 @@ function getSlotDurationLabel(durationMinutes: number): string {
   return `每個時段 ${durationMinutes} 分鐘`;
 }
 
+function getVisitOptionDurationLabel(option?: BookingVisitOption): string | null {
+  if (!option || option.hideDurationLabel) return null;
+  return getSlotDurationLabel(option.durationMinutes);
+}
+
 function formatHkdPrice(price?: number): string {
   if (typeof price !== 'number') return '';
   return `HK$${price.toLocaleString('en-HK')}`;
@@ -360,7 +365,7 @@ function formatVisitOptionSummary(option?: BookingVisitOption): string | null {
 
   const serviceLabel = `${option.serviceNameZh} ${option.serviceNameEn}`;
   const priceLabel = getVisitOptionPriceLabel(option);
-  return [serviceLabel, priceLabel, getSlotDurationLabel(option.durationMinutes)]
+  return [serviceLabel, priceLabel, getVisitOptionDurationLabel(option)]
     .filter(Boolean)
     .join('．');
 }
@@ -827,6 +832,14 @@ export function BookingTabFlow({
     selectedVisitOption?.durationMinutes
     ?? selectedDoctor?.bookingSlotMinutes
     ?? DEFAULT_SLOT_DURATION_MINUTES;
+  const selectedDoctorVisitOptionsHideDurations =
+    Boolean(selectedDoctor?.bookingVisitOptions.length)
+    && selectedDoctor?.bookingVisitOptions.every((option) => option.hideDurationLabel);
+  const selectedDoctorSlotDurationLabel =
+    usesVisitBasedServices
+    && (selectedVisitOption?.hideDurationLabel ?? selectedDoctorVisitOptionsHideDurations)
+      ? null
+      : getSlotDurationLabel(selectedDoctorSlotMinutes);
   const groupBookingNotice = '';
   const scannableClinics = useMemo(
     () => selectedDoctor?.clinics ?? [],
@@ -1653,9 +1666,11 @@ export function BookingTabFlow({
                     <p className="mt-1 text-base font-semibold leading-snug text-[#254430]">
                       {selectedDoctor.doctorNameZh}
                     </p>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {getSlotDurationLabel(selectedDoctor.bookingSlotMinutes)}
-                    </p>
+                    {selectedDoctorSlotDurationLabel ? (
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {selectedDoctorSlotDurationLabel}
+                      </p>
+                    ) : null}
                     <Link
                       href="/booking-whatsapp"
                       className="mt-2 inline-flex w-fit rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
@@ -1740,9 +1755,11 @@ export function BookingTabFlow({
                             ) : null}
                           </>
                         ) : null}
-                        <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
-                          {getSlotDurationLabel(selectedDoctorSlotMinutes)}
-                        </span>
+                        {selectedDoctorSlotDurationLabel ? (
+                          <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
+                            {selectedDoctorSlotDurationLabel}
+                          </span>
+                        ) : null}
                         {isSupportBookingDoctor(selectedDoctor) ? (
                           <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
                             {selectedDoctor.bookingRoleLabel}
@@ -1893,9 +1910,11 @@ export function BookingTabFlow({
                     <p className="text-sm font-semibold text-emerald-700">
                       {getVisitOptionPriceLabel(firstVisitOption)}
                     </p>
-                    <p className="text-xs text-slate-500">
-                      {getSlotDurationLabel(firstVisitOption.durationMinutes)}
-                    </p>
+                    {getVisitOptionDurationLabel(firstVisitOption) ? (
+                      <p className="text-xs text-slate-500">
+                        {getVisitOptionDurationLabel(firstVisitOption)}
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="mt-1 text-xs text-slate-500">第一次到診所就診</p>
@@ -1923,9 +1942,11 @@ export function BookingTabFlow({
                     <p className="text-sm font-semibold text-slate-700">
                       {getVisitOptionPriceLabel(followupVisitOption)}
                     </p>
-                    <p className="text-xs text-slate-500">
-                      {getSlotDurationLabel(followupVisitOption.durationMinutes)}
-                    </p>
+                    {getVisitOptionDurationLabel(followupVisitOption) ? (
+                      <p className="text-xs text-slate-500">
+                        {getVisitOptionDurationLabel(followupVisitOption)}
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="mt-1 text-xs text-slate-500">曾經到診所就診</p>
@@ -2235,9 +2256,13 @@ export function BookingTabFlow({
           <div className="space-y-2">
             <p className="text-sm font-semibold text-slate-700">可預約時段</p>
             <p className="text-xs text-slate-500">
-              {selectedDoctor
-                ? `已按 ${selectedDoctor.doctorNameZh} 設定顯示 ${getSlotDurationLabel(selectedDoctorSlotMinutes)}。`
-                : `已按醫師/協作服務設定顯示 ${getSlotDurationLabel(selectedDoctorSlotMinutes)}。`}
+              {selectedDoctorSlotDurationLabel
+                ? selectedDoctor
+                  ? `已按 ${selectedDoctor.doctorNameZh} 設定顯示 ${selectedDoctorSlotDurationLabel}。`
+                  : `已按醫師/協作服務設定顯示 ${selectedDoctorSlotDurationLabel}。`
+                : selectedDoctor
+                  ? `已按 ${selectedDoctor.doctorNameZh} 設定顯示可預約時段。`
+                  : '已按醫師/協作服務設定顯示可預約時段。'}
             </p>
 
             {slotsLoading ? (

@@ -78,7 +78,7 @@ test('Dr. Wong is treated as a support chiropractic service in booking lists', (
   assert.equal(isSupportBookingPractitioner('chan'), false);
 });
 
-test('Dr. Wong booking keeps two simple chiropractic services without public discount copy', () => {
+test('Dr. Wong booking keeps two simple chiropractic services without public discount or duration labels', () => {
   const visitOptions = getDoctorBookingVisitOptions('wong');
   assert.deepEqual(
     visitOptions.map((option) => option.visitType),
@@ -89,6 +89,7 @@ test('Dr. Wong booking keeps two simple chiropractic services without public dis
   assert.equal(firstVisit?.serviceNameZh, '脊醫首診： 檢查及治療');
   assert.equal(firstVisit?.serviceNameEn, 'Standard Chiropractic Examination');
   assert.equal(firstVisit?.durationMinutes, 30);
+  assert.equal(firstVisit?.hideDurationLabel, true);
   assert.equal(firstVisit?.priceHkd, 980);
   assert.equal(firstVisit?.originalPriceHkd, undefined);
   assert.equal(firstVisit?.promotionLabel, undefined);
@@ -98,6 +99,7 @@ test('Dr. Wong booking keeps two simple chiropractic services without public dis
   assert.equal(followUp?.serviceNameZh, '脊醫覆診： 跟進治療');
   assert.equal(followUp?.serviceNameEn, 'Standard Follow Up Visit');
   assert.equal(followUp?.durationMinutes, 15);
+  assert.equal(followUp?.hideDurationLabel, true);
   assert.equal(followUp?.priceHkd, 880);
 
   assert.equal(getDoctorBookingSlotMinutes('wong', 'first'), 30);
