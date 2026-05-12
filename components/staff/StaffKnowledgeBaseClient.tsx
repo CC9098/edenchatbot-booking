@@ -95,47 +95,37 @@ const QUICK_START_TASKS = [
   {
     label: "分單 / 補收據",
     query: "收據 分單 病假紙",
-    detail: "先查可否補發、收費、取單方式",
     icon: ClipboardCheck,
     cardClassName: "border-emerald-200 bg-emerald-50/90 hover:border-emerald-300 hover:bg-emerald-100/70",
     iconClassName: "border-emerald-200 bg-white text-emerald-700",
-    railClassName: "bg-emerald-500",
   },
   {
     label: "食藥方法",
     query: "食藥 藥袋 西藥",
-    detail: "按處方講，不自行改醫師指示",
     icon: Pill,
     cardClassName: "border-cyan-200 bg-cyan-50/90 hover:border-cyan-300 hover:bg-cyan-100/70",
     iconClassName: "border-cyan-200 bg-white text-cyan-700",
-    railClassName: "bg-cyan-500",
   },
   {
     label: "寄藥安排",
     query: "寄藥 Lalamove 順豐",
-    detail: "先收地址、電話、時間，不承諾即日",
     icon: PackageCheck,
     cardClassName: "border-amber-200 bg-amber-50/90 hover:border-amber-300 hover:bg-amber-100/70",
     iconClassName: "border-amber-200 bg-white text-amber-700",
-    railClassName: "bg-amber-400",
   },
   {
     label: "醫療券",
     query: "醫療券 使用步驟",
-    detail: "跟步驟做，有問題先問主管",
     icon: WalletCards,
     cardClassName: "border-teal-200 bg-teal-50/90 hover:border-teal-300 hover:bg-teal-100/70",
     iconClassName: "border-teal-200 bg-white text-teal-700",
-    railClassName: "bg-teal-500",
   },
 ] satisfies Array<{
   label: string;
   query: string;
-  detail: string;
   icon: LucideIcon;
   cardClassName: string;
   iconClassName: string;
-  railClassName: string;
 }>;
 
 export function StaffKnowledgeBaseClient() {
@@ -276,35 +266,11 @@ export function StaffKnowledgeBaseClient() {
 
   return (
     <div className="space-y-5">
-      <section className="relative overflow-hidden rounded-[28px] border border-emerald-100 bg-[#fbfaf2] p-5 shadow-sm sm:p-6">
-        <svg
-          className="pointer-events-none absolute inset-x-0 top-0 h-28 w-full text-emerald-100"
-          viewBox="0 0 100 28"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <path d="M4 18 C20 5 36 25 52 13 S79 3 96 16" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-        </svg>
-        <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <section className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm font-medium text-emerald-700">姑娘知識庫</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-normal text-emerald-950 sm:text-3xl">
-              病人問到先按任務查
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              不用一開始讀完整手冊。先用下面 4 個常用任務，搵不到才搜尋或問 AI。
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
-              <span className="rounded-full border border-emerald-200 bg-white/80 px-3 py-1 text-emerald-800">
-                今日先做 4 個任務
-              </span>
-              <span className="rounded-full border border-cyan-200 bg-cyan-50/80 px-3 py-1 text-cyan-800">
-                可搜尋完整 SOP
-              </span>
-              <span className="rounded-full border border-amber-200 bg-amber-50/80 px-3 py-1 text-amber-900">
-                不肯定先收口
-              </span>
-            </div>
+            <h1 className="mt-1 text-2xl font-semibold tracking-normal text-slate-950 sm:text-3xl">查 SOP</h1>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -324,19 +290,10 @@ export function StaffKnowledgeBaseClient() {
             </Link>
           </div>
         </div>
-        <p className="relative z-10 mt-4 rounded-[18px] border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm leading-6 text-amber-900">
-          收費、醫療判斷、保險承諾、密碼或後台操作，先用「我幫您確認清楚再回覆」收口。
-        </p>
       </section>
 
-      <section className="rounded-[28px] border border-emerald-100 bg-white/90 p-4 shadow-sm sm:p-5">
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-medium text-emerald-700">常用任務</p>
-            <h2 className="mt-1 text-xl font-semibold text-slate-950">病人問到先按，不用一頁頁搵</h2>
-          </div>
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {QUICK_START_TASKS.map((task) => {
             const TaskIcon = task.icon;
 
@@ -345,16 +302,12 @@ export function StaffKnowledgeBaseClient() {
                 key={task.label}
                 type="button"
                 onClick={() => focusTask(task.query)}
-                className={`group relative overflow-hidden rounded-[22px] border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${task.cardClassName}`}
+                className={`group flex min-h-20 items-center gap-3 rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${task.cardClassName}`}
               >
-                <span className={`absolute inset-x-4 bottom-3 h-1.5 rounded-full ${task.railClassName}`} aria-hidden="true" />
-                <div className="flex items-center gap-3 text-sm font-semibold text-slate-950">
-                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border shadow-sm ${task.iconClassName}`}>
-                    <TaskIcon className="h-5 w-5" />
-                  </span>
-                  <span>{task.label}</span>
-                </div>
-                <p className="mb-3 mt-3 text-xs leading-5 text-slate-600">{task.detail}</p>
+                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm ${task.iconClassName}`}>
+                  <TaskIcon className="h-5 w-5" />
+                </span>
+                <span className="text-sm font-semibold text-slate-950">{task.label}</span>
               </button>
             );
           })}

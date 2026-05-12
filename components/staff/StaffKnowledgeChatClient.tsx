@@ -10,7 +10,6 @@ import {
   Loader2,
   MessageCircle,
   Send,
-  ShieldAlert,
 } from "lucide-react";
 
 import type { StaffKnowledgeChatAnswer } from "@/lib/staff-knowledge-base-types";
@@ -23,10 +22,10 @@ type ChatMessage = {
 };
 
 const SUGGESTIONS = [
-  "上門出診點覆病人？",
-  "講座查詢要收集咩資料？",
-  "減重治療有冇標準回覆？",
-  "寄藥要收集咩資料？",
+  "上門出診",
+  "講座查詢",
+  "減重治療",
+  "寄藥安排",
 ];
 
 function confidenceLabel(confidence: StaffKnowledgeChatAnswer["confidence"]) {
@@ -50,7 +49,7 @@ export function StaffKnowledgeChatClient() {
     {
       id: "intro",
       role: "assistant",
-      content: "可以問我姑娘手冊入面已有的 SOP、話術或待補資料。",
+      content: "問 SOP。",
     },
   ]);
   const [question, setQuestion] = useState(prompt ?? "");
@@ -118,22 +117,14 @@ export function StaffKnowledgeChatClient() {
   return (
     <div className="space-y-5">
       <section className="rounded-lg border border-emerald-100 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <Link
-              href="/nurse/knowledge"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-900"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              返回知識庫
-            </Link>
-            <h1 className="mt-3 text-2xl font-semibold text-slate-950">知識庫 AI 問答</h1>
-          </div>
-          <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-            只根據 staff 知識庫回答；未有資料會要求主管確認。
-          </div>
-        </div>
+        <Link
+          href="/nurse/knowledge"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-900"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          返回知識庫
+        </Link>
+        <h1 className="mt-3 text-2xl font-semibold text-slate-950">AI 問答</h1>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_280px]">
@@ -215,7 +206,7 @@ export function StaffKnowledgeChatClient() {
               <input
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
-                placeholder="問：上門出診點覆病人？"
+                placeholder="問 SOP"
                 className="min-w-0 flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
               />
               <button
