@@ -174,6 +174,7 @@ interface SendWhatsappBookingConfirmationResult {
   success: boolean;
   conversationId?: number;
   whatsappSent: boolean;
+  deliveryStatus?: string | null;
   error?: string;
 }
 
@@ -1118,6 +1119,32 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function sendTextMessageWithFailureCheck(
+  client: ChatwootWhatsappClient,
+  accountId: number,
+  conversationId: number,
+  content: string,
+): Promise<string | null> {
+  const message = await client.createMessage(accountId, conversationId, {
+    content,
+  });
+  const deliveryStatus = await waitForMessageDeliveryStatus(
+    client,
+    accountId,
+    conversationId,
+    message,
+  );
+
+  if (deliveryStatus.status === 'failed') {
+    if (message.id) {
+      await client.deleteMessage(accountId, conversationId, message.id).catch(() => undefined);
+    }
+    throw new Error('[Chatwoot] WhatsApp text delivery failed');
+  }
+
+  return deliveryStatus.status;
+}
+
 async function sendBookingWhatsappNotification(
   input: {
     patientName: string;
@@ -1196,6 +1223,7 @@ async function sendBookingWhatsappNotification(
   const content = options.buildContent();
   const templateConfigs = options.getTemplateConfigs(inbox);
   const bodyParams = options.buildBodyParams();
+  let deliveryStatus: string | null | undefined;
 
   if (options.preferTemplateIfAvailable && templateConfigs.length > 0) {
     try {
@@ -1216,15 +1244,16 @@ async function sendBookingWhatsappNotification(
         `[chatwoot-whatsapp] Preferred template send failed, retrying as text: ${getSafeErrorMessage(error)}`,
       );
 
-      await client.createMessage(accountId, conversationId, {
-        content,
-      });
+      deliveryStatus = options.fallbackTextOnTemplateFailure
+        ? await sendTextMessageWithFailureCheck(client, accountId, conversationId, content)
+        : (await client.createMessage(accountId, conversationId, { content }), null);
     }
 
     return {
       success: true,
       whatsappSent: true,
       conversationId,
+      deliveryStatus,
     };
   }
 

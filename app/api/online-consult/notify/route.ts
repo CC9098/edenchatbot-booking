@@ -173,6 +173,9 @@ export async function POST(request: NextRequest) {
           conversationIds: successfulWhatsappResults
             .map((result) => result.conversationId)
             .filter(Boolean),
+          deliveryStatuses: successfulWhatsappResults
+            .map((result) => result.deliveryStatus)
+            .filter(Boolean),
         });
       }
 
