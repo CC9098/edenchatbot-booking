@@ -78,22 +78,6 @@ function buildPatientManageBookingUrl(manageAccessToken?: string): string {
     : buildManageBookingUrl();
 }
 
-function buildOnlineConsultFlowText(input: BookingWhatsappConfirmationInput): string {
-  if (input.onlineConsultUrl && input.meetLink) {
-    return `請於預約時間前 5 分鐘按「進入網上診症」按鈕進入 Google Meet；系統會通知醫師，請保持 Google Meet 開啟等候。如按鈕未能開啟，可直接使用 Google Meet 連結：${input.meetLink}`;
-  }
-
-  if (input.onlineConsultUrl) {
-    return '請於預約時間前 5 分鐘按「進入網上診症」按鈕；系統會通知醫師，請保持頁面開啟等候。';
-  }
-
-  if (input.meetLink) {
-    return `請於預約時間前 5 分鐘開啟 Google Meet，並保持在線等候醫師：${input.meetLink}`;
-  }
-
-  return '';
-}
-
 function buildOnlineConsultFlowLines(input: BookingWhatsappConfirmationInput): string[] {
   if (!input.onlineConsultUrl && !input.meetLink) {
     return [];
@@ -162,14 +146,12 @@ export function buildWhatsappOnlineTemplateBodyParams(
   input: BookingWhatsappConfirmationInput & { manageAccessToken?: string },
 ): Record<string, string> {
   const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
-  const onlineConsultFlowText = buildOnlineConsultFlowText(input);
 
   return {
     patient_name: input.patientName,
     doctor_name: input.doctorNameZh,
     clinic_name: input.clinicNameZh,
     appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
-    meet_link: onlineConsultFlowText || input.meetLink || '',
     ...(input.onlineConsultUrl ? { online_consult_url: input.onlineConsultUrl } : {}),
     visit_type: VISIT_TYPE_LABELS[input.visitType],
     booking_id: input.bookingId,
