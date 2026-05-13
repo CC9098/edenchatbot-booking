@@ -157,6 +157,19 @@ interface DoctorOnlineConsultReadyWhatsappInput {
   clinicWhatsappPhone?: string | null;
 }
 
+interface PatientOnlineConsultWaitingWhatsappInput {
+  bookingId: string;
+  calendarId: string;
+  patientName: string;
+  phone: string;
+  email: string;
+  doctorNameZh: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  waitingMinutes?: number;
+  clinicWhatsappPhone?: string | null;
+}
+
 interface SendWhatsappBookingConfirmationResult {
   success: boolean;
   conversationId?: number;
@@ -649,6 +662,20 @@ function getDoctorOnlineConsultReadyTemplateConfigs(inbox: ChatwootInbox): Templ
   });
 }
 
+function getPatientOnlineConsultWaitingTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
+  return getNamedTemplateConfigs(inbox, {
+    configuredName: process.env.CHATWOOT_WHATSAPP_ONLINE_WAITING_TEMPLATE_NAME,
+    configuredLanguage:
+      process.env.CHATWOOT_WHATSAPP_ONLINE_WAITING_TEMPLATE_LANGUAGE ||
+      process.env.CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE,
+    configuredCategory:
+      process.env.CHATWOOT_WHATSAPP_ONLINE_WAITING_TEMPLATE_CATEGORY ||
+      process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY,
+    fallbackNames: ['online_consult_waiting_reassurance'],
+    defaultCategory: 'UTILITY',
+  });
+}
+
 function getNamedTemplateConfigs(
   inbox: ChatwootInbox,
   options: {
@@ -970,6 +997,37 @@ function buildDoctorOnlineConsultReadyTemplateBodyParams(
     notified_at: notifiedAt,
     booking_id: input.bookingId,
     meet_link: input.meetLink,
+  };
+}
+
+function buildPatientOnlineConsultWaitingWhatsappText(
+  input: PatientOnlineConsultWaitingWhatsappInput,
+): string {
+  const waitingMinutes = input.waitingMinutes && input.waitingMinutes > 0 ? input.waitingMinutes : 5;
+
+  return [
+    `你好 ${input.patientName}，`,
+    '',
+    `如醫師仍未進入網上診症，${input.doctorNameZh} 即將會進來，請保持 Google Meet 開啟，耐心等候多約 ${waitingMinutes} 分鐘。`,
+    '如診症已經開始，請不用理會此訊息。',
+    '如已等候較長時間或連結未能開啟，請回覆此訊息，我們會盡快跟進。',
+    '',
+    `預約時間：${input.appointmentDate} ${input.appointmentTime}`,
+    `預約編號：${input.bookingId}`,
+  ].join('\n');
+}
+
+function buildPatientOnlineConsultWaitingTemplateBodyParams(
+  input: PatientOnlineConsultWaitingWhatsappInput,
+): Record<string, string> {
+  const waitingMinutes = input.waitingMinutes && input.waitingMinutes > 0 ? input.waitingMinutes : 5;
+
+  return {
+    patient_name: input.patientName,
+    doctor_name: input.doctorNameZh,
+    waiting_minutes: String(waitingMinutes),
+    appointment_datetime: `${input.appointmentDate} ${input.appointmentTime}`,
+    booking_id: input.bookingId,
   };
 }
 
@@ -1391,6 +1449,33 @@ export async function sendDoctorOnlineConsultReadyWhatsapp(
         buildContent: () => buildDoctorOnlineConsultReadyWhatsappText(input),
         buildBodyParams: () => buildDoctorOnlineConsultReadyTemplateBodyParams(input),
         getTemplateConfigs: getDoctorOnlineConsultReadyTemplateConfigs,
+        preferTemplateIfAvailable: true,
+      },
+    );
+  } catch (error) {
+    return {
+      success: false,
+      whatsappSent: false,
+      error: getSafeErrorMessage(error),
+    };
+  }
+}
+
+export async function sendPatientOnlineConsultWaitingWhatsapp(
+  input: PatientOnlineConsultWaitingWhatsappInput,
+): Promise<SendWhatsappBookingConfirmationResult> {
+  try {
+    return await sendBookingWhatsappNotification(
+      {
+        patientName: input.patientName,
+        phone: input.phone,
+        email: input.email,
+        clinicWhatsappPhone: input.clinicWhatsappPhone,
+      },
+      {
+        buildContent: () => buildPatientOnlineConsultWaitingWhatsappText(input),
+        buildBodyParams: () => buildPatientOnlineConsultWaitingTemplateBodyParams(input),
+        getTemplateConfigs: getPatientOnlineConsultWaitingTemplateConfigs,
         preferTemplateIfAvailable: true,
       },
     );
