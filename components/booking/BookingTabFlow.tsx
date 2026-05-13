@@ -1635,7 +1635,7 @@ export function BookingTabFlow({
         </p>
         {!embedMode ? (
           <Link
-            href={isStaffFlow ? '/doctor' : '/chat'}
+            href={isStaffFlow ? '/nurse' : '/chat'}
             className="mt-6 inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
           >
             {isStaffFlow ? '返回控制台' : '返回聊天頁'}
@@ -2701,10 +2701,10 @@ export function BookingTabFlow({
 
             {!embedMode ? (
               <Link
-                href={isStaffFlow ? '/doctor' : '/chat'}
+                href={isStaffFlow ? '/nurse' : '/chat'}
                 className="inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
               >
-                {isStaffFlow ? '返回病人列表' : '返回聊天頁'}
+                {isStaffFlow ? '返回姑娘主頁' : '返回聊天頁'}
               </Link>
             ) : null}
           </div>

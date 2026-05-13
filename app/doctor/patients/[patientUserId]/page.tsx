@@ -333,7 +333,7 @@ export default function PatientDetailPage() {
     <div className="space-y-4 sm:space-y-6">
       {/* Back link */}
       <button
-        onClick={() => router.push("/doctor")}
+        onClick={() => router.push("/doctor/patients")}
         className="inline-flex items-center gap-1 rounded-md py-1 text-sm text-gray-500 transition-colors hover:text-primary"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

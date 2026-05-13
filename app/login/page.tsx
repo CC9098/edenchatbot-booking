@@ -381,7 +381,7 @@ function LoginForm() {
                   <p className="text-sm font-semibold text-slate-800">staff 專用入口</p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {["病人列表", "語音記錄", "內容管理", "姑娘代約"].map((label) => (
+                  {["醫師主頁", "病人列表", "姑娘主頁", "姑娘代約"].map((label) => (
                     <span
                       key={label}
                       className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-cyan-100"

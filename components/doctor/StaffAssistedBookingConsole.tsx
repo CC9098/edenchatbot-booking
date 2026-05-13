@@ -141,10 +141,10 @@ export function StaffAssistedBookingConsole({
           </div>
 
           <Link
-            href="/doctor"
+            href="/nurse"
             className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-primary/30 hover:text-primary"
           >
-            返回病人列表
+            返回姑娘主頁
           </Link>
         </div>
 
@@ -167,7 +167,7 @@ export function StaffAssistedBookingConsole({
             <p className="text-xs leading-5 text-slate-500">
               如現場病人未建立帳戶，亦可以直接用下方表單手動輸入資料完成代約。之後如要綁定病人帳戶，可到
               {' '}
-              <Link href="/doctor" className="font-medium text-primary underline-offset-2 hover:underline">
+              <Link href="/doctor/patients" className="font-medium text-primary underline-offset-2 hover:underline">
                 病人列表
               </Link>
               {' '}

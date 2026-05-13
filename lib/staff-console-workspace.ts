@@ -19,6 +19,10 @@ export type StaffWorkspaceConfig = {
 const DOCTOR_NAV_ITEMS: StaffWorkspaceNavItem[] = [
   {
     href: "/doctor",
+    label: "首頁",
+  },
+  {
+    href: "/doctor/patients",
     label: "病人列表",
     matchPrefixes: ["/doctor/patients/"],
   },
@@ -31,6 +35,10 @@ const DOCTOR_NAV_ITEMS: StaffWorkspaceNavItem[] = [
 ];
 
 const NURSE_NAV_ITEMS: StaffWorkspaceNavItem[] = [
+  {
+    href: "/nurse",
+    label: "首頁",
+  },
   {
     href: "/nurse/operations",
     label: "營運台",
@@ -79,9 +87,6 @@ export function isWorkspacePathActive(
   pathname: string,
   item: StaffWorkspaceNavItem
 ): boolean {
-  if (item.href === "/nurse/operations" && pathname === "/nurse") {
-    return true;
-  }
   if (pathname === item.href) return true;
   return (item.matchPrefixes ?? []).some((prefix) => pathname.startsWith(prefix));
 }
