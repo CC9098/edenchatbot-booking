@@ -840,6 +840,13 @@ export function BookingTabFlow({
     && (selectedVisitOption?.hideDurationLabel ?? selectedDoctorVisitOptionsHideDurations)
       ? null
       : getSlotDurationLabel(selectedDoctorSlotMinutes);
+  const onlineConsultationMethodNotice =
+    isOnlineConsultation && selectedDoctor?.doctorId === 'cheung'
+      ? `${selectedDoctor.doctorNameZh}網上診症會使用 Google Meet 視像。預約成功後，系統會透過 WhatsApp 發送網上診症入口；到時按連結進入即可。`
+      : '';
+  const onlineConsultationMethodDetail = onlineConsultationMethodNotice
+    ? '視像方式：Google Meet；預約成功後 WhatsApp 會收到網上診症入口。'
+    : null;
   const groupBookingNotice = '';
   const scannableClinics = useMemo(
     () => selectedDoctor?.clinics ?? [],
@@ -862,18 +869,23 @@ export function BookingTabFlow({
     : '「每一次預約，都是照顧自己的開始。」';
   const submitButtonLabel = '確認預約';
   const submitLoadingLabel = isStaffFlow ? '代約處理中...' : '預約處理中...';
-  const detailNotice = isStaffFlow
+  const confirmationNotice = isStaffFlow
     ? '此頁會以病人資料建立正式預約，並嘗試即時發送 WhatsApp 確認。若病人已有電郵，系統亦會補發確認電郵。'
     : groupBookingNotice
     ? groupBookingNotice
     : isWhatsappFlow
     ? '成功預約後會透過 WhatsApp 發送確認訊息到你提供的電話。'
     : '如有提供電郵，系統會發送確認電郵；更改或取消可使用電郵內連結。';
+  const detailNotice = onlineConsultationMethodNotice
+    ? `${onlineConsultationMethodNotice} ${confirmationNotice}`
+    : confirmationNotice;
   const successTitle = isStaffFlow ? '代約完成' : '預約成功';
   const successDescription = isStaffFlow
     ? '預約已建立，系統已嘗試發送確認訊息到病人提供的聯絡方式。'
     : groupBookingNotice
     ? groupBookingNotice
+    : onlineConsultationMethodNotice
+    ? '預約已建立，Google Meet 網上診症入口會隨 WhatsApp 確認訊息發送到你提供的電話。'
     : isWhatsappFlow
     ? '預約已建立，診所會透過 WhatsApp 跟進並發送確認訊息到你提供的電話。'
     : formValues.email.trim()
@@ -1874,6 +1886,12 @@ export function BookingTabFlow({
                   ? '點按診所即可篩選。'
                   : '點按診所卡即可套用篩選；如顯示「本月餘下日子暫滿」，可到下一步按右箭嘴查看下月。'}
               </p>
+              {onlineConsultationMethodNotice ? (
+                <div className="mt-4 flex gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-relaxed text-sky-900">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>{onlineConsultationMethodNotice}</p>
+                </div>
+              ) : null}
             </section>
           )}
 
@@ -2058,6 +2076,7 @@ export function BookingTabFlow({
               !usesVisitBasedServices
                 ? `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`
                 : null,
+              onlineConsultationMethodDetail,
               selectedClinic
                 ? '日曆只顯示所選診所燈號。'
                 : '日曆會同時顯示各診所燈號，方便直接比較日期。',
@@ -2340,6 +2359,7 @@ export function BookingTabFlow({
               !usesVisitBasedServices
                 ? `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`
                 : null,
+              onlineConsultationMethodDetail,
             ])}
           />
 
@@ -2665,6 +2685,7 @@ export function BookingTabFlow({
               ...(usesVisitBasedServices && selectedVisitOptionSummary
                 ? [`${VISIT_TYPE_LABELS[visitType]}．${selectedVisitOptionSummary}`]
                 : []),
+              ...(onlineConsultationMethodDetail ? [onlineConsultationMethodDetail] : []),
               bookingId ? `${referenceLabel}：${bookingId}` : '確認資料已準備完成',
             ]}
           />

@@ -129,7 +129,7 @@ export const CLINICS: ClinicProfile[] = [
     id: 'online',
     nameZh: '網上',
     nameEn: 'Online',
-    address: '網上 Zoom / WhatsApp Video',
+    address: '網上 Google Meet 視像診症',
     phones: [],
     hoursText: '視乎醫師安排',
   },
