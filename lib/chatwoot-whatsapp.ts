@@ -653,7 +653,7 @@ function getDoctorOnlineConsultReadyTemplateConfigs(inbox: ChatwootInbox): Templ
     configuredName: process.env.CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_NAME,
     configuredLanguage:
       process.env.CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_LANGUAGE ||
-      process.env.CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE,
+      'zh_HK',
     configuredCategory:
       process.env.CHATWOOT_WHATSAPP_DOCTOR_ONLINE_READY_TEMPLATE_CATEGORY ||
       process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY,
@@ -667,7 +667,7 @@ function getPatientOnlineConsultWaitingTemplateConfigs(inbox: ChatwootInbox): Te
     configuredName: process.env.CHATWOOT_WHATSAPP_ONLINE_WAITING_TEMPLATE_NAME,
     configuredLanguage:
       process.env.CHATWOOT_WHATSAPP_ONLINE_WAITING_TEMPLATE_LANGUAGE ||
-      process.env.CHATWOOT_WHATSAPP_TEMPLATE_LANGUAGE,
+      'zh_HK',
     configuredCategory:
       process.env.CHATWOOT_WHATSAPP_ONLINE_WAITING_TEMPLATE_CATEGORY ||
       process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY,
@@ -1130,6 +1130,7 @@ async function sendBookingWhatsappNotification(
     buildBodyParams: () => Record<string, string>;
     getTemplateConfigs: (inbox: ChatwootInbox) => TemplateConfig[];
     preferTemplateIfAvailable?: boolean;
+    fallbackTextOnTemplateFailure?: boolean;
   },
 ): Promise<SendWhatsappBookingConfirmationResult> {
   const baseUrl = (process.env.CHATWOOT_BASE_URL || '').trim().replace(/\/$/, '');
@@ -1207,12 +1208,12 @@ async function sendBookingWhatsappNotification(
         bodyParams,
       );
     } catch (error) {
-      if (!isActiveConversation(existingConversation)) {
+      if (!options.fallbackTextOnTemplateFailure && !isActiveConversation(existingConversation)) {
         throw error;
       }
 
       console.warn(
-        `[chatwoot-whatsapp] Preferred template send failed, retrying as active conversation text: ${getSafeErrorMessage(error)}`,
+        `[chatwoot-whatsapp] Preferred template send failed, retrying as text: ${getSafeErrorMessage(error)}`,
       );
 
       await client.createMessage(accountId, conversationId, {
@@ -1450,6 +1451,7 @@ export async function sendDoctorOnlineConsultReadyWhatsapp(
         buildBodyParams: () => buildDoctorOnlineConsultReadyTemplateBodyParams(input),
         getTemplateConfigs: getDoctorOnlineConsultReadyTemplateConfigs,
         preferTemplateIfAvailable: true,
+        fallbackTextOnTemplateFailure: true,
       },
     );
   } catch (error) {

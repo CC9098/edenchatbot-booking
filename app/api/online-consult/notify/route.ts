@@ -14,6 +14,7 @@ const notifySchema = z.object({
 });
 
 const CHEUNG_DOCTOR_WHATSAPP_FALLBACKS = ['+85260260716', '+85296322476'];
+const DOCTOR_NOTIFY_PUBLIC_ERROR = '暫時未能自動通知醫師，請先開啟 Google Meet。如需協助，請回覆 WhatsApp 訊息。';
 
 type BookingIntakeReadyRow = {
   id: string;
@@ -27,7 +28,7 @@ type BookingIntakeReadyRow = {
   duration_minutes: number | null;
   patient_name: string;
   phone: string;
-  email: string;
+  email: string | null;
 };
 
 function isBookingIntakeReadyRow(value: unknown): value is BookingIntakeReadyRow {
@@ -41,7 +42,7 @@ function isBookingIntakeReadyRow(value: unknown): value is BookingIntakeReadyRow
       typeof row.appointment_time === 'string' &&
       typeof row.patient_name === 'string' &&
       typeof row.phone === 'string' &&
-      typeof row.email === 'string',
+      (typeof row.email === 'string' || row.email === null),
   );
 }
 
@@ -134,7 +135,7 @@ export async function POST(request: NextRequest) {
       doctorNameZh: data.doctor_name_zh,
       patientName: data.patient_name,
       patientPhone: data.phone,
-      patientEmail: data.email,
+      patientEmail: data.email || '',
       date: data.appointment_date,
       time: data.appointment_time,
       durationMinutes: data.duration_minutes || undefined,
@@ -184,16 +185,22 @@ export async function POST(request: NextRequest) {
     const emailResult = await sendDoctorOnlineConsultReadyEmail(notificationPayload);
 
     if (!emailResult.success) {
+      console.warn(
+        `[online-consult/notify] doctor notification failed; whatsapp=${whatsappError || 'not attempted'}; email=${emailResult.error || 'unknown error'}`,
+      );
       return NextResponse.json(
-        { error: whatsappError || emailResult.error || '未能通知醫師。' },
+        { error: DOCTOR_NOTIFY_PUBLIC_ERROR },
         { status: 502 },
       );
     }
 
     return NextResponse.json({ success: true, channel: 'email' });
   } catch (error) {
+    console.warn(
+      `[online-consult/notify] unexpected failure: ${error instanceof Error ? error.message : String(error)}`,
+    );
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : '通知醫師時發生錯誤。' },
+      { error: DOCTOR_NOTIFY_PUBLIC_ERROR },
       { status: 500 },
     );
   }
