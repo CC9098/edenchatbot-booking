@@ -1149,9 +1149,9 @@ test('sendBookingConfirmationWhatsapp uses online template for active conversati
     assert.equal(result.conversationId, 42);
     assert.equal(sentMessagePayloads.length, 1);
     assert.equal(sentMessagePayloads[0]?.template_params?.name, 'booking_confirm_online');
-    assert.equal(
+    assert.match(
       sentMessagePayloads[0]?.template_params?.processed_params?.body?.meet_link,
-      'https://meet.google.com/uud-rdxb-crk',
+      /預約時間前 5 分鐘.*https:\/\/meet\.google\.com\/uud-rdxb-crk/,
     );
     assert.equal(
       sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter,
@@ -1294,9 +1294,9 @@ test('sendBookingConfirmationWhatsapp uses online templates when no active conve
     assert.equal(result.conversationId, 42);
     assert.equal(sentMessagePayloads.length, 1);
     assert.equal(sentMessagePayloads[0]?.template_params?.name, 'booking_confirm_online');
-    assert.equal(
+    assert.match(
       sentMessagePayloads[0]?.template_params?.processed_params?.body?.meet_link,
-      'https://meet.google.com/uud-rdxb-crk',
+      /預約時間前 5 分鐘.*https:\/\/meet\.google\.com\/uud-rdxb-crk/,
     );
     assert.equal(
       sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter,
@@ -1453,9 +1453,9 @@ test('sendBookingConfirmationWhatsapp uses online fallback template when Meet li
     assert.equal(result.conversationId, 42);
     assert.equal(sentMessagePayloads.length, 1);
     assert.equal(sentMessagePayloads[0]?.template_params?.name, 'booking_confirm_online');
-    assert.equal(
+    assert.match(
       sentMessagePayloads[0]?.template_params?.processed_params?.body?.meet_link,
-      'https://meet.google.com/uud-rdxb-crk',
+      /預約時間前 5 分鐘.*https:\/\/meet\.google\.com\/uud-rdxb-crk/,
     );
     assert.equal(
       sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter,

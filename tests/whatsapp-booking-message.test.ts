@@ -17,9 +17,13 @@ test('WhatsApp confirmation text includes Google Meet link for online bookings',
     appointmentTime: '21:30',
     visitType: 'followup',
     meetLink: 'https://meet.google.com/abc-defg-hij',
+    onlineConsultUrl: 'https://edenchatbot-booking.vercel.app/online-consult?token=online123',
   });
 
-  assert.match(text, /Google Meet 網上應診連結：https:\/\/meet\.google\.com\/abc-defg-hij/);
+  assert.match(text, /網上診症流程/);
+  assert.match(text, /預約時間前 5 分鐘/);
+  assert.match(text, /網上診症入口：https:\/\/edenchatbot-booking\.vercel\.app\/online-consult\?token=online123/);
+  assert.match(text, /Google Meet 連結：https:\/\/meet\.google\.com\/abc-defg-hij/);
 });
 
 test('WhatsApp template params omit Meet link unless template is explicitly configured for it', () => {
@@ -48,7 +52,7 @@ test('WhatsApp template params omit Meet link unless template is explicitly conf
   }
 });
 
-test('WhatsApp online template params include Google Meet link', () => {
+test('WhatsApp online template params include online consult flow', () => {
   const params = buildWhatsappOnlineTemplateBodyParams({
     bookingId: 'booking-123',
     patientName: '陳大文',
@@ -61,7 +65,9 @@ test('WhatsApp online template params include Google Meet link', () => {
     onlineConsultUrl: 'https://edenchatbot-booking.vercel.app/online-consult?token=online123',
   });
 
-  assert.equal(params.meet_link, 'https://meet.google.com/abc-defg-hij');
+  assert.match(params.meet_link, /預約時間前 5 分鐘/);
+  assert.match(params.meet_link, /進入網上診症/);
+  assert.match(params.meet_link, /https:\/\/meet\.google\.com\/abc-defg-hij/);
   assert.equal(params.online_consult_url, 'https://edenchatbot-booking.vercel.app/online-consult?token=online123');
   assert.equal(params.doctor_name, '張天慧醫師');
   assert.equal(params.clinic_name, '網上');

@@ -78,10 +78,47 @@ function buildPatientManageBookingUrl(manageAccessToken?: string): string {
     : buildManageBookingUrl();
 }
 
+function buildOnlineConsultFlowText(input: BookingWhatsappConfirmationInput): string {
+  if (input.onlineConsultUrl && input.meetLink) {
+    return `請於預約時間前 5 分鐘按「進入網上診症」按鈕進入 Google Meet；系統會通知醫師，請保持 Google Meet 開啟等候。如按鈕未能開啟，可直接使用 Google Meet 連結：${input.meetLink}`;
+  }
+
+  if (input.onlineConsultUrl) {
+    return '請於預約時間前 5 分鐘按「進入網上診症」按鈕；系統會通知醫師，請保持頁面開啟等候。';
+  }
+
+  if (input.meetLink) {
+    return `請於預約時間前 5 分鐘開啟 Google Meet，並保持在線等候醫師：${input.meetLink}`;
+  }
+
+  return '';
+}
+
+function buildOnlineConsultFlowLines(input: BookingWhatsappConfirmationInput): string[] {
+  if (!input.onlineConsultUrl && !input.meetLink) {
+    return [];
+  }
+
+  const lines = [
+    '網上診症流程：',
+    input.onlineConsultUrl
+      ? '1. 請於預約時間前 5 分鐘按以下「網上診症入口」進入候診。'
+      : '1. 請於預約時間前 5 分鐘開啟 Google Meet。',
+    input.onlineConsultUrl ? `網上診症入口：${input.onlineConsultUrl}` : '',
+    '2. 打開入口後，系統會通知醫師，請保持 Google Meet 開啟等候。',
+    input.meetLink
+      ? `3. 如入口未能開啟，可直接使用 Google Meet 連結：${input.meetLink}`
+      : '',
+  ];
+
+  return lines.filter(Boolean);
+}
+
 export function buildWhatsappConfirmationText(
   input: BookingWhatsappConfirmationInput & { manageAccessToken?: string },
 ): string {
   const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
+  const onlineConsultFlowLines = buildOnlineConsultFlowLines(input);
 
   return [
     '醫天圓中醫診所預約確認',
@@ -91,8 +128,8 @@ export function buildWhatsappConfirmationText(
     `診所：${input.clinicNameZh}`,
     `日期：${formatDateForWhatsapp(input.appointmentDate)}`,
     `時間：${input.appointmentTime}`,
-    input.meetLink ? `Google Meet 網上應診連結：${input.meetLink}` : '',
     `診症類型：${VISIT_TYPE_LABELS[input.visitType]}`,
+    ...onlineConsultFlowLines,
     `預約編號：${input.bookingId}`,
     input.groupBookingNotice ? '' : '',
     input.groupBookingNotice || '',
@@ -125,13 +162,14 @@ export function buildWhatsappOnlineTemplateBodyParams(
   input: BookingWhatsappConfirmationInput & { manageAccessToken?: string },
 ): Record<string, string> {
   const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
+  const onlineConsultFlowText = buildOnlineConsultFlowText(input);
 
   return {
     patient_name: input.patientName,
     doctor_name: input.doctorNameZh,
     clinic_name: input.clinicNameZh,
     appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
-    meet_link: input.meetLink || '',
+    meet_link: onlineConsultFlowText || input.meetLink || '',
     ...(input.onlineConsultUrl ? { online_consult_url: input.onlineConsultUrl } : {}),
     visit_type: VISIT_TYPE_LABELS[input.visitType],
     booking_id: input.bookingId,
