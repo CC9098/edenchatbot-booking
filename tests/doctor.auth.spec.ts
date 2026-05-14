@@ -16,6 +16,12 @@ test("/nurse 權限保護：未登入應跳到 /login", async ({ page }) => {
   await expect(page.getByText("使用 Google 登入")).toBeVisible();
 });
 
+test("/nurse/quiz 權限保護：未登入應跳到 /login", async ({ page }) => {
+  await page.goto("/nurse/quiz");
+  await page.waitForURL(/\/login\?next=%2Fnurse%2Fquiz$/);
+  await expect(page.getByRole("heading", { name: "登入 staff 控制台" })).toBeVisible();
+});
+
 test("/doctor 登入後流程：可見醫師主頁", async ({ browser }) => {
   const missing = getMissingRoleEnvVars(["doctor"]);
   test.skip(missing.length > 0, `Missing env: ${missing.join(", ")}`);
@@ -64,6 +70,33 @@ test("/nurse 登入後流程：可見姑娘主頁", async ({ browser }) => {
 
     await expect(page.getByRole("heading", { name: "姑娘主頁" })).toBeVisible();
     await expect(page.getByRole("button", { name: "登出" })).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
+test("/nurse/quiz 登入後流程：可見姑娘小測驗", async ({ browser }) => {
+  const missing = getMissingRoleEnvVars(["doctor"]);
+  test.skip(missing.length > 0, `Missing env: ${missing.join(", ")}`);
+
+  const context = await createAuthenticatedContext(browser, "doctor");
+  const page = await context.newPage();
+
+  try {
+    await page.goto("/nurse/quiz");
+    await page.waitForURL("**/nurse/quiz");
+
+    await expect(page.getByRole("heading", { name: "前台安全判斷 Test" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "交卷" })).toBeDisabled();
+    await page.getByLabel("我先幫您確認清楚，再 WhatsApp 回覆您。").check();
+    await page.getByLabel("記低姓名、電話、問題、想聯絡的分店或醫師。").check();
+    await page.getByLabel("先查系統可約時段，今日滿就提供最近可約時間。").check();
+    await page.getByLabel("不保證保險結果，先查紀錄和按診所收據流程處理。").check();
+    await page.getByLabel("收姓名、電話、完整地址、方便收件時間；運費或海外先確認。").check();
+    await page.getByLabel("這類資料不可在一般對話講，按指定流程交主管。").check();
+    await page.getByRole("button", { name: "交卷" }).click();
+    await expect(page.getByText("過關", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "6/6" })).toBeVisible();
   } finally {
     await context.close();
   }

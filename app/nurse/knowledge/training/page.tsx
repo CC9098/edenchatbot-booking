@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import Link from "next/link";
-import { ArrowLeft, PlayCircle } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, PlayCircle } from "lucide-react";
 
 import MarkdownContent from "@/components/content/MarkdownContent";
 
@@ -45,6 +45,13 @@ export default async function NurseKnowledgeTrainingPage() {
             <PlayCircle className="h-4 w-4" />
             開啟對答影片
           </a>
+          <Link
+            href="/nurse/quiz"
+            className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+          >
+            <ClipboardCheck className="h-4 w-4" />
+            做小測驗
+          </Link>
         </div>
       </section>
 

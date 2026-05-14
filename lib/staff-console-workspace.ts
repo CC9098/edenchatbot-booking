@@ -49,6 +49,11 @@ const NURSE_NAV_ITEMS: StaffWorkspaceNavItem[] = [
     label: "上手棋盤",
     matchPrefixes: ["/nurse/onboarding"],
   },
+  {
+    href: "/nurse/quiz",
+    label: "小測驗",
+    matchPrefixes: ["/nurse/quiz"],
+  },
   { href: "/nurse/booking", label: "姑娘代約" },
   {
     href: "/nurse/knowledge",

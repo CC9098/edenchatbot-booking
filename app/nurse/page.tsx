@@ -6,6 +6,7 @@ import {
   ClipboardList,
   GraduationCap,
   MessageCircle,
+  ClipboardCheck,
   UserRoundPlus,
   type LucideIcon,
 } from "lucide-react";
@@ -43,6 +44,14 @@ const NURSE_ACTIONS: RoleHomeAction[] = [
     icon: GraduationCap,
     className: "border-amber-200 bg-amber-50 hover:border-amber-300 hover:bg-amber-100/70",
     iconClassName: "border-amber-200 bg-white text-amber-800",
+  },
+  {
+    title: "姑娘小測驗",
+    subtitle: "6 題測安全收口、預約和主管升級。",
+    href: "/nurse/quiz",
+    icon: ClipboardCheck,
+    className: "border-rose-200 bg-rose-50 hover:border-rose-300 hover:bg-rose-100/70",
+    iconClassName: "border-rose-200 bg-white text-rose-800",
   },
   {
     title: "查 SOP / 問 AI",
