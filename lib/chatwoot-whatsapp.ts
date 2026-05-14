@@ -1621,6 +1621,7 @@ export async function sendStaffPatientWhatsappMessage(
         buildBodyParams: () => buildStaffPatientTemplateBodyParams(input),
         getTemplateConfigs: (inbox) => getStaffPatientMessageTemplateConfigs(inbox, input.purpose),
         preferTemplateIfAvailable: true,
+        fallbackTextOnTemplateFailure: true,
       },
     );
   } catch (error) {
