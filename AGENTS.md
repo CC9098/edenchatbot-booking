@@ -12,6 +12,18 @@ Keep the public app and booking UI on Eden green brand tokens in `app/globals.cs
 Do not change global `--primary`, `--primary-pale`, or page backgrounds to purple/violet unless the user explicitly asks for a new full-app palette.
 If a different area needs experimental styling, scope it locally instead of changing the global brand variables.
 
+## UI Copy / Minimalism Guardrail
+
+Default website and staff-console UI work to Steve Jobs-style minimalism: the screen should feel obvious from layout, labels, and actions, not from explanatory paragraphs.
+
+- Visible copy must earn its place. If a busy patient, nurse, doctor, or front-desk staff member would not read it during real work, remove it.
+- Prefer short action labels, real data, icons, grouping, spacing, and visual hierarchy over explanatory text.
+- Avoid feature-intro copy, self-describing UI text, "how this page works" paragraphs, internal jargon, SOP/browser labels, and repeated helper text.
+- For staff tools, write like an operational console: task name, current state, next action. Do not make training/onboarding pages feel like a manual unless the user explicitly asks for teaching material.
+- For public patient pages, keep wording direct and confidence-building. Do not expose implementation details, backend terms, or system-generated metadata.
+- Keep only text that is necessary for safety, consent, privacy, payment, medical escalation, legal clarity, form errors, or a decision the user must make now.
+- Before adding any paragraph, ask: "Can this become a button label, field label, status, or be deleted?" If yes, do that instead.
+
 ## Chat Systems
 
 ### 1) WordPress widget 客服 bot

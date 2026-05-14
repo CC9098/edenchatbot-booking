@@ -50,7 +50,6 @@ type AssessmentStatus = {
 const STORAGE_KEY = "eden-nurse-quiz-result-v1";
 const PASS_SCORE = 5;
 const OPTION_LABELS = ["A", "B", "C"];
-const ASSESSMENT_PRINCIPLES = ["不估價", "先核對", "要升級就升級"];
 
 const SCENES: QuizScene[] = [
   {
@@ -348,23 +347,9 @@ export function NurseQuizClient() {
       <section className="rounded-lg border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px_300px] lg:items-center">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold text-emerald-800">姑娘放行評估</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-normal text-slate-950">
+            <h1 className="text-3xl font-semibold tracking-normal text-slate-950">
               前台安全放行測驗
             </h1>
-            <p className="mt-3 text-sm leading-7 text-slate-600">
-              6 個真實前台情境，測試新人是否懂得核對、收口、升級和保護資料。
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {ASSESSMENT_PRINCIPLES.map((item) => (
-                <span
-                  key={item}
-                  className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-900"
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
           </div>
 
           <div className="relative aspect-[16/9] overflow-hidden rounded-lg border border-emerald-100 bg-slate-100 shadow-sm">
