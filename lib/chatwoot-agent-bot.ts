@@ -131,7 +131,7 @@ export interface ChatwootRuntimeCopy {
   clinicAddressesMessage: string;
 }
 
-type MenuSelectionKind = 'general' | 'booking' | 'reschedule' | 'cancel' | 'human';
+type MenuSelectionKind = 'main' | 'general' | 'booking' | 'reschedule' | 'cancel' | 'human';
 type GeneralSelectionKind = 'fees' | 'clinic' | 'timetable' | 'other' | 'main';
 type ClinicSelectionKind = 'hours' | 'addresses' | 'main';
 type BookingSelectionKind = 'new_booking' | 'reschedule_booking' | 'cancel_booking' | 'main';
@@ -532,6 +532,16 @@ export function isDuplicateIncomingMessage(
   return String(customAttributes?.[CHATWOOT_LAST_INCOMING_MESSAGE_ID_ATTRIBUTE] ?? '') === String(messageId);
 }
 
+export function shouldSilenceUnmatchedChatwootMessage(state: ChatwootFlowState): boolean {
+  return (
+    state === 'menu' ||
+    state === 'general_menu' ||
+    state === 'clinic_menu' ||
+    state === 'booking_menu' ||
+    state === 'human'
+  );
+}
+
 export function mergeFlowAttributes(
   currentAttributes: Record<string, unknown> | null | undefined,
   nextState: ChatwootFlowState,
@@ -913,6 +923,10 @@ export function resolveMenuSelection(
   const allowNumeric = options?.allowNumeric ?? true;
 
   return resolveSelection(content, [
+    {
+      kind: 'main',
+      pattern: /^(?:menu(?:[:：\s-]|$)|主選單(?:[:：\s-]|$)|主菜单(?:[:：\s-]|$)|返回主選單(?:[:：\s-]|$)|返回主菜单(?:[:：\s-]|$))/iu,
+    },
     {
       kind: 'general',
       pattern: allowNumeric

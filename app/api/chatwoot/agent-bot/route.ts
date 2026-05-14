@@ -23,6 +23,7 @@ import {
   sendChatwootBookingDoctorReply,
   shouldAllowGeneralAiReply,
   shouldDeferToHumanAfterAgentReply,
+  shouldSilenceUnmatchedChatwootMessage,
   verifyChatwootSignature,
 } from '@/lib/chatwoot-agent-bot';
 import { generateLegacyChatResponse } from '@/lib/legacy-chat-response';
@@ -96,18 +97,8 @@ export async function POST(request: NextRequest) {
       contentType: 'input_select',
       items: [...runtimeCopy.generalMenuItems],
     };
-    const generalMenuRetryReply: ChatwootOutgoingMessagePayload = {
-      content: `${runtimeCopy.generalMenuPrompt}\n\n如想自由輸入問題，請先選擇「其他問題」。`,
-      contentType: 'input_select',
-      items: [...runtimeCopy.generalMenuItems],
-    };
     const clinicMenuReply: ChatwootOutgoingMessagePayload = {
       content: runtimeCopy.clinicMenuPrompt,
-      contentType: 'input_select',
-      items: [...runtimeCopy.clinicMenuItems],
-    };
-    const clinicMenuRetryReply: ChatwootOutgoingMessagePayload = {
-      content: `${runtimeCopy.clinicMenuPrompt}\n\n請先選擇以上項目；如想問其他內容，請返回上一層再選擇「其他問題」。`,
       contentType: 'input_select',
       items: [...runtimeCopy.clinicMenuItems],
     };
@@ -134,6 +125,9 @@ export async function POST(request: NextRequest) {
     if (shouldDeferToHuman) {
       nextState = 'human';
       reply = null;
+    } else if (rootSelection?.kind === 'main') {
+      nextState = 'menu';
+      reply = MAIN_MENU_REPLY;
     } else if (rootSelection?.kind === 'human') {
       nextState = 'human';
       reply = CHATWOOT_HUMAN_ACK;
@@ -220,8 +214,8 @@ export async function POST(request: NextRequest) {
         nextState = 'menu';
         reply = MAIN_MENU_REPLY;
       } else {
-        nextState = 'general_menu';
-        reply = generalMenuRetryReply;
+        nextState = 'human';
+        reply = null;
       }
     } else if (currentState === 'clinic_menu') {
       const clinicSelection = resolveClinicMenuSelection(event.content, {
@@ -242,8 +236,8 @@ export async function POST(request: NextRequest) {
         nextState = 'menu';
         reply = MAIN_MENU_REPLY;
       } else {
-        nextState = 'clinic_menu';
-        reply = clinicMenuRetryReply;
+        nextState = 'human';
+        reply = null;
       }
     } else {
       if (nextState === 'general_ai') {
@@ -257,13 +251,12 @@ export async function POST(request: NextRequest) {
         reply = aiReplyIsArmed
           ? await generateGeneralAiReply(conversation.messages, event.content, runtimeSystemMessages)
           : null;
-      } else if (nextState === 'booking_menu') {
-        reply = BOOKING_MENU_REPLY;
-      } else if (nextState === 'human') {
+      } else if (shouldSilenceUnmatchedChatwootMessage(nextState)) {
+        nextState = 'human';
         reply = null;
       } else {
-        nextState = 'menu';
-        reply = MAIN_MENU_REPLY;
+        nextState = 'human';
+        reply = null;
       }
     }
 

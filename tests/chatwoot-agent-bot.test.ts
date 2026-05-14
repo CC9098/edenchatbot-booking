@@ -21,6 +21,7 @@ import {
   sendChatwootBookingDoctorReply,
   shouldAllowGeneralAiReply,
   shouldDeferToHumanAfterAgentReply,
+  shouldSilenceUnmatchedChatwootMessage,
 } from '@/lib/chatwoot-agent-bot';
 import { DEFAULT_WIDGET_CHATBOT_SETTINGS } from '@/lib/widget-chatbot-settings';
 
@@ -43,10 +44,21 @@ test('resolveBookingMenuSelection recognizes booking, reschedule, and cancel act
 test('main menu uses booking service label and routes manage intents separately', () => {
   assert.equal(CHATWOOT_MAIN_MENU_ITEMS[1]?.title, '預約服務');
   assert.equal(CHATWOOT_MAIN_MENU_MESSAGE.includes('2. 預約服務'), true);
+  assert.equal(resolveMenuSelection('menu')?.kind, 'main');
+  assert.equal(resolveMenuSelection('主選單')?.kind, 'main');
   assert.equal(resolveMenuSelection('2', { allowNumeric: true })?.kind, 'booking');
   assert.equal(resolveMenuSelection('預約管理')?.kind, 'booking');
   assert.equal(resolveMenuSelection('更期')?.kind, 'reschedule');
   assert.equal(resolveMenuSelection('取消')?.kind, 'cancel');
+});
+
+test('unmatched WhatsApp text is silenced instead of reopening bot prompts', () => {
+  assert.equal(shouldSilenceUnmatchedChatwootMessage('menu'), true);
+  assert.equal(shouldSilenceUnmatchedChatwootMessage('general_menu'), true);
+  assert.equal(shouldSilenceUnmatchedChatwootMessage('clinic_menu'), true);
+  assert.equal(shouldSilenceUnmatchedChatwootMessage('booking_menu'), true);
+  assert.equal(shouldSilenceUnmatchedChatwootMessage('human'), true);
+  assert.equal(shouldSilenceUnmatchedChatwootMessage('general_ai'), false);
 });
 
 test('booking menu copy points users to booking page while legacy booking state still resolves', async () => {
