@@ -8,10 +8,18 @@ type NotifyChannel = "whatsapp" | "email" | null;
 type WaitingReminderState = "idle" | "scheduled" | "sent" | "failed";
 
 const WAITING_REASSURANCE_DELAY_MS = 5 * 60 * 1000;
+const SAFE_NOTIFY_ERROR_MESSAGE = "暫時未能確認通知狀態，請先開啟 Google Meet。如需協助，請回覆 WhatsApp 訊息。";
 
 interface OnlineConsultClientProps {
   token: string;
   meetLink: string;
+}
+
+function isTransientFetchFailure(error: unknown) {
+  if (error instanceof TypeError) return true;
+
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /load failed|failed to fetch|networkerror|cancelled|canceled/i.test(message);
 }
 
 export default function OnlineConsultClient({ token, meetLink }: OnlineConsultClientProps) {
@@ -45,6 +53,7 @@ export default function OnlineConsultClient({ token, meetLink }: OnlineConsultCl
       try {
         const response = await fetch("/api/online-consult/notify", {
           method: "POST",
+          keepalive: true,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),
         });
@@ -64,8 +73,15 @@ export default function OnlineConsultClient({ token, meetLink }: OnlineConsultCl
         }
       } catch (error) {
         if (!cancelled) {
+          if (isTransientFetchFailure(error)) {
+            sessionStorage.setItem(storageKey, "1");
+            setNotifyChannel(null);
+            setNotifyState("sent");
+            return;
+          }
+
           setNotifyState("failed");
-          setErrorMessage(error instanceof Error ? error.message : "未能通知醫師。");
+          setErrorMessage(error instanceof Error && error.message ? error.message : SAFE_NOTIFY_ERROR_MESSAGE);
         }
       }
     }

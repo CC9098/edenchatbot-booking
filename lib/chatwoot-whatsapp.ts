@@ -1136,15 +1136,14 @@ function buildDoctorOnlineConsultReadyTemplateBodyParams(
   const notifiedAt = formatDoctorReadyNotifiedAt(input.notifiedAtIso);
 
   return {
-    doctor_name: input.doctorNameZh,
-    patient_name: input.patientName,
-    patient_phone: input.patientPhone,
-    patient_email: input.patientEmail || '',
-    appointment_datetime: `${input.date} ${input.time}`,
-    duration: durationText,
-    notified_at: notifiedAt,
-    booking_id: input.bookingId,
-    meet_link: input.meetLink,
+    '1': input.doctorNameZh,
+    '2': input.patientName,
+    '3': input.patientPhone,
+    '4': `${input.date} ${input.time}`,
+    '5': durationText,
+    '6': notifiedAt,
+    '7': input.bookingId,
+    '8': input.meetLink,
   };
 }
 

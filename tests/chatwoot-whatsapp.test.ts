@@ -2421,18 +2421,16 @@ test('sendDoctorOnlineConsultReadyWhatsapp sends the doctor ready notification t
     assert.equal(result.conversationId, 6020);
     assert.equal(sentMessagePayloads.length, 1);
     assert.equal(sentMessagePayloads[0]?.template_params?.name, 'doctor_online_consult_ready');
-    assert.equal(
-      sentMessagePayloads[0]?.template_params?.processed_params?.body?.doctor_name,
-      '張天慧醫師',
-    );
-    assert.equal(
-      sentMessagePayloads[0]?.template_params?.processed_params?.body?.patient_phone,
-      '96322476',
-    );
-    assert.equal(
-      sentMessagePayloads[0]?.template_params?.processed_params?.body?.meet_link,
-      'https://meet.google.com/rkk-jrzp-pqh',
-    );
+    assert.deepEqual(sentMessagePayloads[0]?.template_params?.processed_params?.body, {
+      '1': '張天慧醫師',
+      '2': '小明',
+      '3': '96322476',
+      '4': '2026-05-13 21:30',
+      '5': '20 分鐘',
+      '6': '11/5/2026 下午11:32:00',
+      '7': '7rqc6fcjkjhsikq5basiae3g6o',
+      '8': 'https://meet.google.com/rkk-jrzp-pqh',
+    });
     assert.match(sentMessagePayloads[0]?.content, /病人已打開網上診症入口/);
   } finally {
     global.fetch = originalFetch;
@@ -2578,14 +2576,23 @@ test('sendDoctorOnlineConsultReadyWhatsapp falls back to text when the doctor te
     assert.equal(result.success, true);
     assert.equal(result.whatsappSent, true);
     assert.equal(result.conversationId, 6020);
-    assert.equal(sentMessagePayloads.length, 3);
+    assert.equal(sentMessagePayloads.length, 2);
     assert.equal(sentMessagePayloads[0]?.template_params?.name, 'doctor_online_consult_ready');
     assert.equal(sentMessagePayloads[0]?.template_params?.language, 'zh_HK');
-    assert.equal(sentMessagePayloads[1]?.template_params?.name, 'doctor_online_consult_ready');
-    assert.equal(sentMessagePayloads[2]?.template_params, undefined);
-    assert.match(sentMessagePayloads[2]?.content, /病人已打開網上診症入口/);
-    assert.match(sentMessagePayloads[2]?.content, /小明明/);
-    assert.deepEqual(deletedMessageIds, [931, 932]);
+    assert.deepEqual(sentMessagePayloads[0]?.template_params?.processed_params?.body, {
+      '1': '張天慧醫師',
+      '2': '小明明',
+      '3': '96322476',
+      '4': '2026-05-20 21:30',
+      '5': '20 分鐘',
+      '6': '14/5/2026 上午12:22:38',
+      '7': 'd8v07eca4j8v2e4g8r0kmo17c4',
+      '8': 'https://meet.google.com/krn-dbfi-bfh',
+    });
+    assert.equal(sentMessagePayloads[1]?.template_params, undefined);
+    assert.match(sentMessagePayloads[1]?.content, /病人已打開網上診症入口/);
+    assert.match(sentMessagePayloads[1]?.content, /小明明/);
+    assert.deepEqual(deletedMessageIds, [931]);
   } finally {
     global.fetch = originalFetch;
 
