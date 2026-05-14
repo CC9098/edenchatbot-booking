@@ -56,7 +56,7 @@ const NURSE_NAV_ITEMS: StaffWorkspaceNavItem[] = [
   },
   {
     href: "/nurse/quiz",
-    label: "小測驗",
+    label: "放行測驗",
     matchPrefixes: ["/nurse/quiz"],
   },
   { href: "/nurse/booking", label: "姑娘代約" },

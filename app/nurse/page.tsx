@@ -55,8 +55,8 @@ const NURSE_ACTIONS: RoleHomeAction[] = [
     iconClassName: "border-amber-200 bg-white text-amber-800",
   },
   {
-    title: "姑娘小測驗",
-    subtitle: "6 題測安全收口、預約和主管升級。",
+    title: "前台放行測驗",
+    subtitle: "6 題測收口、核對、升級和資料保護。",
     href: "/nurse/quiz",
     icon: ClipboardCheck,
     className: "border-rose-200 bg-rose-50 hover:border-rose-300 hover:bg-rose-100/70",
