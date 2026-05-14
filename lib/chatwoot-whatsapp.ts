@@ -1,5 +1,10 @@
 import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import {
+  buildStaffPatientMessageText,
+  buildStaffPatientTemplateBodyParams,
+  type StaffPatientMessagePurpose,
+} from '@/lib/staff-patient-messages';
+import {
   buildWhatsappManageAccessTemplateBodyParams,
   buildWhatsappManageAccessText,
   buildWhatsappManageVerificationTemplateBodyParams,
@@ -168,6 +173,18 @@ interface PatientOnlineConsultWaitingWhatsappInput {
   appointmentTime: string;
   waitingMinutes?: number;
   clinicWhatsappPhone?: string | null;
+}
+
+interface StaffPatientWhatsappMessageInput {
+  patientName: string;
+  phone: string;
+  email?: string;
+  clinicNameZh: string;
+  clinicWhatsappPhone?: string | null;
+  purpose: StaffPatientMessagePurpose;
+  note?: string;
+  linkUrl?: string;
+  manageUrl?: string;
 }
 
 interface SendWhatsappBookingConfirmationResult {
@@ -677,6 +694,56 @@ function getPatientOnlineConsultWaitingTemplateConfigs(inbox: ChatwootInbox): Te
   });
 }
 
+function getStaffPatientMessageTemplateConfigs(
+  inbox: ChatwootInbox,
+  purpose: StaffPatientMessagePurpose,
+): TemplateConfig[] {
+  if (purpose === 'manage_link') {
+    return getManageLinkTemplateConfigs(inbox);
+  }
+
+  const templateOptions: Record<Exclude<StaffPatientMessagePurpose, 'manage_link'>, {
+    configuredName?: string;
+    configuredLanguage?: string;
+    configuredCategory?: string;
+    fallbackNames: string[];
+  }> = {
+    intake_link: {
+      configuredName: process.env.CHATWOOT_WHATSAPP_STAFF_INTAKE_TEMPLATE_NAME,
+      configuredLanguage: process.env.CHATWOOT_WHATSAPP_STAFF_INTAKE_TEMPLATE_LANGUAGE,
+      configuredCategory: process.env.CHATWOOT_WHATSAPP_STAFF_INTAKE_TEMPLATE_CATEGORY,
+      fallbackNames: ['staff_patient_intake_link'],
+    },
+    pre_visit: {
+      configuredName: process.env.CHATWOOT_WHATSAPP_STAFF_PRE_VISIT_TEMPLATE_NAME,
+      configuredLanguage: process.env.CHATWOOT_WHATSAPP_STAFF_PRE_VISIT_TEMPLATE_LANGUAGE,
+      configuredCategory: process.env.CHATWOOT_WHATSAPP_STAFF_PRE_VISIT_TEMPLATE_CATEGORY,
+      fallbackNames: ['staff_patient_pre_visit'],
+    },
+    follow_up: {
+      configuredName: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME,
+      configuredLanguage: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE,
+      configuredCategory: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY,
+      fallbackNames: ['staff_patient_follow_up'],
+    },
+    online_waiting: {
+      configuredName: process.env.CHATWOOT_WHATSAPP_STAFF_ONLINE_WAITING_TEMPLATE_NAME,
+      configuredLanguage: process.env.CHATWOOT_WHATSAPP_STAFF_ONLINE_WAITING_TEMPLATE_LANGUAGE,
+      configuredCategory: process.env.CHATWOOT_WHATSAPP_STAFF_ONLINE_WAITING_TEMPLATE_CATEGORY,
+      fallbackNames: ['staff_patient_online_waiting'],
+    },
+  };
+
+  const options = templateOptions[purpose];
+  return getNamedTemplateConfigs(inbox, {
+    configuredName: options.configuredName,
+    configuredLanguage: options.configuredLanguage,
+    configuredCategory: options.configuredCategory || process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY,
+    fallbackNames: options.fallbackNames,
+    defaultCategory: 'UTILITY',
+  });
+}
+
 function getNamedTemplateConfigs(
   inbox: ChatwootInbox,
   options: {
@@ -832,10 +899,12 @@ function buildTemplateProcessedParamCandidates(
 
   const manageUrl = normalizedBody.manage_url?.trim();
   const onlineConsultUrl = normalizedBody.online_consult_url?.trim();
-  if (manageUrl || onlineConsultUrl) {
+  const actionUrl = normalizedBody.action_url?.trim();
+  if (manageUrl || onlineConsultUrl || actionUrl) {
     const {
       manage_url: _manageUrl,
       online_consult_url: _onlineConsultUrl,
+      action_url: _actionUrl,
       ...bodyWithoutActionUrls
     } = normalizedBody;
 
@@ -863,6 +932,15 @@ function buildTemplateProcessedParamCandidates(
           pushCandidate({
             ...(bodyCandidate ? { body: bodyCandidate } : {}),
             buttons: [{ type: 'url', parameter: onlineConsultButtonParameter }],
+          });
+        }
+      }
+
+      if (actionUrl) {
+        for (const actionButtonParameter of extractUrlButtonParameters(actionUrl)) {
+          pushCandidate({
+            ...(bodyCandidate ? { body: bodyCandidate } : {}),
+            buttons: [{ type: 'url', parameter: actionButtonParameter }],
           });
         }
       }
@@ -906,6 +984,14 @@ function buildTemplateProcessedParamCandidates(
             buttons: [{ type: 'url', parameter: manageButtonParameter }],
           });
         }
+      }
+    }
+
+    if (actionUrl && Object.keys(bodyWithoutActionUrls).length > 0) {
+      for (const actionButtonParameter of extractUrlButtonParameters(actionUrl)) {
+        pushCandidate({
+          buttons: [{ type: 'url', parameter: actionButtonParameter }],
+        });
       }
     }
 
@@ -1507,6 +1593,33 @@ export async function sendPatientOnlineConsultWaitingWhatsapp(
         buildContent: () => buildPatientOnlineConsultWaitingWhatsappText(input),
         buildBodyParams: () => buildPatientOnlineConsultWaitingTemplateBodyParams(input),
         getTemplateConfigs: getPatientOnlineConsultWaitingTemplateConfigs,
+        preferTemplateIfAvailable: true,
+      },
+    );
+  } catch (error) {
+    return {
+      success: false,
+      whatsappSent: false,
+      error: getSafeErrorMessage(error),
+    };
+  }
+}
+
+export async function sendStaffPatientWhatsappMessage(
+  input: StaffPatientWhatsappMessageInput,
+): Promise<SendWhatsappBookingConfirmationResult> {
+  try {
+    return await sendBookingWhatsappNotification(
+      {
+        patientName: input.patientName,
+        phone: input.phone,
+        email: input.email || '',
+        clinicWhatsappPhone: input.clinicWhatsappPhone,
+      },
+      {
+        buildContent: () => buildStaffPatientMessageText(input),
+        buildBodyParams: () => buildStaffPatientTemplateBodyParams(input),
+        getTemplateConfigs: (inbox) => getStaffPatientMessageTemplateConfigs(inbox, input.purpose),
         preferTemplateIfAvailable: true,
       },
     );

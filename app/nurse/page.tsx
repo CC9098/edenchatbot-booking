@@ -6,6 +6,7 @@ import {
   ClipboardList,
   GraduationCap,
   MessageCircle,
+  Send,
   ClipboardCheck,
   UserRoundPlus,
   type LucideIcon,
@@ -36,6 +37,14 @@ const NURSE_ACTIONS: RoleHomeAction[] = [
     icon: UserRoundPlus,
     className: "border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:bg-emerald-100/70",
     iconClassName: "border-emerald-200 bg-white text-emerald-800",
+  },
+  {
+    title: "傳新病人訊息",
+    subtitle: "揀 template 用途，發 WhatsApp 給新病人。",
+    href: "/nurse/messages/new",
+    icon: Send,
+    className: "border-indigo-200 bg-indigo-50 hover:border-indigo-300 hover:bg-indigo-100/70",
+    iconClassName: "border-indigo-200 bg-white text-indigo-800",
   },
   {
     title: "新姑娘上手",
