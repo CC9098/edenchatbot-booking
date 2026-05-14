@@ -735,13 +735,74 @@ function getStaffPatientMessageTemplateConfigs(
   };
 
   const options = templateOptions[purpose];
-  return getNamedTemplateConfigs(inbox, {
+  return getConfiguredOrSyncedTemplateConfigs(inbox, {
     configuredName: options.configuredName,
     configuredLanguage: options.configuredLanguage,
     configuredCategory: options.configuredCategory || process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY,
     fallbackNames: options.fallbackNames,
     defaultCategory: 'UTILITY',
   });
+}
+
+function getConfiguredOrSyncedTemplateConfigs(
+  inbox: ChatwootInbox,
+  options: {
+    configuredName?: string;
+    configuredLanguage?: string;
+    configuredCategory?: string;
+    fallbackNames: string[];
+    defaultCategory: string;
+  },
+): TemplateConfig[] {
+  const configuredName = (options.configuredName || '').trim();
+  const configuredLanguage = (options.configuredLanguage || '').trim();
+  const category = (options.configuredCategory || options.defaultCategory).trim();
+  const preferredLanguages = buildPreferredTemplateLanguages(configuredLanguage);
+  const templateNames = Array.from(
+    new Set([configuredName, ...options.fallbackNames].filter(Boolean)),
+  );
+
+  const syncedTemplates = (inbox.message_templates || []).filter((template) => {
+    if (!template.name || !template.language) return false;
+    if (!templateNames.includes(template.name)) return false;
+    return String(template.status || '').toLowerCase() === 'approved';
+  });
+
+  const preferredSyncedTemplates = [...syncedTemplates]
+    .sort((left, right) => {
+      const nameRankDifference = rankTemplateName(
+        left.name || '',
+        templateNames,
+      ) - rankTemplateName(
+        right.name || '',
+        templateNames,
+      );
+
+      if (nameRankDifference !== 0) {
+        return nameRankDifference;
+      }
+
+      return rankTemplateLanguage(left.language || '', preferredLanguages)
+        - rankTemplateLanguage(right.language || '', preferredLanguages);
+    });
+
+  if (preferredSyncedTemplates.length > 0) {
+    return preferredSyncedTemplates.map((template) => ({
+      name: template.name || configuredName || options.fallbackNames[0] || '',
+      category: (template.category || category).trim(),
+      language: (template.language || preferredLanguages[0] || 'zh_HK').trim(),
+    })).filter((template) => Boolean(template.name));
+  }
+
+  if (configuredName) {
+    return preferredLanguages.map((language) => ({
+      name: configuredName,
+      category,
+      language,
+    }));
+  }
+
+  return [];
 }
 
 function getNamedTemplateConfigs(
@@ -1345,14 +1406,15 @@ async function sendBookingWhatsappNotification(
 
   if (isActiveConversation(existingConversation)) {
     try {
-      await client.createMessage(accountId, conversationId, {
-        content,
-      });
+      deliveryStatus = options.fallbackTextOnTemplateFailure
+        ? await sendTextMessageWithFailureCheck(client, accountId, conversationId, content)
+        : (await client.createMessage(accountId, conversationId, { content }), null);
 
       return {
         success: true,
         whatsappSent: true,
         conversationId,
+        deliveryStatus,
       };
     } catch (error) {
       console.warn(
@@ -1371,15 +1433,16 @@ async function sendBookingWhatsappNotification(
       bodyParams,
     );
   } else {
-    await client.createMessage(accountId, conversationId, {
-      content,
-    });
+    deliveryStatus = options.fallbackTextOnTemplateFailure
+      ? await sendTextMessageWithFailureCheck(client, accountId, conversationId, content)
+      : (await client.createMessage(accountId, conversationId, { content }), null);
   }
 
   return {
     success: true,
     whatsappSent: true,
     conversationId,
+    deliveryStatus,
   };
 }
 
