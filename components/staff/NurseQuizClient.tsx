@@ -1,262 +1,488 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowRight,
+  AlertTriangle,
   CheckCircle2,
   ClipboardCheck,
-  FileText,
+  GraduationCap,
+  PlayCircle,
   RotateCcw,
-  ShieldAlert,
-  ShieldCheck,
+  Video,
   XCircle,
 } from "lucide-react";
 
-type QuizOption = {
-  id: string;
-  text: string;
-  note: string;
-};
+type OptionId = "A" | "B" | "C" | "D";
 
-type QuizScene = {
+type TrainingVideo = {
   id: string;
   title: string;
-  area: string;
-  riskLabel: string;
-  quoteFrom: string;
-  quote: string;
-  goal: string;
+  driveId: string;
+};
+
+type QuizOption = {
+  id: OptionId;
+  text: string;
+};
+
+type QuizQuestion = {
+  id: string;
+  videoTitle: string;
+  prompt: string;
   options: QuizOption[];
-  correctOptionId: string;
+  correctOptionId: OptionId;
+  critical: boolean;
   why: string;
-  safeScript: string;
-  supervisorRule: string;
 };
 
-type StoredResult = {
-  score: number;
-  total: number;
-  completedAt: string;
+type TrainingModule = {
+  id: string;
+  title: string;
+  shortTitle: string;
+  audience: string;
+  videos: TrainingVideo[];
+  questions: QuizQuestion[];
 };
 
-type AssessmentStatus = {
-  label: string;
-  note: string;
-  badgeClassName: string;
-};
+type StoredResults = Record<
+  string,
+  {
+    score: number;
+    total: number;
+    criticalErrors: number;
+    completedAt: string;
+  }
+>;
 
-const STORAGE_KEY = "eden-nurse-quiz-result-v1";
-const PASS_SCORE = 5;
-const OPTION_LABELS = ["A", "B", "C"];
+const STORAGE_KEY = "eden-nurse-training-platform-v1";
+const PASS_RATIO = 0.8;
 
-const SCENES: QuizScene[] = [
+const MODULES: TrainingModule[] = [
   {
-    id: "safe-close",
-    title: "收費未確認",
-    area: "接待櫃位",
-    riskLabel: "承諾風險",
-    quoteFrom: "病人",
-    quote: "我上次好似有折，今次應該都係同一個價？你幫我答實得唔得？",
-    goal: "未確認收費或優惠時，先守住診所承諾。",
-    options: [
+    id: "front-desk",
+    title: "前台與服務標準",
+    shortTitle: "前台",
+    audience: "前台 / 接待 / 姑娘",
+    videos: [
       {
-        id: "soft-promise",
-        text: "我估今次應該都差唔多；如果有不同，我再通知你。",
-        note: "聽起來客氣，但已經給了病人價格預期。",
-      },
-      {
-        id: "delay",
-        text: "我先幫你查清楚今次收費和優惠，確認後再 WhatsApp 回覆你。",
-        note: "先查核、後回覆，不即場估價。",
-      },
-      {
-        id: "ai",
-        text: "我先問 AI，如果 AI 說可以，我就照它答你。",
-        note: "AI 不能代替收費規則和主管確認。",
+        id: "front-desk-manners",
+        title: "前台儀態要求",
+        driveId: "13w1stGKerWohcT1AfI7y122OnH2-PL0U",
       },
     ],
-    correctOptionId: "delay",
-    why: "收費、優惠、保險或醫師安排都屬於承諾風險，新人不應即場估。",
-    safeScript: "「我先查清楚紀錄和今次安排，確認後再 WhatsApp 回覆你。」",
-    supervisorRule: "涉及收費差異、優惠、退款、醫師安排，未確定就交當值同事確認。",
+    questions: [
+      {
+        id: "front-q1",
+        videoTitle: "前台儀態要求",
+        prompt: "病人入到前台時，姑娘最先應保持哪一類表現？",
+        options: [
+          { id: "A", text: "只處理電腦，不望病人" },
+          { id: "B", text: "清楚、有禮、主動確認需要" },
+          { id: "C", text: "等病人重複問多次先回應" },
+          { id: "D", text: "只用內部術語回答" },
+        ],
+        correctOptionId: "B",
+        critical: false,
+        why: "前台第一反應會直接影響病人信任，先讓病人知道有人接住佢。",
+      },
+      {
+        id: "front-q2",
+        videoTitle: "前台儀態要求",
+        prompt: "如病人問題涉及私隱或個人資料，最合適做法是？",
+        options: [
+          { id: "A", text: "在大堂大聲確認資料" },
+          { id: "B", text: "按診所私隱流程處理，避免公開講出敏感資料" },
+          { id: "C", text: "叫其他病人一齊聽" },
+          { id: "D", text: "直接忽略問題" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "病人資料不可在公共位置暴露，私隱題錯誤需要主管覆核。",
+      },
+      {
+        id: "front-q3",
+        videoTitle: "前台儀態要求",
+        prompt: "如病人情緒急或不滿，姑娘應優先做到？",
+        options: [
+          { id: "A", text: "即時反駁" },
+          { id: "B", text: "保持冷靜，先聽清楚，再按流程處理或交給負責人" },
+          { id: "C", text: "叫病人之後再來" },
+          { id: "D", text: "在群組討論病人資料" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "投訴或急切情況要先降溫，再按權限處理，不可即場升級衝突。",
+      },
+      {
+        id: "front-q4",
+        videoTitle: "前台儀態要求",
+        prompt: "以下哪一項最不應該出現在前台服務？",
+        options: [
+          { id: "A", text: "清楚確認預約/資料" },
+          { id: "B", text: "有禮貌回應" },
+          { id: "C", text: "在病人面前講內部抱怨或責備同事" },
+          { id: "D", text: "需要時請 senior 跟進" },
+        ],
+        correctOptionId: "C",
+        critical: false,
+        why: "前台是病人接觸診所的第一個場景，內部問題不應在病人面前處理。",
+      },
+      {
+        id: "front-q5",
+        videoTitle: "前台儀態要求",
+        prompt: "如果自己不肯定答案，較安全做法是？",
+        options: [
+          { id: "A", text: "估一個答案給病人" },
+          { id: "B", text: "查清楚或請負責人確認後再回答" },
+          { id: "C", text: "叫病人自己上網查" },
+          { id: "D", text: "不回應" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "不確定就查核或升級，比即場估更保護病人和診所。",
+      },
+    ],
   },
   {
-    id: "identity",
-    title: "身份未核實",
-    area: "電話查詢",
-    riskLabel: "私隱風險",
-    quoteFrom: "來電者",
-    quote: "我唔記得預約時間，只記得電話尾數 8899，你幫我睇下。",
-    goal: "查預約前先做基本身份核對。",
-    options: [
+    id: "treatment-room",
+    title: "治療室安全操作",
+    shortTitle: "治療室",
+    audience: "治療室 / 姑娘",
+    videos: [
       {
-        id: "tail",
-        text: "電話尾數應該夠用，我先讀出最近一個預約時間。",
-        note: "電話尾數不足以確認身份，容易洩露預約資料。",
-      },
-      {
-        id: "verify",
-        text: "我先核對姓名和完整電話；資料對上後，只講相關預約資料。",
-        note: "先核對，再提供最少需要的資料。",
-      },
-      {
-        id: "refuse",
-        text: "只有電話尾數一定查不到，請你自己找回完整資料再打來。",
-        note: "太快拒絕，沒有先提供合理核對路徑。",
+        id: "heat-lamp",
+        title: "治療室熱燈使用操作",
+        driveId: "1tNdb5ln-o9p0329eNhmIOKVXSE6Gqjhw",
       },
     ],
-    correctOptionId: "verify",
-    why: "姑娘要幫到病人，但同時要避免把預約資料講給錯人。",
-    safeScript: "「我先同你核對姓名同完整電話，資料對上後再幫你確認預約時間。」",
-    supervisorRule: "多人共用電話、資料對不上、對方代家人查詢，要問主管或當值同事。",
+    questions: [
+      {
+        id: "room-q1",
+        videoTitle: "治療室熱燈使用操作",
+        prompt: "使用熱燈前，最重要先確認的是？",
+        options: [
+          { id: "A", text: "房間是否最靚" },
+          { id: "B", text: "病人/治療位置及是否按診所或醫師指示使用" },
+          { id: "C", text: "是否有人影相" },
+          { id: "D", text: "是否可以離開房間" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "熱燈屬安全操作，位置、距離和指示未確認就不應開始。",
+      },
+      {
+        id: "room-q2",
+        videoTitle: "治療室熱燈使用操作",
+        prompt: "熱燈照射期間，姑娘應留意甚麼？",
+        options: [
+          { id: "A", text: "只要開著就不用理會" },
+          { id: "B", text: "病人舒適度、距離、時間及異常反應" },
+          { id: "C", text: "只看手機時間" },
+          { id: "D", text: "只確保房門關上" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "治療室設備要有人留意反應，異常要及早處理。",
+      },
+      {
+        id: "room-q3",
+        videoTitle: "治療室熱燈使用操作",
+        prompt: "如病人表示太熱或不舒服，應該？",
+        options: [
+          { id: "A", text: "叫病人忍耐" },
+          { id: "B", text: "立即按安全流程調整/停止，並通知負責人" },
+          { id: "C", text: "加大熱度" },
+          { id: "D", text: "離開治療室" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "不適反應不可拖延，先停止風險再通知負責人。",
+      },
+      {
+        id: "room-q4",
+        videoTitle: "治療室熱燈使用操作",
+        prompt: "完成使用後，以下哪項應做？",
+        options: [
+          { id: "A", text: "確認關機/移開設備/整理治療室" },
+          { id: "B", text: "直接走開" },
+          { id: "C", text: "交給下一位病人自行處理" },
+          { id: "D", text: "不用記錄任何異常" },
+        ],
+        correctOptionId: "A",
+        critical: true,
+        why: "設備收尾是安全流程一部分，避免下一位病人或同事接手出錯。",
+      },
+    ],
   },
   {
-    id: "today-slot",
-    title: "即日加位要求",
-    area: "預約表",
-    riskLabel: "排程風險",
-    quoteFrom: "病人",
-    quote: "我今日一定要睇，你幫我 WhatsApp 醫師問下可唔可以加個位。",
-    goal: "分清可約時段、加位權限和醫療急切度。",
-    options: [
+    id: "medicine-machine",
+    title: "藥機操作及保養",
+    shortTitle: "藥機",
+    audience: "藥房 / 姑娘",
+    videos: [
       {
-        id: "message-doctor",
-        text: "病人話急，我先私訊醫師；醫師得閒應該可以加一個位。",
-        note: "新人不應自行打亂醫師排程或承諾加位。",
+        id: "machine-start",
+        title: "藥機開機方法",
+        driveId: "1ssfbCkiXVBR8z4sIqvgLBBT35NquQ-Rq",
       },
       {
-        id: "system",
-        text: "我先查系統可約時段；如已滿，提供最近可約時間，急症狀況交當值同事。",
-        note: "先用系統時間，特殊情況才升級。",
+        id: "machine-care",
+        title: "藥機操作保養教學",
+        driveId: "1Y-pMyVrIq_LMYkrawyT-DyrRl5z-Hb38",
       },
       {
-        id: "diagnose",
-        text: "我先問清楚症狀，再替你判斷今日是否一定要看醫師。",
-        note: "姑娘可以收集資料，不應替病人做醫療判斷。",
+        id: "machine-pack",
+        title: "藥機pack藥準則",
+        driveId: "1lrJsv14F2Uf00SjSpgEEJUNLR5OnCqDH",
       },
     ],
-    correctOptionId: "system",
-    why: "即日加位同時牽涉排程、公平性和醫療風險，不能由新人自行決定。",
-    safeScript: "「我先幫你查系統可約時間；如果今日滿了，我給你最近可約選擇。」",
-    supervisorRule: "病人描述高風險症狀、強烈要求加位、指定醫師破例安排，一律升級。",
+    questions: [
+      {
+        id: "machine-q1",
+        videoTitle: "藥機開機方法",
+        prompt: "藥機開機前較合理的第一步是？",
+        options: [
+          { id: "A", text: "直接開始 pack 藥" },
+          { id: "B", text: "按影片示範檢查機器狀態及必要準備" },
+          { id: "C", text: "跳過所有檢查" },
+          { id: "D", text: "只看藥袋顏色" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "機器未準備好就開始，會增加錯藥、卡機或污染風險。",
+      },
+      {
+        id: "machine-q2",
+        videoTitle: "藥機開機方法",
+        prompt: "如果開機時出現異常聲響或錯誤提示，應該？",
+        options: [
+          { id: "A", text: "繼續使用直到完成" },
+          { id: "B", text: "停止並按流程通知負責人/檢查問題" },
+          { id: "C", text: "拍片放群組但繼續 pack" },
+          { id: "D", text: "自行拆機維修" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "異常提示不可照常運作，先停機和升級處理。",
+      },
+      {
+        id: "machine-q3",
+        videoTitle: "藥機操作保養教學",
+        prompt: "保養清潔的目的主要是？",
+        options: [
+          { id: "A", text: "令機器看起來新" },
+          { id: "B", text: "保持機器運作穩定，減少污染/錯誤風險" },
+          { id: "C", text: "節省所有覆核步驟" },
+          { id: "D", text: "代替醫師處方" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "藥機保養是穩定和衛生要求，不是外觀整理。",
+      },
+      {
+        id: "machine-q4",
+        videoTitle: "藥機pack藥準則",
+        prompt: "Pack 藥時最核心的核對原則是？",
+        options: [
+          { id: "A", text: "快過所有同事" },
+          { id: "B", text: "按處方/藥袋/影片流程核對，避免錯藥錯量錯袋" },
+          { id: "C", text: "藥粉顏色相似就可以" },
+          { id: "D", text: "病人催就省略覆核" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "藥房流程最重要是準確，不是速度。",
+      },
+      {
+        id: "machine-q5",
+        videoTitle: "藥機pack藥準則",
+        prompt: "如發現藥袋或資料與處方不一致，應該？",
+        options: [
+          { id: "A", text: "照 pack 再算" },
+          { id: "B", text: "停止流程並請負責人核對" },
+          { id: "C", text: "自行改資料" },
+          { id: "D", text: "交給病人自己判斷" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "資料不一致就是錯誤攔截點，不可自行跳過。",
+      },
+    ],
   },
   {
-    id: "receipt-insurance",
-    title: "保險收據",
-    area: "收據處理",
-    riskLabel: "第三方承諾",
-    quoteFrom: "病人",
-    quote: "我保險要 claim，你張收據寫咗就一定 claim 到啦？",
-    goal: "可以講診所流程，不承諾第三方審批結果。",
-    options: [
+    id: "medicine-bag",
+    title: "裝藥與藥袋流程",
+    shortTitle: "裝藥",
+    audience: "藥房 / 姑娘",
+    videos: [
       {
-        id: "guarantee",
-        text: "診所收據通常都可以 claim，我估你應該沒有問題。",
-        note: "即使語氣保守，仍然是在替保險公司作承諾。",
+        id: "dispense",
+        title: "盛藥方法",
+        driveId: "1zV1Ze0p3iEHxpC4S9cqIu97GCslrsgAA",
       },
       {
-        id: "safe",
-        text: "我可以按診所紀錄處理收據；能否索償要由保險公司審批。",
-        note: "清楚分開診所能做的事和第三方決定。",
+        id: "powder-bag",
+        title: "藥粉袋裝藥準則",
+        driveId: "1eEf9xrfUZRisKH3mw_oqgNW3dQ_sDzo5",
       },
       {
-        id: "doctor-sign",
-        text: "如果保險要文件，我可以答應醫師今日一定簽好。",
-        note: "醫師簽署時限不可由新人承諾。",
+        id: "seal-bag",
+        title: "藥袋封口方法",
+        driveId: "1NhdqJklWNjtDFCBJMzVDmmqnN-3xiDce",
       },
     ],
-    correctOptionId: "safe",
-    why: "診所可以處理文件，但保險是否批核不是診所可保證的結果。",
-    safeScript: "「我可以按診所紀錄幫你處理收據；保險是否批核，要以保險公司為準。」",
-    supervisorRule: "退款、補發收費、醫師信、保險特別格式或簽署時限，要先問主管。",
+    questions: [
+      {
+        id: "bag-q1",
+        videoTitle: "盛藥方法",
+        prompt: "盛藥時最應避免的是？",
+        options: [
+          { id: "A", text: "按流程核對藥物" },
+          { id: "B", text: "保持容器/工具清潔" },
+          { id: "C", text: "不同病人或不同處方混淆" },
+          { id: "D", text: "完成後覆核" },
+        ],
+        correctOptionId: "C",
+        critical: true,
+        why: "混藥或混處方屬高風險錯誤。",
+      },
+      {
+        id: "bag-q2",
+        videoTitle: "盛藥方法",
+        prompt: "盛藥完成後，下一步應該？",
+        options: [
+          { id: "A", text: "直接放低不標示" },
+          { id: "B", text: "按影片流程核對/標示/交下一工序" },
+          { id: "C", text: "叫病人自己取" },
+          { id: "D", text: "把多餘藥物混回其他藥" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "交接前要有清楚標示和核對，避免下一工序接錯。",
+      },
+      {
+        id: "bag-q3",
+        videoTitle: "藥粉袋裝藥準則",
+        prompt: "藥粉入袋時，最重要確認的是？",
+        options: [
+          { id: "A", text: "袋口是否最美觀" },
+          { id: "B", text: "藥袋、份量、病人/處方資料是否吻合" },
+          { id: "C", text: "誰最快完成" },
+          { id: "D", text: "是否可一次處理多個病人而不分開" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "裝袋前後都要確認身份、份量和處方，避免錯袋。",
+      },
+      {
+        id: "bag-q4",
+        videoTitle: "藥袋封口方法",
+        prompt: "封口完成後，較安全的檢查是？",
+        options: [
+          { id: "A", text: "封口是否完整，藥粉是否容易漏出" },
+          { id: "B", text: "只看顏色" },
+          { id: "C", text: "不需檢查" },
+          { id: "D", text: "把破損袋照用" },
+        ],
+        correctOptionId: "A",
+        critical: true,
+        why: "封口不完整會直接影響藥物保存和交付安全。",
+      },
+      {
+        id: "bag-q5",
+        videoTitle: "藥袋封口方法",
+        prompt: "如發現封口不完整，應該？",
+        options: [
+          { id: "A", text: "照樣交出" },
+          { id: "B", text: "按流程重做/更換並重新核對" },
+          { id: "C", text: "用手按一下就算" },
+          { id: "D", text: "交給病人提醒小心" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "品質問題要在交付前攔截和重做。",
+      },
+    ],
   },
   {
-    id: "delivery",
-    title: "寄藥資料",
-    area: "藥袋枱",
-    riskLabel: "送遞風險",
-    quoteFrom: "病人",
-    quote: "我想寄藥，你幫我照舊地址寄啦，應該無變。",
-    goal: "寄送前收齊最新資料，不靠舊紀錄估。",
-    options: [
+    id: "medicine-rack",
+    title: "藥架整理與出藥準則",
+    shortTitle: "藥架",
+    audience: "藥房 / 姑娘",
+    videos: [
       {
-        id: "old-address",
-        text: "如果系統有舊地址，我可以直接照舊寄，這樣最快。",
-        note: "舊地址可能已改，寄藥不可靠估。",
+        id: "rack-pack",
+        title: "藥架包藥準則",
+        driveId: "1ZpQDOl28DKgN5jh6Nrc4jA03g7MzBhJQ",
       },
       {
-        id: "complete",
-        text: "我先重新確認收件人、電話、完整地址和收件時段，再確認運費和送遞方式。",
-        note: "把寄送需要的核心資料一次收齊。",
-      },
-      {
-        id: "promise-today",
-        text: "我先答應今日送到，再叫司機盡量安排。",
-        note: "未確認物流前，不可承諾送達時間。",
+        id: "rack-insert",
+        title: "藥架插藥袋方法",
+        driveId: "1ry0BE2smXJXaLku5BVzaXpr-Stf_sozE",
       },
     ],
-    correctOptionId: "complete",
-    why: "寄藥最常出錯的是地址、電話、收件時間和運費未確認。",
-    safeScript: "「我需要重新同你確認收件人、電話、完整地址、收件時間同運費安排。」",
-    supervisorRule: "海外、貴重藥物、投訴、即日送達承諾或地址不清，要升級處理。",
-  },
-  {
-    id: "restricted",
-    title: "密碼與 OTP",
-    area: "員工後場",
-    riskLabel: "帳號安全",
-    quoteFrom: "同事",
-    quote: "我部機登入唔到，你 WhatsApp 個 OTP 或後台密碼俾我先啦。",
-    goal: "守住 restricted 資料，不在普通對話轉發。",
-    options: [
+    questions: [
       {
-        id: "share",
-        text: "對方是同事，我可以先傳 OTP 或密碼，之後再提醒他改密碼。",
-        note: "同事身份不代表可以用普通 WhatsApp 傳 restricted 資料。",
+        id: "rack-q1",
+        videoTitle: "藥架包藥準則",
+        prompt: "使用藥架包藥時，最核心目標是？",
+        options: [
+          { id: "A", text: "把藥袋放得好看" },
+          { id: "B", text: "確保每位病人/每張處方的藥袋不混亂、不錯位" },
+          { id: "C", text: "節省所有標示" },
+          { id: "D", text: "讓多人同時亂放" },
+        ],
+        correctOptionId: "B",
+        critical: true,
+        why: "藥架是防止錯袋錯位的工具，不只是收納。",
       },
       {
-        id: "restricted",
-        text: "OTP、密碼和後台權限不能在 WhatsApp 傳；請用正式登入流程或交主管處理。",
-        note: "守住權限邊界，也保護同事和診所。",
+        id: "rack-q2",
+        videoTitle: "藥架插藥袋方法",
+        prompt: "插藥袋時應優先跟隨甚麼？",
+        options: [
+          { id: "A", text: "影片示範的位置/次序/標示規則" },
+          { id: "B", text: "自己習慣" },
+          { id: "C", text: "任何空位都可以" },
+          { id: "D", text: "按袋大小隨便排" },
+        ],
+        correctOptionId: "A",
+        critical: true,
+        why: "藥架位置和次序要一致，否則交接時容易出錯。",
       },
       {
-        id: "ai",
-        text: "我可以先問 AI 有沒有記錄，再把找到的資料轉發給同事。",
-        note: "restricted 資料不可交給 AI 查，也不可轉發。",
+        id: "rack-q3",
+        videoTitle: "藥架插藥袋方法",
+        prompt: "出藥或交接前，應該做甚麼？",
+        options: [
+          { id: "A", text: "按流程最後核對病人/處方/藥袋/數量" },
+          { id: "B", text: "只數總袋數" },
+          { id: "C", text: "直接交給下一位同事不用講" },
+          { id: "D", text: "等病人自己核對" },
+        ],
+        correctOptionId: "A",
+        critical: true,
+        why: "最後交接是出錯前最後一道防線。",
       },
     ],
-    correctOptionId: "restricted",
-    why: "密碼、OTP、銀行、後台權限都屬 restricted 資料，不可用普通對話傳遞。",
-    safeScript: "「呢類資料不能在 WhatsApp 傳，我幫你按正式登入或主管流程處理。」",
-    supervisorRule: "任何人要求密碼、OTP、銀行資料、後台權限或病人敏感資料，都要立即升級。",
   },
 ];
 
-function readStoredResult(): StoredResult | null {
-  if (typeof window === "undefined") return null;
+function readStoredResults(): StoredResults {
+  if (typeof window === "undefined") return {};
 
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null");
-    if (
-      parsed &&
-      typeof parsed.score === "number" &&
-      typeof parsed.total === "number" &&
-      typeof parsed.completedAt === "string"
-    ) {
-      return parsed;
-    }
+    const parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
-    return null;
+    return {};
   }
-
-  return null;
 }
 
-function formatStoredDate(value: string) {
+function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
+
   return date.toLocaleString("zh-HK", {
     month: "2-digit",
     day: "2-digit",
@@ -265,108 +491,332 @@ function formatStoredDate(value: string) {
   });
 }
 
-function getAssessmentStatus(score: number, total: number): AssessmentStatus {
-  if (score === total) {
-    return {
-      label: "可獨立處理低風險前台任務",
-      note: "高風險、收費、保險、加位和 restricted 資料仍要升級。",
-      badgeClassName: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    };
-  }
-
-  if (score >= PASS_SCORE) {
-    return {
-      label: "可處理低風險任務，錯題需主管覆核",
-      note: "先重溫錯題情境，再由主管確認是否可放行。",
-      badgeClassName: "border-cyan-200 bg-cyan-50 text-cyan-900",
-    };
-  }
-
-  return {
-    label: "暫時需要主管旁聽",
-    note: "先重溫上手棋盤和錯題句式，不建議獨立處理前台查詢。",
-    badgeClassName: "border-amber-200 bg-amber-50 text-amber-900",
-  };
+function getPassScore(total: number) {
+  return Math.ceil(total * PASS_RATIO);
 }
 
 export function NurseQuizClient() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [lockedSceneIds, setLockedSceneIds] = useState<string[]>([]);
-  const [storedResult, setStoredResult] = useState<StoredResult | null>(null);
+  const [selectedModuleId, setSelectedModuleId] = useState(MODULES[0].id);
+  const [selectedVideoIds, setSelectedVideoIds] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, Record<string, OptionId>>>({});
+  const [storedResults, setStoredResults] = useState<StoredResults>({});
 
   useEffect(() => {
-    setStoredResult(readStoredResult());
+    setStoredResults(readStoredResults());
   }, []);
 
-  const currentScene = SCENES[currentIndex];
-  const currentAnswer = answers[currentScene.id];
-  const currentLocked = lockedSceneIds.includes(currentScene.id);
+  const selectedModule = MODULES.find((module) => module.id === selectedModuleId) ?? MODULES[0];
+  const selectedVideoId = selectedVideoIds[selectedModule.id] ?? selectedModule.videos[0].id;
+  const selectedVideo =
+    selectedModule.videos.find((video) => video.id === selectedVideoId) ?? selectedModule.videos[0];
+  const moduleAnswers = useMemo(
+    () => answers[selectedModule.id] ?? {},
+    [answers, selectedModule.id],
+  );
+  const answeredCount = Object.keys(moduleAnswers).length;
 
   const score = useMemo(
-    () => SCENES.filter((scene) => answers[scene.id] === scene.correctOptionId).length,
-    [answers],
+    () =>
+      selectedModule.questions.filter(
+        (question) => moduleAnswers[question.id] === question.correctOptionId,
+      ).length,
+    [moduleAnswers, selectedModule.questions],
   );
-  const finished = lockedSceneIds.length === SCENES.length;
-  const progressPercent = Math.round((lockedSceneIds.length / SCENES.length) * 100);
-  const currentCorrect = currentAnswer === currentScene.correctOptionId;
-  const resultStatus = getAssessmentStatus(score, SCENES.length);
 
-  function chooseAnswer(optionId: string) {
-    if (currentLocked) return;
+  const criticalErrors = useMemo(
+    () =>
+      selectedModule.questions.filter(
+        (question) =>
+          question.critical &&
+          moduleAnswers[question.id] &&
+          moduleAnswers[question.id] !== question.correctOptionId,
+      ).length,
+    [moduleAnswers, selectedModule.questions],
+  );
 
-    const nextAnswers = { ...answers, [currentScene.id]: optionId };
-    const nextLocked = [...lockedSceneIds, currentScene.id];
+  const passScore = getPassScore(selectedModule.questions.length);
+  const finished = answeredCount === selectedModule.questions.length;
+  const passed = finished && score >= passScore && criticalErrors === 0;
+  const progressPercent = Math.round((answeredCount / selectedModule.questions.length) * 100);
+  const completedModules = MODULES.filter((module) => storedResults[module.id]).length;
+
+  function selectModule(moduleId: string) {
+    setSelectedModuleId(moduleId);
+  }
+
+  function chooseAnswer(questionId: string, optionId: OptionId) {
+    if (moduleAnswers[questionId]) return;
+
+    const nextModuleAnswers = {
+      ...moduleAnswers,
+      [questionId]: optionId,
+    };
+    const nextAnswers = {
+      ...answers,
+      [selectedModule.id]: nextModuleAnswers,
+    };
+
     setAnswers(nextAnswers);
-    setLockedSceneIds(nextLocked);
 
-    if (nextLocked.length === SCENES.length) {
-      const finalScore = SCENES.filter((scene) => nextAnswers[scene.id] === scene.correctOptionId).length;
-      const nextResult = {
-        score: finalScore,
-        total: SCENES.length,
-        completedAt: new Date().toISOString(),
+    if (Object.keys(nextModuleAnswers).length === selectedModule.questions.length) {
+      const finalScore = selectedModule.questions.filter(
+        (question) => nextModuleAnswers[question.id] === question.correctOptionId,
+      ).length;
+      const finalCriticalErrors = selectedModule.questions.filter(
+        (question) =>
+          question.critical && nextModuleAnswers[question.id] !== question.correctOptionId,
+      ).length;
+      const nextResults = {
+        ...storedResults,
+        [selectedModule.id]: {
+          score: finalScore,
+          total: selectedModule.questions.length,
+          criticalErrors: finalCriticalErrors,
+          completedAt: new Date().toISOString(),
+        },
       };
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextResult));
-      setStoredResult(nextResult);
+
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextResults));
+      setStoredResults(nextResults);
     }
   }
 
-  function goNext() {
-    setCurrentIndex((index) => Math.min(index + 1, SCENES.length - 1));
-  }
-
-  function resetAssessment() {
-    setCurrentIndex(0);
-    setAnswers({});
-    setLockedSceneIds([]);
+  function resetModule() {
+    const nextAnswers = { ...answers };
+    delete nextAnswers[selectedModule.id];
+    setAnswers(nextAnswers);
   }
 
   return (
     <div className="space-y-5">
       <section className="rounded-lg border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px_300px] lg:items-center">
-          <div className="max-w-3xl">
-            <h1 className="text-3xl font-semibold tracking-normal text-slate-950">
-              前台安全放行測驗
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-900">
+              <GraduationCap className="h-4 w-4" />
+              Staff training
+            </div>
+            <h1 className="mt-4 text-3xl font-semibold tracking-normal text-slate-950">
+              姑娘培訓平台
             </h1>
-          </div>
-
-          <div className="relative aspect-[16/9] overflow-hidden rounded-lg border border-emerald-100 bg-slate-100 shadow-sm">
-            <Image
-              src="/images/nurse-quiz-consultation-photo.jpg"
-              alt="姑娘在診所前台與病人溝通"
-              fill
-              priority
-              sizes="(min-width: 1024px) 360px, 100vw"
-              className="object-cover"
-            />
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+              播放影片，完成同組測驗；安全題錯誤需要重溫。
+            </p>
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-700">
-              <span>進度</span>
-              <span>{lockedSceneIds.length}/{SCENES.length}</span>
+              <span>已完成模組</span>
+              <span>{completedModules}/{MODULES.length}</span>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-emerald-700 transition-all"
+                style={{ width: `${Math.round((completedModules / MODULES.length) * 100)}%` }}
+              />
+            </div>
+            <p className="mt-3 text-xs leading-5 text-slate-500">
+              第一版紀錄儲存在此裝置；正式總覽可再接資料庫。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-5">
+        {MODULES.map((module) => {
+          const result = storedResults[module.id];
+          const active = module.id === selectedModule.id;
+          const modulePassed =
+            result && result.score >= getPassScore(result.total) && result.criticalErrors === 0;
+
+          return (
+            <button
+              key={module.id}
+              type="button"
+              onClick={() => selectModule(module.id)}
+              className={`rounded-lg border p-4 text-left shadow-sm transition focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 ${
+                active
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50/50"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold">{module.shortTitle}</span>
+                {result ? (
+                  modulePassed ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  )
+                ) : null}
+              </div>
+              <div className="mt-2 text-xs leading-5 text-current/65">{module.videos.length} 影片</div>
+            </button>
+          );
+        })}
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="space-y-5">
+          <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-800">
+                  {selectedModule.audience}
+                </span>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">
+                  {selectedModule.questions.length} 題
+                </span>
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-900">
+                  {passScore}/{selectedModule.questions.length} 合格
+                </span>
+              </div>
+              <h2 className="mt-4 text-2xl font-semibold tracking-normal text-slate-950">
+                {selectedModule.title}
+              </h2>
+            </div>
+
+            <div className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
+                <iframe
+                  title={`播放影片：${selectedVideo.title}`}
+                  src={`https://drive.google.com/file/d/${selectedVideo.driveId}/preview`}
+                  className="aspect-video w-full"
+                  allow="autoplay; encrypted-media; fullscreen"
+                  allowFullScreen
+                />
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <Video className="h-4 w-4 text-emerald-700" />
+                  影片
+                </div>
+                <div className="mt-4 space-y-2">
+                  {selectedModule.videos.map((video, index) => (
+                    <button
+                      key={video.id}
+                      type="button"
+                      onClick={() =>
+                        setSelectedVideoIds((current) => ({
+                          ...current,
+                          [selectedModule.id]: video.id,
+                        }))
+                      }
+                      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 ${
+                        video.id === selectedVideo.id
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-emerald-200"
+                      }`}
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-current/20 text-xs font-semibold">
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0 font-semibold">{video.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            {selectedModule.questions.map((question, questionIndex) => {
+              const selectedAnswer = moduleAnswers[question.id];
+              const answered = Boolean(selectedAnswer);
+              const correct = selectedAnswer === question.correctOptionId;
+
+              return (
+                <article
+                  key={question.id}
+                  className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+                >
+                  <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                      <span className="rounded-full bg-white px-3 py-1 text-slate-700">
+                        第 {questionIndex + 1} 題
+                      </span>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">
+                        {question.videoTitle}
+                      </span>
+                      {question.critical ? (
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-900">
+                          安全題
+                        </span>
+                      ) : null}
+                    </div>
+                    <h3 className="mt-3 text-lg font-semibold leading-7 text-slate-950">
+                      {question.prompt}
+                    </h3>
+                  </div>
+
+                  <div className="grid gap-3 p-5 md:grid-cols-2">
+                    {question.options.map((option) => {
+                      const selected = selectedAnswer === option.id;
+                      const isCorrectOption = option.id === question.correctOptionId;
+                      const showCorrect = answered && isCorrectOption;
+                      const showWrong = answered && selected && !isCorrectOption;
+
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => chooseAnswer(question.id, option.id)}
+                          disabled={answered}
+                          className={`rounded-lg border p-4 text-left text-sm shadow-sm transition focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 disabled:cursor-default ${
+                            showCorrect
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+                              : showWrong
+                                ? "border-amber-300 bg-amber-50 text-amber-950"
+                                : selected
+                                  ? "border-cyan-300 bg-cyan-50 text-cyan-950"
+                                  : "border-slate-200 bg-white text-slate-800 hover:border-emerald-200 hover:bg-emerald-50/40"
+                          }`}
+                        >
+                          <span className="flex gap-3">
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-current/20 text-xs font-semibold">
+                              {option.id}
+                            </span>
+                            <span className="min-w-0 font-semibold leading-6">{option.text}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {answered ? (
+                    <div
+                      role="status"
+                      className={`border-t px-5 py-4 text-sm leading-6 ${
+                        correct
+                          ? "border-emerald-100 bg-emerald-50 text-emerald-950"
+                          : "border-amber-100 bg-amber-50 text-amber-950"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 font-semibold">
+                        {correct ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                        {correct ? "答對" : "需要重溫"}
+                      </div>
+                      <p className="mt-2">{question.why}</p>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </section>
+        </div>
+
+        <aside className="space-y-4">
+          <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+              <ClipboardCheck className="h-4 w-4 text-emerald-700" />
+              本組進度
+            </div>
+            <div className="mt-4 flex items-baseline justify-between gap-3">
+              <span className="text-sm text-slate-500">已完成</span>
+              <span className="text-xl font-semibold text-slate-950">
+                {answeredCount}/{selectedModule.questions.length}
+              </span>
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
               <div
@@ -374,241 +824,75 @@ export function NurseQuizClient() {
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <div className="mt-3 flex items-baseline justify-between gap-3">
-              <span className="text-sm text-slate-500">目前分數</span>
-              <span className="text-xl font-semibold text-slate-950">{score}/{SCENES.length}</span>
-            </div>
-            <p className="mt-2 text-xs leading-5 text-slate-500">
-              {storedResult
-                ? `上次：${storedResult.score}/${storedResult.total} · ${formatStoredDate(storedResult.completedAt)}`
-                : "未有完成紀錄"}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-4">
-          <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 bg-emerald-50 px-5 py-4">
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                <span className="rounded-full bg-white px-3 py-1 text-emerald-800">
-                  第 {currentIndex + 1} 關
-                </span>
-                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-900">
-                  {currentScene.riskLabel}
-                </span>
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">
-                  {currentScene.area}
-                </span>
-              </div>
-              <h2 className="mt-4 text-2xl font-semibold tracking-normal text-slate-950">
-                {currentScene.title}
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{currentScene.goal}</p>
-            </div>
-
-            <div className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="rounded-lg border border-slate-200 bg-slate-950 p-4 text-white">
-                <div className="text-xs font-semibold text-emerald-200">{currentScene.quoteFrom}</div>
-                <p className="mt-3 text-base leading-8">{currentScene.quote}</p>
-              </div>
-
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                  <ShieldCheck className="h-4 w-4 text-emerald-700" />
-                  判斷重點
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="text-xs font-semibold text-slate-500">分數</div>
+                <div className="mt-1 text-lg font-semibold text-slate-950">
+                  {score}/{selectedModule.questions.length}
                 </div>
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  選擇一個最穩陣、最可被主管接受的前台回應。
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="text-xs font-semibold text-slate-500">安全錯題</div>
+                <div className="mt-1 text-lg font-semibold text-slate-950">{criticalErrors}</div>
+              </div>
+            </div>
+
+            {finished ? (
+              <div
+                className={`mt-4 rounded-lg border p-3 text-sm leading-6 ${
+                  passed
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+                    : "border-amber-200 bg-amber-50 text-amber-950"
+                }`}
+              >
+                <div className="flex items-center gap-2 font-semibold">
+                  {passed ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                  {passed ? "本組合格" : "需要主管覆核"}
+                </div>
+                <p className="mt-2">
+                  {passed
+                    ? "可進入下一組影片。"
+                    : `${passScore}/${selectedModule.questions.length} 或以上且安全題無錯才合格。`}
                 </p>
               </div>
-            </div>
-          </section>
+            ) : null}
 
-          <div className="grid gap-3">
-            {currentScene.options.map((option, index) => {
-              const selected = currentAnswer === option.id;
-              const correct = option.id === currentScene.correctOptionId;
-              const showCorrect = currentLocked && correct;
-              const showWrong = currentLocked && selected && !correct;
-
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => chooseAnswer(option.id)}
-                  disabled={currentLocked}
-                  className={`group rounded-lg border p-4 text-left shadow-sm transition focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 disabled:cursor-default ${
-                    showCorrect
-                      ? "border-emerald-300 bg-emerald-50 text-emerald-950"
-                      : showWrong
-                        ? "border-amber-300 bg-amber-50 text-amber-950"
-                        : selected
-                          ? "border-cyan-300 bg-cyan-50 text-cyan-950"
-                          : "border-slate-200 bg-white text-slate-900 hover:border-emerald-200 hover:bg-emerald-50/40"
-                  }`}
-                >
-                  <span className="flex gap-3">
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${
-                      showCorrect
-                        ? "border-emerald-300 bg-white text-emerald-800"
-                        : showWrong
-                          ? "border-amber-300 bg-white text-amber-800"
-                          : "border-slate-200 bg-slate-50 text-slate-600"
-                    }`}>
-                      {OPTION_LABELS[index]}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold leading-6">{option.text}</span>
-                      {currentLocked ? (
-                        <span className="mt-2 block text-xs leading-5 text-slate-500">{option.note}</span>
-                      ) : null}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {currentLocked ? (
-            <section
-              role="status"
-              className={`rounded-lg border p-5 shadow-sm ${
-                currentCorrect
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-950"
-                  : "border-amber-200 bg-amber-50 text-amber-950"
-              }`}
+            <button
+              type="button"
+              onClick={resetModule}
+              className="mt-4 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100"
             >
-              <div className="flex items-center gap-2 font-semibold">
-                {currentCorrect ? (
-                  <CheckCircle2 className="h-5 w-5" />
-                ) : (
-                  <ShieldAlert className="h-5 w-5" />
-                )}
-                {currentCorrect ? "判斷穩陣" : "需要重溫"}
-              </div>
-              <p className="mt-3 text-sm leading-6">{currentScene.why}</p>
-              <div className="mt-4 grid gap-3 text-sm leading-6 md:grid-cols-3">
-                <div className="rounded-lg border border-current/20 bg-white/70 p-3">
-                  <div className="text-xs font-semibold text-current/70">可照讀句子</div>
-                  <p className="mt-2">{currentScene.safeScript}</p>
-                </div>
-                <div className="rounded-lg border border-current/20 bg-white/70 p-3 md:col-span-2">
-                  <div className="text-xs font-semibold text-current/70">何時問主管</div>
-                  <p className="mt-2">{currentScene.supervisorRule}</p>
-                </div>
-              </div>
-            </section>
-          ) : null}
-        </div>
-
-        <aside className="space-y-4">
-          <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <ClipboardCheck className="h-4 w-4 text-emerald-700" />
-              6 個判斷點
-            </div>
-            <div className="mt-4 space-y-2">
-              {SCENES.map((scene, index) => {
-                const done = lockedSceneIds.includes(scene.id);
-                const active = index === currentIndex;
-                const correct = answers[scene.id] === scene.correctOptionId;
-
-                return (
-                  <button
-                    key={scene.id}
-                    type="button"
-                    onClick={() => setCurrentIndex(index)}
-                    className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 ${
-                      active
-                        ? "border-emerald-300 bg-emerald-50 text-emerald-950"
-                        : done && correct
-                          ? "border-emerald-100 bg-white text-slate-700"
-                          : done
-                            ? "border-amber-200 bg-amber-50 text-amber-950"
-                            : "border-slate-200 bg-white text-slate-600 hover:border-emerald-100"
-                    }`}
-                    aria-label={`前往第 ${index + 1} 關：${scene.title}`}
-                  >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-current/20 text-xs font-semibold">
-                      {done ? (correct ? <CheckCircle2 className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />) : index + 1}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block font-semibold">{scene.title}</span>
-                      <span className="block text-xs text-current/60">{scene.riskLabel}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+              <RotateCcw className="h-4 w-4" />
+              重做本組
+            </button>
           </section>
 
           <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <FileText className="h-4 w-4 text-emerald-700" />
-              放行標準
+              <PlayCircle className="h-4 w-4 text-emerald-700" />
+              上次紀錄
             </div>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              {PASS_SCORE}/{SCENES.length} 或以上才可進入低風險前台任務；錯題仍需主管覆核。
-            </p>
+            <div className="mt-4 space-y-2">
+              {MODULES.map((module) => {
+                const result = storedResults[module.id];
+
+                return (
+                  <div
+                    key={module.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <span className="font-semibold text-slate-700">{module.shortTitle}</span>
+                    <span className="text-xs text-slate-500">
+                      {result
+                        ? `${result.score}/${result.total} · ${formatDate(result.completedAt)}`
+                        : "未完成"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </section>
         </aside>
-      </section>
-
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        {finished ? (
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${resultStatus.badgeClassName}`}>
-                {score >= PASS_SCORE ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-                {resultStatus.label}
-              </div>
-              <h2 className="mt-3 text-2xl font-semibold text-slate-950">
-                {score}/{SCENES.length}
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{resultStatus.note}</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={resetAssessment}
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100"
-              >
-                <RotateCcw className="h-4 w-4" />
-                重新測驗
-              </button>
-              <Link
-                href="/nurse/onboarding"
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100"
-              >
-                返回上手棋盤
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">
-                <ClipboardCheck className="h-4 w-4" />
-                {currentLocked ? "本題已完成" : "揀一個最穩陣回應"}
-              </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                第 {currentIndex + 1} 關：{currentScene.title}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={goNext}
-              disabled={!currentLocked || currentIndex === SCENES.length - 1}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-            >
-              下一關
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-        )}
       </section>
     </div>
   );
