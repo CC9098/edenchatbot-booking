@@ -192,6 +192,20 @@ function getRowPhoneDigits(row: BookingIntakeRow): string {
   return row.phone_digits || normalizePhoneForSearch(row.phone);
 }
 
+function getTodayIsoInHongKong() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: HONG_KONG_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  return year && month && day ? `${year}-${month}-${day}` : new Date().toISOString().slice(0, 10);
+}
+
 function canManageRow(row: BookingIntakeRow): boolean {
   return Boolean(row.google_event_id && row.calendar_id) && row.status !== "cancelled" && row.status !== "failed";
 }
@@ -283,7 +297,7 @@ function matchesSearch(row: BookingIntakeRow, query: string): boolean {
 }
 
 function buildStats(rows: BookingIntakeRow[]): StaffBookingListStats {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayIsoInHongKong();
 
   return {
     total: rows.length,

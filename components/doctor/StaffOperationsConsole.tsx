@@ -143,7 +143,17 @@ const GENDER_LABELS: Record<string, string> = {
 };
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Hong_Kong",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  return year && month && day ? `${year}-${month}-${day}` : new Date().toISOString().slice(0, 10);
 }
 
 function addDays(base: string, days: number) {
@@ -295,7 +305,7 @@ export function StaffOperationsConsole({
     clinicId: "",
     source: "all",
     dateFrom: todayStr(),
-    dateTo: "",
+    dateTo: todayStr(),
   });
   const deferredQuery = useDeferredValue(filters.q.trim());
 
@@ -569,7 +579,7 @@ export function StaffOperationsConsole({
       clinicId: "",
       source: "all",
       dateFrom: today,
-      dateTo: "",
+      dateTo: today,
     });
   }
 
