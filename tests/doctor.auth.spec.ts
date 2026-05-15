@@ -88,7 +88,7 @@ test("/nurse/quiz 登入後流程：可見培訓影片與測驗", async ({ brows
 
     await expect(page.getByRole("heading", { name: "姑娘培訓平台" })).toBeVisible();
     await expect(page.getByTitle("播放影片：前台儀態要求")).toBeVisible();
-    await expect(page.getByRole("button", { name: /藥機/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /第 10 條/ })).toBeVisible();
     await expect(page.getByText("病人入到前台時，姑娘最先應保持哪一類表現？")).toBeVisible();
 
     await page.getByRole("button", { name: "B 清楚、有禮、主動確認需要" }).click();
