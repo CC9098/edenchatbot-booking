@@ -1,7 +1,15 @@
 import { createServerClient } from "@/lib/supabase-server";
 import { createServiceClient } from "@/lib/supabase";
+import { getDefaultStaffKind, normalizeStaffEmail, type StaffKind } from "@/lib/staff-access";
 
 export type StaffRoleName = "doctor" | "assistant" | "admin";
+
+export type StaffRoleResult = {
+  user_id: string;
+  role: StaffRoleName;
+  is_active: boolean;
+  staff_kind: StaffKind | null;
+};
 
 const STAFF_EMAIL_ROLE_FALLBACKS = new Map<string, StaffRoleName>([
   ["chetleung@gmail.com", "doctor"],
@@ -38,6 +46,39 @@ export function getFallbackStaffRoleForEmail(email?: string | null): StaffRoleNa
   return null;
 }
 
+function isMissingStaffAccessEmailTable(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return error.code === "42P01" || error.code === "PGRST205" || /staff_access_emails/i.test(error.message || "");
+}
+
+async function getStaffAccessForEmail(email?: string | null) {
+  const normalizedEmail = email ? normalizeStaffEmail(email) : "";
+  if (!normalizedEmail) return null;
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("staff_access_emails")
+    .select("email, role, staff_kind, is_active")
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+
+  if (error) {
+    if (!isMissingStaffAccessEmailTable(error)) {
+      console.error("[getStaffAccessForEmail] DB error:", error.message);
+    }
+    return null;
+  }
+
+  return data as
+    | {
+        email: string;
+        role: StaffRoleName;
+        staff_kind: StaffKind | null;
+        is_active: boolean;
+      }
+    | null;
+}
+
 /**
  * Extracts the authenticated user from the current request context.
  * Uses the cookie-based server client (for App Router Server Components / Route Handlers).
@@ -59,7 +100,7 @@ export async function getCurrentUser() {
  * Queries the `staff_roles` table using the service client (bypasses RLS).
  * Throws a structured error if the user is not staff.
  */
-export async function requireStaffRole(userId: string) {
+export async function requireStaffRole(userId: string): Promise<StaffRoleResult> {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("staff_roles")
@@ -80,19 +121,48 @@ export async function requireStaffRole(userId: string) {
       throw new AuthError(403, "Forbidden: staff role required");
     }
 
+    const emailAccess = await getStaffAccessForEmail(authUserData.user?.email);
+    if (emailAccess) {
+      if (!emailAccess.is_active) {
+        throw new AuthError(403, "Forbidden: staff role inactive");
+      }
+
+      return {
+        user_id: userId,
+        role: emailAccess.role,
+        is_active: true,
+        staff_kind: emailAccess.staff_kind ?? getDefaultStaffKind(emailAccess.role),
+      };
+    }
+
     const fallbackRole = getFallbackStaffRoleForEmail(authUserData.user?.email);
     if (fallbackRole) {
       return {
         user_id: userId,
         role: fallbackRole,
         is_active: true,
+        staff_kind: getDefaultStaffKind(fallbackRole),
       };
     }
 
     throw new AuthError(403, "Forbidden: staff role required");
   }
 
-  return data;
+  return {
+    ...data,
+    role: data.role as StaffRoleName,
+    staff_kind: getDefaultStaffKind(data.role as StaffRoleName),
+  };
+}
+
+export async function requireStaffManagerRole(userId: string): Promise<StaffRoleResult> {
+  const staffRole = await requireStaffRole(userId);
+
+  if (staffRole.role !== "admin" && staffRole.role !== "doctor") {
+    throw new AuthError(403, "Forbidden: doctor or admin role required");
+  }
+
+  return staffRole;
 }
 
 /**

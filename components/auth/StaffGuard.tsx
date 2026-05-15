@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import type { StaffWorkspace } from "@/lib/staff-console-workspace";
 
 type StaffGuardState = "checking" | "authorized" | "forbidden" | "error";
 
@@ -12,10 +13,12 @@ export function StaffGuard({
   children,
   areaLabel = "staff 控制台",
   loginNextPath = "/doctor",
+  workspace,
 }: {
   children: ReactNode;
   areaLabel?: string;
   loginNextPath?: string;
+  workspace?: StaffWorkspace;
 }) {
   const router = useRouter();
   const { signOut } = useAuth();
@@ -37,6 +40,17 @@ export function StaffGuard({
         });
 
         if (response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          if (
+            workspace === "doctor" &&
+            payload.role === "assistant" &&
+            payload.staffKind === "part_time_assistant"
+          ) {
+            setState("forbidden");
+            setErrorMessage("此帳號係兼職姑娘權限，請使用姑娘控制台。");
+            return;
+          }
+
           setState("authorized");
           return;
         }
@@ -44,6 +58,7 @@ export function StaffGuard({
         const payload = await response.json().catch(() => ({}));
         if (response.status === 403) {
           setState("forbidden");
+          setErrorMessage(payload.error || null);
           return;
         }
 
@@ -65,7 +80,7 @@ export function StaffGuard({
     void loadStaffStatus();
 
     return () => controller.abort();
-  }, []);
+  }, [workspace]);
 
   async function handleSignOut() {
     if (signingOut) return;
@@ -96,26 +111,30 @@ export function StaffGuard({
       <div className="min-h-screen bg-[#f5f9f2] px-4 py-10">
         <div className="mx-auto max-w-md rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
           <h1 className="text-xl font-semibold text-gray-900">無法進入{areaLabel}</h1>
-          <p className="mt-2 text-sm leading-6 text-gray-600">
-            此帳號已登入，但未有 staff 權限，所以不能進入{areaLabel}。請聯絡管理者為此帳號加入
-            <span className="mx-1 rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-700">
-              staff_roles
-            </span>
-            ，並設定合適角色，例如
-            <span className="mx-1 rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-700">
-              assistant
-            </span>
-            或
-            <span className="mx-1 rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-700">
-              doctor
-            </span>
-            。
-          </p>
+          {errorMessage ? (
+            <p className="mt-2 text-sm leading-6 text-gray-600">{errorMessage}</p>
+          ) : (
+            <p className="mt-2 text-sm leading-6 text-gray-600">
+              此帳號已登入，但未有 staff 權限，所以不能進入{areaLabel}。請聯絡管理者加入權限。
+            </p>
+          )}
 
           <div className="mt-5 flex flex-wrap gap-3">
+            {workspace === "doctor" ? (
+              <Link
+                href="/nurse"
+                className="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+              >
+                前往姑娘控制台
+              </Link>
+            ) : null}
             <Link
               href="/chat"
-              className="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+              className={`inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                workspace === "doctor"
+                  ? "border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  : "bg-primary text-white hover:bg-primary-hover"
+              }`}
             >
               返回病人頁面
             </Link>

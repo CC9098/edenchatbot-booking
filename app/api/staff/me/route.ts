@@ -17,6 +17,7 @@ export async function GET() {
       userId: user.id,
       role: staffRole.role,
       isActive: staffRole.is_active,
+      staffKind: staffRole.staff_kind,
     });
   } catch (error) {
     if (error instanceof AuthError) {

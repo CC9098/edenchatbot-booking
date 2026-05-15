@@ -4,6 +4,7 @@ export type StaffWorkspaceNavItem = {
   href: string;
   label: string;
   matchPrefixes?: string[];
+  managerOnly?: boolean;
 };
 
 export type StaffWorkspaceConfig = {
@@ -32,6 +33,7 @@ const DOCTOR_NAV_ITEMS: StaffWorkspaceNavItem[] = [
   { href: "/doctor/content/articles", label: "文章管理" },
   { href: "/doctor/content/cards", label: "知識卡" },
   { href: "/doctor/timetable", label: "時間表管理" },
+  { href: "/doctor/staff-access", label: "權限", managerOnly: true },
 ];
 
 const NURSE_NAV_ITEMS: StaffWorkspaceNavItem[] = [
@@ -67,6 +69,7 @@ const NURSE_NAV_ITEMS: StaffWorkspaceNavItem[] = [
   },
   { href: "/nurse/widget-chatbot", label: "客服 Widget" },
   { href: "/nurse/timetable", label: "時間表管理" },
+  { href: "/nurse/staff-access", label: "權限", managerOnly: true },
 ];
 
 export function getStaffWorkspaceConfig(workspace: StaffWorkspace): StaffWorkspaceConfig {

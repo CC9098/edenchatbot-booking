@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
@@ -18,6 +19,26 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
   const pathname = usePathname();
   const config = getStaffWorkspaceConfig(workspace);
   const iconLabel = workspace === "nurse" ? "護" : "醫";
+  const [staffStatus, setStaffStatus] = useState<{ role?: string; staffKind?: string | null } | null>(null);
+  const isPartTimeAssistant =
+    staffStatus?.role === "assistant" && staffStatus.staffKind === "part_time_assistant";
+  const visibleNavItems = config.navItems.filter((item) => {
+    if (item.managerOnly && staffStatus?.role !== "admin" && staffStatus?.role !== "doctor") return false;
+    if (workspace === "doctor" && isPartTimeAssistant) return false;
+    return true;
+  });
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/staff/me", { cache: "no-store", signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => setStaffStatus(payload))
+      .catch(() => {
+        if (!controller.signal.aborted) setStaffStatus(null);
+      });
+
+    return () => controller.abort();
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 border-b border-primary/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
@@ -35,7 +56,7 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
           </Link>
 
           <nav className="hidden min-w-0 items-center gap-1 overflow-x-auto xl:flex">
-            {config.navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const active = isWorkspacePathActive(pathname, item);
 
               return (
@@ -56,12 +77,14 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
         </div>
 
         <div className="flex items-center gap-3">
-          <Link
-            href={config.switchHref}
-            className="hidden whitespace-nowrap rounded-md border border-primary/15 px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5 md:inline-flex"
-          >
-            {config.switchLabel}
-          </Link>
+          {!isPartTimeAssistant ? (
+            <Link
+              href={config.switchHref}
+              className="hidden whitespace-nowrap rounded-md border border-primary/15 px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5 md:inline-flex"
+            >
+              {config.switchLabel}
+            </Link>
+          ) : null}
           <span className="hidden max-w-[180px] truncate text-sm text-gray-500 sm:block">
             {user?.email}
           </span>
@@ -76,7 +99,7 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
 
       <div className="border-t border-primary/10 bg-white/90 px-4 py-2 xl:hidden">
         <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto">
-          {config.navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const active = isWorkspacePathActive(pathname, item);
 
             return (
@@ -93,12 +116,14 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
               </Link>
             );
           })}
-          <Link
-            href={config.switchHref}
-            className="whitespace-nowrap rounded-full border border-primary/15 bg-white px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
-          >
-            {config.switchLabel}
-          </Link>
+          {!isPartTimeAssistant ? (
+            <Link
+              href={config.switchHref}
+              className="whitespace-nowrap rounded-full border border-primary/15 bg-white px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
+            >
+              {config.switchLabel}
+            </Link>
+          ) : null}
         </div>
       </div>
     </header>
@@ -117,7 +142,7 @@ export function StaffConsoleShell({
   return (
     <AuthProvider>
       <AuthGuard>
-        <StaffGuard areaLabel={config.areaLabel} loginNextPath={config.homeHref}>
+        <StaffGuard areaLabel={config.areaLabel} loginNextPath={config.homeHref} workspace={workspace}>
           <div className="staff-console-shell min-h-screen">
             <StaffConsoleHeader workspace={workspace} />
             <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">{children}</main>
