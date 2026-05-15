@@ -2,12 +2,9 @@ import Link from "next/link";
 import {
   AlertTriangle,
   ArrowRight,
-  BookOpenCheck,
   Bot,
   CalendarCheck2,
   CheckCircle2,
-  ChevronDown,
-  CircleAlert,
   Clock3,
   ClipboardCheck,
   ClipboardList,
@@ -24,7 +21,6 @@ import {
   Stethoscope,
   Users,
   WalletCards,
-  XCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -260,21 +256,18 @@ const boardDays: BoardDay[] = [
   },
 ];
 
-const releaseMeta: Record<ReleaseLevel, { label: string; className: string; icon: typeof CheckCircle2 }> = {
+const releaseMeta: Record<ReleaseLevel, { label: string; className: string }> = {
   green: {
     label: "可自己答",
     className: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    icon: CheckCircle2,
   },
   yellow: {
     label: "先問同事",
     className: "border-amber-200 bg-amber-50 text-amber-900",
-    icon: CircleAlert,
   },
   red: {
     label: "一定交主管",
     className: "border-rose-200 bg-rose-50 text-rose-800",
-    icon: XCircle,
   },
 };
 
@@ -311,7 +304,7 @@ function InfoLine({
   children: string;
 }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-3">
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
       <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
         <Icon className="h-3.5 w-3.5 text-emerald-700" />
         {label}
@@ -325,7 +318,7 @@ function CardDetails({ card }: { card: BoardCard }) {
   const mustEscalate = card.release === "red" || card.supervisor === "always";
 
   return (
-    <div className="mt-3 grid gap-2">
+    <div className="mt-4 grid gap-2">
       <InfoLine icon={ClipboardCheck} label="照做">
         {card.task}
       </InfoLine>
@@ -336,7 +329,7 @@ function CardDetails({ card }: { card: BoardCard }) {
         {card.cannotSay}
       </InfoLine>
       <div
-        className={`rounded-md border p-3 ${
+        className={`rounded-lg border p-3 ${
           mustEscalate
             ? "border-rose-200 bg-rose-50"
             : "border-cyan-200 bg-cyan-50"
@@ -354,16 +347,11 @@ function CardDetails({ card }: { card: BoardCard }) {
           )}
           {mustEscalate ? "先交主管" : "問 AI 幫手"}
         </div>
-        <p className={`mt-1 text-sm leading-6 ${mustEscalate ? "text-rose-950" : "text-cyan-950"}`}>
-          {mustEscalate
-            ? "這件事不要自己決定。先交當值同事或主管，再用 AI 幫你整理要問甚麼。"
-            : card.aiPrompt}
-        </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {mustEscalate ? (
             <a
               href="#supervisor-gates"
-              className="inline-flex items-center gap-2 rounded-md bg-rose-700 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-800"
+              className="inline-flex items-center gap-2 rounded-lg bg-rose-700 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-800"
             >
               交主管確認
               <ArrowRight className="h-4 w-4" />
@@ -371,7 +359,7 @@ function CardDetails({ card }: { card: BoardCard }) {
           ) : null}
           <Link
             href={aiChatHref(card.aiPrompt)}
-            className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold ${
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${
               mustEscalate
                 ? "border border-rose-200 bg-white text-rose-800 hover:bg-rose-50"
                 : "bg-emerald-700 text-white hover:bg-emerald-800"
@@ -449,12 +437,12 @@ function dayShortLabel(day: number) {
 
 function gameTileClass(card: BoardCard) {
   if (card.release === "red" || card.supervisor === "always") {
-    return "border-rose-300 bg-[#fff5f5] text-rose-800";
+    return "border-rose-200 bg-rose-50 text-rose-800";
   }
   if (card.release === "yellow") {
-    return "border-amber-300 bg-[#fff9df] text-amber-950";
+    return "border-amber-200 bg-amber-50 text-amber-950";
   }
-  return "border-emerald-300 bg-[#f4fff8] text-emerald-950";
+  return "border-emerald-200 bg-emerald-50 text-emerald-950";
 }
 
 function releaseDotClass(card: BoardCard) {
@@ -494,19 +482,19 @@ function BoardGameTile({
       <Link
         href={boardCardHref(card.code)}
         scroll={false}
-        className={`group/tile relative flex aspect-[1.18] min-h-24 cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 px-3 py-3 text-center shadow-[inset_0_-5px_0_rgba(77,63,20,0.08)] transition-colors hover:border-emerald-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 ${gameTileClass(card)} ${
-          selected ? "outline outline-4 outline-emerald-200" : ""
+        className={`group/tile relative flex min-h-24 cursor-pointer flex-col items-start justify-between rounded-lg border px-3 py-3 text-left transition-colors hover:border-emerald-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 ${gameTileClass(card)} ${
+          selected ? "border-emerald-600 ring-4 ring-emerald-100" : ""
         }`}
         aria-current={selected ? "step" : undefined}
       >
-        <span className="absolute left-2 top-2 rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-slate-400">
+        <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-slate-400">
           {card.code.replace("D", "")}
         </span>
-        <span className="text-current">
-          <TileIcon className="h-7 w-7" />
+        <span className="mt-3 flex w-full items-end justify-between gap-2">
+          <span className="text-sm font-semibold leading-5">{tileShortLabel(card.code)}</span>
+          <TileIcon className="h-5 w-5 shrink-0" />
         </span>
-        <span className="mt-2 text-sm font-semibold leading-5">{tileShortLabel(card.code)}</span>
-        <span className={`mt-2 h-1.5 w-10 rounded-full ${releaseDotClass(card)}`} />
+        <span className={`mt-3 h-1 w-full rounded-full ${releaseDotClass(card)}`} />
       </Link>
       {mustEscalate ? (
         <span className="absolute -right-1 -top-1 z-20 rounded-full bg-rose-600 px-2 py-1 text-[10px] font-bold text-white shadow-sm">
@@ -518,12 +506,10 @@ function BoardGameTile({
 }
 
 function BoardGameLane({ day, selectedCode }: { day: BoardDay; selectedCode: string }) {
-  const placeholders = Array.from({ length: Math.max(0, 4 - day.cards.length) });
-
   return (
-    <section className={`relative grid gap-3 rounded-[28px] border p-3 shadow-sm ${gameLaneClass(day.day)} lg:grid-cols-[132px_minmax(0,1fr)]`}>
+    <section className={`relative grid gap-3 rounded-lg border p-3 ${gameLaneClass(day.day)} lg:grid-cols-[126px_minmax(0,1fr)]`}>
       <div className="flex items-center gap-3 lg:block">
-        <div className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-full border text-center text-sm font-bold leading-5 shadow-lg ring-4 ring-white/80 ${dayBadgeClass(day.day)}`}>
+        <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full border text-center text-xs font-bold leading-5 ring-4 ring-white/80 ${dayBadgeClass(day.day)}`}>
           <span>
             Day {day.day}
             <br />
@@ -532,21 +518,13 @@ function BoardGameLane({ day, selectedCode }: { day: BoardDay; selectedCode: str
         </div>
         <div className="min-w-0 lg:mt-3">
           <p className="text-xs font-semibold text-slate-500">{day.day === 1 ? "今日必行" : "之後再開"}</p>
-          <h2 className="mt-1 text-lg font-semibold leading-5 text-slate-950">{day.title}</h2>
+          <h2 className="mt-1 text-base font-semibold leading-5 text-slate-950">{dayShortLabel(day.day)}</h2>
         </div>
       </div>
-      <div className="relative rounded-[28px] border border-white/80 bg-white/45 p-2 shadow-inner">
-        <div className="absolute left-8 right-8 top-1/2 h-4 -translate-y-1/2 rounded-full bg-white/70 shadow-inner" />
-        <div className="relative grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="relative rounded-lg border border-white/80 bg-white/50 p-2">
+        <div className="relative grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {day.cards.map((card) => (
             <BoardGameTile key={card.code} card={card} selected={selectedCode === card.code} />
-          ))}
-          {placeholders.map((_, index) => (
-            <div
-              key={`${day.day}-empty-${index}`}
-              className="aspect-[1.18] min-h-24 rounded-[22px] border-2 border-white/70 bg-white/40 shadow-[inset_0_-5px_0_rgba(77,63,20,0.04)]"
-              aria-hidden="true"
-            />
           ))}
         </div>
       </div>
@@ -565,27 +543,19 @@ function ComponentBoardScene({
   const laterDays = boardDays.filter((day) => day.day !== 1);
 
   return (
-    <div className="relative rounded-[28px] border border-emerald-100 bg-[#fbfaf2] p-5 shadow-sm">
-      <svg
-        className="pointer-events-none absolute inset-0 h-full w-full text-emerald-100"
-        viewBox="0 0 100 100"
-        aria-hidden="true"
-      >
-        <path d="M6 18 C26 10 47 10 68 18 S92 25 86 36 C80 48 25 32 11 45" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-        <path d="M10 53 C31 45 63 43 84 53 S82 72 59 68 C38 64 24 67 12 76" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      </svg>
-
-      <div className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1fr)_310px]">
+    <div className="rounded-lg border border-emerald-100 bg-[#fbfaf2] p-4 shadow-sm sm:p-5">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
-          <div className="flex items-start justify-between gap-4 rounded-[24px] border border-white/80 bg-white/80 p-5 shadow-sm">
+          <div className="flex flex-col gap-3 rounded-lg border border-white/80 bg-white/85 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-emerald-700">今日返工</p>
-              <h1 className="mt-1 text-4xl font-semibold tracking-normal text-emerald-950">
-                先做好下一步
+              <h1 className="mt-1 text-3xl font-semibold tracking-normal text-emerald-950">
+                新姑娘上手
               </h1>
+              <p className="mt-2 text-sm font-semibold text-slate-600">今日只做 Day 1。</p>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+            <div className="grid grid-cols-2 gap-2 text-sm sm:min-w-72">
+              <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3">
                 <div className="text-xs font-semibold text-emerald-700">今日</div>
                 <div className="mt-1 font-semibold text-slate-950">Day 1</div>
               </div>
@@ -598,7 +568,7 @@ function ComponentBoardScene({
               <BoardGameLane key={day.day} day={day} selectedCode={selectedCard.code} />
             ))}
             <details
-              className="rounded-[24px] border border-slate-200 bg-white/65 p-3 shadow-sm"
+              className="rounded-lg border border-slate-200 bg-white/70 p-3 shadow-sm"
               open={selectedDay > 1}
             >
               <summary className="cursor-pointer list-none text-sm font-semibold text-slate-600">
@@ -612,23 +582,19 @@ function ComponentBoardScene({
             </details>
           </div>
 
-          <div className="flex items-center justify-between gap-3 rounded-[20px] border border-emerald-100 bg-white/75 px-4 py-3 shadow-sm">
-            <p className="text-sm font-semibold text-slate-700">
-              不肯定就不要估，先記低資料再問人。
-            </p>
-            <Link
-              href="/nurse/knowledge"
-              className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
-            >
-              查資料
-            </Link>
-          </div>
+          <Link
+            href="/nurse/knowledge"
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+          >
+            查資料
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
 
-        <aside className="space-y-3">
+        <aside>
           <section
             id="selected-onboarding-card"
-            className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm"
+            className="sticky top-24 rounded-lg border border-emerald-200 bg-white p-4 shadow-sm"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -649,78 +615,10 @@ function ComponentBoardScene({
             />
             <CardDetails card={selectedCard} />
           </section>
-          <div className="rounded-2xl border border-teal-200 bg-teal-50 p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-sm font-semibold text-teal-900">
-              <ShieldCheck className="h-4 w-4" />
-              唔識就停
-            </div>
-            <p className="mt-2 text-xl font-semibold text-teal-950">不要估，記低資料，交當值同事。</p>
-            <a
-              href="#supervisor-gates"
-              className="mt-4 inline-flex items-center gap-2 rounded-full bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
-            >
-              邊啲要問主管
-              <ArrowRight className="h-4 w-4" />
-            </a>
-          </div>
         </aside>
       </div>
     </div>
   );
-}
-
-function BoardTile({ card, day, isToday }: { card: BoardCard; day: number; isToday: boolean }) {
-  const mustEscalate = card.release === "red" || card.supervisor === "always";
-  const TileIcon = tileIcon(card.code);
-
-  return (
-    <details
-      className={`group rounded-xl border p-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-        isToday ? "border-emerald-200 bg-white/95" : "border-slate-200 bg-white/75"
-      }`}
-    >
-      <summary className="relative flex min-h-28 cursor-pointer list-none flex-col items-center justify-center gap-2 text-center">
-        <span className="absolute left-1.5 top-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">
-          {card.code}
-        </span>
-        <ChevronDown className="absolute right-1.5 top-1.5 h-4 w-4 text-slate-400 transition group-open:rotate-180" />
-        <div className="flex min-w-0 flex-col items-center gap-2">
-          <div
-            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border shadow-sm ${
-              mustEscalate
-                ? "border-rose-200 bg-rose-50 text-rose-700"
-                : card.release === "yellow"
-                  ? "border-amber-200 bg-amber-50 text-amber-800"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
-            }`}
-          >
-            <TileIcon className="h-6 w-6" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold leading-5 text-slate-950">
-              {tileShortLabel(card.code)}
-            </h3>
-            <NurseOnboardingProgress
-              cardCode={card.code}
-              day={day}
-              release={card.release}
-              supervisor={card.supervisor}
-            />
-          </div>
-        </div>
-      </summary>
-
-      <CardDetails card={card} />
-    </details>
-  );
-}
-
-function boardRowClass(day: number) {
-  if (day === 1) return "border-emerald-300 bg-emerald-50/90 shadow-[inset_0_-3px_0_rgba(74,123,82,0.15)]";
-  if (day === 2) return "border-cyan-200 bg-cyan-50/75 shadow-[inset_0_-3px_0_rgba(8,145,178,0.12)]";
-  if (day === 3) return "border-orange-200 bg-orange-50/75 shadow-[inset_0_-3px_0_rgba(234,88,12,0.12)]";
-  if (day === 4) return "border-lime-200 bg-lime-50/75 shadow-[inset_0_-3px_0_rgba(77,124,15,0.12)]";
-  return "border-teal-200 bg-teal-50/75 shadow-[inset_0_-3px_0_rgba(13,148,136,0.12)]";
 }
 
 export default function NurseOnboardingPage({
@@ -734,149 +632,20 @@ export default function NurseOnboardingPage({
 
   return (
     <div className="space-y-5">
-      <section className="hidden xl:block">
-        <ComponentBoardScene
-          selectedCard={selected.card}
-          selectedDay={selected.day}
-        />
-      </section>
-
-      <section className="grid gap-4 xl:hidden">
-        <div className="overflow-hidden rounded-[26px] border border-emerald-100 bg-[#fbfaf2] p-4 shadow-sm sm:p-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div>
-              <p className="text-sm font-medium text-emerald-700">今日返工</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-normal text-slate-950 sm:text-3xl">
-                先做好下一步
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                今日只做 Day 1。其他之後先理。
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
-              <div className="rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2">
-                <div className="text-xs font-semibold text-emerald-700">今日</div>
-                <div className="mt-1 font-semibold text-slate-950">Day 1</div>
-              </div>
-              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                <div className="text-xs font-semibold text-slate-500">今日</div>
-                <div className="mt-1 font-semibold text-slate-950">4 步</div>
-              </div>
-              <NurseOnboardingSummary />
-              <Link
-                href="/nurse/knowledge"
-                className="col-span-2 inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 sm:col-span-3"
-              >
-                <BookOpenCheck className="h-4 w-4" />
-                查資料
-              </Link>
-            </div>
-          </div>
-
-          <div className="mt-5 rounded-[24px] border border-emerald-100 bg-white/55 p-3 shadow-inner">
-            <div className="space-y-3">
-            {boardDays.filter((day) => day.day === 1).map((day) => {
-              const isToday = day.day === 1;
-              return (
-                <div
-                  key={day.day}
-                  className={`grid gap-3 rounded-[24px] border p-3 ${
-                    isToday ? "shadow-sm" : ""
-                  } ${boardRowClass(day.day)} lg:grid-cols-[180px_minmax(0,1fr)]`}
-                >
-                  <div className="flex items-start gap-3 lg:block">
-                    <div
-                      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm ring-4 ring-white/80 ${
-                        isToday ? "bg-emerald-700 text-white" : "bg-white text-slate-600"
-                      }`}
-                    >
-                      Day {day.day}
-                    </div>
-                    <div className="min-w-0 lg:mt-3">
-                      {day.day === 1 ? (
-                        <div className="mb-2 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-1 text-xs font-semibold text-emerald-800">
-                          <Flag className="h-3.5 w-3.5" />
-                          由呢度開始
-                        </div>
-                      ) : null}
-                      <h2 className="text-base font-semibold leading-5 text-slate-950">
-                        {dayShortLabel(day.day)}
-                      </h2>
-                      <p className="mt-1 text-xs font-semibold text-slate-500">
-                        {isToday ? "今日必行" : "之後再開"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                    {day.cards.map((card) => (
-                      <BoardTile key={card.code} card={card} day={day.day} isToday={isToday} />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-            <details className="rounded-[24px] border border-slate-200 bg-white/65 p-3">
-              <summary className="cursor-pointer list-none text-sm font-semibold text-slate-600">
-                之後先做：第 2-5 日
-              </summary>
-              <div className="mt-3 space-y-3">
-                {boardDays.filter((day) => day.day !== 1).map((day) => (
-                  <div
-                    key={day.day}
-                    className={`grid gap-3 rounded-[24px] border p-3 ${boardRowClass(day.day)} lg:grid-cols-[180px_minmax(0,1fr)]`}
-                  >
-                    <div className="flex items-start gap-3 lg:block">
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-slate-600 shadow-sm ring-4 ring-white/80">
-                        Day {day.day}
-                      </div>
-                      <div className="min-w-0 lg:mt-3">
-                        <h2 className="text-base font-semibold leading-5 text-slate-950">
-                          {dayShortLabel(day.day)}
-                        </h2>
-                        <p className="mt-1 text-xs font-semibold text-slate-500">之後再開</p>
-                      </div>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                      {day.cards.map((card) => (
-                        <BoardTile key={card.code} card={card} day={day.day} isToday={false} />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </details>
-            </div>
-          </div>
-        </div>
-
-        <aside className="space-y-3">
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-              <ShieldCheck className="h-4 w-4 text-emerald-700" />
-              唔識就停
-            </div>
-            <p className="mt-2 text-sm leading-6 text-slate-700">
-              不肯定就不要估。先記低資料，再問當值同事或主管。
-            </p>
-          </div>
-        </aside>
-      </section>
+      <ComponentBoardScene
+        selectedCard={selected.card}
+        selectedDay={selected.day}
+      />
 
       <section
         id="supervisor-gates"
-        className="rounded-lg border border-emerald-100 bg-white p-5 shadow-sm"
+        className="rounded-lg border border-emerald-100 bg-white p-4 shadow-sm"
       >
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-sm font-medium text-emerald-700">真人主管放行</p>
-            <h2 className="mt-1 text-xl font-semibold text-slate-950">一定要主管確認的事</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              以下幾項未做到，就繼續由當值同事或主管陪住做。
-            </p>
-          </div>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-lg font-semibold text-slate-950">主管確認</h2>
           <Link
             href="/nurse/knowledge/training"
-            className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
           >
             去對答練習
             <ArrowRight className="h-4 w-4" />
@@ -893,7 +662,7 @@ export default function NurseOnboardingPage({
           ].map((item) => (
             <div
               key={item}
-              className="flex items-center gap-2 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900"
+              className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900"
             >
               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-700" />
               {item}
