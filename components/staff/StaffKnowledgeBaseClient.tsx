@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   ClipboardCheck,
   ClipboardCopy,
   FileText,
-  FilePlus,
   Loader2,
   MessageCircle,
   PackageCheck,
@@ -16,6 +15,8 @@ import {
   Plus,
   Save,
   Search,
+  Trash2,
+  Type,
   WalletCards,
   X,
   type LucideIcon,
@@ -43,11 +44,12 @@ function documentMatches(document: StaffKnowledgeDocument, query: string) {
   ].join(" ")).includes(normalizedQuery);
 }
 
-type NoteEditorMode = "create" | "copy" | "edit";
+type NoteEditorMode = "create" | "edit";
 
 interface NoteEditorState {
   mode: NoteEditorMode;
   noteId?: string;
+  sourceDocumentId?: string;
   title: string;
   category: string;
   sensitivity: StaffKnowledgeDocument["sensitivity"];
@@ -64,20 +66,11 @@ function emptyNoteEditor(category = "姑娘新增 Note"): NoteEditorState {
   };
 }
 
-function copyFromDocument(document: StaffKnowledgeDocument): NoteEditorState {
-  return {
-    mode: "copy",
-    title: `${document.title} - 補充`,
-    category: document.category,
-    sensitivity: document.sensitivity,
-    contentMd: document.contentMd.slice(0, 50000),
-  };
-}
-
 function editDocument(document: StaffKnowledgeDocument): NoteEditorState {
   return {
     mode: "edit",
     noteId: document.noteId,
+    sourceDocumentId: document.imported ? document.id : undefined,
     title: document.title,
     category: document.category,
     sensitivity: document.sensitivity,
@@ -87,8 +80,49 @@ function editDocument(document: StaffKnowledgeDocument): NoteEditorState {
 
 function editorTitle(mode: NoteEditorMode) {
   if (mode === "edit") return "編輯 Note";
-  if (mode === "copy") return "建立可編輯副本";
   return "新增 Note";
+}
+
+const KNOWLEDGE_FONT_OPTIONS = [
+  {
+    id: "system",
+    label: "系統字",
+    fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  },
+  {
+    id: "ming",
+    label: "明體",
+    fontFamily: "'Songti TC', 'Noto Serif TC', 'PMingLiU', Georgia, serif",
+  },
+  {
+    id: "rounded",
+    label: "圓體",
+    fontFamily: "'Hiragino Maru Gothic ProN', 'Yu Gothic', 'Microsoft JhengHei', sans-serif",
+  },
+  {
+    id: "mono",
+    label: "等寬",
+    fontFamily: "'SFMono-Regular', Consolas, 'Liberation Mono', monospace",
+  },
+] as const;
+
+type KnowledgeFontId = typeof KNOWLEDGE_FONT_OPTIONS[number]["id"];
+
+const KNOWLEDGE_ACCENT_OPTIONS = [
+  { id: "emerald", label: "綠", color: "#047857", soft: "#ecfdf5", ring: "#a7f3d0" },
+  { id: "cyan", label: "藍", color: "#0e7490", soft: "#ecfeff", ring: "#a5f3fc" },
+  { id: "amber", label: "琥珀", color: "#b45309", soft: "#fffbeb", ring: "#fde68a" },
+  { id: "rose", label: "紅", color: "#be123c", soft: "#fff1f2", ring: "#fecdd3" },
+] as const;
+
+type KnowledgeAccentId = typeof KNOWLEDGE_ACCENT_OPTIONS[number]["id"];
+
+function isKnowledgeFontId(value: string | null): value is KnowledgeFontId {
+  return KNOWLEDGE_FONT_OPTIONS.some((item) => item.id === value);
+}
+
+function isKnowledgeAccentId(value: string | null): value is KnowledgeAccentId {
+  return KNOWLEDGE_ACCENT_OPTIONS.some((item) => item.id === value);
 }
 
 const QUICK_START_TASKS = [
@@ -142,6 +176,10 @@ export function StaffKnowledgeBaseClient() {
   const [editor, setEditor] = useState<NoteEditorState | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [fontChoice, setFontChoice] = useState<KnowledgeFontId>("system");
+  const [accentChoice, setAccentChoice] = useState<KnowledgeAccentId>("emerald");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const fetchDocuments = useCallback(async () => {
     setLoading(true);
@@ -168,6 +206,28 @@ export function StaffKnowledgeBaseClient() {
     void fetchDocuments();
   }, [fetchDocuments]);
 
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem("eden.staffKnowledge.display") || "{}") as {
+        font?: string;
+        accent?: string;
+      };
+      const savedFont = saved.font ?? null;
+      const savedAccent = saved.accent ?? null;
+      if (isKnowledgeFontId(savedFont)) setFontChoice(savedFont);
+      if (isKnowledgeAccentId(savedAccent)) setAccentChoice(savedAccent);
+    } catch {
+      // Ignore broken local display preferences.
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "eden.staffKnowledge.display",
+      JSON.stringify({ font: fontChoice, accent: accentChoice }),
+    );
+  }, [accentChoice, fontChoice]);
+
   const categories = useMemo(
     () => ["all", ...Array.from(new Set(documents.map((item) => item.category)))],
     [documents],
@@ -191,6 +251,23 @@ export function StaffKnowledgeBaseClient() {
     return documents.find((item) => item.id === selectedId) ?? null;
   }, [documents, selectedId]);
 
+  const selectedFont = useMemo(
+    () => KNOWLEDGE_FONT_OPTIONS.find((item) => item.id === fontChoice) ?? KNOWLEDGE_FONT_OPTIONS[0],
+    [fontChoice],
+  );
+
+  const selectedAccent = useMemo(
+    () => KNOWLEDGE_ACCENT_OPTIONS.find((item) => item.id === accentChoice) ?? KNOWLEDGE_ACCENT_OPTIONS[0],
+    [accentChoice],
+  );
+
+  const documentStyle = useMemo(() => ({
+    "--staff-knowledge-accent": selectedAccent.color,
+    "--staff-knowledge-accent-soft": selectedAccent.soft,
+    "--staff-knowledge-accent-ring": selectedAccent.ring,
+    fontFamily: selectedFont.fontFamily,
+  }) as CSSProperties, [selectedAccent, selectedFont]);
+
   async function copyText(label: string, text: string) {
     await navigator.clipboard.writeText(text);
     setCopied(label);
@@ -199,12 +276,14 @@ export function StaffKnowledgeBaseClient() {
 
   function openCreateEditor() {
     setSaveError(null);
+    setDeleteError(null);
     setEditor(emptyNoteEditor(category === "all" ? "姑娘新增 Note" : category));
   }
 
   function openDocumentEditor(document: StaffKnowledgeDocument) {
     setSaveError(null);
-    setEditor(document.editable && document.noteId ? editDocument(document) : copyFromDocument(document));
+    setDeleteError(null);
+    setEditor(editDocument(document));
   }
 
   function focusTask(nextQuery: string) {
@@ -229,13 +308,22 @@ export function StaffKnowledgeBaseClient() {
     setSaving(true);
     setSaveError(null);
     try {
-      const endpoint = editor.mode === "edit" && editor.noteId
-        ? `/api/staff/knowledge/${encodeURIComponent(editor.noteId)}`
-        : "/api/staff/knowledge";
+      if (editor.mode === "edit" && !editor.noteId && !editor.sourceDocumentId) {
+        throw new Error("找不到可編輯項目");
+      }
+      const endpoint = editor.sourceDocumentId
+        ? "/api/staff/knowledge"
+        : editor.mode === "edit" && editor.noteId
+          ? `/api/staff/knowledge/${encodeURIComponent(editor.noteId)}`
+          : "/api/staff/knowledge";
+      const method = editor.sourceDocumentId
+        ? "PUT"
+        : editor.mode === "edit" ? "PATCH" : "POST";
       const response = await fetch(endpoint, {
-        method: editor.mode === "edit" ? "PATCH" : "POST",
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          documentId: editor.sourceDocumentId,
           title: editor.title,
           category: editor.category,
           sensitivity: editor.sensitivity,
@@ -261,6 +349,41 @@ export function StaffKnowledgeBaseClient() {
       setSaveError(saveErrorValue instanceof Error ? saveErrorValue.message : "未能儲存 Note");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteDocument(document: StaffKnowledgeDocument) {
+    if (deleting) return;
+    const confirmed = window.confirm(`刪除「${document.title}」？`);
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      if (!document.imported && !document.noteId) {
+        throw new Error("找不到可刪除 Note");
+      }
+      const response = await fetch(
+        document.imported ? "/api/staff/knowledge" : `/api/staff/knowledge/${encodeURIComponent(document.noteId || "")}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: document.imported ? JSON.stringify({ documentId: document.id }) : undefined,
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+
+      setDocuments((current) => current.filter((item) => item.id !== document.id));
+      setSelectedId(null);
+      setEditor(null);
+      setCopied("deleted");
+      window.setTimeout(() => setCopied(null), 1800);
+      void fetchDocuments();
+    } catch (deleteErrorValue) {
+      setDeleteError(deleteErrorValue instanceof Error ? deleteErrorValue.message : "未能刪除");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -318,7 +441,9 @@ export function StaffKnowledgeBaseClient() {
           <form onSubmit={saveNote} className="space-y-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
-                <p className="text-sm font-medium text-emerald-700">{editorTitle(editor.mode)}</p>
+                <p className="text-sm font-medium text-emerald-700">
+                  {editor.sourceDocumentId ? "編輯匯入檔" : editorTitle(editor.mode)}
+                </p>
                 <h2 className="mt-1 text-xl font-semibold text-slate-950">
                   {editor.mode === "edit" ? editor.title || "未命名 Note" : "姑娘可以即時補資料"}
                 </h2>
@@ -385,6 +510,7 @@ export function StaffKnowledgeBaseClient() {
                 onChange={(event) => setEditor((current) => current ? { ...current, contentMd: event.target.value } : current)}
                 rows={16}
                 className="w-full rounded-md border border-slate-200 px-3 py-2 font-mono text-sm leading-6 text-slate-900 outline-none focus:border-emerald-400"
+                style={{ fontFamily: selectedFont.fontFamily, caretColor: selectedAccent.color }}
                 placeholder={"可直接打字。支援 Markdown，例如：\\n## 病人可見回覆\\n...\\n\\n## 姑娘內部做法\\n..."}
               />
             </label>
@@ -412,7 +538,7 @@ export function StaffKnowledgeBaseClient() {
                 className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                儲存 Note
+                儲存
               </button>
             </div>
           </form>
@@ -431,8 +557,8 @@ export function StaffKnowledgeBaseClient() {
           </button>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-          <aside className="space-y-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="min-w-0 space-y-3">
             <div className="rounded-[20px] border border-cyan-100 bg-cyan-50/80 p-3 shadow-sm">
               <label className="flex items-center gap-2 rounded-[14px] border border-cyan-200 bg-white px-3 py-2">
                 <Search className="h-4 w-4 text-cyan-700" />
@@ -525,49 +651,103 @@ export function StaffKnowledgeBaseClient() {
                   <h2 className="mt-2 text-2xl font-semibold text-slate-950">{selectedDocument.title}</h2>
                   <p className="mt-2 text-sm text-slate-500">
                     來源：{selectedDocument.source}
-                    {selectedDocument.editable ? " · 可編輯 Note" : " · 匯入底稿"}
+                    {selectedDocument.imported ? " · 匯入檔" : " · 可編輯 Note"}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openDocumentEditor(selectedDocument)}
-                    className="inline-flex items-center gap-2 rounded-md border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
-                  >
-                    {selectedDocument.editable ? <Pencil className="h-4 w-4" /> : <FilePlus className="h-4 w-4" />}
-                    {selectedDocument.editable ? "編輯 Note" : "建立可編輯副本"}
-                  </button>
-                  {selectedDocument.patientReplyMd ? (
+                <div className="flex flex-col gap-2 md:items-end">
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2">
+                    <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+                      <Type className="h-4 w-4 text-slate-500" />
+                      <select
+                        value={fontChoice}
+                        onChange={(event) => setFontChoice(event.target.value as KnowledgeFontId)}
+                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-800 outline-none focus:border-emerald-400"
+                      >
+                        {KNOWLEDGE_FONT_OPTIONS.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="flex items-center gap-1" aria-label="顏色">
+                      {KNOWLEDGE_ACCENT_OPTIONS.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setAccentChoice(item.id)}
+                          className={`h-7 w-7 rounded-full border-2 transition ${
+                            accentChoice === item.id ? "border-slate-950" : "border-white ring-1 ring-slate-200"
+                          }`}
+                          style={{ backgroundColor: item.color }}
+                          aria-label={item.label}
+                          title={item.label}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => void copyText("patient", selectedDocument.patientReplyMd || "")}
+                      onClick={() => openDocumentEditor(selectedDocument)}
                       className="inline-flex items-center gap-2 rounded-md border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
                     >
-                      <ClipboardCopy className="h-4 w-4" />
-                      複製病人回覆
+                      <Pencil className="h-4 w-4" />
+                      編輯
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => void copyText("full", selectedDocument.contentMd)}
-                    className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <ClipboardCopy className="h-4 w-4" />
-                    複製全文
-                  </button>
+                    {selectedDocument.patientReplyMd ? (
+                      <button
+                        type="button"
+                        onClick={() => void copyText("patient", selectedDocument.patientReplyMd || "")}
+                        className="inline-flex items-center gap-2 rounded-md border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+                      >
+                        <ClipboardCopy className="h-4 w-4" />
+                        複製病人回覆
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => void copyText("full", selectedDocument.contentMd)}
+                      className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <ClipboardCopy className="h-4 w-4" />
+                      複製全文
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void deleteDocument(selectedDocument)}
+                      disabled={deleting}
+                      className="inline-flex items-center gap-2 rounded-md border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      刪除
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {copied ? (
                 <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
-                  已複製
+                  {copied === "saved" ? "已儲存" : copied === "deleted" ? "已刪除" : "已複製"}
                 </div>
               ) : null}
 
-              <MarkdownContent
-                content={selectedDocument.contentMd}
-                className="max-w-none"
-              />
+              {deleteError ? (
+                <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+                  {deleteError}
+                </div>
+              ) : null}
+
+              <div
+                style={documentStyle}
+                className="rounded-xl border border-[var(--staff-knowledge-accent-ring)] bg-white px-4 py-1"
+              >
+                <MarkdownContent
+                  content={selectedDocument.contentMd}
+                  className="max-w-none [&_a]:text-[var(--staff-knowledge-accent)] [&_blockquote]:border-[var(--staff-knowledge-accent)] [&_blockquote]:bg-[var(--staff-knowledge-accent-soft)] [&_code]:text-[var(--staff-knowledge-accent)] [&_h1]:text-[var(--staff-knowledge-accent)] [&_h2]:text-[var(--staff-knowledge-accent)] [&_h3]:text-[var(--staff-knowledge-accent)] [&_li]:text-slate-700 [&_p]:text-slate-700"
+                />
+              </div>
             </div>
           )}
           </article>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { AuthError, getCurrentUser, requireStaffRole } from "@/lib/auth-helpers";
-import { updateStaffKnowledgeNote } from "@/lib/staff-knowledge-base";
+import { deleteStaffKnowledgeNote, updateStaffKnowledgeNote } from "@/lib/staff-knowledge-base";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +44,30 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     }
 
     console.error("[PATCH /api/staff/knowledge/[id]] unexpected error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(_request: NextRequest, { params }: RouteContext) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await requireStaffRole(user.id);
+    await deleteStaffKnowledgeNote(params.id, user.id);
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    console.error("[DELETE /api/staff/knowledge/[id]] unexpected error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -13,6 +13,8 @@ import type {
 const KNOWLEDGE_ROOT = path.join(process.cwd(), "docs", "staff-knowledge-base");
 const STAFF_KNOWLEDGE_NOTE_TAG = "staff-knowledge";
 const STAFF_KNOWLEDGE_SOURCE_HASH = "staff-knowledge-note";
+const STAFF_KNOWLEDGE_IMPORT_SOURCE_HASH_PREFIX = "staff-knowledge-import:";
+const STAFF_IMPORTED_DOCUMENT_TAG_PREFIX = "staff-import:";
 const STAFF_CATEGORY_TAG_PREFIX = "staff-category:";
 const STAFF_SENSITIVITY_TAG_PREFIX = "staff-sensitivity:";
 
@@ -201,13 +203,14 @@ async function collectMarkdownFiles(dir: string): Promise<string[]> {
   return files;
 }
 
-interface StaffKnowledgeNoteRow {
+export interface StaffKnowledgeNoteRow {
   id: string;
   title: string;
   body_md: string;
   status: "inbox" | "drafting" | "ready" | "published" | "archived";
   source: "manual" | "article_sync" | "ai_assist";
   tags: string[] | null;
+  source_hash: string | null;
   is_active: boolean;
   created_by: string | null;
   updated_by: string | null;
@@ -252,11 +255,26 @@ function toNoteStatus(status: StaffKnowledgeNoteRow["status"]): StaffKnowledgeSt
   return "draft";
 }
 
-function buildNoteTags(category: string, sensitivity: StaffKnowledgeSensitivity, existingTags: string[] = []): string[] {
+function buildImportedDocumentSourceHash(documentId: string): string {
+  return `${STAFF_KNOWLEDGE_IMPORT_SOURCE_HASH_PREFIX}${documentId}`;
+}
+
+function parseImportedDocumentId(row: StaffKnowledgeNoteRow): string | null {
+  if (!row.source_hash?.startsWith(STAFF_KNOWLEDGE_IMPORT_SOURCE_HASH_PREFIX)) return null;
+  return row.source_hash.slice(STAFF_KNOWLEDGE_IMPORT_SOURCE_HASH_PREFIX.length);
+}
+
+function buildNoteTags(
+  category: string,
+  sensitivity: StaffKnowledgeSensitivity,
+  existingTags: string[] = [],
+  extraTags: string[] = [],
+): string[] {
   const preserved = existingTags
     .filter((tag) => {
       return (
         tag !== STAFF_KNOWLEDGE_NOTE_TAG &&
+        !tag.startsWith(STAFF_IMPORTED_DOCUMENT_TAG_PREFIX) &&
         !tag.startsWith(STAFF_CATEGORY_TAG_PREFIX) &&
         !tag.startsWith(STAFF_SENSITIVITY_TAG_PREFIX)
       );
@@ -268,6 +286,7 @@ function buildNoteTags(category: string, sensitivity: StaffKnowledgeSensitivity,
     STAFF_KNOWLEDGE_NOTE_TAG,
     `${STAFF_CATEGORY_TAG_PREFIX}${category}`,
     `${STAFF_SENSITIVITY_TAG_PREFIX}${sensitivity}`,
+    ...extraTags,
     ...preserved,
   ])).slice(0, 12);
 }
@@ -302,12 +321,73 @@ function mapNoteRowToDocument(row: StaffKnowledgeNoteRow): StaffKnowledgeDocumen
   };
 }
 
-async function listStaffKnowledgeNoteDocuments(): Promise<StaffKnowledgeDocument[]> {
+function mapImportedRowToDocument(
+  baseDocument: StaffKnowledgeDocument,
+  row?: StaffKnowledgeNoteRow,
+): StaffKnowledgeDocument {
+  if (!row) {
+    return {
+      ...baseDocument,
+      editable: true,
+      imported: true,
+    };
+  }
+
+  const category = parseNoteCategory(row.tags);
+  const sensitivity = parseNoteSensitivity(row.tags);
+  const contentMd = row.body_md || "";
+  const patientReplyMd = extractSection(
+    contentMd,
+    /^##\s+(病人|病人\/客戶).*可見回覆/,
+  );
+
+  return {
+    ...baseDocument,
+    noteId: row.id,
+    title: row.title,
+    category,
+    status: toNoteStatus(row.status),
+    sensitivity,
+    updatedAt: toIsoDateLabel(row.updated_at),
+    createdAt: row.created_at,
+    updatedBy: row.updated_by,
+    excerpt: compactMarkdown(contentMd),
+    contentMd,
+    patientReplyMd,
+    tags: Array.from(new Set([category, "editable", sensitivity, ...(row.tags || [])])),
+    editable: true,
+    imported: true,
+  };
+}
+
+export function mergeImportedStaffKnowledgeDocuments(
+  importedDocuments: StaffKnowledgeDocument[],
+  rows: StaffKnowledgeNoteRow[],
+): StaffKnowledgeDocument[] {
+  const rowsByImportedId = new Map<string, StaffKnowledgeNoteRow>();
+
+  for (const row of rows) {
+    const importedId = parseImportedDocumentId(row);
+    if (!importedId) continue;
+    const current = rowsByImportedId.get(importedId);
+    if (!current || row.updated_at > current.updated_at) {
+      rowsByImportedId.set(importedId, row);
+    }
+  }
+
+  return importedDocuments.flatMap((document) => {
+    const row = rowsByImportedId.get(document.id);
+    if (row?.status === "archived") return [];
+    return [mapImportedRowToDocument(document, row)];
+  });
+}
+
+async function listStaffKnowledgeNoteRows(): Promise<StaffKnowledgeNoteRow[]> {
   try {
     const supabase = createServiceClient();
     const { data, error } = await supabase
       .from("knowledge_cards")
-      .select("id, title, body_md, status, source, tags, is_active, created_by, updated_by, created_at, updated_at")
+      .select("id, title, body_md, status, source, tags, source_hash, is_active, created_by, updated_by, created_at, updated_at")
       .contains("tags", [STAFF_KNOWLEDGE_NOTE_TAG])
       .eq("is_active", true)
       .order("updated_at", { ascending: false })
@@ -318,7 +398,7 @@ async function listStaffKnowledgeNoteDocuments(): Promise<StaffKnowledgeDocument
       return [];
     }
 
-    return ((data || []) as StaffKnowledgeNoteRow[]).map(mapNoteRowToDocument);
+    return (data || []) as StaffKnowledgeNoteRow[];
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Missing SUPABASE_")) {
       return [];
@@ -326,6 +406,13 @@ async function listStaffKnowledgeNoteDocuments(): Promise<StaffKnowledgeDocument
     console.error("[staff-knowledge] editable notes unavailable:", error);
     return [];
   }
+}
+
+function mapManualStaffKnowledgeRows(rows: StaffKnowledgeNoteRow[]): StaffKnowledgeDocument[] {
+  return rows
+    .filter((row) => !parseImportedDocumentId(row))
+    .filter((row) => row.status !== "archived")
+    .map(mapNoteRowToDocument);
 }
 
 function prepareNoteInput(input: StaffKnowledgeNoteInput) {
@@ -372,7 +459,7 @@ export async function createStaffKnowledgeNote(
       created_by: userId,
       updated_by: userId,
     })
-    .select("id, title, body_md, status, source, tags, is_active, created_by, updated_by, created_at, updated_at")
+    .select("id, title, body_md, status, source, tags, source_hash, is_active, created_by, updated_by, created_at, updated_at")
     .single();
 
   if (error || !data) {
@@ -396,6 +483,7 @@ export async function updateStaffKnowledgeNote(
     .select("id, tags")
     .eq("id", noteId)
     .contains("tags", [STAFF_KNOWLEDGE_NOTE_TAG])
+    .eq("is_active", true)
     .maybeSingle();
 
   if (existingError) {
@@ -417,7 +505,7 @@ export async function updateStaffKnowledgeNote(
     })
     .eq("id", noteId)
     .contains("tags", [STAFF_KNOWLEDGE_NOTE_TAG])
-    .select("id, title, body_md, status, source, tags, is_active, created_by, updated_by, created_at, updated_at")
+    .select("id, title, body_md, status, source, tags, source_hash, is_active, created_by, updated_by, created_at, updated_at")
     .single();
 
   if (error || !data) {
@@ -428,9 +516,9 @@ export async function updateStaffKnowledgeNote(
   return mapNoteRowToDocument(data as StaffKnowledgeNoteRow);
 }
 
-export async function listStaffKnowledgeDocuments(): Promise<StaffKnowledgeDocument[]> {
+async function listImportedStaffKnowledgeDocuments(): Promise<StaffKnowledgeDocument[]> {
   const filePaths = await collectMarkdownFiles(KNOWLEDGE_ROOT);
-  const importedDocuments = await Promise.all(
+  return Promise.all(
     filePaths.map(async (filePath) => {
       const contentMd = await fs.readFile(filePath, "utf8");
       const relativePath = path.relative(KNOWLEDGE_ROOT, filePath).replace(/\\/g, "/");
@@ -454,19 +542,206 @@ export async function listStaffKnowledgeDocuments(): Promise<StaffKnowledgeDocum
         patientReplyMd,
         sourcePath: `docs/staff-knowledge-base/${relativePath}`,
         tags: Array.from(new Set([toCategory(relativePath), parseStatus(contentMd), parseSensitivity(contentMd)])),
-        editable: false,
+        editable: true,
         imported: true,
       } satisfies StaffKnowledgeDocument;
     }),
   );
-  const noteDocuments = await listStaffKnowledgeNoteDocuments();
-  const documents = [...noteDocuments, ...importedDocuments];
+}
+
+async function getImportedStaffKnowledgeDocument(documentId: string): Promise<StaffKnowledgeDocument> {
+  const documents = await listImportedStaffKnowledgeDocuments();
+  const document = documents.find((item) => item.id === documentId);
+  if (!document) {
+    throw new Error("找不到匯入檔");
+  }
+  return document;
+}
+
+export async function listStaffKnowledgeDocuments(): Promise<StaffKnowledgeDocument[]> {
+  const importedDocuments = await listImportedStaffKnowledgeDocuments();
+  const noteRows = await listStaffKnowledgeNoteRows();
+  const noteDocuments = mapManualStaffKnowledgeRows(noteRows);
+  const visibleImportedDocuments = mergeImportedStaffKnowledgeDocuments(importedDocuments, noteRows);
+  const documents = [...noteDocuments, ...visibleImportedDocuments];
 
   return documents.sort((a, b) => {
     if (a.editable !== b.editable) return a.editable ? -1 : 1;
     if (a.category !== b.category) return a.category.localeCompare(b.category, "zh-HK");
     return a.title.localeCompare(b.title, "zh-HK");
   });
+}
+
+export async function updateImportedStaffKnowledgeDocument(
+  documentId: string,
+  input: StaffKnowledgeNoteInput,
+  userId: string,
+): Promise<StaffKnowledgeDocument> {
+  const importedDocument = await getImportedStaffKnowledgeDocument(documentId);
+  const prepared = prepareNoteInput(input);
+  const supabase = createServiceClient();
+  const sourceHash = buildImportedDocumentSourceHash(documentId);
+  const importedTag = `${STAFF_IMPORTED_DOCUMENT_TAG_PREFIX}${documentId}`.slice(0, 80);
+
+  const { data: existing, error: existingError } = await supabase
+    .from("knowledge_cards")
+    .select("id, tags")
+    .eq("source_hash", sourceHash)
+    .contains("tags", [STAFF_KNOWLEDGE_NOTE_TAG])
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingError) {
+    console.error("[staff-knowledge] fetch imported document before update failed:", existingError.message);
+    throw new Error("未能讀取匯入檔");
+  }
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from("knowledge_cards")
+      .update({
+        title: prepared.title,
+        body_md: prepared.contentMd,
+        status: "ready",
+        source: "manual",
+        tags: buildNoteTags(
+          prepared.category,
+          prepared.sensitivity,
+          Array.isArray(existing.tags) ? existing.tags : [],
+          [importedTag],
+        ),
+        source_hash: sourceHash,
+        is_active: true,
+        updated_by: userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id)
+      .select("id, title, body_md, status, source, tags, source_hash, is_active, created_by, updated_by, created_at, updated_at")
+      .single();
+
+    if (error || !data) {
+      console.error("[staff-knowledge] update imported document failed:", error?.message);
+      throw new Error("未能更新匯入檔");
+    }
+
+    return mapImportedRowToDocument(importedDocument, data as StaffKnowledgeNoteRow);
+  }
+
+  const { data, error } = await supabase
+    .from("knowledge_cards")
+    .insert({
+      title: prepared.title,
+      body_md: prepared.contentMd,
+      status: "ready",
+      source: "manual",
+      tags: buildNoteTags(prepared.category, prepared.sensitivity, [], [importedTag]),
+      source_hash: sourceHash,
+      sort_order: 0,
+      is_active: true,
+      created_by: userId,
+      updated_by: userId,
+    })
+    .select("id, title, body_md, status, source, tags, source_hash, is_active, created_by, updated_by, created_at, updated_at")
+    .single();
+
+  if (error || !data) {
+    console.error("[staff-knowledge] create imported document override failed:", error?.message);
+    throw new Error("未能更新匯入檔");
+  }
+
+  return mapImportedRowToDocument(importedDocument, data as StaffKnowledgeNoteRow);
+}
+
+export async function deleteStaffKnowledgeNote(noteId: string, userId: string): Promise<void> {
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("knowledge_cards")
+    .update({
+      status: "archived",
+      is_active: false,
+      updated_by: userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", noteId)
+    .contains("tags", [STAFF_KNOWLEDGE_NOTE_TAG]);
+
+  if (error) {
+    console.error("[staff-knowledge] delete note failed:", error.message);
+    throw new Error("未能刪除 Note");
+  }
+}
+
+export async function deleteImportedStaffKnowledgeDocument(
+  documentId: string,
+  userId: string,
+): Promise<void> {
+  const importedDocument = await getImportedStaffKnowledgeDocument(documentId);
+  const supabase = createServiceClient();
+  const sourceHash = buildImportedDocumentSourceHash(documentId);
+  const importedTag = `${STAFF_IMPORTED_DOCUMENT_TAG_PREFIX}${documentId}`.slice(0, 80);
+
+  const { data: existing, error: existingError } = await supabase
+    .from("knowledge_cards")
+    .select("id, tags")
+    .eq("source_hash", sourceHash)
+    .contains("tags", [STAFF_KNOWLEDGE_NOTE_TAG])
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingError) {
+    console.error("[staff-knowledge] fetch imported document before delete failed:", existingError.message);
+    throw new Error("未能讀取匯入檔");
+  }
+
+  if (existing) {
+    const { error } = await supabase
+      .from("knowledge_cards")
+      .update({
+        title: importedDocument.title,
+        body_md: importedDocument.contentMd,
+        status: "archived",
+        source: "manual",
+        tags: buildNoteTags(
+          importedDocument.category,
+          importedDocument.sensitivity,
+          Array.isArray(existing.tags) ? existing.tags : [],
+          [importedTag],
+        ),
+        source_hash: sourceHash,
+        is_active: true,
+        updated_by: userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+
+    if (error) {
+      console.error("[staff-knowledge] delete imported document failed:", error.message);
+      throw new Error("未能刪除匯入檔");
+    }
+    return;
+  }
+
+  const { error } = await supabase
+    .from("knowledge_cards")
+    .insert({
+      title: importedDocument.title,
+      body_md: importedDocument.contentMd,
+      status: "archived",
+      source: "manual",
+      tags: buildNoteTags(importedDocument.category, importedDocument.sensitivity, [], [importedTag]),
+      source_hash: sourceHash,
+      sort_order: 0,
+      is_active: true,
+      created_by: userId,
+      updated_by: userId,
+    });
+
+  if (error) {
+    console.error("[staff-knowledge] create imported document delete marker failed:", error.message);
+    throw new Error("未能刪除匯入檔");
+  }
 }
 
 export function isVisibleStaffHandbookDocument(document: StaffKnowledgeDocument): boolean {
