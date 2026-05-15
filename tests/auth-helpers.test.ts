@@ -4,8 +4,13 @@ import test from "node:test";
 import { getFallbackStaffRoleForEmail } from "@/lib/auth-helpers";
 
 test("getFallbackStaffRoleForEmail allows known doctor accounts", () => {
-  assert.equal(getFallbackStaffRoleForEmail(" chetleung@gmail.com "), "doctor");
   assert.equal(getFallbackStaffRoleForEmail("DRLEUNG@EDENCLINIC.HK"), "doctor");
+});
+
+test("getFallbackStaffRoleForEmail gives owner accounts admin access", () => {
+  assert.equal(getFallbackStaffRoleForEmail(" chetleung@gmail.com "), "admin");
+  assert.equal(getFallbackStaffRoleForEmail("drleungeden@gmail.com"), "admin");
+  assert.equal(getFallbackStaffRoleForEmail("edeninfo333@gmail.com"), "admin");
 });
 
 test("getFallbackStaffRoleForEmail allows known nurse accounts", () => {

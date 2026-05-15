@@ -12,7 +12,8 @@ export type StaffRoleResult = {
 };
 
 const STAFF_EMAIL_ROLE_FALLBACKS = new Map<string, StaffRoleName>([
-  ["chetleung@gmail.com", "doctor"],
+  ["chetleung@gmail.com", "admin"],
+  ["drleungeden@gmail.com", "admin"],
   ["drleung@edenclinic.hk", "doctor"],
   ["cheungtinw@gmail.com", "doctor"],
   ["cafu2046@gmail.com", "doctor"],
@@ -22,7 +23,7 @@ const STAFF_EMAIL_ROLE_FALLBACKS = new Map<string, StaffRoleName>([
   ["edenannachan@gmail.com", "doctor"],
   ["info@edenclinic.hk", "admin"],
   ["admin@edenclinic.hk", "admin"],
-  ["edeninfo333@gmail.com", "assistant"],
+  ["edeninfo333@gmail.com", "admin"],
   ["edenkayilau@gmail.com", "assistant"],
   ["edenling1113@gmail.com", "assistant"],
   ["edenethel333@gmail.com", "assistant"],
