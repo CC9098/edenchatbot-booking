@@ -22,6 +22,12 @@ test("/nurse/quiz 權限保護：未登入應跳到 /login", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "登入 staff 控制台" })).toBeVisible();
 });
 
+test("/nurse/lesson 權限保護：未登入應跳到 /login", async ({ page }) => {
+  await page.goto("/nurse/lesson");
+  await page.waitForURL(/\/login\?next=%2Fnurse%2Flesson$/);
+  await expect(page.getByRole("heading", { name: "登入 staff 控制台" })).toBeVisible();
+});
+
 test("/doctor 登入後流程：可見醫師主頁", async ({ browser }) => {
   const missing = getMissingRoleEnvVars(["doctor"]);
   test.skip(missing.length > 0, `Missing env: ${missing.join(", ")}`);
@@ -94,6 +100,26 @@ test("/nurse/quiz 登入後流程：可見培訓影片與測驗", async ({ brows
     await page.getByRole("button", { name: "B 清楚、有禮、主動確認需要" }).click();
 
     await expect(page.getByText("答對", { exact: true })).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
+test("/nurse/lesson 登入後流程：可見寄藥情境課", async ({ browser }) => {
+  const missing = getMissingRoleEnvVars(["doctor"]);
+  test.skip(missing.length > 0, `Missing env: ${missing.join(", ")}`);
+
+  const context = await createAuthenticatedContext(browser, "doctor");
+  const page = await context.newPage();
+
+  try {
+    await page.goto("/nurse/lesson");
+    await page.waitForURL("**/nurse/lesson");
+
+    await expect(page.getByRole("heading", { name: "寄藥情境課" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Step 2/ })).toBeVisible();
+    await page.getByRole("button", { name: /可以，我先查運費/ }).click();
+    await expect(page.getByText("可以進下一關")).toBeVisible();
   } finally {
     await context.close();
   }

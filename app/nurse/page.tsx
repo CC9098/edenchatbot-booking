@@ -55,6 +55,14 @@ const NURSE_ACTIONS: RoleHomeAction[] = [
     iconClassName: "border-amber-200 bg-white text-amber-800",
   },
   {
+    title: "寄藥情境課",
+    subtitle: "用一個病人查詢練判斷、回覆和記錄。",
+    href: "/nurse/lesson",
+    icon: GraduationCap,
+    className: "border-orange-200 bg-orange-50 hover:border-orange-300 hover:bg-orange-100/70",
+    iconClassName: "border-orange-200 bg-white text-orange-800",
+  },
+  {
     title: "前台放行測驗",
     subtitle: "6 題測收口、核對、升級和資料保護。",
     href: "/nurse/quiz",
