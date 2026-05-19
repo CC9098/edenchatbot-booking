@@ -67,7 +67,7 @@ const boardDays: BoardDay[] = [
         code: "D1-01",
         title: "唔肯定先收口",
         minutes: "2 分鐘",
-        task: "先背熟一句安全回覆。病人問到你不肯定，就不要即場答。",
+        task: "不肯定，不即場答；記低後再確認。",
         canSay: "我先幫您確認清楚，再 WhatsApp 回覆您。",
         cannotSay: "一定 claim 到、一定有位、密碼係...",
         aiPrompt: "病人問我不肯定的事，第一句應該點講？",
@@ -79,7 +79,7 @@ const boardDays: BoardDay[] = [
         code: "D1-02",
         title: "記低病人問題",
         minutes: "5 分鐘",
-        task: "記低姓名、電話、問題、想聯絡的分店或醫師，再交當值同事跟進。",
+        task: "記低姓名、電話、問題、分店或醫師，再交當值同事。",
         canSay: "我記低資料，確認清楚後再回覆您。",
         cannotSay: "我無留資料都可以幫你跟進。",
         aiPrompt: "病人問完問題，我要記低哪些資料？",
@@ -104,7 +104,7 @@ const boardDays: BoardDay[] = [
         code: "D1-04",
         title: "病人入門口",
         minutes: "8 分鐘",
-        task: "禮貌招呼，核對姓名、電話、預約時間、醫師；身份不清就查紀錄。",
+        task: "招呼、核對姓名電話、預約時間和醫師。",
         canSay: "你好，我先幫你核對預約資料，請問你姓名同電話尾數？",
         cannotSay: "你一定好快有得睇、你應該係睇某某醫師、Walk-in 一定安排到。",
         aiPrompt: "病人入門口但我不肯定預約資料，可以點做？",
@@ -299,12 +299,12 @@ function InfoLine({
   label,
   children,
 }: {
-  icon: typeof ClipboardCheck;
+  icon: LucideIcon;
   label: string;
   children: string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
       <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
         <Icon className="h-3.5 w-3.5 text-emerald-700" />
         {label}
@@ -318,61 +318,57 @@ function CardDetails({ card }: { card: BoardCard }) {
   const mustEscalate = card.release === "red" || card.supervisor === "always";
 
   return (
-    <div className="mt-4 grid gap-2">
-      <InfoLine icon={ClipboardCheck} label="照做">
-        {card.task}
-      </InfoLine>
-      <InfoLine icon={MessageCircle} label="照講">
-        {card.canSay}
-      </InfoLine>
-      <InfoLine icon={AlertTriangle} label="不要講">
-        {card.cannotSay}
-      </InfoLine>
-      <div
-        className={`rounded-lg border p-3 ${
-          mustEscalate
-            ? "border-rose-200 bg-rose-50"
-            : "border-cyan-200 bg-cyan-50"
-        }`}
-      >
-        <div
-          className={`flex items-center gap-2 text-xs font-semibold ${
-            mustEscalate ? "text-rose-800" : "text-cyan-800"
-          }`}
-        >
+    <div className="mt-4 space-y-3">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+          <ClipboardCheck className="h-3.5 w-3.5 text-emerald-700" />
+          下一步
+        </div>
+        <p className="mt-2 text-base font-semibold leading-6 text-slate-950">{card.task}</p>
+      </div>
+
+      <div className="grid gap-2">
+        <InfoLine icon={MessageCircle} label="可講">
+          {card.canSay}
+        </InfoLine>
+        <InfoLine icon={AlertTriangle} label="不可講">
+          {card.cannotSay}
+        </InfoLine>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
           {mustEscalate ? (
-            <ShieldAlert className="h-3.5 w-3.5" />
+            <ShieldAlert className="h-3.5 w-3.5 text-rose-700" />
           ) : (
-            <Bot className="h-3.5 w-3.5" />
+            <Bot className="h-3.5 w-3.5 text-emerald-700" />
           )}
-          {mustEscalate ? "先交主管" : "問 AI 幫手"}
+          {mustEscalate ? "先問主管" : "需要時問 AI"}
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {mustEscalate ? (
             <a
               href="#supervisor-gates"
-              className="inline-flex items-center gap-2 rounded-lg bg-rose-700 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-800"
+              className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-50"
             >
-              交主管確認
+              交主管
               <ArrowRight className="h-4 w-4" />
             </a>
           ) : null}
           <Link
             href={aiChatHref(card.aiPrompt)}
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${
-              mustEscalate
-                ? "border border-rose-200 bg-white text-rose-800 hover:bg-rose-50"
-                : "bg-emerald-700 text-white hover:bg-emerald-800"
-            }`}
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
           >
-            {mustEscalate ? "整理要問咩" : "問 AI"}
+            問 AI
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </div>
-      <InfoLine icon={Flag} label="做完要識">
+
+      <InfoLine icon={Flag} label="完成">
         {card.passCondition}
       </InfoLine>
+
       <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
         <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1">
           <Clock3 className="h-3.5 w-3.5" />
@@ -517,7 +513,7 @@ function BoardGameLane({ day, selectedCode }: { day: BoardDay; selectedCode: str
           </span>
         </div>
         <div className="min-w-0 lg:mt-3">
-          <p className="text-xs font-semibold text-slate-500">{day.day === 1 ? "今日必行" : "之後再開"}</p>
+          <p className="text-xs font-semibold text-slate-500">{day.day === 1 ? "今日" : "之後"}</p>
           <h2 className="mt-1 text-base font-semibold leading-5 text-slate-950">{dayShortLabel(day.day)}</h2>
         </div>
       </div>
@@ -529,6 +525,56 @@ function BoardGameLane({ day, selectedCode }: { day: BoardDay; selectedCode: str
         </div>
       </div>
     </section>
+  );
+}
+
+function LaterDaysPanel({
+  days,
+  selectedCode,
+  selectedDay,
+}: {
+  days: BoardDay[];
+  selectedCode: string;
+  selectedDay: number;
+}) {
+  return (
+    <details
+      className="rounded-lg border border-slate-200 bg-white/80 p-3 shadow-sm"
+      open={selectedDay > 1}
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-700">
+        <span>Day 2-5</span>
+        <span className="text-xs text-slate-400">之後先做</span>
+      </summary>
+      <div className="mt-3 divide-y divide-slate-100">
+        {days.map((day) => (
+          <div key={day.day} className="grid gap-3 py-3 first:pt-0 last:pb-0 sm:grid-cols-[112px_minmax(0,1fr)]">
+            <div>
+              <p className="text-xs font-semibold text-slate-400">Day {day.day}</p>
+              <h3 className="mt-1 text-sm font-semibold text-slate-900">{dayShortLabel(day.day)}</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {day.cards.map((card) => (
+                <Link
+                  key={card.code}
+                  href={boardCardHref(card.code)}
+                  scroll={false}
+                  className={`inline-flex min-h-9 items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm font-semibold transition-colors hover:border-emerald-300 hover:bg-emerald-50 ${
+                    selectedCode === card.code
+                      ? "border-emerald-400 text-emerald-900 ring-2 ring-emerald-100"
+                      : "border-slate-200 text-slate-700"
+                  }`}
+                  aria-current={selectedCode === card.code ? "step" : undefined}
+                >
+                  <span className={`h-2 w-2 rounded-full ${releaseDotClass(card)}`} />
+                  {tileShortLabel(card.code)}
+                </Link>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -544,20 +590,19 @@ function ComponentBoardScene({
 
   return (
     <div className="rounded-lg border border-emerald-100 bg-[#fbfaf2] p-4 shadow-sm sm:p-5">
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_336px]">
         <div className="space-y-4">
           <div className="flex flex-col gap-3 rounded-lg border border-white/80 bg-white/85 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-semibold text-emerald-700">今日返工</p>
+              <p className="text-sm font-semibold text-emerald-700">Day 1</p>
               <h1 className="mt-1 text-3xl font-semibold tracking-normal text-emerald-950">
-                新姑娘上手
+                今日上手
               </h1>
-              <p className="mt-2 text-sm font-semibold text-slate-600">今日只做 Day 1。</p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm sm:min-w-72">
               <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3">
-                <div className="text-xs font-semibold text-emerald-700">今日</div>
-                <div className="mt-1 font-semibold text-slate-950">Day 1</div>
+                <div className="text-xs font-semibold text-emerald-700">先做</div>
+                <div className="mt-1 font-semibold text-slate-950">4 步</div>
               </div>
               <NurseOnboardingSummary />
             </div>
@@ -567,19 +612,7 @@ function ComponentBoardScene({
             {todayDays.map((day) => (
               <BoardGameLane key={day.day} day={day} selectedCode={selectedCard.code} />
             ))}
-            <details
-              className="rounded-lg border border-slate-200 bg-white/70 p-3 shadow-sm"
-              open={selectedDay > 1}
-            >
-              <summary className="cursor-pointer list-none text-sm font-semibold text-slate-600">
-                之後先做：第 2-5 日
-              </summary>
-              <div className="mt-3 space-y-3">
-                {laterDays.map((day) => (
-                  <BoardGameLane key={day.day} day={day} selectedCode={selectedCard.code} />
-                ))}
-              </div>
-            </details>
+            <LaterDaysPanel days={laterDays} selectedCode={selectedCard.code} selectedDay={selectedDay} />
           </div>
 
           <Link
@@ -594,11 +627,11 @@ function ComponentBoardScene({
         <aside>
           <section
             id="selected-onboarding-card"
-            className="sticky top-24 rounded-lg border border-emerald-200 bg-white p-4 shadow-sm"
+            className="sticky top-24 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-emerald-700">而家做呢步</p>
+                <p className="text-sm font-semibold text-slate-500">Day {selectedDay}</p>
                 <h2 className="mt-1 text-xl font-semibold leading-6 text-slate-950">
                   {selectedCard.title}
                 </h2>
