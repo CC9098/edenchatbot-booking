@@ -628,6 +628,9 @@ export function StaffKnowledgeBaseClient() {
                       <FileText className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
                       <div className="min-w-0">
                         <p className="line-clamp-2 text-sm font-semibold text-slate-950">{item.title}</p>
+                        <span className="mt-2 inline-flex max-w-full items-center rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                          <span className="truncate">{item.category}</span>
+                        </span>
                         <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.excerpt}</p>
                       </div>
                     </div>

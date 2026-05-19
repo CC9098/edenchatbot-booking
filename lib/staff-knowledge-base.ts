@@ -27,6 +27,15 @@ const CATEGORY_BY_PREFIX: Array<[string, string]> = [
   ["security-and-credentials", "安全與權限"],
 ];
 
+const CATEGORY_BY_CONTENT: Array<[RegExp, string]> = [
+  [/醫療券|醫健通/i, "醫療券"],
+  [/寄藥|送藥|寄收據|lalamove|順豐|海外郵寄/i, "寄藥"],
+  [/收據|病假紙|到診紙|醫療報告|分單|價目|零售價|收費|醫療廢物/i, "文件 / 收費"],
+  [/藥袋|食藥|藥方|訂藥|代煎|藥膏|外用藥|重配|藥丸|精油|天灸|lifaair/i, "藥物 / 處方"],
+  [/上班時間|開診前|假期|颱風|病假|放長年假|wifi|飛線|留言|同工電郵|醫師卡片|蕉印|qr code|apowersoft/i, "診所日常"],
+  [/招呼|入房|基本對話|英文|介紹|回應處理/i, "病人接待"],
+];
+
 const STATUS_VALUES = new Set<StaffKnowledgeStatus>([
   "seed",
   "placeholder",
@@ -59,6 +68,34 @@ function toCategory(relativePath: string): string {
     if (relativePath.startsWith(prefix)) return category;
   }
   return "姑娘內部手冊";
+}
+
+function toDocumentCategory(
+  contentMd: string,
+  relativePath: string,
+  title: string,
+): string {
+  const explicitCategory = parseMetadataValue(contentMd, "分類") || parseMetadataValue(contentMd, "類別");
+  if (explicitCategory) return explicitCategory.slice(0, 80);
+
+  if (relativePath.startsWith("00-intake-index") || relativePath.startsWith("security-and-credentials")) {
+    return toCategory(relativePath);
+  }
+  if (relativePath.startsWith("patient-enquiries/")) return "病人查詢";
+  if (relativePath.startsWith("notion-live/whatsapp-replies/")) return "WhatsApp 回覆";
+
+  const searchable = [
+    relativePath,
+    title,
+    compactMarkdown(contentMd, 600),
+  ].join("\n");
+  for (const [pattern, category] of CATEGORY_BY_CONTENT) {
+    if (pattern.test(searchable)) return category;
+  }
+
+  if (relativePath.startsWith("notion-import/eden-series/")) return "前台流程";
+  if (relativePath.startsWith("notion-import/edengram/")) return "診所工具";
+  return toCategory(relativePath);
 }
 
 function parseMetadataValue(
@@ -524,6 +561,7 @@ async function listImportedStaffKnowledgeDocuments(): Promise<StaffKnowledgeDocu
       const relativePath = path.relative(KNOWLEDGE_ROOT, filePath).replace(/\\/g, "/");
       const id = relativePath.replace(/\.md$/, "");
       const title = toTitle(contentMd, path.basename(filePath, ".md"));
+      const category = toDocumentCategory(contentMd, relativePath, title);
       const patientReplyMd = extractSection(
         contentMd,
         /^##\s+(病人|病人\/客戶).*可見回覆/,
@@ -532,7 +570,7 @@ async function listImportedStaffKnowledgeDocuments(): Promise<StaffKnowledgeDocu
       return {
         id,
         title,
-        category: toCategory(relativePath),
+        category,
         status: parseStatus(contentMd),
         sensitivity: parseSensitivity(contentMd),
         source: parseMetadataValue(contentMd, "來源") || "staff-knowledge-base",
@@ -541,7 +579,7 @@ async function listImportedStaffKnowledgeDocuments(): Promise<StaffKnowledgeDocu
         contentMd,
         patientReplyMd,
         sourcePath: `docs/staff-knowledge-base/${relativePath}`,
-        tags: Array.from(new Set([toCategory(relativePath), parseStatus(contentMd), parseSensitivity(contentMd)])),
+        tags: Array.from(new Set([category, toCategory(relativePath), parseStatus(contentMd), parseSensitivity(contentMd)])),
         editable: true,
         imported: true,
       } satisfies StaffKnowledgeDocument;

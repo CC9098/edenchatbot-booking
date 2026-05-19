@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  listStaffKnowledgeDocuments,
   mergeImportedStaffKnowledgeDocuments,
   type StaffKnowledgeNoteRow,
 } from "@/lib/staff-knowledge-base";
@@ -66,4 +67,15 @@ test("mergeImportedStaffKnowledgeDocuments hides archived imported files", () =>
   );
 
   assert.deepEqual(merged, []);
+});
+
+test("listStaffKnowledgeDocuments assigns practical categories to imported notes", async () => {
+  const documents = await listStaffKnowledgeDocuments();
+
+  const byTitle = (titlePart: string) => documents.find((document) => document.title.includes(titlePart));
+
+  assert.equal(byTitle("寄藥篇")?.category, "寄藥");
+  assert.equal(byTitle("醫療券")?.category, "醫療券");
+  assert.equal(byTitle("三店wifi")?.category, "診所日常");
+  assert.equal(byTitle("前台分單")?.category, "文件 / 收費");
 });
