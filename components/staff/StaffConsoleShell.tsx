@@ -20,11 +20,16 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
   const config = getStaffWorkspaceConfig(workspace);
   const iconLabel = workspace === "nurse" ? "護" : "醫";
   const [staffStatus, setStaffStatus] = useState<{ role?: string; staffKind?: string | null } | null>(null);
+  const isOnboardingFocus = workspace === "nurse" && pathname.startsWith("/nurse/onboarding");
   const isPartTimeAssistant =
     staffStatus?.role === "assistant" && staffStatus.staffKind === "part_time_assistant";
+  const showSwitchLink = !isOnboardingFocus && !isPartTimeAssistant;
   const visibleNavItems = config.navItems.filter((item) => {
     if (item.managerOnly && staffStatus?.role !== "admin" && staffStatus?.role !== "doctor") return false;
     if (workspace === "doctor" && isPartTimeAssistant) return false;
+    if (isOnboardingFocus && !["/nurse", "/nurse/onboarding", "/nurse/knowledge"].includes(item.href)) {
+      return false;
+    }
     return true;
   });
 
@@ -77,7 +82,7 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
         </div>
 
         <div className="flex items-center gap-3">
-          {!isPartTimeAssistant ? (
+          {showSwitchLink ? (
             <Link
               href={config.switchHref}
               className="hidden whitespace-nowrap rounded-md border border-primary/15 px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5 md:inline-flex"
@@ -116,7 +121,7 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
               </Link>
             );
           })}
-          {!isPartTimeAssistant ? (
+          {showSwitchLink ? (
             <Link
               href={config.switchHref}
               className="whitespace-nowrap rounded-full border border-primary/15 bg-white px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5"

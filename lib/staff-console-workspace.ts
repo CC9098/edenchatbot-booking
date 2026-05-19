@@ -53,7 +53,7 @@ const NURSE_NAV_ITEMS: StaffWorkspaceNavItem[] = [
   },
   {
     href: "/nurse/onboarding",
-    label: "上手棋盤",
+    label: "上手",
     matchPrefixes: ["/nurse/onboarding"],
   },
   {

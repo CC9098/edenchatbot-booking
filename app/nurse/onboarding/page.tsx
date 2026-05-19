@@ -319,66 +319,71 @@ function CardDetails({ card }: { card: BoardCard }) {
 
   return (
     <div className="mt-4 space-y-3">
-      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+      <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-4">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
           <ClipboardCheck className="h-3.5 w-3.5 text-emerald-700" />
-          下一步
+          做呢件事
         </div>
         <p className="mt-2 text-base font-semibold leading-6 text-slate-950">{card.task}</p>
       </div>
 
-      <div className="grid gap-2">
-        <InfoLine icon={MessageCircle} label="可講">
-          {card.canSay}
-        </InfoLine>
-        <InfoLine icon={AlertTriangle} label="不可講">
-          {card.cannotSay}
-        </InfoLine>
-      </div>
-
-      <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-          {mustEscalate ? (
-            <ShieldAlert className="h-3.5 w-3.5 text-rose-700" />
-          ) : (
-            <Bot className="h-3.5 w-3.5 text-emerald-700" />
-          )}
-          {mustEscalate ? "先問主管" : "需要時問 AI"}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {mustEscalate ? (
-            <a
-              href="#supervisor-gates"
-              className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-50"
-            >
-              交主管
-              <ArrowRight className="h-4 w-4" />
-            </a>
-          ) : null}
-          <Link
-            href={aiChatHref(card.aiPrompt)}
-            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
-          >
-            問 AI
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </div>
-
-      <InfoLine icon={Flag} label="完成">
-        {card.passCondition}
+      <InfoLine icon={MessageCircle} label="可以講">
+        {card.canSay}
       </InfoLine>
 
-      <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
-        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1">
-          <Clock3 className="h-3.5 w-3.5" />
-          約 {card.minutes}
-        </span>
-        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1">
-          <Users className="h-3.5 w-3.5" />
-          {supervisorLabel(card.supervisor)}
-        </span>
-      </div>
+      {mustEscalate ? (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-rose-800">
+            <ShieldAlert className="h-3.5 w-3.5" />
+            先問主管
+          </div>
+          <a
+            href="#supervisor-gates"
+            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-50"
+          >
+            交主管
+            <ArrowRight className="h-4 w-4" />
+          </a>
+        </div>
+      ) : null}
+
+      <details className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-700">
+          <span>更多</span>
+          <span className="text-xs text-slate-400">AI / 不可講 / 完成準則</span>
+        </summary>
+        <div className="mt-3 space-y-2">
+          <InfoLine icon={AlertTriangle} label="不可講">
+            {card.cannotSay}
+          </InfoLine>
+          <InfoLine icon={Flag} label="完成">
+            {card.passCondition}
+          </InfoLine>
+          <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+              <Bot className="h-3.5 w-3.5 text-emerald-700" />
+              需要時問 AI
+            </div>
+            <Link
+              href={aiChatHref(card.aiPrompt)}
+              className="mt-3 inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+            >
+              問 AI
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
+            <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1">
+              <Clock3 className="h-3.5 w-3.5" />
+              約 {card.minutes}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1">
+              <Users className="h-3.5 w-3.5" />
+              {supervisorLabel(card.supervisor)}
+            </span>
+          </div>
+        </div>
+      </details>
     </div>
   );
 }
@@ -478,19 +483,18 @@ function BoardGameTile({
       <Link
         href={boardCardHref(card.code)}
         scroll={false}
-        className={`group/tile relative flex min-h-24 cursor-pointer flex-col items-start justify-between rounded-lg border px-3 py-3 text-left transition-colors hover:border-emerald-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 ${gameTileClass(card)} ${
+        className={`group/tile relative flex min-h-16 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors hover:border-emerald-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 ${gameTileClass(card)} ${
           selected ? "border-emerald-600 ring-4 ring-emerald-100" : ""
         }`}
         aria-current={selected ? "step" : undefined}
       >
-        <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-slate-400">
-          {card.code.replace("D", "")}
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold ${selected ? "text-emerald-800" : "text-slate-500"}`}>
+          {card.code.slice(-2).replace(/^0/, "")}
         </span>
-        <span className="mt-3 flex w-full items-end justify-between gap-2">
+        <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
           <span className="text-sm font-semibold leading-5">{tileShortLabel(card.code)}</span>
           <TileIcon className="h-5 w-5 shrink-0" />
         </span>
-        <span className={`mt-3 h-1 w-full rounded-full ${releaseDotClass(card)}`} />
       </Link>
       {mustEscalate ? (
         <span className="absolute -right-1 -top-1 z-20 rounded-full bg-rose-600 px-2 py-1 text-[10px] font-bold text-white shadow-sm">
@@ -503,26 +507,15 @@ function BoardGameTile({
 
 function BoardGameLane({ day, selectedCode }: { day: BoardDay; selectedCode: string }) {
   return (
-    <section className={`relative grid gap-3 rounded-lg border p-3 ${gameLaneClass(day.day)} lg:grid-cols-[126px_minmax(0,1fr)]`}>
-      <div className="flex items-center gap-3 lg:block">
-        <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full border text-center text-xs font-bold leading-5 ring-4 ring-white/80 ${dayBadgeClass(day.day)}`}>
-          <span>
-            Day {day.day}
-            <br />
-            {dayShortLabel(day.day)}
-          </span>
-        </div>
-        <div className="min-w-0 lg:mt-3">
-          <p className="text-xs font-semibold text-slate-500">{day.day === 1 ? "今日" : "之後"}</p>
-          <h2 className="mt-1 text-base font-semibold leading-5 text-slate-950">{dayShortLabel(day.day)}</h2>
-        </div>
+    <section className="rounded-lg border border-emerald-100 bg-white/80 p-3">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-slate-950">今日 4 步</h2>
+        <span className="text-xs font-semibold text-slate-400">逐格做</span>
       </div>
-      <div className="relative rounded-lg border border-white/80 bg-white/50 p-2">
-        <div className="relative grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {day.cards.map((card) => (
-            <BoardGameTile key={card.code} card={card} selected={selectedCode === card.code} />
-          ))}
-        </div>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {day.cards.map((card) => (
+          <BoardGameTile key={card.code} card={card} selected={selectedCode === card.code} />
+        ))}
       </div>
     </section>
   );
@@ -589,66 +582,58 @@ function ComponentBoardScene({
   const laterDays = boardDays.filter((day) => day.day !== 1);
 
   return (
-    <div className="rounded-lg border border-emerald-100 bg-[#fbfaf2] p-4 shadow-sm sm:p-5">
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_336px]">
-        <div className="space-y-4">
-          <div className="flex flex-col gap-3 rounded-lg border border-white/80 bg-white/85 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-emerald-700">Day 1</p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-normal text-emerald-950">
-                今日上手
-              </h1>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm sm:min-w-72">
-              <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3">
-                <div className="text-xs font-semibold text-emerald-700">先做</div>
-                <div className="mt-1 font-semibold text-slate-950">4 步</div>
-              </div>
-              <NurseOnboardingSummary />
-            </div>
+    <div className="mx-auto max-w-4xl rounded-lg border border-emerald-100 bg-[#fbfaf2] p-4 shadow-sm sm:p-5">
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 rounded-lg border border-white/80 bg-white/90 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-emerald-700">Day {selectedDay}</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-normal text-emerald-950">
+              而家做：{selectedCard.title}
+            </h1>
           </div>
-
-          <div className="space-y-3">
-            {todayDays.map((day) => (
-              <BoardGameLane key={day.day} day={day} selectedCode={selectedCard.code} />
-            ))}
-            <LaterDaysPanel days={laterDays} selectedCode={selectedCard.code} selectedDay={selectedDay} />
+          <div className="sm:min-w-60">
+            <NurseOnboardingSummary />
           </div>
-
-          <Link
-            href="/nurse/knowledge"
-            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
-          >
-            查資料
-            <ArrowRight className="h-4 w-4" />
-          </Link>
         </div>
 
-        <aside>
-          <section
-            id="selected-onboarding-card"
-            className="sticky top-24 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-slate-500">Day {selectedDay}</p>
-                <h2 className="mt-1 text-xl font-semibold leading-6 text-slate-950">
-                  {selectedCard.title}
-                </h2>
-              </div>
-              <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-semibold ${releaseMeta[selectedCard.release].className}`}>
-                {releaseMeta[selectedCard.release].label.split(" ")[0]}
-              </span>
+        <section
+          id="selected-onboarding-card"
+          className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-slate-400">{selectedCard.code}</p>
+              <h2 className="mt-1 text-xl font-semibold leading-6 text-slate-950">
+                {selectedCard.title}
+              </h2>
             </div>
-            <NurseOnboardingProgress
-              cardCode={selectedCard.code}
-              day={selectedDay}
-              release={selectedCard.release}
-              supervisor={selectedCard.supervisor}
-            />
-            <CardDetails card={selectedCard} />
-          </section>
-        </aside>
+            <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-semibold ${releaseMeta[selectedCard.release].className}`}>
+              {releaseMeta[selectedCard.release].label.split(" ")[0]}
+            </span>
+          </div>
+          <NurseOnboardingProgress
+            cardCode={selectedCard.code}
+            day={selectedDay}
+            release={selectedCard.release}
+            supervisor={selectedCard.supervisor}
+          />
+          <CardDetails card={selectedCard} />
+        </section>
+
+        <div className="space-y-3">
+          {todayDays.map((day) => (
+            <BoardGameLane key={day.day} day={day} selectedCode={selectedCard.code} />
+          ))}
+          <LaterDaysPanel days={laterDays} selectedCode={selectedCard.code} selectedDay={selectedDay} />
+        </div>
+
+        <Link
+          href="/nurse/knowledge"
+          className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+        >
+          查資料
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
     </div>
   );
@@ -670,12 +655,15 @@ export default function NurseOnboardingPage({
         selectedDay={selected.day}
       />
 
-      <section
+      <details
         id="supervisor-gates"
         className="rounded-lg border border-emerald-100 bg-white p-4 shadow-sm"
       >
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-slate-950">主管確認</h2>
+          <span className="text-xs font-semibold text-slate-400">需要時打開</span>
+        </summary>
+        <div className="mt-4">
           <Link
             href="/nurse/knowledge/training"
             className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
@@ -702,7 +690,7 @@ export default function NurseOnboardingPage({
             </div>
           ))}
         </div>
-      </section>
+      </details>
     </div>
   );
 }
