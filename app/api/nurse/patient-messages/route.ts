@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { AuthError, getCurrentUser, requireStaffRole } from "@/lib/auth-helpers";
-import { sendStaffPatientWhatsappMessage } from "@/lib/chatwoot-whatsapp";
+import { sendBookingConfirmationWhatsapp, sendStaffPatientWhatsappMessage } from "@/lib/chatwoot-whatsapp";
 import { normalizePhoneForSearch } from "@/lib/contact-utils";
 import {
   STAFF_PATIENT_MESSAGE_PURPOSE_BY_ID,
@@ -24,6 +24,12 @@ const nursePatientMessageSchema = z.object({
   linkUrl: z.string().trim().max(1200, "連結太長").optional().default(""),
   note: z.string().trim().max(240, "內容太長").optional().default(""),
   manageAction: z.enum(["reschedule", "cancel"]).optional(),
+  bookingId: z.string().trim().max(120).optional().default(""),
+  doctorNameZh: z.string().trim().max(80).optional().default(""),
+  appointmentDate: z.string().trim().max(20).optional().default(""),
+  appointmentTime: z.string().trim().max(20).optional().default(""),
+  meetLink: z.string().trim().max(500).optional().default(""),
+  visitType: z.enum(["first", "followup"]).optional().default("followup"),
 });
 
 function formatZodIssues(error: z.ZodError) {
@@ -95,16 +101,42 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const whatsappResult = await sendStaffPatientWhatsappMessage({
-      patientName: messageData.patientName,
-      phone: messageData.phone,
-      clinicNameZh: clinic.nameZh,
-      clinicWhatsappPhone: getClinicWhatsappPhone(messageData.clinicId),
-      purpose: messageData.purpose,
-      note: messageData.note,
-      linkUrl: messageData.linkUrl,
-      manageUrl,
-    });
+    const clinicWhatsappPhone = getClinicWhatsappPhone(messageData.clinicId);
+    const canSendOnlineConfirmationTemplate =
+      messageData.purpose === "online_waiting" &&
+      Boolean(
+        messageData.linkUrl &&
+          messageData.bookingId &&
+          messageData.doctorNameZh &&
+          messageData.appointmentDate &&
+          messageData.appointmentTime,
+      );
+
+    const whatsappResult = canSendOnlineConfirmationTemplate
+      ? await sendBookingConfirmationWhatsapp({
+          bookingId: messageData.bookingId,
+          patientName: messageData.patientName,
+          phone: messageData.phone,
+          email: "",
+          doctorNameZh: messageData.doctorNameZh,
+          clinicNameZh: clinic.nameZh,
+          appointmentDate: messageData.appointmentDate,
+          appointmentTime: messageData.appointmentTime,
+          visitType: messageData.visitType,
+          meetLink: messageData.meetLink,
+          onlineConsultUrl: messageData.linkUrl,
+          clinicWhatsappPhone,
+        })
+      : await sendStaffPatientWhatsappMessage({
+          patientName: messageData.patientName,
+          phone: messageData.phone,
+          clinicNameZh: clinic.nameZh,
+          clinicWhatsappPhone,
+          purpose: messageData.purpose,
+          note: messageData.note,
+          linkUrl: messageData.linkUrl,
+          manageUrl,
+        });
 
     const preview = buildStaffPatientMessageText({
       patientName: messageData.patientName,
