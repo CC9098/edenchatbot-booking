@@ -11,7 +11,7 @@ import {
 } from "@/lib/staff-patient-messages";
 import { buildManageBookingUrl } from "@/lib/public-url";
 import { createManageAccessToken } from "@/lib/widget-booking-management";
-import { CLINIC_BY_ID, PHYSICAL_CLINIC_IDS } from "@/shared/clinic-data";
+import { CLINIC_BY_ID, CLINIC_IDS } from "@/shared/clinic-data";
 import { getClinicWhatsappPhone } from "@/lib/whatsapp-booking";
 
 export const dynamic = "force-dynamic";
@@ -19,9 +19,9 @@ export const dynamic = "force-dynamic";
 const nursePatientMessageSchema = z.object({
   patientName: z.string().trim().min(1, "請輸入病人姓名").max(80, "病人姓名太長"),
   phone: z.string().trim().min(6, "請輸入 WhatsApp 電話號碼").max(32, "電話號碼太長"),
-  clinicId: z.enum(PHYSICAL_CLINIC_IDS),
+  clinicId: z.enum(CLINIC_IDS),
   purpose: z.enum(STAFF_PATIENT_MESSAGE_PURPOSE_IDS),
-  linkUrl: z.string().trim().max(500, "連結太長").optional().default(""),
+  linkUrl: z.string().trim().max(1200, "連結太長").optional().default(""),
   note: z.string().trim().max(240, "內容太長").optional().default(""),
   manageAction: z.enum(["reschedule", "cancel"]).optional(),
 });

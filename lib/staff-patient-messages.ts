@@ -111,6 +111,7 @@ export function buildStaffPatientMessageText(input: BuildStaffPatientMessageText
     case "online_waiting":
       lines.push(
         note || "如醫師仍未進入網上診症，請保持 Google Meet 或網上診症入口開啟，姑娘會盡快跟進。",
+        linkUrl ? `網上診症入口：${linkUrl}` : "",
       );
       break;
   }
