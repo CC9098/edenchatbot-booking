@@ -146,12 +146,13 @@ export function buildWhatsappOnlineTemplateBodyParams(
   input: BookingWhatsappConfirmationInput & { manageAccessToken?: string },
 ): Record<string, string> {
   const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
+  const appointmentDateTime = `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`;
 
   return {
     patient_name: input.patientName,
-    doctor_name: input.doctorNameZh,
+    doctor_name: `${input.doctorNameZh}（預約時間：${appointmentDateTime}）`,
     clinic_name: input.clinicNameZh,
-    appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
+    appointment_datetime: appointmentDateTime,
     ...(input.onlineConsultUrl ? { online_consult_url: input.onlineConsultUrl } : {}),
     visit_type: VISIT_TYPE_LABELS[input.visitType],
     booking_id: input.bookingId,

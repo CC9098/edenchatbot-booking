@@ -67,7 +67,8 @@ test('WhatsApp online template params match the current Meta template variables'
 
   assert.equal(params.meet_link, undefined);
   assert.equal(params.online_consult_url, 'https://edenchatbot-booking.vercel.app/online-consult?token=online123');
-  assert.equal(params.doctor_name, '張天慧醫師');
+  assert.equal(params.doctor_name, '張天慧醫師（預約時間：2026年5月13日星期三 21:30）');
+  assert.equal(params.appointment_datetime, '2026年5月13日星期三 21:30');
   assert.equal(params.clinic_name, '網上');
   assert.equal(params.booking_id, 'booking-123');
 });
