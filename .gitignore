@@ -16,6 +16,7 @@
 /test-results/
 /output/
 /.playwright-cli/
+/graphify-out/
 
 # audio files
 *.aiff
