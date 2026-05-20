@@ -3,13 +3,31 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import {
+  BadgeCheck,
+  BellRing,
   BookOpen,
   Bookmark,
+  BriefcaseMedical,
+  Brush,
+  Building2,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
+  Compass,
   Feather,
+  FilePenLine,
+  Leaf,
   ListChecks,
+  Search,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
   ScrollText,
+  Stethoscope,
+  Syringe,
+  UserRound,
+  UsersRound,
+  type LucideIcon,
 } from "lucide-react";
 
 type NoteSection = {
@@ -377,9 +395,63 @@ const NOTEBOOK_PAGES: NotebookPage[] = [
   },
 ];
 
-function getSpreadNumber(pageIndex: number) {
-  return Math.floor(pageIndex / 2);
-}
+type RoleTab = {
+  label: string;
+  description: string;
+  icon: LucideIcon;
+};
+
+type EquipmentCard = {
+  title: string;
+  description: string;
+  detail: string;
+  icon: LucideIcon;
+  spreadIndex: number;
+};
+
+const ROLE_TABS: RoleTab[] = [
+  { label: "醫師", description: "診症、處方、溝通", icon: Stethoscope },
+  { label: "姑娘", description: "治療區、藥房、配合", icon: UsersRound },
+  { label: "前台", description: "登記、收費、病人安排", icon: Building2 },
+  { label: "管理", description: "制度、培訓、風險", icon: Settings2 },
+];
+
+const TODAY_EQUIPMENT: EquipmentCard[] = [
+  {
+    title: "身份核對盾",
+    description: "藥方／收據必須用真正睇症本人資料",
+    detail: "處方紙 + 印章",
+    icon: ShieldCheck,
+    spreadIndex: 2,
+  },
+  {
+    title: "情緒安定鈴",
+    description: "投訴先穩情緒，再守住專業原則",
+    detail: "診室鈴 + 同理語氣",
+    icon: BellRing,
+    spreadIndex: 1,
+  },
+  {
+    title: "調理指南針",
+    description: "覆診不是催促，是講清身體方向",
+    detail: "針灸線 + 方向",
+    icon: Compass,
+    spreadIndex: 0,
+  },
+];
+
+const SCENARIO_ROWS = [
+  { label: "情境", value: "病人用家屬身份登記" },
+  { label: "判斷", value: "不可用非本人資料" },
+  { label: "做法", value: "請前台補回本人資料" },
+  { label: "不要做", value: "未更正前不要出單" },
+];
+
+const WEEKLY_READS = [
+  { title: "處方筆", text: "服藥時間要主動講清楚", icon: FilePenLine, spreadIndex: 4 },
+  { title: "藥包", text: "孕婦配藥先通知姑娘", icon: Leaf, spreadIndex: 4 },
+  { title: "針灸針", text: "敏感病人由輕量開始", icon: Syringe, spreadIndex: 1 },
+];
 
 function splitIntoSpreads(pages: NotebookPage[]) {
   const spreads: Array<[NotebookPage, NotebookPage | null]> = [];
@@ -398,7 +470,7 @@ function PageContent({ page, pageNumber }: { page: NotebookPage; pageNumber: num
       <div className="pointer-events-none absolute -right-16 top-10 h-48 w-48 rounded-full border border-[#d4ad5d]/25" />
       <div className="relative">
         <div className="flex items-start justify-between gap-4">
-          <span className="rounded-full border border-[#c5a35b]/40 bg-[#f8efd8] px-3 py-1 text-xs font-semibold tracking-[0.24em] text-[#8a6129]">
+          <span className="rounded-full border border-[#c5a35b]/40 bg-[#f8efd8] px-3 py-1 text-xs font-semibold text-[#8a6129]">
             {page.eyebrow}
           </span>
           <span className="font-serif text-xs text-[#9a7f52]">第 {pageNumber} 頁</span>
@@ -470,36 +542,245 @@ export function DoctorNotebook() {
   }
 
   return (
-    <div className="doctor-notebook -mx-4 -my-6 min-h-[calc(100vh-56px)] bg-[#efe7d5] px-4 py-5 text-[#263327] sm:-mx-6 sm:px-6 lg:py-8">
-      <section className="mx-auto max-w-7xl">
-        <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="overflow-hidden rounded-[20px] border border-[#c8b082] bg-[#243629] text-[#fff8ea] shadow-2xl shadow-[#4a3520]/20">
-            <div className="relative h-72">
-              <Image
-                src="/images/doctor-notebook-cover.png"
-                alt="醫師手札書法封面"
-                fill
-                sizes="(min-width: 1024px) 320px, 100vw"
-                className="object-cover opacity-85"
-                priority
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#17231a] via-[#17231a]/35 to-transparent" />
-              <div className="absolute bottom-5 left-5 right-5">
-                <div className="font-serif text-4xl font-semibold leading-tight">醫師手札</div>
-                <div className="mt-2 text-sm leading-6 text-[#eadfc4]">內部筆記 · 診症溝通 · 團隊合作</div>
+    <div className="doctor-notebook -mx-4 -my-6 min-h-[calc(100vh-56px)] bg-[#f5efe2] px-4 py-5 text-[#1f2c23] sm:-mx-6 sm:px-6 lg:py-8">
+      <section className="mx-auto max-w-7xl space-y-6">
+        <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+          <aside className="rounded-lg border border-[#d4c4a6] bg-[#203326] p-4 text-[#fff8ea] shadow-sm">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md border border-[#d8bd76]/35 bg-[#f3d995]/15">
+                <BriefcaseMedical className="h-5 w-5 text-[#f0cf7a]" />
+              </div>
+              <div>
+                <div className="font-serif text-xl font-semibold">Eden Staff Kit</div>
+                <div className="text-xs text-[#d8cdae]">員工手冊變成每日工具</div>
               </div>
             </div>
 
-            <div className="space-y-4 p-5">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#d5b56b]">
+            <div className="mb-5">
+              <div className="mb-2 text-xs font-semibold text-[#c9b06f]">
+                角色
+              </div>
+              <div className="grid gap-2">
+                {ROLE_TABS.map((role, index) => {
+                  const RoleIcon = role.icon;
+                  const active = index === 0;
+
+                  return (
+                    <button
+                      key={role.label}
+                      type="button"
+                      className={`flex items-center gap-3 rounded-md border px-3 py-3 text-left transition-colors ${
+                        active
+                          ? "border-[#d8bd76] bg-[#d8bd76] text-[#1f2c23]"
+                          : "border-white/10 bg-white/5 text-[#efe7d5] hover:border-[#d8bd76]/60"
+                      }`}
+                    >
+                      <RoleIcon className="h-4 w-4 shrink-0" />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold">{role.label}</span>
+                        <span className="block truncate text-xs opacity-75">{role.description}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-md border border-white/10 bg-white/5 p-3">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#f0cf7a]">
+                <Bookmark className="h-4 w-4" />
+                舊手札保留
+              </div>
+              <div className="relative mb-3 h-28 overflow-hidden rounded-md border border-white/10">
+                <Image
+                  src="/images/doctor-notebook-cover.png"
+                  alt="醫師手札封面"
+                  fill
+                  sizes="228px"
+                  className="object-cover opacity-80"
+                  priority
+                />
+              </div>
+              <p className="text-xs leading-5 text-[#dfd5bd]">
+                完整章節仍在下方。第一屏只留下今日要用的判斷。
+              </p>
+            </div>
+          </aside>
+
+          <div className="min-w-0 space-y-5">
+            <header className="flex flex-col gap-4 rounded-lg border border-[#d9c9ab] bg-[#fffaf0] p-5 shadow-sm lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-bold text-[#8a642e]">
+                  <Sparkles className="h-4 w-4" />
+                  AI 時代員工手冊
+                </div>
+                <h1 className="mt-2 font-serif text-3xl font-semibold leading-tight text-[#203326] sm:text-4xl">
+                  Eden 醫師裝備
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-[#635845]">
+                  每日 3 件事，守住診症品質。
+                </p>
+              </div>
+
+              <div className="flex w-full items-center gap-2 rounded-md border border-[#d7c59d] bg-[#fbf5e8] px-3 py-2 text-[#6c5b3f] lg:w-64">
+                <Search className="h-4 w-4 shrink-0 text-[#96713a]" />
+                <span className="text-sm">問手冊</span>
+              </div>
+            </header>
+
+            <section className="rounded-lg border border-[#d9c9ab] bg-[#fffaf0] p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-bold text-[#8a642e]">
+                    今日上班前 30 秒
+                  </div>
+                  <h2 className="mt-1 font-serif text-2xl font-semibold text-[#203326]">
+                    先拿三件裝備
+                  </h2>
+                </div>
+                <BadgeCheck className="h-5 w-5 text-[#8a642e]" />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                {TODAY_EQUIPMENT.map((item) => {
+                  const ItemIcon = item.icon;
+
+                  return (
+                    <button
+                      key={item.title}
+                      type="button"
+                      onClick={() => goToSpread(item.spreadIndex)}
+                      className="group rounded-lg border border-[#d8c6a3] bg-[#fcf7eb] p-4 text-left transition-colors hover:border-[#b78a45] hover:bg-[#fff4d8]"
+                    >
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-md border border-[#c9ad70] bg-[#f6e7bd] text-[#203326]">
+                          <ItemIcon className="h-5 w-5" />
+                        </div>
+                        <span className="rounded-md border border-[#e0ceb0] px-2 py-1 text-xs text-[#7a633c]">
+                          {item.detail}
+                        </span>
+                      </div>
+                      <h3 className="font-serif text-lg font-semibold text-[#203326]">{item.title}</h3>
+                      <p className="mt-2 text-sm leading-6 text-[#5f5443]">{item.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+              <section className="rounded-lg border border-[#d9c9ab] bg-[#fffaf0] p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5 text-[#8a642e]" />
+                  <h2 className="font-serif text-2xl font-semibold text-[#203326]">情境卡</h2>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {SCENARIO_ROWS.map((row) => (
+                    <div key={row.label} className="rounded-md border border-[#decdae] bg-[#fcf7eb] p-4">
+                      <div className="text-xs font-bold text-[#8a642e]">{row.label}</div>
+                      <div className="mt-2 text-base font-semibold leading-6 text-[#2d3c30]">{row.value}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-[#d9c9ab] bg-[#203326] p-5 text-[#fff8ea] shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <Brush className="h-5 w-5 text-[#f0cf7a]" />
+                  <h2 className="font-serif text-xl font-semibold">Eden 語句庫</h2>
+                </div>
+                <p className="text-sm leading-6 text-[#e5dbc4]">
+                  為保障您的醫療紀錄和日後治療安全，藥方和收據必須用真正睇症本人的資料。
+                </p>
+                <button
+                  type="button"
+                  onClick={() => goToSpread(2)}
+                  className="mt-5 inline-flex items-center gap-2 rounded-md border border-[#f0cf7a]/40 px-3 py-2 text-sm font-semibold text-[#f0cf7a] hover:bg-white/10"
+                >
+                  查看完整指引
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </section>
+            </div>
+
+            <section>
+              <div className="mb-3 flex items-center gap-2">
+                <ListChecks className="h-5 w-5 text-[#8a642e]" />
+                <h2 className="font-serif text-xl font-semibold text-[#203326]">本週必讀 3 條</h2>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                {WEEKLY_READS.map((item) => {
+                  const ItemIcon = item.icon;
+
+                  return (
+                    <button
+                      key={item.title}
+                      type="button"
+                      onClick={() => goToSpread(item.spreadIndex)}
+                      className="flex items-center gap-3 rounded-lg border border-[#d9c9ab] bg-[#fffaf0] p-4 text-left shadow-sm transition-colors hover:border-[#b78a45]"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md border border-[#d7c59d] bg-[#f8efd8] text-[#7a5a2d]">
+                        <ItemIcon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="font-serif text-base font-semibold text-[#203326]">{item.title}</div>
+                        <div className="mt-1 text-sm text-[#635845]">{item.text}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <section className="rounded-lg border border-[#d2bf9a] bg-[#eadfcb] p-4 shadow-sm">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold text-[#8a642e]">
+                <ScrollText className="h-4 w-4" />
+                完整手札
+              </div>
+              <h2 className="mt-1 font-serif text-2xl font-semibold text-[#203326]">
+                深讀時，再揭開整本筆記
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => goToSpread(spreadIndex - 1)}
+                disabled={isFirst}
+                aria-label="上一頁"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#c5a35b] bg-[#fffaf0] text-[#5a4b35] transition-colors hover:bg-[#f4e7c7] disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <span className="min-w-[92px] text-center text-sm font-semibold text-[#5a4b35]">
+                {spreadIndex + 1} / {spreads.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => goToSpread(spreadIndex + 1)}
+                disabled={isLast}
+                aria-label="下一頁"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#c5a35b] bg-[#fffaf0] text-[#5a4b35] transition-colors hover:bg-[#f4e7c7] disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+            <div className="rounded-lg border border-[#d8c6a3] bg-[#fffaf0] p-3">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#7a5a2d]">
                 <BookOpen className="h-4 w-4" />
-                可翻閱章節
+                章節
               </div>
               <div className="grid gap-2">
                 {spreads.map((spread, index) => {
                   const active = index === spreadIndex;
                   const pageStart = index * 2 + 1;
-                  const title = index === 0 ? "封面與覆診調理" : spread[0].title;
+                  const title = index === 0 ? "今日底稿" : spread[0].title;
 
                   return (
                     <button
@@ -508,8 +789,8 @@ export function DoctorNotebook() {
                       onClick={() => goToSpread(index)}
                       className={`flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors ${
                         active
-                          ? "border-[#d5b56b] bg-[#d5b56b] text-[#213021]"
-                          : "border-white/10 bg-white/5 text-[#efe7d5] hover:border-[#d5b56b]/60 hover:bg-white/10"
+                          ? "border-[#b78a45] bg-[#f2ddaa] text-[#203326]"
+                          : "border-[#e0ceb0] bg-white text-[#5f5443] hover:border-[#b78a45]"
                       }`}
                     >
                       <span className="truncate">{title}</span>
@@ -518,54 +799,9 @@ export function DoctorNotebook() {
                   );
                 })}
               </div>
-
-              <div className="rounded-md border border-white/10 bg-white/5 p-4 text-sm leading-6 text-[#eadfc4]">
-                <div className="mb-2 flex items-center gap-2 font-semibold text-[#f5d98f]">
-                  <Bookmark className="h-4 w-4" />
-                  手札原則
-                </div>
-                這頁不是給病人看的宣傳頁，而是醫師內部溫習、面談、培訓時使用的臨床筆記。
-              </div>
-            </div>
-          </aside>
-
-          <div className="min-w-0">
-            <div className="mb-4 flex flex-col gap-3 rounded-[16px] border border-[#d0bd91] bg-[#fff8ea]/85 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-[#8c632c]">
-                  <ScrollText className="h-4 w-4" />
-                  醫天圓 · 醫師內部手札
-                </div>
-                <h1 className="mt-1 font-serif text-2xl font-semibold text-[#263d2b] sm:text-3xl">
-                  一本真的可以揭的醫師筆記本
-                </h1>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => goToSpread(spreadIndex - 1)}
-                  disabled={isFirst}
-                  aria-label="上一頁"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#c5a35b] bg-[#fffaf0] text-[#5a4b35] transition-colors hover:bg-[#f4e7c7] disabled:cursor-not-allowed disabled:opacity-35"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <span className="min-w-[92px] text-center text-sm font-semibold text-[#5a4b35]">
-                  {spreadIndex + 1} / {spreads.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => goToSpread(spreadIndex + 1)}
-                  disabled={isLast}
-                  aria-label="下一頁"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#c5a35b] bg-[#fffaf0] text-[#5a4b35] transition-colors hover:bg-[#f4e7c7] disabled:cursor-not-allowed disabled:opacity-35"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
             </div>
 
-            <div className="relative rounded-[26px] border border-[#8d6a35]/25 bg-[#5f3d20] p-3 shadow-2xl shadow-[#4f351d]/20 sm:p-5">
+            <div className="relative rounded-lg border border-[#8d6a35]/25 bg-[#5f3d20] p-3 shadow-sm sm:p-5">
               <div className="absolute bottom-8 left-1/2 top-8 hidden w-px -translate-x-1/2 bg-[#a97b3e]/45 lg:block" />
               <div
                 key={spreadIndex}
@@ -577,7 +813,7 @@ export function DoctorNotebook() {
                 {rightPage ? (
                   <PageContent page={rightPage} pageNumber={spreadIndex * 2 + 2} />
                 ) : (
-                  <article className="relative min-h-[620px] overflow-hidden rounded-[18px] border border-[#d8c6a3] bg-[#fffaf0] p-8 shadow-[inset_0_0_40px_rgba(123,93,49,0.08)]">
+                  <article className="relative min-h-[620px] overflow-hidden rounded-lg border border-[#d8c6a3] bg-[#fffaf0] p-8 shadow-[inset_0_0_40px_rgba(123,93,49,0.08)]">
                     <div className="flex h-full items-center justify-center text-center font-serif text-xl text-[#a38455]">
                       留白，待醫師補筆。
                     </div>
@@ -585,24 +821,8 @@ export function DoctorNotebook() {
                 )}
               </div>
             </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              {[
-                "先聆聽，再說明",
-                "以比喻解釋身體現況",
-                "治本，調體質",
-              ].map((line) => (
-                <div
-                  key={line}
-                  className="flex items-center gap-2 rounded-md border border-[#d7c59d] bg-[#fff8ea] px-4 py-3 font-serif text-sm text-[#5f4b2f]"
-                >
-                  <ListChecks className="h-4 w-4 text-[#8b6733]" />
-                  {line}
-                </div>
-              ))}
-            </div>
           </div>
-        </div>
+        </section>
       </section>
     </div>
   );
