@@ -18,12 +18,22 @@ const DOCTOR_EVENT_COLOR_ID_BY_ID: Record<string, string> = {
   wong: '8',
 };
 
+export const CHEUNG_TIN_WAI_ONLINE_CONSULTATION_ATTENDEE = {
+  email: 'cheungtinw@gmail.com',
+  displayName: '張天慧醫師',
+} as const;
+
 type CreateBookingResult = {
   success: boolean;
   eventId?: string;
   meetLink?: string;
   eventHtmlLink?: string;
   error?: string;
+};
+
+type BookingEventAttendee = {
+  email: string;
+  displayName?: string;
 };
 
 function buildBookingEventSummary(details: {
@@ -41,6 +51,18 @@ function getBookingEventColorId(doctorId?: string): string {
 
 function isOnlineBooking(details: { clinicId?: string; clinicNameZh: string }): boolean {
   return details.clinicId === 'online' || details.clinicNameZh === '網上';
+}
+
+export function buildBookingEventAttendees(details: {
+  doctorId?: string;
+  clinicId?: string;
+  clinicNameZh: string;
+}): BookingEventAttendee[] | undefined {
+  if (details.doctorId === 'cheung' && isOnlineBooking(details)) {
+    return [{ ...CHEUNG_TIN_WAI_ONLINE_CONSULTATION_ATTENDEE }];
+  }
+
+  return undefined;
 }
 
 function getMeetLinkFromEvent(event: any): string | undefined {
@@ -269,6 +291,7 @@ export async function createBooking(
     const calendar = await getUncachableGoogleCalendarClient();
     const privateMetadata = buildBookingEventPrivateMetadata(details);
     const shouldCreateMeet = isOnlineBooking(details);
+    const attendees = buildBookingEventAttendees(details);
 
     const event = {
       summary: buildBookingEventSummary(details),
@@ -289,6 +312,7 @@ export async function createBooking(
         timeZone: 'Asia/Hong_Kong',
       },
       colorId: getBookingEventColorId(details.doctorId),
+      attendees,
       extendedProperties: privateMetadata
         ? {
             private: privateMetadata,
@@ -310,6 +334,7 @@ export async function createBooking(
       calendarId: calendarId,
       requestBody: event,
       conferenceDataVersion: shouldCreateMeet ? 1 : undefined,
+      sendUpdates: attendees && attendees.length > 0 ? 'all' : undefined,
     });
 
     return {

@@ -24,9 +24,14 @@ import {
 } from '@/shared/booking-pickup';
 import { getActiveCalendarIds, getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
 import { getMappingWithFallback } from '@/lib/storage-helpers';
-import { getFreeBusy } from './google-calendar';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
-import { createBooking, deleteEvent, listEventsInRange } from './google-calendar';
+import {
+  CHEUNG_TIN_WAI_ONLINE_CONSULTATION_ATTENDEE,
+  createBooking,
+  deleteEvent,
+  getFreeBusy,
+  listEventsInRange,
+} from './google-calendar';
 import {
   sendBookingConfirmationEmail,
   sendDoctorOnlineBookingNotificationEmail,
@@ -58,6 +63,9 @@ const DEFAULT_RECENT_BOOKINGS_LIMIT = 3;
 const CALENDAR_LOOKBACK_DAYS = 180;
 const CALENDAR_LOOKAHEAD_DAYS = 365;
 const CALENDAR_UNAVAILABLE_TAG = '[CALENDAR_UNAVAILABLE]';
+const INTERNAL_BOOKING_ATTENDEE_EMAILS = new Set<string>([
+  CHEUNG_TIN_WAI_ONLINE_CONSULTATION_ATTENDEE.email,
+]);
 
 const RECEIPT_LABELS: Record<BookingReceiptType, string> = {
   no: '不用',
@@ -414,7 +422,10 @@ function extractEventEmail(event: CalendarEventLike): string | null {
 
   if (Array.isArray(event.attendees)) {
     const matched = event.attendees.find(
-      (attendee) => typeof attendee?.email === 'string' && attendee.email.trim().length > 0
+      (attendee) =>
+        typeof attendee?.email === 'string' &&
+        attendee.email.trim().length > 0 &&
+        !INTERNAL_BOOKING_ATTENDEE_EMAILS.has(normalizeEmail(attendee.email))
     );
     if (matched?.email) return normalizeEmail(matched.email);
   }
