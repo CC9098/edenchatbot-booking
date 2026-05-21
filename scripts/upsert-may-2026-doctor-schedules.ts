@@ -164,12 +164,6 @@ const MAY_2026_HOLIDAYS: HolidaySeed[] = [
     reason: '勞動節，全線休息一日',
   },
   {
-    doctorId: null,
-    clinicId: null,
-    holidayDate: '2026-05-25',
-    reason: '佛誕翌日，全線休息一日',
-  },
-  {
     doctorId: 'chan',
     clinicId: 'tsuenwan',
     holidayDate: '2026-05-02',
