@@ -67,6 +67,14 @@ interface ChatwootContact {
   contact_inboxes?: ChatwootContactInbox[] | null;
 }
 
+interface ChatwootCreateContactResponse extends ChatwootContact {
+  payload?: ChatwootContact[] | ChatwootContact | {
+    contact?: ChatwootContact;
+    contact_inboxes?: ChatwootContactInbox[] | null;
+  };
+  contact?: ChatwootContact;
+}
+
 interface ChatwootContactSearchResponse {
   payload?: ChatwootContact[];
 }
@@ -274,7 +282,7 @@ class ChatwootWhatsappClient {
     email: string;
     phone_number: string;
   }) {
-    return this.request<ChatwootContact>(
+    return this.request<ChatwootCreateContactResponse>(
       `/api/v1/accounts/${accountId}/contacts`,
       {
         method: 'POST',
@@ -389,6 +397,37 @@ function findMatchingContact(
   });
 
   return emailMatch || null;
+}
+
+function extractContactFromCreateResponse(
+  response: ChatwootCreateContactResponse,
+  normalizedPhone: string,
+  normalizedEmail: string,
+): ChatwootContact | null {
+  const candidates: ChatwootContact[] = [];
+
+  if (response.id) {
+    candidates.push(response);
+  }
+
+  if (response.contact) {
+    candidates.push(response.contact);
+  }
+
+  if (Array.isArray(response.payload)) {
+    candidates.push(...response.payload);
+  } else if (response.payload) {
+    if ('id' in response.payload) {
+      candidates.push(response.payload as ChatwootContact);
+    }
+
+    if ('contact' in response.payload && response.payload.contact) {
+      candidates.push(response.payload.contact);
+    }
+  }
+
+  const matchingContact = findMatchingContact(candidates, normalizedPhone, normalizedEmail);
+  return matchingContact || candidates.find((candidate) => Boolean(candidate.id)) || null;
 }
 
 function findExistingConversation(
@@ -529,16 +568,32 @@ async function ensureWhatsappContact(
   }
 
   if (!contact?.id) {
-    contact = await client.createContact(accountId, {
+    const createContactResponse = await client.createContact(accountId, {
       inbox_id: inboxId,
       name: patientName,
       email: normalizedEmail,
       phone_number: normalizedPhone,
     });
+    contact = extractContactFromCreateResponse(
+      createContactResponse,
+      normalizedPhone,
+      normalizedEmail,
+    );
   }
 
   if (!contact?.id) {
     throw new Error('Failed to resolve Chatwoot contact');
+  }
+
+  const embeddedContactInbox = (contact.contact_inboxes || []).find((contactInbox) => {
+    return contactInbox.inbox?.id === inboxId && contactInbox.source_id;
+  });
+
+  if (embeddedContactInbox?.source_id) {
+    return {
+      contactId: contact.id,
+      sourceId: embeddedContactInbox.source_id,
+    };
   }
 
   const contactableInboxes = await client.getContactableInboxes(accountId, contact.id);

@@ -155,6 +155,156 @@ test('sendStaffPatientWhatsappMessage sends an approved intake template with a U
   }
 });
 
+test('sendStaffPatientWhatsappMessage creates a missing Chatwoot contact before sending template', async () => {
+  const originalFetch = global.fetch;
+  const originalEnv = {
+    CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
+    CHATWOOT_API_ACCESS_TOKEN: process.env.CHATWOOT_API_ACCESS_TOKEN,
+    CHATWOOT_ACCOUNT_ID: process.env.CHATWOOT_ACCOUNT_ID,
+    CHATWOOT_WHATSAPP_INBOX_ID: process.env.CHATWOOT_WHATSAPP_INBOX_ID,
+    CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME,
+    CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE,
+    CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY,
+  };
+
+  const createdContacts: Array<Record<string, any>> = [];
+  const createdContactInboxes: Array<Record<string, any>> = [];
+  const sentMessagePayloads: Array<Record<string, any>> = [];
+
+  process.env.CHATWOOT_BASE_URL = 'https://chatwoot.example';
+  process.env.CHATWOOT_API_ACCESS_TOKEN = 'test-token';
+  process.env.CHATWOOT_ACCOUNT_ID = '';
+  process.env.CHATWOOT_WHATSAPP_INBOX_ID = '';
+  process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME = 'staff_patient_follow_up';
+  process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE = 'zh_HK';
+  process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY = 'UTILITY';
+
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const parsedUrl = new URL(requestUrl);
+    const method = init?.method || 'GET';
+    const path = `${parsedUrl.pathname}${parsedUrl.search}`;
+
+    if (method === 'GET' && path === '/api/v1/profile') {
+      return jsonResponse({ account_id: 1 });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/inboxes') {
+      return jsonResponse({
+        payload: [{
+          id: 7,
+          channel_type: 'Channel::Whatsapp',
+          phone_number: '+85267333801',
+          message_templates: [{
+            name: 'staff_patient_follow_up',
+            language: 'zh_HK',
+            status: 'approved',
+            category: 'UTILITY',
+          }],
+        }],
+      });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/inboxes/7/sync_templates') {
+      return jsonResponse({ message: 'ok' });
+    }
+
+    if (method === 'GET' && path.startsWith('/api/v1/accounts/1/contacts/search?')) {
+      return jsonResponse({ payload: [] });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/contacts') {
+      const payload = JSON.parse(String(init?.body || '{}'));
+      createdContacts.push(payload);
+
+      return jsonResponse({
+        payload: {
+          contact: {
+            id: 123,
+            phone_number: '+85291234567',
+            email: '',
+            contact_inboxes: [],
+          },
+        },
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/123/contactable_inboxes') {
+      return jsonResponse({ payload: [] });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/contacts/123/contact_inboxes') {
+      const payload = JSON.parse(String(init?.body || '{}'));
+      createdContactInboxes.push(payload);
+      return jsonResponse({
+        source_id: '85291234567',
+        inbox: { id: 7 },
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/123/conversations') {
+      return jsonResponse({ payload: [] });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/conversations') {
+      return jsonResponse({ id: 42 });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/conversations/42/messages') {
+      const payload = JSON.parse(String(init?.body || '{}'));
+      sentMessagePayloads.push(payload);
+
+      return jsonResponse({
+        id: 601,
+        status: 'sent',
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/conversations/42/messages') {
+      return jsonResponse({
+        payload: [{
+          id: 601,
+          status: 'delivered',
+        }],
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${method} ${path}`);
+  }) as typeof global.fetch;
+
+  try {
+    const result = await sendStaffPatientWhatsappMessage({
+      patientName: '陳小明',
+      phone: '91234567',
+      clinicNameZh: '佐敦',
+      purpose: 'follow_up',
+      note: '姑娘想確認你的預約資料。',
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.whatsappSent, true);
+    assert.equal(result.conversationId, 42);
+    assert.equal(createdContacts.length, 1);
+    assert.equal(createdContacts[0]?.phone_number, '+85291234567');
+    assert.deepEqual(createdContactInboxes[0], {
+      inbox_id: 7,
+      source_id: '85291234567',
+    });
+    assert.equal(sentMessagePayloads.length, 1);
+    assert.equal(sentMessagePayloads[0]?.template_params?.name, 'staff_patient_follow_up');
+  } finally {
+    global.fetch = originalFetch;
+
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (typeof value === 'undefined') {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});
+
 test('sendStaffPatientWhatsappMessage falls back to text inside an active conversation', async () => {
   const originalFetch = global.fetch;
   const originalEnv = {
