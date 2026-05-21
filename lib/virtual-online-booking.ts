@@ -7,7 +7,7 @@ import {
   isSlotBlockedByHolidaysUtc,
   isSlotBlockedBySameDayEveningCutoffUtc,
 } from '@/lib/booking-helpers';
-import { getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
+import { getActiveScheduleMappings, getScheduleVersions } from '@/lib/doctor-schedule-store';
 import { getFreeBusy } from '@/lib/google-calendar';
 import type { Holiday } from '@/shared/schema';
 import {
@@ -80,6 +80,44 @@ function mergeTimeRanges(ranges: TimeRange[]): TimeRange[] {
 
 function hasAnySchedule(schedule: WeeklySchedule): boolean {
   return Object.values(schedule).some((ranges) => ranges !== null && ranges.length > 0);
+}
+
+function getEffectiveFrom(mapping: CalendarMapping): string {
+  return typeof mapping.effectiveFrom === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(mapping.effectiveFrom)
+    ? mapping.effectiveFrom
+    : '1970-01-01';
+}
+
+function resolveLatestMappingForDate(
+  mappings: CalendarMapping[],
+  targetDate: string
+): CalendarMapping | null {
+  let latest: CalendarMapping | null = null;
+
+  for (const mapping of mappings) {
+    if (getEffectiveFrom(mapping) > targetDate) {
+      continue;
+    }
+
+    if (!latest || getEffectiveFrom(mapping) > getEffectiveFrom(latest)) {
+      latest = mapping;
+    }
+  }
+
+  return latest;
+}
+
+function resolveOnlineMappingVersionForDate(
+  mappings: CalendarMapping[],
+  doctorId: DoctorId,
+  targetDate: string
+): CalendarMapping | null {
+  return resolveLatestMappingForDate(
+    mappings.filter(
+      (mapping) => mapping.doctorId === doctorId && isOnlineClinicId(mapping.clinicId)
+    ),
+    targetDate
+  );
 }
 
 function buildMergedWeeklyScheduleFromMappings(mappings: CalendarMapping[]): WeeklySchedule | null {
@@ -162,6 +200,14 @@ async function getActiveOnlineMappingsForDoctor(
   return mappings.filter(
     (mapping) => mapping.doctorId === doctorId && mapping.isActive && isOnlineClinicId(mapping.clinicId)
   );
+}
+
+async function getResolvedOnlineMappingVersionForDoctor(
+  doctorId: DoctorId,
+  targetDate: string
+): Promise<CalendarMapping | null> {
+  const mappings = await getScheduleVersions();
+  return resolveOnlineMappingVersionForDate(mappings, doctorId, targetDate);
 }
 
 async function getAvailableSlotsForMapping(params: {
@@ -250,18 +296,19 @@ async function getOnlineCandidateMappingsForDate(
   doctorId: DoctorId,
   requestedDate: string
 ): Promise<CalendarMapping[]> {
-  const [onlineMappings, physicalMappings] = await Promise.all([
-    getActiveOnlineMappingsForDoctor(doctorId, requestedDate),
+  const [resolvedOnlineMapping, physicalMappings] = await Promise.all([
+    getResolvedOnlineMappingVersionForDoctor(doctorId, requestedDate),
     getPhysicalMappingsForDoctor(doctorId, requestedDate),
   ]);
   const { dayOfWeek } = getRequestedDayContext(requestedDate);
 
-  const explicitOnlineCandidates = onlineMappings.filter((mapping) => {
-    const daySchedule = getScheduleForDayFromWeekly(mapping.schedule, dayOfWeek);
-    return Boolean(daySchedule && daySchedule.length > 0);
-  });
-  if (explicitOnlineCandidates.length > 0) {
-    return explicitOnlineCandidates;
+  if (resolvedOnlineMapping) {
+    if (!resolvedOnlineMapping.isActive) {
+      return [];
+    }
+
+    const daySchedule = getScheduleForDayFromWeekly(resolvedOnlineMapping.schedule, dayOfWeek);
+    return daySchedule && daySchedule.length > 0 ? [resolvedOnlineMapping] : [];
   }
 
   return physicalMappings.filter((mapping) => {
@@ -334,7 +381,11 @@ async function isMappingBookableForExactSlot(params: {
 
 export function buildVirtualOnlineScheduleFromMappings(
   mappings: CalendarMapping[],
-  doctorId: DoctorId
+  doctorId: DoctorId,
+  options?: {
+    allScheduleVersions?: CalendarMapping[];
+    targetDate?: string;
+  }
 ): WeeklySchedule | null {
   const explicitOnlineSchedule = buildMergedWeeklyScheduleFromMappings(
     mappings.filter(
@@ -343,6 +394,14 @@ export function buildVirtualOnlineScheduleFromMappings(
   );
   if (explicitOnlineSchedule) {
     return explicitOnlineSchedule;
+  }
+
+  const explicitOnlineVersion =
+    options?.allScheduleVersions && options.targetDate
+      ? resolveOnlineMappingVersionForDate(options.allScheduleVersions, doctorId, options.targetDate)
+      : null;
+  if (explicitOnlineVersion) {
+    return null;
   }
 
   return buildMergedWeeklyScheduleFromMappings(mappings.filter(
@@ -354,8 +413,16 @@ export async function getVirtualOnlineScheduleForDoctor(
   doctorId: DoctorId,
   targetDate?: string
 ): Promise<WeeklySchedule | null> {
-  const mappings = await getActiveScheduleMappings(targetDate);
-  return buildVirtualOnlineScheduleFromMappings(mappings, doctorId);
+  const effectiveTargetDate =
+    targetDate ?? formatInTimeZone(new Date(), HONG_KONG_TIMEZONE, 'yyyy-MM-dd');
+  const [mappings, allScheduleVersions] = await Promise.all([
+    getActiveScheduleMappings(effectiveTargetDate),
+    getScheduleVersions(),
+  ]);
+  return buildVirtualOnlineScheduleFromMappings(mappings, doctorId, {
+    allScheduleVersions,
+    targetDate: effectiveTargetDate,
+  });
 }
 
 export async function getVirtualOnlineAvailability(params: {

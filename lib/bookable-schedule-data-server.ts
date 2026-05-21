@@ -199,7 +199,10 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
       const onlineSchedule =
         doctorProfile.onlineBookingEnabled === false
           ? null
-          : buildVirtualOnlineScheduleFromMappings(mappings, doctorProfile.id);
+          : buildVirtualOnlineScheduleFromMappings(mappings, doctorProfile.id, {
+              allScheduleVersions,
+              targetDate: previewDate ?? today,
+            });
       const existingDoctor = doctorMap.get(doctorProfile.id);
 
       if (!existingDoctor && (!onlineSchedule || !hasAnySchedule(onlineSchedule))) {
