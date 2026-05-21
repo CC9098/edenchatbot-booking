@@ -78,4 +78,5 @@ test("listStaffKnowledgeDocuments assigns practical categories to imported notes
   assert.equal(byTitle("醫療券")?.category, "醫療券");
   assert.equal(byTitle("三店wifi")?.category, "診所日常");
   assert.equal(byTitle("前台分單")?.category, "文件 / 收費");
+  assert.equal(byTitle("病假、覆診及產前檢查指引")?.category, "人事 / 考勤");
 });
