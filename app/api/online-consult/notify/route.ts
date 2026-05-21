@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import { sendDoctorOnlineConsultReadyWhatsapp } from '@/lib/chatwoot-whatsapp';
 import { sendDoctorOnlineConsultReadyEmail } from '@/lib/gmail';
+import { patchEventPrivateMetadata } from '@/lib/google-calendar';
+import { ONLINE_CONSULT_PATIENT_OPENED_KEY } from '@/lib/online-consult-no-show-reminder-core';
 import { verifyOnlineConsultToken } from '@/lib/online-consult-token';
 import { createServiceClient } from '@/lib/supabase';
 import { DOCTOR_BY_ID, type DoctorId } from '@/shared/clinic-data';
@@ -124,6 +126,15 @@ export async function POST(request: NextRequest) {
 
     if (data.status !== 'confirmed') {
       return NextResponse.json({ error: '此預約不是有效狀態。' }, { status: 409 });
+    }
+
+    const openedMarkResult = await patchEventPrivateMetadata(payload.calendarId, payload.bookingId, {
+      [ONLINE_CONSULT_PATIENT_OPENED_KEY]: new Date().toISOString(),
+    });
+    if (!openedMarkResult.success) {
+      console.warn(
+        `[online-consult/notify] failed to mark patient opened ${payload.calendarId}/${payload.bookingId}: ${openedMarkResult.error || 'unknown error'}`,
+      );
     }
 
     const doctor = DOCTOR_BY_ID[data.doctor_id as DoctorId];
