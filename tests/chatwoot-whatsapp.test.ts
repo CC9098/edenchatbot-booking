@@ -289,7 +289,7 @@ test('sendStaffPatientWhatsappMessage falls back to text inside an active conver
   }
 });
 
-test('sendStaffPatientWhatsappMessage does not invent absent staff template names', async () => {
+test('sendStaffPatientWhatsappMessage blocks proactive staff text when no approved template exists', async () => {
   const originalFetch = global.fetch;
   const originalEnv = {
     CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
@@ -394,13 +394,10 @@ test('sendStaffPatientWhatsappMessage does not invent absent staff template name
       note: 'TESTTTt',
     });
 
-    assert.equal(result.success, true);
-    assert.equal(result.whatsappSent, true);
-    assert.equal(result.conversationId, 42);
-    assert.equal(result.deliveryStatus, 'delivered');
-    assert.equal(sentMessagePayloads.length, 1);
-    assert.equal(sentMessagePayloads[0]?.template_params, undefined);
-    assert.equal(String(sentMessagePayloads[0]?.content || '').includes('TESTTTt'), true);
+    assert.equal(result.success, false);
+    assert.equal(result.whatsappSent, false);
+    assert.match(result.error || '', /No approved WhatsApp template/);
+    assert.equal(sentMessagePayloads.length, 0);
   } finally {
     global.fetch = originalFetch;
 
@@ -414,7 +411,7 @@ test('sendStaffPatientWhatsappMessage does not invent absent staff template name
   }
 });
 
-test('sendStaffPatientWhatsappMessage retries as text when a new staff template delivery fails', async () => {
+test('sendStaffPatientWhatsappMessage reports template failure for inactive proactive sends', async () => {
   const originalFetch = global.fetch;
   const originalEnv = {
     CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
@@ -428,7 +425,6 @@ test('sendStaffPatientWhatsappMessage retries as text when a new staff template 
 
   const sentMessagePayloads: Array<Record<string, any>> = [];
   const deletedMessagePaths: string[] = [];
-  let latestTextMessageId = 0;
 
   process.env.CHATWOOT_BASE_URL = 'https://chatwoot.example';
   process.env.CHATWOOT_API_ACCESS_TOKEN = 'test-token';
@@ -506,18 +502,15 @@ test('sendStaffPatientWhatsappMessage retries as text when a new staff template 
         });
       }
 
-      latestTextMessageId = 401;
       return jsonResponse({
-        id: latestTextMessageId,
+        id: 401,
         status: 'sent',
       });
     }
 
     if (method === 'GET' && path === '/api/v1/accounts/1/conversations/42/messages') {
       return jsonResponse({
-        payload: latestTextMessageId
-          ? [{ id: latestTextMessageId, status: 'delivered' }]
-          : [{ id: 301, status: 'failed' }],
+        payload: [{ id: 301, status: 'failed' }],
       });
     }
 
@@ -538,13 +531,11 @@ test('sendStaffPatientWhatsappMessage retries as text when a new staff template 
       note: 'TESTTTt',
     });
 
-    assert.equal(result.success, true);
-    assert.equal(result.whatsappSent, true);
-    assert.equal(result.conversationId, 42);
-    assert.equal(result.deliveryStatus, 'delivered');
+    assert.equal(result.success, false);
+    assert.equal(result.whatsappSent, false);
+    assert.match(result.error || '', /WhatsApp template delivery failed for staff_patient_follow_up/);
     assert.equal(sentMessagePayloads.some((payload) => payload.template_params?.name === 'staff_patient_follow_up'), true);
-    assert.equal(sentMessagePayloads.at(-1)?.template_params, undefined);
-    assert.equal(String(sentMessagePayloads.at(-1)?.content || '').includes('TESTTTt'), true);
+    assert.equal(sentMessagePayloads.some((payload) => !payload.template_params), false);
     assert.equal(deletedMessagePaths.length > 0, true);
   } finally {
     global.fetch = originalFetch;

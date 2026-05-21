@@ -1261,6 +1261,18 @@ function buildTemplateFailureDetail(
   return `[Chatwoot] WhatsApp template delivery failed for ${templateConfig.name} (${templateConfig.language}, status=${status}) with params ${JSON.stringify(processedParams)}`;
 }
 
+function buildNoTemplateForOutboundTextError(): Error {
+  return new Error(
+    '[Chatwoot] No approved WhatsApp template is available for this outbound staff message. WhatsApp only allows free-text replies inside an active customer-service window; configure/sync the matching Meta template or ask the patient to reply first.',
+  );
+}
+
+function buildTextDeliveryFailureError(error: unknown): Error {
+  return new Error(
+    `${getSafeErrorMessage(error)}. Possible cause: the WhatsApp customer-service window is closed, so free-text outbound delivery is blocked. Use an approved template or ask the patient to reply first.`,
+  );
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -1304,6 +1316,7 @@ async function sendBookingWhatsappNotification(
     getTemplateConfigs: (inbox: ChatwootInbox) => TemplateConfig[];
     preferTemplateIfAvailable?: boolean;
     fallbackTextOnTemplateFailure?: boolean;
+    allowInactiveTextFallbackOnTemplateFailure?: boolean;
   },
 ): Promise<SendWhatsappBookingConfirmationResult> {
   const baseUrl = (process.env.CHATWOOT_BASE_URL || '').trim().replace(/\/$/, '');
@@ -1370,6 +1383,7 @@ async function sendBookingWhatsappNotification(
   const templateConfigs = options.getTemplateConfigs(inbox);
   const bodyParams = options.buildBodyParams();
   let deliveryStatus: string | null | undefined;
+  let activeConversationTextError: unknown = null;
 
   if (options.preferTemplateIfAvailable && templateConfigs.length > 0) {
     try {
@@ -1382,7 +1396,10 @@ async function sendBookingWhatsappNotification(
         bodyParams,
       );
     } catch (error) {
-      if (!options.fallbackTextOnTemplateFailure && !isActiveConversation(existingConversation)) {
+      if (
+        !isActiveConversation(existingConversation) &&
+        !options.allowInactiveTextFallbackOnTemplateFailure
+      ) {
         throw error;
       }
 
@@ -1392,6 +1409,9 @@ async function sendBookingWhatsappNotification(
 
       deliveryStatus = options.fallbackTextOnTemplateFailure
         ? await sendTextMessageWithFailureCheck(client, accountId, conversationId, content)
+            .catch((textError) => {
+              throw buildTextDeliveryFailureError(textError);
+            })
         : (await client.createMessage(accountId, conversationId, { content }), null);
     }
 
@@ -1416,6 +1436,7 @@ async function sendBookingWhatsappNotification(
         deliveryStatus,
       };
     } catch (error) {
+      activeConversationTextError = error;
       console.warn(
         `[chatwoot-whatsapp] Active conversation text send failed, falling back to template: ${getSafeErrorMessage(error)}`,
       );
@@ -1432,8 +1453,23 @@ async function sendBookingWhatsappNotification(
       bodyParams,
     );
   } else {
+    if (activeConversationTextError) {
+      throw buildTextDeliveryFailureError(activeConversationTextError);
+    }
+
+    if (
+      options.fallbackTextOnTemplateFailure &&
+      !isActiveConversation(existingConversation) &&
+      !options.allowInactiveTextFallbackOnTemplateFailure
+    ) {
+      throw buildNoTemplateForOutboundTextError();
+    }
+
     deliveryStatus = options.fallbackTextOnTemplateFailure
       ? await sendTextMessageWithFailureCheck(client, accountId, conversationId, content)
+          .catch((error) => {
+            throw buildTextDeliveryFailureError(error);
+          })
       : (await client.createMessage(accountId, conversationId, { content }), null);
   }
 
@@ -1629,6 +1665,7 @@ export async function sendDoctorOnlineConsultReadyWhatsapp(
         getTemplateConfigs: getDoctorOnlineConsultReadyTemplateConfigs,
         preferTemplateIfAvailable: true,
         fallbackTextOnTemplateFailure: true,
+        allowInactiveTextFallbackOnTemplateFailure: true,
       },
     );
   } catch (error) {

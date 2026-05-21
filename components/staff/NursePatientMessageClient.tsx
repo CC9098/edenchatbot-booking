@@ -57,7 +57,21 @@ function getErrorText(payload: unknown): string {
     "error" in payload &&
     typeof (payload as { error?: unknown }).error === "string"
   ) {
-    return (payload as { error: string }).error;
+    const error = (payload as { error: string }).error;
+
+    if (error.includes("No approved WhatsApp template")) {
+      return "未有可用的 approved template，不能主動發普通文字；請確認 template 已同步，或請病人先回覆 WhatsApp。";
+    }
+
+    if (error.includes("customer-service window is closed") || error.includes("WhatsApp text delivery failed")) {
+      return "普通文字被 WhatsApp 拒絕，通常是客服窗口已關閉；請改用 approved template，或請病人先回覆 WhatsApp。";
+    }
+
+    if (error.includes("WhatsApp template delivery failed")) {
+      return "Template 發送失敗，請確認 Meta / Chatwoot template 名稱、語言及同步狀態。";
+    }
+
+    return error;
   }
 
   return "未能發送 WhatsApp 訊息。";
