@@ -340,13 +340,6 @@ export function NursePatientMessageClient({ clinics }: { clinics: ClinicOption[]
             <p className="text-sm font-semibold text-emerald-200">預覽</p>
             <pre className="mt-4 whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">{previewText}</pre>
           </section>
-
-          <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-            <p className="font-semibold">Template 提醒</p>
-            <p className="mt-2">
-              如果 Meta / Chatwoot 未有對應 approved template，系統會回報未成功；病人已開啟中的對話才會自動退回普通文字。
-            </p>
-          </section>
         </aside>
       </div>
     </div>
