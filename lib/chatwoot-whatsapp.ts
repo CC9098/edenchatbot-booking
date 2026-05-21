@@ -170,6 +170,24 @@ interface DoctorOnlineConsultReadyWhatsappInput {
   clinicWhatsappPhone?: string | null;
 }
 
+interface DoctorOnlineConsultNoShowReminderWhatsappInput {
+  bookingId: string;
+  calendarId: string;
+  doctorId?: string;
+  doctorName: string;
+  doctorNameZh: string;
+  doctorWhatsappPhone: string;
+  patientName: string;
+  patientPhone: string;
+  date: string;
+  time: string;
+  onlineConsultUrl: string;
+  patientConversationId?: number;
+  patientDeliveryStatus?: string | null;
+  notifiedAtIso?: string;
+  clinicWhatsappPhone?: string | null;
+}
+
 interface PatientOnlineConsultWaitingWhatsappInput {
   bookingId: string;
   calendarId: string;
@@ -1202,6 +1220,33 @@ function buildDoctorOnlineConsultReadyTemplateBodyParams(
   };
 }
 
+function buildDoctorOnlineConsultNoShowReminderWhatsappText(
+  input: DoctorOnlineConsultNoShowReminderWhatsappInput,
+): string {
+  const notifiedAt = formatDoctorReadyNotifiedAt(input.notifiedAtIso);
+  const deliveryText = [
+    '已發送 WhatsApp 給病人',
+    input.patientConversationId ? `Chatwoot 對話 #${input.patientConversationId}` : '',
+    input.patientDeliveryStatus ? `狀態：${input.patientDeliveryStatus}` : '',
+  ].filter(Boolean).join('；');
+
+  return [
+    '醫天圓網上診症提醒',
+    '',
+    `${input.doctorNameZh}，系統已向病人發出網上診症候診提醒。`,
+    '',
+    `病人：${input.patientName}`,
+    `電話：${input.patientPhone}`,
+    `預約時間：${input.date} ${input.time}`,
+    deliveryText,
+    notifiedAt ? `通知時間：${notifiedAt}` : '',
+    `預約編號：${input.bookingId}`,
+    '',
+    '病人候診入口：',
+    input.onlineConsultUrl,
+  ].filter(Boolean).join('\n');
+}
+
 function buildPatientOnlineConsultWaitingWhatsappText(
   input: PatientOnlineConsultWaitingWhatsappInput,
 ): string {
@@ -1719,6 +1764,34 @@ export async function sendDoctorOnlineConsultReadyWhatsapp(
         buildBodyParams: () => buildDoctorOnlineConsultReadyTemplateBodyParams(input),
         getTemplateConfigs: getDoctorOnlineConsultReadyTemplateConfigs,
         preferTemplateIfAvailable: true,
+        fallbackTextOnTemplateFailure: true,
+        allowInactiveTextFallbackOnTemplateFailure: true,
+      },
+    );
+  } catch (error) {
+    return {
+      success: false,
+      whatsappSent: false,
+      error: getSafeErrorMessage(error),
+    };
+  }
+}
+
+export async function sendDoctorOnlineConsultNoShowReminderWhatsapp(
+  input: DoctorOnlineConsultNoShowReminderWhatsappInput,
+): Promise<SendWhatsappBookingConfirmationResult> {
+  try {
+    return await sendBookingWhatsappNotification(
+      {
+        patientName: input.doctorNameZh,
+        phone: input.doctorWhatsappPhone,
+        email: '',
+        clinicWhatsappPhone: input.clinicWhatsappPhone,
+      },
+      {
+        buildContent: () => buildDoctorOnlineConsultNoShowReminderWhatsappText(input),
+        buildBodyParams: () => ({}),
+        getTemplateConfigs: () => [],
         fallbackTextOnTemplateFailure: true,
         allowInactiveTextFallbackOnTemplateFailure: true,
       },

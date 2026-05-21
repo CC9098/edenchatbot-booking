@@ -11,7 +11,11 @@ import { buildOnlineConsultUrl } from '@/lib/public-url';
 import { createServiceClient } from '@/lib/supabase';
 import { getClinicWhatsappPhone } from '@/lib/whatsapp-booking';
 import { getEvent, patchEventPrivateMetadata } from '@/lib/google-calendar';
-import { sendStaffPatientWhatsappMessage } from '@/lib/chatwoot-whatsapp';
+import {
+  sendDoctorOnlineConsultNoShowReminderWhatsapp,
+  sendStaffPatientWhatsappMessage,
+} from '@/lib/chatwoot-whatsapp';
+import { getConfiguredDoctorNotificationWhatsapps } from '@/lib/doctor-notification-whatsapp';
 
 const DEFAULT_DELAY_MINUTES = 5;
 const DEFAULT_LOOKBACK_MINUTES = 35;
@@ -44,6 +48,9 @@ type OnlineConsultNoShowSummary = {
   whatsappWouldSend: number;
   whatsappSent: number;
   whatsappFailed: number;
+  doctorRecipients: number;
+  doctorNotified: number;
+  doctorNotifyFailed: number;
   marked: number;
   markFailed: number;
   skipped: Record<string, number>;
@@ -165,6 +172,9 @@ export async function runOnlineConsultNoShowReminderJob(options: {
     whatsappWouldSend: 0,
     whatsappSent: 0,
     whatsappFailed: 0,
+    doctorRecipients: 0,
+    doctorNotified: 0,
+    doctorNotifyFailed: 0,
     marked: 0,
     markFailed: 0,
     skipped: {},
@@ -222,7 +232,6 @@ export async function runOnlineConsultNoShowReminderJob(options: {
     const onlineConsultUrl = buildOnlineConsultUrl({ token });
     const note = buildOnlineConsultNoShowReminderNote({
       doctorNameZh: row.doctor_name_zh,
-      onlineConsultUrl,
     });
 
     if (options.dryRun) {
@@ -250,6 +259,40 @@ export async function runOnlineConsultNoShowReminderJob(options: {
     }
 
     summary.whatsappSent += 1;
+    const doctorWhatsappPhones = getConfiguredDoctorNotificationWhatsapps(row.doctor_id);
+    summary.doctorRecipients += doctorWhatsappPhones.length;
+
+    for (const doctorWhatsappPhone of doctorWhatsappPhones) {
+      const doctorResult = await sendDoctorOnlineConsultNoShowReminderWhatsapp({
+        bookingId: candidate.googleEventId,
+        calendarId: candidate.calendarId,
+        doctorId: row.doctor_id,
+        doctorName: row.doctor_name_zh,
+        doctorNameZh: row.doctor_name_zh,
+        doctorWhatsappPhone,
+        patientName: row.patient_name || '病人',
+        patientPhone: row.phone,
+        date: row.appointment_date,
+        time: row.appointment_time,
+        onlineConsultUrl,
+        patientConversationId: whatsappResult.conversationId,
+        patientDeliveryStatus: whatsappResult.deliveryStatus,
+        notifiedAtIso: new Date().toISOString(),
+        clinicWhatsappPhone: getClinicWhatsappPhone(row.clinic_id),
+      });
+
+      if (doctorResult.success) {
+        summary.doctorNotified += 1;
+      } else {
+        summary.doctorNotifyFailed += 1;
+        if (summary.errors.length < 10) {
+          summary.errors.push(
+            `${row.id}: doctor ${doctorWhatsappPhone}: ${doctorResult.error || 'send failed'}`,
+          );
+        }
+      }
+    }
+
     const markResult = await patchEventPrivateMetadata(candidate.calendarId, candidate.googleEventId, {
       [ONLINE_CONSULT_NO_SHOW_REMINDER_SENT_KEY]: new Date().toISOString(),
     });

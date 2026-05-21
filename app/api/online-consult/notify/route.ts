@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { sendDoctorOnlineConsultReadyWhatsapp } from '@/lib/chatwoot-whatsapp';
+import { getConfiguredDoctorNotificationWhatsapps } from '@/lib/doctor-notification-whatsapp';
 import { sendDoctorOnlineConsultReadyEmail } from '@/lib/gmail';
 import { patchEventPrivateMetadata } from '@/lib/google-calendar';
 import { ONLINE_CONSULT_PATIENT_OPENED_KEY } from '@/lib/online-consult-no-show-reminder-core';
@@ -15,7 +16,6 @@ const notifySchema = z.object({
   token: z.string().trim().min(1),
 });
 
-const CHEUNG_DOCTOR_WHATSAPP_FALLBACKS = ['+85260260716', '+85296322476'];
 const DOCTOR_NOTIFY_PUBLIC_ERROR = '暫時未能自動通知醫師，請先開啟 Google Meet。如需協助，請回覆 WhatsApp 訊息。';
 
 type BookingIntakeReadyRow = {
@@ -46,52 +46,6 @@ function isBookingIntakeReadyRow(value: unknown): value is BookingIntakeReadyRow
       typeof row.phone === 'string' &&
       (typeof row.email === 'string' || row.email === null),
   );
-}
-
-function normalizeDoctorEnvKey(doctorId: string): string {
-  return doctorId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '_');
-}
-
-function splitWhatsappRecipients(value: string | undefined): string[] {
-  return (value || '')
-    .split(',')
-    .map((phone) => phone.trim())
-    .filter(Boolean);
-}
-
-function uniqueWhatsappRecipients(recipients: string[]): string[] {
-  const seen = new Set<string>();
-  const uniqueRecipients: string[] = [];
-
-  for (const recipient of recipients) {
-    const dedupeKey = recipient.replace(/[^\d]/g, '');
-    if (!dedupeKey || seen.has(dedupeKey)) continue;
-    seen.add(dedupeKey);
-    uniqueRecipients.push(recipient);
-  }
-
-  return uniqueRecipients;
-}
-
-function getConfiguredDoctorNotificationWhatsapps(doctorId: string): string[] {
-  const normalizedRawDoctorId = doctorId.trim().toLowerCase();
-  const normalizedDoctorId = normalizeDoctorEnvKey(doctorId);
-  const doctorSpecificWhatsapps = splitWhatsappRecipients(
-    process.env[`DOCTOR_NOTIFICATION_WHATSAPP_${normalizedDoctorId}`],
-  );
-  const legacyCheungWhatsapps = normalizedRawDoctorId === 'cheung'
-    ? [
-        ...splitWhatsappRecipients(process.env.CHEUNG_DOCTOR_WHATSAPP),
-        ...CHEUNG_DOCTOR_WHATSAPP_FALLBACKS,
-      ]
-    : [];
-  const clinicNotificationWhatsapps = splitWhatsappRecipients(process.env.CLINIC_NOTIFICATION_WHATSAPP);
-
-  return uniqueWhatsappRecipients([
-    ...doctorSpecificWhatsapps,
-    ...legacyCheungWhatsapps,
-    ...clinicNotificationWhatsapps,
-  ]);
 }
 
 export async function POST(request: NextRequest) {

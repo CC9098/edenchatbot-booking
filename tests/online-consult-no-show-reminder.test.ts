@@ -69,9 +69,9 @@ test('online consult no-show decision sends only when patient has not opened the
 test('online consult no-show reminder note reuses the waiting link', () => {
   const note = buildOnlineConsultNoShowReminderNote({
     doctorNameZh: '張醫師',
-    onlineConsultUrl: 'https://eden.example/online-consult?token=abc',
   });
 
   assert.match(note, /張醫師已準備網上診症/);
-  assert.match(note, /https:\/\/eden\.example\/online-consult\?token=abc/);
+  assert.match(note, /請按以下連結進入候診。/);
+  assert.doesNotMatch(note, /https?:\/\//);
 });

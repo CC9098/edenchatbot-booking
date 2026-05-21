@@ -117,7 +117,6 @@ export function decideOnlineConsultNoShowReminder(input: {
 
 export function buildOnlineConsultNoShowReminderNote(input: {
   doctorNameZh: string;
-  onlineConsultUrl: string;
 }): string {
-  return `${input.doctorNameZh}已準備網上診症，請按以下連結進入候診：${input.onlineConsultUrl}`;
+  return `${input.doctorNameZh}已準備網上診症，請按以下連結進入候診。`;
 }

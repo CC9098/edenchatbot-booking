@@ -5,6 +5,7 @@ import {
   sendBookingCancellationWhatsapp,
   sendBookingConfirmationWhatsapp,
   sendBookingRescheduleWhatsapp,
+  sendDoctorOnlineConsultNoShowReminderWhatsapp,
   sendDoctorOnlineConsultReadyWhatsapp,
   sendPatientOnlineConsultWaitingWhatsapp,
   sendStaffPatientWhatsappMessage,
@@ -2734,6 +2735,135 @@ test('sendDoctorOnlineConsultReadyWhatsapp falls back to text when the doctor te
     assert.match(sentMessagePayloads[1]?.content, /病人已打開網上診症入口/);
     assert.match(sentMessagePayloads[1]?.content, /小明明/);
     assert.deepEqual(deletedMessageIds, [931]);
+  } finally {
+    global.fetch = originalFetch;
+
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (typeof value === 'undefined') {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});
+
+test('sendDoctorOnlineConsultNoShowReminderWhatsapp sends a text notice without a new template', async () => {
+  const originalFetch = global.fetch;
+  const originalEnv = {
+    CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
+    CHATWOOT_API_ACCESS_TOKEN: process.env.CHATWOOT_API_ACCESS_TOKEN,
+    CHATWOOT_ACCOUNT_ID: process.env.CHATWOOT_ACCOUNT_ID,
+    CHATWOOT_WHATSAPP_INBOX_ID: process.env.CHATWOOT_WHATSAPP_INBOX_ID,
+  };
+
+  const sentMessagePayloads: Array<Record<string, any>> = [];
+
+  process.env.CHATWOOT_BASE_URL = 'https://chatwoot.example';
+  process.env.CHATWOOT_API_ACCESS_TOKEN = 'test-token';
+  process.env.CHATWOOT_ACCOUNT_ID = '';
+  process.env.CHATWOOT_WHATSAPP_INBOX_ID = '';
+
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const parsedUrl = new URL(requestUrl);
+    const method = init?.method || 'GET';
+    const path = `${parsedUrl.pathname}${parsedUrl.search}`;
+
+    if (method === 'GET' && path === '/api/v1/profile') {
+      return jsonResponse({ account_id: 1 });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/inboxes') {
+      return jsonResponse({
+        payload: [{
+          id: 7,
+          channel_type: 'Channel::Whatsapp',
+          phone_number: '+85267333801',
+          message_templates: [],
+        }],
+      });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/inboxes/7/sync_templates') {
+      return jsonResponse({ message: 'ok' });
+    }
+
+    if (method === 'GET' && path.startsWith('/api/v1/accounts/1/contacts/search?')) {
+      const query = parsedUrl.searchParams.get('q') || '';
+      assert.match(query, /60260716|85260260716|\+85260260716/);
+      return jsonResponse({
+        payload: [{
+          id: 602,
+          phone_number: '+85260260716',
+          email: '',
+        }],
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/602/contactable_inboxes') {
+      return jsonResponse({
+        payload: [{
+          source_id: '85260260716',
+          inbox: { id: 7 },
+        }],
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/602/conversations') {
+      return jsonResponse({
+        payload: [{
+          id: 6020,
+          inbox_id: 7,
+          status: 'resolved',
+        }],
+      });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/conversations/6020/messages') {
+      const payload = JSON.parse(String(init?.body || '{}'));
+      sentMessagePayloads.push(payload);
+      return jsonResponse({ id: 940, status: 'sent' });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/conversations/6020/messages') {
+      return jsonResponse({
+        payload: [{
+          id: 940,
+          status: 'delivered',
+        }],
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${method} ${path}`);
+  }) as typeof global.fetch;
+
+  try {
+    const result = await sendDoctorOnlineConsultNoShowReminderWhatsapp({
+      bookingId: 'event-1',
+      calendarId: 'calendar-1',
+      doctorId: 'cheung',
+      doctorName: 'Dr. Cheung',
+      doctorNameZh: '張天慧醫師',
+      doctorWhatsappPhone: '+85260260716',
+      patientName: '陳惠萍',
+      patientPhone: '97502595',
+      date: '2026-05-21',
+      time: '15:00',
+      onlineConsultUrl: 'https://eden.example/online-consult?token=abc',
+      patientConversationId: 558,
+      patientDeliveryStatus: 'delivered',
+      notifiedAtIso: '2026-05-21T07:06:00.000Z',
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.whatsappSent, true);
+    assert.equal(sentMessagePayloads.length, 1);
+    assert.equal(sentMessagePayloads[0]?.template_params, undefined);
+    assert.match(sentMessagePayloads[0]?.content, /系統已向病人發出網上診症候診提醒/);
+    assert.match(sentMessagePayloads[0]?.content, /陳惠萍/);
+    assert.match(sentMessagePayloads[0]?.content, /Chatwoot 對話 #558/);
+    assert.match(sentMessagePayloads[0]?.content, /https:\/\/eden\.example\/online-consult\?token=abc/);
   } finally {
     global.fetch = originalFetch;
 
