@@ -49,6 +49,8 @@ Booking system backend and frontend for Eden TCM Clinic (醫天圓).
 | `CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_NAME` | Optional. Approved WhatsApp template name used for reschedule messages |
 | `CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_LANGUAGE` | Optional. Reschedule template language, defaults to `zh_HK` |
 | `CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_CATEGORY` | Optional. Reschedule template category, defaults to `UTILITY` |
+| `CHATWOOT_DELIVERY_POLL_ATTEMPTS` | Optional. Delivery status checks after sending a Chatwoot WhatsApp message. Defaults to `4` |
+| `CHATWOOT_DELIVERY_POLL_INTERVAL_MS` | Optional. Delay between delivery status checks. Defaults to `1000` |
 | `CHATWOOT_WEBHOOK_SECRET` | Optional but recommended. Validates the Agent Bot webhook signature |
 
 ### URL Resolution Logic
@@ -88,6 +90,10 @@ Preview / developer `*.vercel.app` deployment URLs are rejected for server-gener
 For the first-pass WhatsApp / Chatwoot flow, point the inbox Agent Bot `outgoing_url` to:
 
 -   `POST /api/chatwoot/agent-bot`
+
+Useful check:
+
+-   `npm run chatwoot:realtime-check`: verifies the configured Chatwoot REST API token and `/cable` WebSocket subscription. Use this when agents need a browser refresh before seeing new patient messages.
 
 Current behavior:
 

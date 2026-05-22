@@ -138,8 +138,8 @@ type BookingSelectionKind = 'new_booking' | 'reschedule_booking' | 'cancel_booki
 type ChatwootManageBookingAction = 'reschedule' | 'cancel';
 
 const CHATWOOT_DELIVERY_TERMINAL_STATUSES = new Set(['failed', 'delivered', 'read']);
-const CHATWOOT_DELIVERY_POLL_ATTEMPTS = 4;
-const CHATWOOT_DELIVERY_POLL_INTERVAL_MS = 1000;
+const DEFAULT_CHATWOOT_DELIVERY_POLL_ATTEMPTS = 4;
+const DEFAULT_CHATWOOT_DELIVERY_POLL_INTERVAL_MS = 1000;
 
 function buildMenuMessage(prompt: string, items: readonly ChatwootSelectItem[]): string {
   const numberedItems = items.map((item, index) => `${index + 1}. ${item.title}`).join('\n');
@@ -715,6 +715,28 @@ function normalizeMessageStatus(status: string | null | undefined): string | nul
   return normalized || null;
 }
 
+function parsePositiveIntegerEnv(name: string, fallback: number): number {
+  const rawValue = process.env[name]?.trim();
+  if (!rawValue) return fallback;
+
+  const parsed = Number(rawValue);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getDeliveryPollAttempts(): number {
+  return parsePositiveIntegerEnv(
+    'CHATWOOT_DELIVERY_POLL_ATTEMPTS',
+    DEFAULT_CHATWOOT_DELIVERY_POLL_ATTEMPTS,
+  );
+}
+
+function getDeliveryPollIntervalMs(): number {
+  return parsePositiveIntegerEnv(
+    'CHATWOOT_DELIVERY_POLL_INTERVAL_MS',
+    DEFAULT_CHATWOOT_DELIVERY_POLL_INTERVAL_MS,
+  );
+}
+
 function buildTemplateFailureDetail(
   templateConfig: ChatwootTemplateConfig,
   processedParams: ChatwootTemplateProcessedParams,
@@ -743,7 +765,10 @@ async function waitForMessageDeliveryStatus(
 
   let latestMessage: ChatwootMessage | undefined = createdMessage;
 
-  for (let attempt = 0; attempt < CHATWOOT_DELIVERY_POLL_ATTEMPTS; attempt += 1) {
+  const pollAttempts = getDeliveryPollAttempts();
+  const pollIntervalMs = getDeliveryPollIntervalMs();
+
+  for (let attempt = 0; attempt < pollAttempts; attempt += 1) {
     const messagesResponse = await client.listMessages(accountId, conversationId).catch(() => null);
     const matchedMessage = (messagesResponse?.payload || []).find((message) => message.id === createdMessage.id);
 
@@ -756,8 +781,8 @@ async function waitForMessageDeliveryStatus(
       return { status, message: latestMessage };
     }
 
-    if (attempt < CHATWOOT_DELIVERY_POLL_ATTEMPTS - 1) {
-      await sleep(CHATWOOT_DELIVERY_POLL_INTERVAL_MS);
+    if (attempt < pollAttempts - 1) {
+      await sleep(pollIntervalMs);
     }
   }
 
@@ -1094,6 +1119,37 @@ export function getPreviousVisibleConversationMessage(
   }
 
   return visibleMessages.at(-1);
+}
+
+export function mergeIncomingEventIntoConversationMessages(
+  messages: ChatwootMessage[] | undefined,
+  event: ChatwootIncomingEvent,
+): ChatwootMessage[] {
+  const currentMessages = [...(messages || [])];
+  const alreadyPresent = currentMessages.some(
+    (message) => String(message.id ?? '') === String(event.messageId),
+  );
+
+  if (alreadyPresent) {
+    return currentMessages;
+  }
+
+  const latestCreatedAt = currentMessages.reduce((latest, message) => {
+    return Math.max(latest, Number(message.created_at || 0));
+  }, 0);
+
+  return [
+    ...currentMessages,
+    {
+      id: event.messageId,
+      content: event.content,
+      created_at: latestCreatedAt + 1,
+      message_type: 0,
+      private: false,
+      sender_type: 'contact',
+      status: 'sent',
+    },
+  ];
 }
 
 export function shouldAllowGeneralAiReply(

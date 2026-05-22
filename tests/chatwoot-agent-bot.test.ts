@@ -13,6 +13,7 @@ import {
   buildDirectBookingReply,
   getFlowState,
   getPreviousVisibleConversationMessage,
+  mergeIncomingEventIntoConversationMessages,
   mapConversationMessagesToLegacyChat,
   resolveBookingMenuSelection,
   resolveClinicMenuSelection,
@@ -327,6 +328,42 @@ test('getPreviousVisibleConversationMessage falls back to the latest visible mes
   assert.equal(
     getPreviousVisibleConversationMessage(messages, 999)?.content,
     CHATWOOT_GENERAL_INQUIRY_PROMPT,
+  );
+});
+
+test('mergeIncomingEventIntoConversationMessages adds the webhook row when Chatwoot history is stale', () => {
+  const staleMessages = [
+    {
+      id: 10,
+      content: CHATWOOT_GENERAL_INQUIRY_PROMPT,
+      created_at: 100,
+      message_type: 'outgoing',
+      sender_type: 'agent',
+    },
+  ];
+
+  const mergedMessages = mergeIncomingEventIntoConversationMessages(staleMessages, {
+    accountId: 1,
+    conversationId: 42,
+    messageId: 999,
+    content: '我想問診金',
+    contactId: 7,
+    contactPhone: '+85261234567',
+  });
+
+  assert.equal(mergedMessages.length, 2);
+  assert.equal(mergedMessages.at(-1)?.id, 999);
+  assert.equal(mergedMessages.at(-1)?.sender_type, 'contact');
+  assert.equal(
+    getPreviousVisibleConversationMessage(mergedMessages, 999)?.content,
+    CHATWOOT_GENERAL_INQUIRY_PROMPT,
+  );
+  assert.deepEqual(
+    mapConversationMessagesToLegacyChat(mergedMessages, new Set()),
+    [
+      { role: 'assistant', content: CHATWOOT_GENERAL_INQUIRY_PROMPT },
+      { role: 'user', content: '我想問診金' },
+    ],
   );
 });
 

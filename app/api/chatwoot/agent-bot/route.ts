@@ -13,6 +13,7 @@ import {
   extractIncomingChatwootEvent,
   getFlowState,
   isDuplicateIncomingMessage,
+  mergeIncomingEventIntoConversationMessages,
   mapConversationMessagesToLegacyChat,
   mergeFlowAttributes,
   replaceLatestUserMessage,
@@ -107,6 +108,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, ignored: 'duplicate_message' });
     }
 
+    const conversationMessages = mergeIncomingEventIntoConversationMessages(
+      conversation.messages,
+      event,
+    );
     const currentState = getFlowState(currentAttributes);
     const rootSelection = resolveMenuSelection(event.content, {
       allowNumeric: currentState === 'menu',
@@ -115,7 +120,7 @@ export async function POST(request: NextRequest) {
       ? resolveBookingMenuSelection(event.content)
       : null;
     const shouldDeferToHuman = !rootSelection && !bookingSelection && shouldDeferToHumanAfterAgentReply(
-      conversation.messages,
+      conversationMessages,
       event.messageId,
       runtimeSystemMessages,
     );
@@ -242,14 +247,14 @@ export async function POST(request: NextRequest) {
     } else {
       if (nextState === 'general_ai') {
         const aiReplyIsArmed = shouldAllowGeneralAiReply(
-          conversation.messages,
+          conversationMessages,
           event.messageId,
           runtimeCopy.generalInquiryPrompt,
         );
 
         nextState = 'human';
         reply = aiReplyIsArmed
-          ? await generateGeneralAiReply(conversation.messages, event.content, runtimeSystemMessages)
+          ? await generateGeneralAiReply(conversationMessages, event.content, runtimeSystemMessages)
           : null;
       } else if (shouldSilenceUnmatchedChatwootMessage(nextState)) {
         nextState = 'human';

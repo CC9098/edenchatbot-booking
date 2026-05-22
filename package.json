@@ -16,6 +16,7 @@
     "test:chat:ai:headed": "playwright test tests/chat.ai-regression.spec.ts --headed",
     "test:chat:ai:loop": "bash ./scripts/test-chat-ai-loop.sh",
     "test:chat:v2:regression": "tsx ./scripts/chatbot-v2-regression.ts",
+    "chatwoot:realtime-check": "node ./scripts/check-chatwoot-realtime.mjs",
     "ai:test": "npm run test:chat:ai",
     "ai:test:headed": "npm run test:chat:ai:headed",
     "ai:test:loop": "bash ./scripts/test-chat-ai-loop.sh 600",

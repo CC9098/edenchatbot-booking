@@ -235,8 +235,8 @@ type TemplateConfig = {
 type TemplateProcessedParams = NonNullable<ChatwootMessagePayload['template_params']>['processed_params'];
 
 const CHATWOOT_DELIVERY_TERMINAL_STATUSES = new Set(['failed', 'delivered', 'read']);
-const CHATWOOT_DELIVERY_POLL_ATTEMPTS = 4;
-const CHATWOOT_DELIVERY_POLL_INTERVAL_MS = 1000;
+const DEFAULT_CHATWOOT_DELIVERY_POLL_ATTEMPTS = 4;
+const DEFAULT_CHATWOOT_DELIVERY_POLL_INTERVAL_MS = 1000;
 
 class ChatwootWhatsappClient {
   constructor(
@@ -1323,7 +1323,10 @@ async function waitForMessageDeliveryStatus(
 
   let latestMessage: ChatwootMessage | undefined = createdMessage;
 
-  for (let attempt = 0; attempt < CHATWOOT_DELIVERY_POLL_ATTEMPTS; attempt += 1) {
+  const pollAttempts = getDeliveryPollAttempts();
+  const pollIntervalMs = getDeliveryPollIntervalMs();
+
+  for (let attempt = 0; attempt < pollAttempts; attempt += 1) {
     const messagesResponse = await client.listMessages(accountId, conversationId).catch(() => null);
     const matchedMessage = (messagesResponse?.payload || []).find((message) => message.id === createdMessage.id);
 
@@ -1336,8 +1339,8 @@ async function waitForMessageDeliveryStatus(
       return { status, message: latestMessage };
     }
 
-    if (attempt < CHATWOOT_DELIVERY_POLL_ATTEMPTS - 1) {
-      await sleep(CHATWOOT_DELIVERY_POLL_INTERVAL_MS);
+    if (attempt < pollAttempts - 1) {
+      await sleep(pollIntervalMs);
     }
   }
 
@@ -1375,6 +1378,28 @@ function buildTextDeliveryFailureError(error: unknown): Error {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parsePositiveIntegerEnv(name: string, fallback: number): number {
+  const rawValue = process.env[name]?.trim();
+  if (!rawValue) return fallback;
+
+  const parsed = Number(rawValue);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getDeliveryPollAttempts(): number {
+  return parsePositiveIntegerEnv(
+    'CHATWOOT_DELIVERY_POLL_ATTEMPTS',
+    DEFAULT_CHATWOOT_DELIVERY_POLL_ATTEMPTS,
+  );
+}
+
+function getDeliveryPollIntervalMs(): number {
+  return parsePositiveIntegerEnv(
+    'CHATWOOT_DELIVERY_POLL_INTERVAL_MS',
+    DEFAULT_CHATWOOT_DELIVERY_POLL_INTERVAL_MS,
+  );
 }
 
 async function sendTextMessageWithFailureCheck(
