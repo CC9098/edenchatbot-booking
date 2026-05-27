@@ -151,10 +151,31 @@ function DoctorStripGroup({
   );
 }
 
-function DoctorStrip() {
-  if (DOCTORS.length === 0) return null;
-  const primaryDoctors = DOCTORS.filter((doctor) => !isSupportBookingPractitioner(doctor.id));
-  const supportDoctors = DOCTORS.filter((doctor) => isSupportBookingPractitioner(doctor.id));
+function getVisibleDoctorIds(cards: TimetableClinicCard[]): Set<string> {
+  const doctorIds = new Set<string>();
+
+  for (const card of cards) {
+    for (const row of card.rows) {
+      for (const entries of Object.values(row.cells)) {
+        for (const entry of entries) {
+          doctorIds.add(entry.doctorId);
+        }
+      }
+    }
+  }
+
+  return doctorIds;
+}
+
+function DoctorStrip({
+  doctorIds,
+}: {
+  doctorIds: Set<string>;
+}) {
+  if (doctorIds.size === 0) return null;
+  const visibleDoctors = DOCTORS.filter((doctor) => doctorIds.has(doctor.id));
+  const primaryDoctors = visibleDoctors.filter((doctor) => !isSupportBookingPractitioner(doctor.id));
+  const supportDoctors = visibleDoctors.filter((doctor) => isSupportBookingPractitioner(doctor.id));
 
   return (
     <section className="mb-5">
@@ -561,6 +582,7 @@ export default async function TimetableEmbedPage({
   const sourceDate = selectedMonth === currentMonth ? todayIso : selectedMonth;
   const { cards, generatedAtLabel } = await getPublicTimetableData(sourceDate);
   const visibleCards = clinicFilter ? cards.filter((card) => card.clinicId === clinicFilter) : cards;
+  const visibleDoctorIds = getVisibleDoctorIds(visibleCards);
   const versionLabel = buildMonthRibbonLabel(selectedMonth);
 
   return (
@@ -588,7 +610,7 @@ export default async function TimetableEmbedPage({
                 時段由系統自動更新，最後同步：{generatedAtLabel}
               </p>
             </div>
-            <DoctorStrip />
+            <DoctorStrip doctorIds={visibleDoctorIds} />
 
             <div className="mt-5 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600">
               <a
@@ -602,7 +624,9 @@ export default async function TimetableEmbedPage({
               </a>
             </div>
           </section>
-        ) : null}
+        ) : (
+          <DoctorStrip doctorIds={visibleDoctorIds} />
+        )}
 
         <div className="space-y-8">
           {visibleCards.map((card) => (
