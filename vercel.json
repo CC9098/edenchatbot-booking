@@ -15,10 +15,6 @@
     {
       "path": "/api/cron/follow-ups-overdue",
       "schedule": "15 16 * * *"
-    },
-    {
-      "path": "/api/cron/online-consult-no-show-reminders",
-      "schedule": "*/5 * * * *"
     }
   ]
 }
