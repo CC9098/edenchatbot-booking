@@ -4,12 +4,10 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import {
   BookOpen,
-  Bookmark,
   ChevronLeft,
   ChevronRight,
   Feather,
   ListChecks,
-  ScrollText,
 } from "lucide-react";
 
 type NoteSection = {
@@ -519,28 +517,12 @@ export function DoctorNotebook() {
                 })}
               </div>
 
-              <div className="rounded-md border border-white/10 bg-white/5 p-4 text-sm leading-6 text-[#eadfc4]">
-                <div className="mb-2 flex items-center gap-2 font-semibold text-[#f5d98f]">
-                  <Bookmark className="h-4 w-4" />
-                  手札原則
-                </div>
-                這頁不是給病人看的宣傳頁，而是醫師內部溫習、面談、培訓時使用的臨床筆記。
-              </div>
             </div>
           </aside>
 
           <div className="min-w-0">
-            <div className="mb-4 flex flex-col gap-3 rounded-[16px] border border-[#d0bd91] bg-[#fff8ea]/85 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-[#8c632c]">
-                  <ScrollText className="h-4 w-4" />
-                  醫天圓 · 醫師內部手札
-                </div>
-                <h1 className="mt-1 font-serif text-2xl font-semibold text-[#263d2b] sm:text-3xl">
-                  一本真的可以揭的醫師筆記本
-                </h1>
-              </div>
-              <div className="flex items-center gap-2">
+            <div className="mb-3 flex justify-end px-1">
+              <div className="flex items-center gap-2" aria-label="翻頁控制">
                 <button
                   type="button"
                   onClick={() => goToSpread(spreadIndex - 1)}
