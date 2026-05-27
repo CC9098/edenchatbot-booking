@@ -580,7 +580,7 @@ export function StaffKnowledgeBaseClient() {
             </div>
 
           <div className="rounded-[20px] border border-emerald-100 bg-white p-2 shadow-sm">
-            <div className="space-y-1">
+            <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
               {categories.map((item) => (
                 <button
                   key={item}
