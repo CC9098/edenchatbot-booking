@@ -1,5 +1,10 @@
 type NullableId = string | null | undefined;
 
+type SupabaseSchemaError = {
+  code?: string;
+  message?: string;
+} | null | undefined;
+
 type VisiblePatientIdOptions = {
   activeStaffUserIds: NullableId[];
   currentStaffUserId?: NullableId;
@@ -80,4 +85,18 @@ export function prioritizeSelfPatient(
   }
 
   return [currentStaffUserId, ...patientIds.filter((id) => id !== currentStaffUserId)];
+}
+
+export function isMissingPatientProfilesSchemaError(error: SupabaseSchemaError): boolean {
+  if (!error) return false;
+
+  const message = (error.message || "").toLowerCase();
+  return (
+    error.code === "PGRST205" ||
+    (error.code === "PGRST204" && message.includes("patient_profiles")) ||
+    message.includes("could not find the table 'public.patient_profiles'") ||
+    message.includes('could not find the table "public"."patient_profiles"') ||
+    message.includes('relation "public.patient_profiles" does not exist') ||
+    message.includes('relation "patient_profiles" does not exist')
+  );
 }

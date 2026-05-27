@@ -4,7 +4,11 @@ import { getCurrentUser, requireStaffRole, AuthError } from "@/lib/auth-helpers"
 import { createServiceClient } from "@/lib/supabase";
 import { normalizePhoneForSearch, normalizePhoneForStorage } from "@/lib/contact-utils";
 import { getWebAuthCallbackUrl } from "@/lib/auth-redirect";
-import { buildVisiblePatientIds, prioritizeSelfPatient } from "@/lib/doctor-patient-list";
+import {
+  buildVisiblePatientIds,
+  isMissingPatientProfilesSchemaError,
+  prioritizeSelfPatient,
+} from "@/lib/doctor-patient-list";
 
 export const dynamic = "force-dynamic";
 const MAX_SEARCH_PATIENT_SCAN = 2000;
@@ -114,10 +118,17 @@ async function fetchAllVisiblePatientIds(
       .limit(scanLimit),
   ]);
 
+  if (isMissingPatientProfilesSchemaError(patientProfileError)) {
+    console.warn(
+      "[GET /api/doctor/patients] patient_profiles source unavailable; continuing without family profiles:",
+      patientProfileError?.message,
+    );
+  }
+
   const firstError =
     activeStaffError ||
     profileError ||
-    patientProfileError ||
+    (isMissingPatientProfilesSchemaError(patientProfileError) ? null : patientProfileError) ||
     careTeamError ||
     careProfileError ||
     bookingIntakeError ||
@@ -423,7 +434,12 @@ export async function GET(request: NextRequest) {
       .order("is_default", { ascending: false })
       .order("created_at", { ascending: true });
 
-    if (patientProfilesError) {
+    if (isMissingPatientProfilesSchemaError(patientProfilesError)) {
+      console.warn(
+        "[GET /api/doctor/patients] patient_profiles detail unavailable; continuing without family profile names:",
+        patientProfilesError?.message,
+      );
+    } else if (patientProfilesError) {
       console.error("[GET /api/doctor/patients] patient_profiles query error:", patientProfilesError.message);
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildVisiblePatientIds,
+  isMissingPatientProfilesSchemaError,
   prioritizeSelfPatient,
 } from "@/lib/doctor-patient-list";
 
@@ -106,4 +107,28 @@ test("prioritizeSelfPatient moves self to the front without duplication", () => 
   );
 
   assert.deepEqual(prioritized, ["staff-self", "patient-a", "patient-b"]);
+});
+
+test("isMissingPatientProfilesSchemaError detects optional patient profile schema drift", () => {
+  assert.equal(
+    isMissingPatientProfilesSchemaError({
+      code: "PGRST205",
+      message: "Could not find the table 'public.patient_profiles' in the schema cache",
+    }),
+    true,
+  );
+  assert.equal(
+    isMissingPatientProfilesSchemaError({
+      code: "PGRST204",
+      message: "Could not find the 'patient_profiles' column of 'booking_intake' in the schema cache",
+    }),
+    true,
+  );
+  assert.equal(
+    isMissingPatientProfilesSchemaError({
+      code: "23505",
+      message: "duplicate key value violates unique constraint",
+    }),
+    false,
+  );
 });
