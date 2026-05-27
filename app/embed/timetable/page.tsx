@@ -143,7 +143,7 @@ function DoctorStripGroup({
           <DoctorStripCard
             key={doctor.id}
             doctor={doctor}
-            isSupport={isSupportBookingPractitioner(doctor.id)}
+            isSupport={false}
           />
         ))}
       </div>
@@ -174,28 +174,10 @@ function DoctorStrip({
 }) {
   if (doctorIds.size === 0) return null;
   const visibleDoctors = DOCTORS.filter((doctor) => doctorIds.has(doctor.id));
-  const primaryDoctors = visibleDoctors.filter((doctor) => !isSupportBookingPractitioner(doctor.id));
-  const supportDoctors = visibleDoctors.filter((doctor) => isSupportBookingPractitioner(doctor.id));
 
   return (
     <section className="mb-5">
-      <DoctorStripGroup title="中醫師" doctors={primaryDoctors} />
-      {supportDoctors.length > 0 ? (
-        <div className="mt-3">
-          <p className="text-xs font-semibold tracking-[0.04em] text-slate-500">
-            其他服務
-          </p>
-          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-            {supportDoctors.map((doctor) => (
-              <DoctorStripCard
-                key={doctor.id}
-                doctor={doctor}
-                isSupport
-              />
-            ))}
-          </div>
-        </div>
-      ) : null}
+      <DoctorStripGroup title="醫師及服務" doctors={visibleDoctors} />
     </section>
   );
 }
