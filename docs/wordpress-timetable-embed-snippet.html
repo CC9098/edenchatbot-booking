@@ -1,7 +1,12 @@
 <!-- Eden Timetable WordPress embed -->
 <!-- Paste into the timetable page Custom HTML block. Remove old holiday notices and static timetable images first. -->
 
+<!-- wp:html -->
 <style>
+  #eden-timetable-doctor-strip,
+  #eden-timetable-doctor-strip * {
+    box-sizing: border-box;
+  }
   #eden-timetable-embed {
     width: 100%;
     min-height: 2600px;
@@ -10,7 +15,124 @@
     display: block;
     overflow: hidden;
   }
+  #eden-timetable-doctor-strip {
+    max-width: 1260px;
+    margin: 0 auto 18px;
+    padding: 16px 16px 0;
+    font-family: inherit;
+  }
+  #eden-timetable-doctor-strip .eden-strip-group-title {
+    margin: 0 0 10px;
+    color: #334155;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .04em;
+  }
+  #eden-timetable-doctor-strip .eden-strip-group-title.support {
+    margin-top: 12px;
+    color: #64748b;
+    font-size: 12px;
+  }
+  #eden-timetable-doctor-strip .eden-strip-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  #eden-timetable-doctor-strip .eden-doctor-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 104px;
+    padding: 8px 12px;
+    border: 1px solid rgba(226, 232, 240, .9);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, .88);
+    color: #334155;
+    text-align: center;
+    text-decoration: none;
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  #eden-timetable-doctor-strip .eden-doctor-chip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px -24px rgba(15, 23, 42, .6);
+  }
+  #eden-timetable-doctor-strip .eden-doctor-chip.support {
+    min-width: 86px;
+    padding: 6px 8px;
+    color: #475569;
+    opacity: .9;
+  }
+  #eden-timetable-doctor-strip .eden-doctor-avatar {
+    display: block;
+    flex: 0 0 auto;
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 5px;
+    overflow: hidden;
+    border: 4px solid #fff;
+    border-radius: 999px;
+    background: #edf7ef;
+    box-shadow: 0 12px 28px -20px rgba(31, 74, 44, .45);
+  }
+  #eden-timetable-doctor-strip .eden-doctor-chip.support .eden-doctor-avatar {
+    width: 40px;
+    height: 40px;
+    border-width: 2px;
+  }
+  #eden-timetable-doctor-strip .eden-doctor-avatar img {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    display: block;
+    object-fit: cover;
+  }
+  #eden-timetable-doctor-strip .eden-doctor-name {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: .02em;
+  }
+  #eden-timetable-doctor-strip .support .eden-doctor-name {
+    font-size: 10px;
+  }
 </style>
+
+<section id="eden-timetable-doctor-strip" aria-label="可預約醫師">
+  <p class="eden-strip-group-title">中醫師</p>
+  <div class="eden-strip-row">
+    <a class="eden-doctor-chip" href="https://edenchatbot-booking.vercel.app/booking?doctor=chan" target="_blank" rel="noreferrer">
+      <span class="eden-doctor-avatar"><img src="https://edenchatbot-booking.vercel.app/doctor-avatars/chan.jpg" alt="陳家富醫師頭像" style="object-position:82% center;"></span>
+      <span class="eden-doctor-name">陳家富醫師</span>
+    </a>
+    <a class="eden-doctor-chip" href="https://edenchatbot-booking.vercel.app/booking?doctor=lee" target="_blank" rel="noreferrer">
+      <span class="eden-doctor-avatar"><img src="https://edenchatbot-booking.vercel.app/doctor-avatars/lee.jpg" alt="李芊霖醫師頭像" style="object-position:84% center;"></span>
+      <span class="eden-doctor-name">李芊霖醫師</span>
+    </a>
+    <a class="eden-doctor-chip" href="https://edenchatbot-booking.vercel.app/booking?doctor=hon" target="_blank" rel="noreferrer">
+      <span class="eden-doctor-avatar"><img src="https://edenchatbot-booking.vercel.app/doctor-avatars/hon.jpg" alt="韓曉恩醫師頭像" style="object-position:38% center;"></span>
+      <span class="eden-doctor-name">韓曉恩醫師</span>
+    </a>
+    <a class="eden-doctor-chip" href="https://edenchatbot-booking.vercel.app/booking?doctor=chau" target="_blank" rel="noreferrer">
+      <span class="eden-doctor-avatar"><img src="https://edenchatbot-booking.vercel.app/doctor-avatars/chau.jpg" alt="周德健醫師頭像" style="object-position:82% center;"></span>
+      <span class="eden-doctor-name">周德健醫師</span>
+    </a>
+    <a class="eden-doctor-chip" href="https://edenchatbot-booking.vercel.app/booking?doctor=cheungmy" target="_blank" rel="noreferrer">
+      <span class="eden-doctor-avatar"><img src="https://edenchatbot-booking.vercel.app/doctor-avatars/cheungmy.jpg" alt="張敏言醫師頭像"></span>
+      <span class="eden-doctor-name">張敏言醫師</span>
+    </a>
+  </div>
+
+  <p class="eden-strip-group-title support">其他服務</p>
+  <div class="eden-strip-row">
+    <a class="eden-doctor-chip support" href="https://edenchatbot-booking.vercel.app/booking?doctor=wong&amp;clinic=jordan" target="_blank" rel="noreferrer">
+      <span class="eden-doctor-avatar"><img src="https://edenchatbot-booking.vercel.app/images/dr-samuel-wong-profile.jpg" alt="黃浩哲脊醫頭像" style="object-position:center 18%;"></span>
+      <span class="eden-doctor-name">黃浩哲</span>
+    </a>
+  </div>
+</section>
 
 <iframe
   id="eden-timetable-embed"
@@ -42,3 +164,4 @@
     });
   })();
 </script>
+<!-- /wp:html -->
