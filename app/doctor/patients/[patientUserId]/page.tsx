@@ -227,6 +227,33 @@ function todayStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function hasMeaningfulCareProfile(careProfile: CareProfile | null): boolean {
+  if (!careProfile) return false;
+  const hasConstitution = Boolean(careProfile.constitution && careProfile.constitution !== "unknown");
+  const hasDoctorAssessment = Boolean(
+    careProfile.doctorAssessmentConstitution || careProfile.doctorAssessmentAt
+  );
+  const hasScores = Object.values(careProfile.constitutionScores || {}).some((score) => score > 0);
+
+  return Boolean(
+    hasConstitution ||
+      careProfile.constitutionNote ||
+      careProfile.lastVisitAt ||
+      hasDoctorAssessment ||
+      hasScores
+  );
+}
+
+function hasPatientClinicalRecord(data: PatientProfile): boolean {
+  return (
+    hasMeaningfulCareProfile(data.careProfile) ||
+    data.activeInstructions.length > 0 ||
+    data.pendingFollowUps.length > 0 ||
+    data.recentSymptoms.length > 0 ||
+    data.recentFollowUpAnswers.length > 0
+  );
+}
+
 /* ================================================================
    Modal wrapper
    ================================================================ */
@@ -328,6 +355,7 @@ export default function PatientDetailPage() {
   }
 
   if (!data) return null;
+  const showQuestionSuggestions = hasPatientClinicalRecord(data);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -344,12 +372,14 @@ export default function PatientDetailPage() {
 
       <PatientIdentitySection identity={data.patientIdentity} />
 
-      <PatientQuestionSuggestions
-        patientUserId={patientUserId}
-        patientName={data.patientIdentity.displayName}
-        onAnswersSaved={() => fetchProfile(false)}
-        sourceScreen="doctor_patient_page"
-      />
+      {showQuestionSuggestions ? (
+        <PatientQuestionSuggestions
+          patientUserId={patientUserId}
+          patientName={data.patientIdentity.displayName}
+          onAnswersSaved={() => fetchProfile(false)}
+          sourceScreen="doctor_patient_page"
+        />
+      ) : null}
 
       {/* Section A: Constitution */}
       <ConstitutionSection

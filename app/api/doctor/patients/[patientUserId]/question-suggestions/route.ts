@@ -42,6 +42,13 @@ interface PatientQuestionContext {
     status: string;
     startedAt: string;
   }>;
+  recentFollowUpAnswers: Array<{
+    symptomLabel: string;
+    questionText: string;
+    answerValueText: string | null;
+    answerValueNumber: number | null;
+    askedAt: string;
+  }>;
 }
 
 interface SuggestionCard {
@@ -57,6 +64,24 @@ interface SuggestionCard {
 interface SuggestionPayload {
   summary: string;
   suggestions: SuggestionCard[];
+}
+
+function hasClinicalQuestionContext(context: PatientQuestionContext): boolean {
+  const careProfile = context.careProfile;
+  const hasCareProfileSignal = Boolean(
+    careProfile &&
+      ((careProfile.constitution && careProfile.constitution !== "unknown") ||
+        careProfile.constitutionNote ||
+        careProfile.doctorAssessmentConstitution)
+  );
+
+  return (
+    hasCareProfileSignal ||
+    context.activeInstructions.length > 0 ||
+    context.pendingFollowUps.length > 0 ||
+    context.recentSymptoms.length > 0 ||
+    context.recentFollowUpAnswers.length > 0
+  );
 }
 
 function sanitizeText(value: unknown, maxLength = 280): string {
@@ -333,6 +358,17 @@ function buildContextPrompt(patientUserId: string, context: PatientQuestionConte
           .join("\n")
       : "（暫無待跟進覆診）";
 
+  const followUpAnswersBlock =
+    context.recentFollowUpAnswers.length > 0
+      ? context.recentFollowUpAnswers
+          .slice(0, 6)
+          .map((answer, index) => {
+            const answerText = answer.answerValueText || (answer.answerValueNumber ?? "未記錄");
+            return `${index + 1}. ${answer.symptomLabel}｜${answer.questionText}｜答案：${answerText}｜時間：${answer.askedAt}`;
+          })
+          .join("\n")
+      : "（暫無問診跟進答案）";
+
   const constitutionBlock = context.careProfile
     ? `體質：${context.careProfile.constitution || "unknown"}\n醫師判定：${context.careProfile.doctorAssessmentLevel || "未設定"}\n醫師備註體質：${context.careProfile.doctorAssessmentConstitution || "（無）"}\n備註：${context.careProfile.constitutionNote || "（無）"}`
     : "（暫無體質評估）";
@@ -369,6 +405,7 @@ function buildContextPrompt(patientUserId: string, context: PatientQuestionConte
     `\n【病人稱呼】\n${context.patientIdentity.displayName || "未提供"}`,
     `\n【體質】\n${constitutionBlock}`,
     `\n【最近症狀】\n${symptomsBlock}`,
+    `\n【問診跟進答案】\n${followUpAnswersBlock}`,
     `\n【護理指引】\n${instructionsBlock}`,
     `\n【待跟進覆診】\n${followUpsBlock}`,
   ].join("\n");
@@ -419,7 +456,15 @@ export async function GET(
     const supabase = createServiceClient();
     const today = new Date().toISOString().split("T")[0];
 
-    const [profileResult, bookingResult, careProfileResult, instructionsResult, followUpsResult, symptomsResult] =
+    const [
+      profileResult,
+      bookingResult,
+      careProfileResult,
+      instructionsResult,
+      followUpsResult,
+      symptomsResult,
+      followUpAnswersResult,
+    ] =
       await Promise.all([
         supabase.from("profiles").select("display_name, phone").eq("id", patientUserId).maybeSingle(),
         supabase
@@ -459,15 +504,29 @@ export async function GET(
           .eq("patient_user_id", patientUserId)
           .order("started_at", { ascending: false })
           .limit(6),
+        supabase
+          .from("symptom_follow_up_answers")
+          .select("symptom_label, question_text, answer_value_text, answer_value_number, asked_at")
+          .eq("patient_user_id", patientUserId)
+          .order("asked_at", { ascending: false })
+          .limit(8),
       ]);
 
-    if (profileResult.error || careProfileResult.error || instructionsResult.error || followUpsResult.error || symptomsResult.error) {
+    if (
+      profileResult.error ||
+      careProfileResult.error ||
+      instructionsResult.error ||
+      followUpsResult.error ||
+      symptomsResult.error ||
+      followUpAnswersResult.error
+    ) {
       console.error("[GET patient question suggestions] query error:", {
         profile: profileResult.error?.message,
         careProfile: careProfileResult.error?.message,
         instructions: instructionsResult.error?.message,
         followUps: followUpsResult.error?.message,
         symptoms: symptomsResult.error?.message,
+        followUpAnswers: followUpAnswersResult.error?.message,
       });
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
@@ -505,7 +564,25 @@ export async function GET(
         status: symptom.status,
         startedAt: symptom.started_at,
       })),
+      recentFollowUpAnswers: (followUpAnswersResult.data || []).map((answer) => ({
+        symptomLabel: answer.symptom_label,
+        questionText: answer.question_text,
+        answerValueText: answer.answer_value_text,
+        answerValueNumber: answer.answer_value_number,
+        askedAt: answer.asked_at,
+      })),
     };
+
+    if (!hasClinicalQuestionContext(context)) {
+      return NextResponse.json({
+        summary: "",
+        suggestions: [],
+        hasClinicalRecord: false,
+        usedFallback: false,
+        model: null,
+        generatedAt: new Date().toISOString(),
+      });
+    }
 
     const fallbackPayload = buildFallbackSuggestions(context);
     const apiKey = process.env.GEMINI_API_KEY;
