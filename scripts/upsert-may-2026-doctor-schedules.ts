@@ -111,6 +111,13 @@ const MAY_2026_SCHEDULES: ScheduleMap = {
     2: [AFTERNOON_1530_1930],
     3: CENTRAL_FULL_DAY,
   }),
+  [scheduleKey('cheung', 'central')]: schedule({
+    1: [AFTERNOON_1530_1930],
+    5: [AFTERNOON_1530_1930],
+  }),
+  [scheduleKey('leung', 'central')]: schedule({
+    4: [AFTERNOON_1530_1930],
+  }),
 
   // 佐敦診所
   [scheduleKey('chan', 'jordan')]: schedule({
@@ -119,6 +126,12 @@ const MAY_2026_SCHEDULES: ScheduleMap = {
   }),
   [scheduleKey('chau', 'jordan')]: schedule({
     2: [AFTERNOON_1530_1930],
+  }),
+  [scheduleKey('cheung', 'jordan')]: schedule({
+    1: [MORNING_1100_1400],
+    2: [{ start: '11:00', end: '14:00' }, AFTERNOON_1530_1900],
+    3: [{ start: '11:00', end: '14:00' }, AFTERNOON_1530_1900],
+    5: [MORNING_1100_1400],
   }),
   [scheduleKey('cheungmy', 'jordan')]: schedule({
     4: [MORNING_1100_1400],
@@ -135,6 +148,11 @@ const MAY_2026_SCHEDULES: ScheduleMap = {
     2: [MORNING_1100_1400],
     5: [AFTERNOON_1530_1930],
     6: [MORNING_1100_1400, { start: '15:30', end: '18:30' }],
+  }),
+  [scheduleKey('leung', 'jordan')]: schedule({
+    1: [MORNING_1100_1400],
+    3: [MORNING_1100_1400],
+    4: [MORNING_1100_1400],
   }),
   [scheduleKey('wong', 'jordan')]: schedule({
     4: [MORNING_1100_1400],
@@ -153,6 +171,9 @@ const MAY_2026_SCHEDULES: ScheduleMap = {
   }),
   [scheduleKey('lee', 'tsuenwan')]: schedule({
     4: TSUENWAN_FULL_DAY,
+  }),
+  [scheduleKey('leung', 'tsuenwan')]: schedule({
+    0: [MORNING_1030_1400],
   }),
 };
 
