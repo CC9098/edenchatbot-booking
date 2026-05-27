@@ -3,7 +3,7 @@ import { LogIn } from 'lucide-react';
 
 import { buildManageBookingUrl } from '@/lib/public-url';
 
-type PublicBookingTab = 'booking' | 'manage' | 'reschedule' | 'cancel';
+type PublicBookingTab = 'booking' | 'timetable' | 'manage' | 'reschedule' | 'cancel';
 
 function TabLink({
   href,
@@ -38,6 +38,7 @@ export function PublicBookingTabs({
   const token = manageToken?.trim() || undefined;
   const links = [
     { href: '/booking-whatsapp', label: '新增預約', active: current === 'booking' },
+    { href: '/embed/timetable', label: '醫師時間表', active: current === 'timetable' },
     {
       href: buildManageBookingUrl({ token }),
       label: '預約管理',

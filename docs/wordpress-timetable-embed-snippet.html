@@ -1,0 +1,44 @@
+<!-- Eden Timetable WordPress embed -->
+<!-- Paste into the timetable page Custom HTML block. Remove old holiday notices and static timetable images first. -->
+
+<style>
+  #eden-timetable-embed {
+    width: 100%;
+    min-height: 2600px;
+    border: 0;
+    background: transparent;
+    display: block;
+    overflow: hidden;
+  }
+</style>
+
+<iframe
+  id="eden-timetable-embed"
+  src="https://edenchatbot-booking.vercel.app/embed/timetable?source=wordpress&v=20260527"
+  title="醫天圓即時醫師時間表"
+  loading="eager"
+  scrolling="no"
+></iframe>
+
+<script>
+  (() => {
+    const iframe = document.getElementById("eden-timetable-embed");
+    if (!iframe) return;
+
+    const DEFAULT_HEIGHT = window.innerWidth < 768 ? 3600 : 2800;
+    const MIN_HEIGHT = window.innerWidth < 768 ? 3000 : 2200;
+
+    const applyHeight = (height) => {
+      const nextHeight = Number.isFinite(height) ? Math.max(height + 48, MIN_HEIGHT) : DEFAULT_HEIGHT;
+      iframe.style.height = `${nextHeight}px`;
+      iframe.style.minHeight = "0";
+    };
+
+    applyHeight(DEFAULT_HEIGHT);
+
+    window.addEventListener("message", (event) => {
+      if (event.data?.type !== "embed-timetable-height") return;
+      applyHeight(Number(event.data.height));
+    });
+  })();
+</script>
