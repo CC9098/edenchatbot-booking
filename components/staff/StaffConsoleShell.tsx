@@ -23,7 +23,10 @@ function StaffConsoleHeader({ workspace }: { workspace: StaffWorkspace }) {
   const isOnboardingFocus = workspace === "nurse" && pathname.startsWith("/nurse/onboarding");
   const isPartTimeAssistant =
     staffStatus?.role === "assistant" && staffStatus.staffKind === "part_time_assistant";
-  const showSwitchLink = !isOnboardingFocus && !isPartTimeAssistant;
+  const showSwitchLink =
+    !isOnboardingFocus &&
+    !isPartTimeAssistant &&
+    workspace !== "doctor";
   const visibleNavItems = config.navItems.filter((item) => {
     if (item.managerOnly && staffStatus?.role !== "admin" && staffStatus?.role !== "doctor") return false;
     if (workspace === "doctor" && isPartTimeAssistant) return false;

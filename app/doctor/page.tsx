@@ -1,10 +1,8 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  Bot,
   CalendarDays,
   Mic2,
-  NotebookPen,
   Stethoscope,
   UsersRound,
   type LucideIcon,
@@ -35,22 +33,6 @@ const DOCTOR_ACTIONS: RoleHomeAction[] = [
     icon: Mic2,
     className: "border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:bg-emerald-100/70",
     iconClassName: "border-emerald-200 bg-white text-emerald-800",
-  },
-  {
-    title: "養生 Chatbot",
-    subtitle: "設定回答方向、護理指引和安全邊界。",
-    href: "/doctor/chatbot",
-    icon: Bot,
-    className: "border-sky-200 bg-sky-50 hover:border-sky-300 hover:bg-sky-100/70",
-    iconClassName: "border-sky-200 bg-white text-sky-800",
-  },
-  {
-    title: "醫師手札",
-    subtitle: "整理醫師筆記、案例和日常參考。",
-    href: "/doctor/notebook",
-    icon: NotebookPen,
-    className: "border-amber-200 bg-amber-50 hover:border-amber-300 hover:bg-amber-100/70",
-    iconClassName: "border-amber-200 bg-white text-amber-800",
   },
   {
     title: "時間表",
@@ -106,7 +88,7 @@ export default function DoctorHomePage() {
               醫師主頁
             </h1>
             <p className="mt-3 text-sm leading-7 text-slate-600">
-              今日先看病人、記錄、跟進。其他管理工具放後面。
+              今日病人、紀錄、時間表。
             </p>
           </div>
           <Link
