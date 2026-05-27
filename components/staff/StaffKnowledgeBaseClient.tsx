@@ -193,7 +193,7 @@ export function StaffKnowledgeBaseClient() {
       setDocuments(items);
       setSelectedId((current) => {
         if (current && items.some((item: StaffKnowledgeDocument) => item.id === current)) return current;
-        return null;
+        return items[0]?.id ?? null;
       });
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "未能載入知識庫");
@@ -290,15 +290,20 @@ export function StaffKnowledgeBaseClient() {
     setCategory("all");
     setQuery(nextQuery);
     const matchedDocument = documents.find((document) => documentMatches(document, nextQuery));
-    if (matchedDocument) {
-      setSelectedId(matchedDocument.id);
-    }
+    setSelectedId(matchedDocument?.id ?? null);
     window.setTimeout(() => {
       document.getElementById("staff-knowledge-browser")?.scrollIntoView({
         behavior: "smooth",
         block: "start",
       });
     }, 0);
+  }
+
+  function openCategory(nextCategory: string) {
+    setCategory(nextCategory);
+    setQuery("");
+    const nextDocument = documents.find((document) => nextCategory === "all" || document.category === nextCategory);
+    setSelectedId(nextDocument?.id ?? null);
   }
 
   async function saveNote(event: FormEvent<HTMLFormElement>) {
@@ -580,10 +585,7 @@ export function StaffKnowledgeBaseClient() {
                 <button
                   key={item}
                   type="button"
-                  onClick={() => {
-                    setCategory(item);
-                    setSelectedId(null);
-                  }}
+                  onClick={() => openCategory(item)}
                   className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm font-medium ${
                     category === item
                       ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100"
