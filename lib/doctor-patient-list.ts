@@ -5,6 +5,7 @@ type VisiblePatientIdOptions = {
   currentStaffUserId?: NullableId;
   includeOtherStaff?: boolean;
   profileIds?: NullableId[];
+  patientProfileUserIds?: NullableId[];
   patientCareTeamIds?: NullableId[];
   patientCareProfileIds?: NullableId[];
   bookingUserIds?: NullableId[];
@@ -36,6 +37,7 @@ export function buildVisiblePatientIds({
   currentStaffUserId,
   includeOtherStaff = false,
   profileIds,
+  patientProfileUserIds,
   patientCareTeamIds,
   patientCareProfileIds,
   bookingUserIds,
@@ -50,6 +52,7 @@ export function buildVisiblePatientIds({
   const patientIds = new Set<string>();
 
   appendVisibleIds(patientIds, profileIds, activeStaffIds, normalizedCurrentStaffUserId, includeOtherStaff);
+  appendVisibleIds(patientIds, patientProfileUserIds, activeStaffIds, normalizedCurrentStaffUserId, includeOtherStaff);
   appendVisibleIds(patientIds, patientCareTeamIds, activeStaffIds, normalizedCurrentStaffUserId, includeOtherStaff);
   appendVisibleIds(patientIds, patientCareProfileIds, activeStaffIds, normalizedCurrentStaffUserId, includeOtherStaff);
   appendVisibleIds(patientIds, bookingUserIds, activeStaffIds, normalizedCurrentStaffUserId, includeOtherStaff);

@@ -97,6 +97,7 @@ type BookingTabFlowProps = {
     visitType?: VisitType;
   };
   staffPatientUserId?: string | null;
+  initialPatientProfileId?: string | null;
   embedMode?: boolean;
   flowVariant?: FlowVariant;
   presentationVariant?: BookingPresentationVariant;
@@ -673,6 +674,7 @@ export function BookingTabFlow({
   initialContact,
   initialSelection,
   staffPatientUserId,
+  initialPatientProfileId,
   embedMode = false,
   flowVariant = 'booking',
   presentationVariant = 'default',
@@ -708,7 +710,9 @@ export function BookingTabFlow({
   const [submitError, setSubmitError] = useState('');
   const [bookingId, setBookingId] = useState('');
   const [whatsappSent, setWhatsappSent] = useState<boolean | null>(null);
-  const [selectedPatientProfileId, setSelectedPatientProfileId] = useState<string | null>(null);
+  const [selectedPatientProfileId, setSelectedPatientProfileId] = useState<string | null>(
+    initialPatientProfileId ?? null,
+  );
 
   const minDate = getTodayIsoInHongKong();
   const maxDate = getMaxDateIsoInHongKong(MAX_BOOKING_WINDOW_DAYS);
@@ -1584,7 +1588,7 @@ export function BookingTabFlow({
           symptoms: formValues.symptoms.trim(),
           referralSource: formValues.referralSource.trim(),
           ...(isStaffFlow && staffPatientUserId ? { patientUserId: staffPatientUserId } : {}),
-          ...(isWhatsappFlow && selectedPatientProfileId
+          ...((isStaffFlow || isWhatsappFlow) && selectedPatientProfileId
             ? { patientProfileId: selectedPatientProfileId }
             : {}),
         }

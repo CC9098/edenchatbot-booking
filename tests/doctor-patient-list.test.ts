@@ -11,6 +11,7 @@ test("buildVisiblePatientIds keeps current staff visible while excluding other s
     activeStaffUserIds: ["staff-self", "staff-other"],
     currentStaffUserId: "staff-self",
     profileIds: ["patient-profile", "staff-other"],
+    patientProfileUserIds: ["patient-family"],
     patientCareTeamIds: ["patient-a", "staff-other"],
     patientCareProfileIds: ["patient-b"],
     bookingUserIds: ["staff-self"],
@@ -23,6 +24,7 @@ test("buildVisiblePatientIds keeps current staff visible while excluding other s
     "patient-a",
     "patient-b",
     "patient-c",
+    "patient-family",
     "patient-profile",
     "staff-self",
   ]);
@@ -57,6 +59,22 @@ test("buildVisiblePatientIds includes non-staff profiles without care activity",
   });
 
   assert.deepEqual(patientIds, ["patient-a", "patient-b", "staff-self"]);
+});
+
+test("buildVisiblePatientIds includes accounts that only have patient_profiles", () => {
+  const patientIds = buildVisiblePatientIds({
+    activeStaffUserIds: ["staff-self", "staff-other"],
+    currentStaffUserId: "staff-self",
+    patientProfileUserIds: ["patient-family", "staff-other"],
+    patientCareTeamIds: [],
+    patientCareProfileIds: [],
+    bookingUserIds: [],
+    symptomPatientIds: [],
+    followUpPatientIds: [],
+    instructionPatientIds: [],
+  });
+
+  assert.deepEqual(patientIds, ["patient-family", "staff-self"]);
 });
 
 test("buildVisiblePatientIds can include all active staff when requested", () => {

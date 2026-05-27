@@ -82,6 +82,7 @@ async function fetchAllVisiblePatientIds(
   const [
     { data: activeStaffRows, error: activeStaffError },
     { data: profileRows, error: profileError },
+    { data: patientProfileRows, error: patientProfileError },
     { data: careTeamRows, error: careTeamError },
     { data: careProfileRows, error: careProfileError },
     { data: bookingIntakeRows, error: bookingIntakeError },
@@ -91,6 +92,7 @@ async function fetchAllVisiblePatientIds(
   ] = await Promise.all([
     supabase.from("staff_roles").select("user_id").eq("is_active", true).limit(scanLimit),
     supabase.from("profiles").select("id").limit(scanLimit),
+    supabase.from("patient_profiles").select("user_id").limit(scanLimit),
     supabase.from("patient_care_team").select("patient_user_id").limit(scanLimit),
     supabase.from("patient_care_profile").select("patient_user_id").limit(scanLimit),
     supabase
@@ -115,6 +117,7 @@ async function fetchAllVisiblePatientIds(
   const firstError =
     activeStaffError ||
     profileError ||
+    patientProfileError ||
     careTeamError ||
     careProfileError ||
     bookingIntakeError ||
@@ -131,6 +134,9 @@ async function fetchAllVisiblePatientIds(
     currentStaffUserId,
     includeOtherStaff,
     profileIds: (profileRows || []).map((row) => row.id),
+    patientProfileUserIds: (patientProfileRows as Array<Record<string, unknown>> | null)?.map(
+      (row) => row.user_id as string | null | undefined,
+    ),
     patientCareTeamIds: (careTeamRows as Array<Record<string, unknown>> | null)?.map(
       (row) => row.patient_user_id as string | null | undefined,
     ),
@@ -410,6 +416,29 @@ export async function GET(request: NextRequest) {
 
     const staffRoleMap = new Map((visibleStaffRoles || []).map((row) => [row.user_id, row.role]));
 
+    const { data: patientProfiles, error: patientProfilesError } = await supabase
+      .from("patient_profiles")
+      .select("id, user_id, display_name, is_default, created_at")
+      .in("user_id", patientIdsToInspect)
+      .order("is_default", { ascending: false })
+      .order("created_at", { ascending: true });
+
+    if (patientProfilesError) {
+      console.error("[GET /api/doctor/patients] patient_profiles query error:", patientProfilesError.message);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+
+    const patientProfilesByUserId = new Map<
+      string,
+      Array<{ id: string; user_id: string; display_name: string | null; is_default: boolean | null }>
+    >();
+    for (const patientProfile of patientProfiles || []) {
+      if (typeof patientProfile.user_id !== "string") continue;
+      const rows = patientProfilesByUserId.get(patientProfile.user_id) || [];
+      rows.push(patientProfile);
+      patientProfilesByUserId.set(patientProfile.user_id, rows);
+    }
+
     // Pull latest intake contact snapshot for fallback display/search.
     const { data: bookingContacts, error: bookingContactsError } = await supabase
       .from("booking_intake")
@@ -438,15 +467,30 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const matchedPatientProfileByUserId = new Map<
+      string,
+      { id: string; display_name: string | null }
+    >();
+
     const matchedIds = !isSearching
       ? patientIdsToInspect
       : patientIdsToInspect.filter((id) => {
           const profile = profileMap.get(id);
           const intakeContact = bookingContactMap.get(id);
+          const matchingPatientProfile = (patientProfilesByUserId.get(id) || []).find((patientProfile) =>
+            includesIgnoreCase(patientProfile.display_name, queryText),
+          );
+          if (matchingPatientProfile) {
+            matchedPatientProfileByUserId.set(id, {
+              id: matchingPatientProfile.id,
+              display_name: matchingPatientProfile.display_name,
+            });
+          }
 
           const nameMatch =
             includesIgnoreCase(profile?.display_name, queryText) ||
-            includesIgnoreCase(intakeContact?.patient_name, queryText);
+            includesIgnoreCase(intakeContact?.patient_name, queryText) ||
+            Boolean(matchingPatientProfile);
 
           const phoneMatch =
             queryDigits.length > 0 &&
@@ -487,16 +531,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const items = idsToFetch.map((id) => ({
-      patientUserId: id,
-      displayName: profileMap.get(id)?.display_name || bookingContactMap.get(id)?.patient_name || null,
-      phone: profileMap.get(id)?.phone || bookingContactMap.get(id)?.phone || null,
-      constitution: careMap.get(id)?.constitution || "unknown",
-      nextFollowUpDate: followUpMap.get(id) || null,
-      entryType: staffRoleMap.has(id) ? "staff" : "patient",
-      staffRole: staffRoleMap.get(id) || null,
-      isSelf: id === user.id,
-    }));
+    const items = idsToFetch.map((id) => {
+      const matchedPatientProfile = matchedPatientProfileByUserId.get(id);
+      const defaultPatientProfile = patientProfilesByUserId.get(id)?.[0] || null;
+      const displayName =
+        matchedPatientProfile?.display_name ||
+        profileMap.get(id)?.display_name ||
+        bookingContactMap.get(id)?.patient_name ||
+        defaultPatientProfile?.display_name ||
+        null;
+
+      return {
+        patientUserId: id,
+        patientProfileId: matchedPatientProfile?.id || defaultPatientProfile?.id || null,
+        displayName,
+        phone: profileMap.get(id)?.phone || bookingContactMap.get(id)?.phone || null,
+        constitution: careMap.get(id)?.constitution || "unknown",
+        nextFollowUpDate: followUpMap.get(id) || null,
+        entryType: staffRoleMap.has(id) ? "staff" : "patient",
+        staffRole: staffRoleMap.get(id) || null,
+        isSelf: id === user.id,
+      };
+    });
 
     const nextCursor = hasMore && !isSearching ? patientIdsToInspect[patientIdsToInspect.length - 1] : null;
 

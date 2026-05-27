@@ -101,6 +101,31 @@ export async function POST(request: NextRequest) {
           { status: 409 },
         );
       }
+
+      if (bookingData.patientProfileId) {
+        const { data: linkedPatientProfile, error: linkedPatientProfileError } = await supabase
+          .from('patient_profiles')
+          .select('id, user_id')
+          .eq('id', bookingData.patientProfileId)
+          .maybeSingle();
+
+        if (linkedPatientProfileError) {
+          console.error('[doctor/bookings] patient profile check failed:', linkedPatientProfileError.message);
+          return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        }
+
+        if (linkedPatientProfile?.user_id !== bookingData.patientUserId) {
+          return NextResponse.json(
+            { error: '所選病人檔案與病人帳戶不相符，請重新搜尋病人。' },
+            { status: 409 },
+          );
+        }
+      }
+    } else if (bookingData.patientProfileId) {
+      return NextResponse.json(
+        { error: '病人檔案必須連結到病人帳戶。請重新搜尋病人或改用手動輸入。' },
+        { status: 400 },
+      );
     }
 
     const durationMinutes = getDoctorBookingSlotMinutes(
@@ -212,6 +237,7 @@ export async function POST(request: NextRequest) {
     const intakeResult = await createPendingBookingIntake({
       source: 'staff_console',
       userId: bookingData.patientUserId,
+      patientProfileId: bookingData.patientProfileId,
       doctorId: bookingData.doctorId,
       doctorNameZh: bookingData.doctorNameZh,
       clinicId: bookingData.clinicId,
@@ -278,7 +304,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create booking in calendar' }, { status: 500 });
     }
 
-    if (bookingData.patientUserId) {
+    if (bookingData.patientUserId && !bookingData.patientProfileId) {
       const profileSync = await syncPatientProfileContact({
         userId: bookingData.patientUserId,
         displayName: bookingData.patientName,

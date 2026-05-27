@@ -3,7 +3,7 @@ import { getCurrentUser, requireStaffRole, requirePatientAccess, AuthError } fro
 import { createServiceClient } from "@/lib/supabase";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { patientUserId: string } }
 ) {
   try {
@@ -17,6 +17,7 @@ export async function GET(
     await requirePatientAccess(user.id, patientUserId);
 
     const supabase = createServiceClient();
+    const patientProfileId = new URL(request.url).searchParams.get("patientProfileId")?.trim() || "";
 
     const { data: profileRow, error: profileError } = await supabase
       .from("profiles")
@@ -26,6 +27,20 @@ export async function GET(
 
     if (profileError) {
       console.error("[GET patient profile] profile error:", profileError.message);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+
+    const { data: patientProfileRow, error: patientProfileError } = patientProfileId
+      ? await supabase
+          .from("patient_profiles")
+          .select("id, display_name")
+          .eq("id", patientProfileId)
+          .eq("user_id", patientUserId)
+          .maybeSingle()
+      : { data: null, error: null };
+
+    if (patientProfileError) {
+      console.error("[GET patient profile] patient_profiles error:", patientProfileError.message);
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 
@@ -116,7 +131,7 @@ export async function GET(
 
     return NextResponse.json({
       patientIdentity: {
-        displayName: profileRow?.display_name || latestBookingContact?.patient_name || null,
+        displayName: patientProfileRow?.display_name || profileRow?.display_name || latestBookingContact?.patient_name || null,
         phone: profileRow?.phone || latestBookingContact?.phone || null,
         email: latestBookingContact?.email || null,
       },

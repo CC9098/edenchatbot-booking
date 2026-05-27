@@ -9,6 +9,7 @@ import type { BookableDoctorSchedule } from '@/shared/bookable-schedule-data';
 
 interface PatientSearchItem {
   patientUserId: string;
+  patientProfileId?: string | null;
   displayName: string | null;
   phone: string | null;
   entryType?: 'patient' | 'staff';
@@ -35,6 +36,7 @@ export function StaffAssistedBookingConsole({
   const [searchError, setSearchError] = useState('');
 
   const [selectedPatientId, setSelectedPatientId] = useState('');
+  const [selectedPatientProfileId, setSelectedPatientProfileId] = useState<string | null>(null);
   const [selectedPatientIdentity, setSelectedPatientIdentity] = useState<PatientIdentity | null>(null);
   const [patientLoading, setPatientLoading] = useState(false);
   const [patientError, setPatientError] = useState('');
@@ -93,7 +95,10 @@ export function StaffAssistedBookingConsole({
     setPatientError('');
 
     try {
-      const response = await fetch(`/api/doctor/patients/${item.patientUserId}/profile`);
+      const profileQuery = item.patientProfileId
+        ? `?patientProfileId=${encodeURIComponent(item.patientProfileId)}`
+        : '';
+      const response = await fetch(`/api/doctor/patients/${item.patientUserId}/profile${profileQuery}`);
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
@@ -102,6 +107,7 @@ export function StaffAssistedBookingConsole({
 
       const nextIdentity = payload.patientIdentity as PatientIdentity | undefined;
       setSelectedPatientId(item.patientUserId);
+      setSelectedPatientProfileId(item.patientProfileId || null);
       setSelectedPatientIdentity(
         nextIdentity || {
           displayName: item.displayName,
@@ -120,13 +126,16 @@ export function StaffAssistedBookingConsole({
 
   function clearSelectedPatient() {
     setSelectedPatientId('');
+    setSelectedPatientProfileId(null);
     setSelectedPatientIdentity(null);
     setPatientError('');
     setSearchQuery('');
     setResults([]);
   }
 
-  const bookingFlowKey = selectedPatientId || 'manual-staff-booking';
+  const bookingFlowKey = selectedPatientId
+    ? `${selectedPatientId}:${selectedPatientProfileId || 'default'}`
+    : 'manual-staff-booking';
 
   return (
     <div className="space-y-6">
@@ -289,6 +298,7 @@ export function StaffAssistedBookingConsole({
         doctors={doctors}
         initialContact={selectedPatientIdentity}
         staffPatientUserId={selectedPatientId || null}
+        initialPatientProfileId={selectedPatientProfileId}
         flowVariant="staff"
       />
     </div>
