@@ -287,9 +287,9 @@ export function StaffKnowledgeBaseClient() {
   }
 
   function focusTask(nextQuery: string) {
-    setCategory("all");
-    setQuery(nextQuery);
+    setQuery("");
     const matchedDocument = documents.find((document) => documentMatches(document, nextQuery));
+    setCategory(matchedDocument?.category ?? "all");
     setSelectedId(matchedDocument?.id ?? null);
     window.setTimeout(() => {
       document.getElementById("staff-knowledge-browser")?.scrollIntoView({
