@@ -1,8 +1,8 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  CalendarDays,
   Mic2,
+  NotebookPen,
   Stethoscope,
   UsersRound,
   type LucideIcon,
@@ -35,12 +35,12 @@ const DOCTOR_ACTIONS: RoleHomeAction[] = [
     iconClassName: "border-emerald-200 bg-white text-emerald-800",
   },
   {
-    title: "時間表",
-    subtitle: "檢查出診、假期和可預約安排。",
-    href: "/doctor/timetable",
-    icon: CalendarDays,
-    className: "border-teal-200 bg-teal-50 hover:border-teal-300 hover:bg-teal-100/70",
-    iconClassName: "border-teal-200 bg-white text-teal-800",
+    title: "醫師手札",
+    subtitle: "整理醫師筆記、案例和日常參考。",
+    href: "/doctor/notebook",
+    icon: NotebookPen,
+    className: "border-amber-200 bg-amber-50 hover:border-amber-300 hover:bg-amber-100/70",
+    iconClassName: "border-amber-200 bg-white text-amber-800",
   },
 ];
 
@@ -88,7 +88,7 @@ export default function DoctorHomePage() {
               醫師主頁
             </h1>
             <p className="mt-3 text-sm leading-7 text-slate-600">
-              今日病人、紀錄、時間表。
+              今日病人、紀錄、手札。
             </p>
           </div>
           <Link
@@ -101,7 +101,7 @@ export default function DoctorHomePage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <section id="today-patients" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {DOCTOR_ACTIONS.map((action) => (
           <RoleActionCard key={action.href} action={action} />
         ))}

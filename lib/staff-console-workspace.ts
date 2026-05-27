@@ -27,8 +27,12 @@ const DOCTOR_NAV_ITEMS: StaffWorkspaceNavItem[] = [
     label: "病人列表",
     matchPrefixes: ["/doctor/patients/"],
   },
+  {
+    href: "/doctor#today-patients",
+    label: "今日病人",
+  },
   { href: "/doctor/record", label: "語音記錄" },
-  { href: "/doctor/timetable", label: "時間表管理" },
+  { href: "/doctor/notebook", label: "醫師手札" },
 ];
 
 const NURSE_NAV_ITEMS: StaffWorkspaceNavItem[] = [
