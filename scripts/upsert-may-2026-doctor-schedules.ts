@@ -87,6 +87,7 @@ const MORNING_1030_1400: TimeRange = { start: '10:30', end: '14:00' };
 const AFTERNOON_1530_1900: TimeRange = { start: '15:30', end: '19:00' };
 const MORNING_1100_1400: TimeRange = { start: '11:00', end: '14:00' };
 const AFTERNOON_1530_1930: TimeRange = { start: '15:30', end: '19:30' };
+const NIGHT_2130_2330: TimeRange = { start: '21:30', end: '23:30' };
 
 const TSUENWAN_FULL_DAY = [MORNING_1030_1400, AFTERNOON_1530_1900];
 const JORDAN_FULL_DAY = [MORNING_1100_1400, AFTERNOON_1530_1930];
@@ -111,13 +112,6 @@ const MAY_2026_SCHEDULES: ScheduleMap = {
     2: [AFTERNOON_1530_1930],
     3: CENTRAL_FULL_DAY,
   }),
-  [scheduleKey('cheung', 'central')]: schedule({
-    1: [AFTERNOON_1530_1930],
-    5: [AFTERNOON_1530_1930],
-  }),
-  [scheduleKey('leung', 'central')]: schedule({
-    4: [AFTERNOON_1530_1930],
-  }),
 
   // 佐敦診所
   [scheduleKey('chan', 'jordan')]: schedule({
@@ -126,12 +120,6 @@ const MAY_2026_SCHEDULES: ScheduleMap = {
   }),
   [scheduleKey('chau', 'jordan')]: schedule({
     2: [AFTERNOON_1530_1930],
-  }),
-  [scheduleKey('cheung', 'jordan')]: schedule({
-    1: [MORNING_1100_1400],
-    2: [{ start: '11:00', end: '14:00' }, AFTERNOON_1530_1900],
-    3: [{ start: '11:00', end: '14:00' }, AFTERNOON_1530_1900],
-    5: [MORNING_1100_1400],
   }),
   [scheduleKey('cheungmy', 'jordan')]: schedule({
     4: [MORNING_1100_1400],
@@ -148,11 +136,6 @@ const MAY_2026_SCHEDULES: ScheduleMap = {
     2: [MORNING_1100_1400],
     5: [AFTERNOON_1530_1930],
     6: [MORNING_1100_1400, { start: '15:30', end: '18:30' }],
-  }),
-  [scheduleKey('leung', 'jordan')]: schedule({
-    1: [MORNING_1100_1400],
-    3: [MORNING_1100_1400],
-    4: [MORNING_1100_1400],
   }),
   [scheduleKey('wong', 'jordan')]: schedule({
     4: [MORNING_1100_1400],
@@ -172,8 +155,11 @@ const MAY_2026_SCHEDULES: ScheduleMap = {
   [scheduleKey('lee', 'tsuenwan')]: schedule({
     4: TSUENWAN_FULL_DAY,
   }),
-  [scheduleKey('leung', 'tsuenwan')]: schedule({
-    0: [MORNING_1030_1400],
+
+  // 網上診症
+  [scheduleKey('cheung', 'online')]: schedule({
+    3: [NIGHT_2130_2330],
+    4: [NIGHT_2130_2330],
   }),
 };
 
