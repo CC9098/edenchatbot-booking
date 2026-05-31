@@ -23,6 +23,8 @@ const DAY_COLUMNS = [
   { day: 0, label: '星期日', short: 'SUN' },
 ] as const;
 
+const FEATURED_DOCTOR_STRIP_IDS = new Set<string>(['cheung']);
+
 const CLINIC_THEMES: Record<
   PhysicalClinicId,
   {
@@ -173,7 +175,9 @@ function DoctorStrip({
   doctorIds: Set<string>;
 }) {
   if (doctorIds.size === 0) return null;
-  const visibleDoctors = DOCTORS.filter((doctor) => doctorIds.has(doctor.id));
+  const visibleDoctors = DOCTORS.filter(
+    (doctor) => doctorIds.has(doctor.id) || FEATURED_DOCTOR_STRIP_IDS.has(doctor.id)
+  );
 
   return (
     <section className="mb-5">
