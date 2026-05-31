@@ -606,9 +606,7 @@ export default async function TimetableEmbedPage({
               </a>
             </div>
           </section>
-        ) : (
-          <DoctorStrip doctorIds={visibleDoctorIds} />
-        )}
+        ) : null}
 
         <div className="space-y-8">
           {visibleCards.map((card) => (
