@@ -573,7 +573,7 @@ export default async function TimetableEmbedPage({
 
   return (
     <main
-      className="min-h-screen w-full"
+      className={minimal ? 'w-full' : 'min-h-screen w-full'}
       style={{
         background:
           'linear-gradient(180deg, #efefec 0%, #f5f4ef 100%)',

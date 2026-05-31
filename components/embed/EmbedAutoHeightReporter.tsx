@@ -16,14 +16,11 @@ export function EmbedAutoHeightReporter({
     const postHeight = () => {
       frameId = 0;
 
-      const height = Math.max(
-        document.documentElement.scrollHeight,
-        document.body.scrollHeight,
-        document.documentElement.clientHeight,
-        document.body.clientHeight,
-        document.documentElement.offsetHeight,
-        document.body.offsetHeight
-      );
+      const contentBottom = Array.from(document.body.children).reduce((bottom, element) => {
+        const rect = element.getBoundingClientRect();
+        return Math.max(bottom, rect.bottom + window.scrollY);
+      }, 0);
+      const height = Math.ceil(contentBottom || document.body.scrollHeight);
 
       if (height === lastHeight) return;
       lastHeight = height;
