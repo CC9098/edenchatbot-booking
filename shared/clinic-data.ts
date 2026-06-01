@@ -84,6 +84,7 @@ const DEFAULT_DOCTOR_BOOKING_SLOT_MINUTES = 15;
 const DEFAULT_BOOKING_PRACTITIONER_GROUP: BookingPractitionerGroup = 'tcm';
 const DEFAULT_BOOKING_GROUP_LABEL = '中醫主診醫師';
 const DEFAULT_BOOKING_ROLE_LABEL = '中醫師';
+const DOCTOR_AVATAR_CACHE_VERSION = '20260602c';
 
 export const CLINICS: ClinicProfile[] = [
   {
@@ -140,7 +141,7 @@ export const DOCTORS: DoctorProfile[] = [
     id: 'chan',
     nameZh: '陳家富醫師',
     nameEn: 'Dr. Chan',
-    avatarSrc: '/doctor-avatars/clean/chan.webp',
+    avatarSrc: `/doctor-avatars/clean/chan.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'chan' }),
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
@@ -149,7 +150,7 @@ export const DOCTORS: DoctorProfile[] = [
     id: 'lee',
     nameZh: '李芊霖醫師',
     nameEn: 'Dr. Lee',
-    avatarSrc: '/doctor-avatars/clean/lee.webp',
+    avatarSrc: `/doctor-avatars/clean/lee.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'lee' }),
     bookingTreatmentOptions: ['acupuncture'],
@@ -158,7 +159,7 @@ export const DOCTORS: DoctorProfile[] = [
     id: 'hon',
     nameZh: '韓曉恩醫師',
     nameEn: 'Dr. Hon',
-    avatarSrc: '/doctor-avatars/clean/hon.webp',
+    avatarSrc: `/doctor-avatars/clean/hon.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'hon' }),
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
@@ -170,7 +171,7 @@ export const DOCTORS: DoctorProfile[] = [
     id: 'chau',
     nameZh: '周德健醫師',
     nameEn: 'Dr. Chau',
-    avatarSrc: '/doctor-avatars/clean/chau.webp',
+    avatarSrc: `/doctor-avatars/clean/chau.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'chau' }),
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
@@ -180,7 +181,7 @@ export const DOCTORS: DoctorProfile[] = [
     id: 'cheung',
     nameZh: '張天慧醫師',
     nameEn: 'Dr. Cheung',
-    avatarSrc: '/doctor-avatars/clean/cheung.webp',
+    avatarSrc: `/doctor-avatars/clean/cheung.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'cheung', clinicId: 'online' }),
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
@@ -190,7 +191,7 @@ export const DOCTORS: DoctorProfile[] = [
     id: 'cheungmy',
     nameZh: '張敏言醫師',
     nameEn: 'Dr. Cheung',
-    avatarSrc: '/doctor-avatars/clean/cheungmy.webp',
+    avatarSrc: `/doctor-avatars/clean/cheungmy.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'cheungmy' }),
     bookingTreatmentOptions: ['acupuncture'],
@@ -201,7 +202,7 @@ export const DOCTORS: DoctorProfile[] = [
     id: 'leung',
     nameZh: '梁仲威醫師',
     nameEn: 'Dr. Leung',
-    avatarSrc: '/doctor-avatars/clean/leung.webp',
+    avatarSrc: `/doctor-avatars/clean/leung.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'leung' }),
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
@@ -210,7 +211,7 @@ export const DOCTORS: DoctorProfile[] = [
     id: 'wong',
     nameZh: '黃浩哲脊醫',
     nameEn: 'Dr. Samuel H.C. Wong',
-    avatarSrc: '/doctor-avatars/clean/wong.webp',
+    avatarSrc: `/doctor-avatars/clean/wong.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'wong', clinicId: 'jordan' }),
     bookingPractitionerGroup: 'support',
