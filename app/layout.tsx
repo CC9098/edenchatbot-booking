@@ -3,6 +3,8 @@ import { Figtree, Noto_Sans_TC, Noto_Serif_TC, Roboto_Mono } from "next/font/goo
 import { NativeOAuthListener } from "@/components/auth/NativeOAuthListener";
 import { PatientAppChrome } from "@/components/patient/PatientAppChrome";
 import { CrossMethodBanner } from "@/components/member/CrossMethodBanner";
+import { clinicStructuredData, jsonLd, SITE_DESCRIPTION, SITE_NAME } from "@/lib/structured-data";
+import { buildPublicUrl, getPublicBaseUrl } from "@/lib/public-url";
 import "./globals.css";
 
 const display = Figtree({
@@ -29,8 +31,35 @@ const serif = Noto_Serif_TC({
 });
 
 export const metadata: Metadata = {
-  title: "醫天圓小助手 | Chatbot Widget",
-  description: "Decision-tree chatbot widget for 醫天圓中醫診所，提供預約、收費、診所資訊與諮詢。",
+  metadataBase: new URL(getPublicBaseUrl()),
+  title: {
+    default: `${SITE_NAME} | 中醫診症、針灸、痛症調理與網上預約`,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  alternates: {
+    canonical: buildPublicUrl("/"),
+  },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} | 中醫診症、針灸、痛症調理與網上預約`,
+    description: SITE_DESCRIPTION,
+    url: buildPublicUrl("/"),
+    images: [
+      {
+        url: buildPublicUrl("/images/edenclinic-homepage-bg.webp"),
+        alt: SITE_NAME,
+      },
+    ],
+    locale: "zh_HK",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} | 中醫診症、針灸、痛症調理與網上預約`,
+    description: SITE_DESCRIPTION,
+    images: [buildPublicUrl("/images/edenclinic-homepage-bg.webp")],
+  },
   icons: {
     icon: "/logo-eden.png",
     shortcut: "/logo-eden.png",
@@ -50,10 +79,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="zh-Hant-HK">
       <body
         className={`${display.variable} ${sans.variable} ${mono.variable} ${serif.variable} antialiased`}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: jsonLd(clinicStructuredData()) }}
+        />
         <NativeOAuthListener />
         <CrossMethodBanner />
         <PatientAppChrome>{children}</PatientAppChrome>

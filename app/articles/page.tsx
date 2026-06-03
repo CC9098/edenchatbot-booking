@@ -1,10 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listPublishedArticles } from "@/lib/content-service";
+import { publicUrl } from "@/lib/structured-data";
 
 export const metadata: Metadata = {
   title: "健康文章 | 醫天圓",
-  description: "閱讀醫天圓中醫文章與調養內容。",
+  description: "閱讀醫天圓中醫、針灸、痛症調理、體質諮詢與預約前準備文章。",
+  alternates: {
+    canonical: publicUrl("/articles"),
+  },
+  openGraph: {
+    title: "健康文章 | 醫天圓",
+    description: "閱讀醫天圓中醫、針灸、痛症調理、體質諮詢與預約前準備文章。",
+    url: publicUrl("/articles"),
+    type: "website",
+  },
 };
 
 export const dynamic = "force-dynamic";

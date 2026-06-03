@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, ChevronDown, ExternalLink, MessageCircle, ShieldCheck } from "lucide-react";
+import { drWongStructuredData, jsonLd, publicUrl } from "@/lib/structured-data";
 
 const posterSrc = "/images/dr-samuel-wong-promo-poster-2026-board-fixed-v2.png";
 const timetablePosterSrc = "/images/dr-samuel-wong-chiropractor-may-2026.png";
@@ -42,11 +43,25 @@ const pricingRows = [
 export const metadata: Metadata = {
   title: "黃浩哲脊醫 Dr. Samuel H.C. Wong | 醫天圓",
   description: "黃浩哲脊醫 Dr. Samuel H.C. Wong，香港註冊脊醫，醫天圓脊骨神經科醫生預約頁。",
+  alternates: {
+    canonical: publicUrl("/dr-wong"),
+  },
+  openGraph: {
+    title: "黃浩哲脊醫 Dr. Samuel H.C. Wong | 醫天圓",
+    description: "香港註冊脊醫黃浩哲 Dr. Samuel H.C. Wong，醫天圓佐敦診所脊醫服務預約頁。",
+    url: publicUrl("/dr-wong"),
+    type: "profile",
+    images: [publicUrl(posterSrc)],
+  },
 };
 
 export default function DrWongPage() {
   return (
     <main className="min-h-screen bg-[#f6f1e8] text-[#123f2a]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLd(drWongStructuredData()) }}
+      />
       <section className="mx-auto grid min-h-screen max-w-7xl gap-8 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,0.92fr)_minmax(420px,0.7fr)] lg:items-center lg:px-12">
         <div className="relative order-2 overflow-hidden rounded-[28px] border border-[#e0cfb4] bg-white shadow-[0_28px_80px_-44px_rgba(20,43,28,0.7)] lg:order-1">
           <Image

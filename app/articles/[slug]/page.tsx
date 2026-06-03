@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPublishedArticleBySlug } from "@/lib/content-service";
 import MarkdownContent from "@/components/content/MarkdownContent";
+import { articleStructuredData, jsonLd, publicUrl } from "@/lib/structured-data";
 
 interface PageProps {
   params: { slug: string };
@@ -21,6 +22,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${article.title} | 健康文章 | 醫天圓`,
     description: article.excerpt || "醫天圓健康文章",
+    alternates: {
+      canonical: publicUrl(`/articles/${article.slug}`),
+    },
+    openGraph: {
+      title: `${article.title} | 健康文章 | 醫天圓`,
+      description: article.excerpt || "醫天圓健康文章",
+      url: publicUrl(`/articles/${article.slug}`),
+      type: "article",
+      publishedTime: article.publishedAt,
+      tags: article.tags,
+      images: article.coverImageUrl ? [article.coverImageUrl] : undefined,
+    },
   };
 }
 
@@ -45,6 +58,10 @@ export default async function ArticleDetailPage({ params }: PageProps) {
   return (
     <main className="patient-pane text-slate-800">
       <article className="patient-card mx-auto max-w-3xl space-y-6 p-6 sm:p-8">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: jsonLd(articleStructuredData(article)) }}
+        />
         <div className="space-y-3">
           <Link href="/articles" className="text-sm font-medium text-primary hover:underline">
             ← 返回文章列表
