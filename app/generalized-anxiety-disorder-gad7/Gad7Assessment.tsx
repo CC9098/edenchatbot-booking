@@ -29,7 +29,7 @@ function getSeverity(score: number) {
       tone: "text-[#9a3412]",
       bg: "bg-[#fff7ed]",
       border: "border-[#fed7aa]",
-      message: "這個分數反映你最近承受得比較辛苦，建議盡快找專業人士傾清楚。",
+      message: "這個分數反映近期焦慮程度較高，建議盡快由專業人士進一步評估。",
     };
   }
 
@@ -49,7 +49,7 @@ function getSeverity(score: number) {
       tone: "text-[#1f6b3f]",
       bg: "bg-[#eef8ef]",
       border: "border-[#cfe8d4]",
-      message: "可以先把這個狀態記低，再留意睡眠、胃口、胸悶和心悸有沒有變化。",
+      message: "可以先記錄目前狀態，再留意睡眠、胃口、胸悶和心悸有沒有變化。",
     };
   }
 
@@ -58,7 +58,7 @@ function getSeverity(score: number) {
     tone: "text-[#1f6b3f]",
     bg: "bg-white",
     border: "border-[#d8e2d8]",
-    message: "分數較低不代表一定沒有困擾。如你已經睡不好或影響生活，也可以預約傾一傾。",
+    message: "分數較低不代表一定沒有困擾。如睡眠或日常生活已受影響，也可以預約了解。",
   };
 }
 
@@ -96,10 +96,10 @@ export function Gad7Assessment() {
               GAD-7 焦慮量表
             </div>
             <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
-              這兩星期，你有沒有一直繃住？
+              這兩星期，你是否持續緊張不安？
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#496153]">
-              請回想過去兩星期，每題選擇最接近你的情況。做完後，你可以帶同分數和最近的睡眠、胃口、心慌、胸悶情況，一併同張敏言醫師講清楚。
+              請回想過去兩星期，每題選擇最接近你的情況。完成後，可帶同分數，以及近期睡眠、胃口、心悸和胸悶情況，讓張敏言醫師一併了解。
             </p>
 
             <div className={`${styles.sketchPanel} mt-8 overflow-hidden rounded-[24px]`}>
@@ -159,7 +159,7 @@ export function Gad7Assessment() {
               </div>
               <div className={`${styles.posterText} pt-8 text-3xl`}>
                 <span className="block">每次覆診</span>
-                <span className={`${styles.posterBrown} mt-1 block`}>睇住變化</span>
+                <span className={`${styles.posterBrown} mt-1 block`}>觀察變化</span>
               </div>
               <p className={`${styles.posterFooter} mt-7 text-sm`}>覆診再看 · 慢慢回穩</p>
             </div>
@@ -178,14 +178,14 @@ export function Gad7Assessment() {
               <p className="mt-2 text-sm leading-relaxed text-[#496153]">
                 {isComplete
                   ? severity.message
-                  : `已完成 ${completedCount} / ${questions.length} 題。完成後會看到分數，方便預約時一併告訴張醫師。`}
+                  : `已完成 ${completedCount} / ${questions.length} 題。完成後會顯示分數，方便預約時一併告訴張醫師。`}
               </p>
             </div>
 
             <div className="mt-5 space-y-2 text-sm leading-relaxed text-[#496153]">
               <p className="flex gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1f6b3f]" />
-                初診時把分數和身體感受一併講清楚。
+                初診時可把分數和身體感受一併說明。
               </p>
               <p className="flex gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1f6b3f]" />

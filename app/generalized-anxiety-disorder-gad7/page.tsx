@@ -23,32 +23,32 @@ const tsuenWanBookingHref =
   "/booking?doctor=cheungmy&clinic=tsuenwan&visitType=first&source=gad7-anxiety-page";
 
 const symptomCards = [
-  { title: "成日嘆氣、胸口翳住", copy: "事情未必很大，但個人長期繃緊，肩頸、胸脅也像鬆不開。" },
-  { title: "瞓落床都停唔到諗", copy: "容易驚醒、多夢、心慌，明明很累，個心仍然定不下來。" },
-  { title: "一緊張就胃口差", copy: "壓力一來便胃脹、易倦、集中不到，越累越容易胡思亂想。" },
-  { title: "夜晚特別煩躁", copy: "口乾、潮熱、睡眠淺，白天忍得到，晚上反而更難放鬆。" },
+  { title: "經常嘆氣、胸悶不舒", copy: "壓力未必很大，但身體長期繃緊，肩頸、胸脅也難以放鬆。" },
+  { title: "思緒停不下來", copy: "容易驚醒、多夢、心悸，明明疲倦，心神仍然難以安定。" },
+  { title: "壓力下胃口轉差", copy: "一緊張便胃脹、易倦、難以集中，越疲倦越容易反覆擔心。" },
+  { title: "夜間煩躁、睡眠淺", copy: "口乾、潮熱或睡眠不穩，白天勉強應付，晚上反而更難放鬆。" },
 ] as const;
 
 const tcmPatterns = [
   {
     title: "肝鬱氣滯",
-    signs: "胸口翳、胸脅脹、易怒、經前情緒起伏，常覺得有一口氣頂住。",
-    principle: "先幫氣機鬆開，讓身體由「繃住」慢慢回到順暢。",
+    signs: "胸悶、胸脅脹、易怒、經前情緒起伏，常覺一口氣鬱在胸中。",
+    principle: "重點在疏肝理氣、調暢氣機，讓身體由繃緊逐步回復順暢。",
   },
   {
     title: "心脾兩虛",
-    signs: "心慌、易倦、胃口差、健忘、睡不穩，愈想愈沒有精神。",
-    principle: "調好脾胃與氣血，心神才較容易安定下來。",
+    signs: "心悸、易倦、胃口差、健忘、睡眠不穩，思慮後更覺疲乏。",
+    principle: "重點在健脾養心、調補氣血，令心神較容易安定。",
   },
   {
     title: "陰虛火旺／心腎不交",
-    signs: "入睡難、睡眠淺、口乾、手足心熱，夜晚特別煩躁。",
-    principle: "把虛熱降下來，讓晚上不再一直繃著。",
+    signs: "入睡困難、睡眠淺、口乾、手足心熱，夜間煩躁較明顯。",
+    principle: "重點在滋陰清熱、交通心腎，幫助晚上逐步安定。",
   },
   {
     title: "痰熱擾心",
-    signs: "心煩、胸悶、胃脘不舒、痰多，腦袋像塞住，容易受驚。",
-    principle: "從脾胃與痰熱入手，讓胸口和思緒都清一點。",
+    signs: "心煩、胸悶、胃脘不舒、痰多，思緒混亂，容易受驚。",
+    principle: "重點在清熱化痰、和胃寧神，讓胸悶和心煩逐步減輕。",
   },
 ] as const;
 
@@ -62,8 +62,8 @@ const tcmAssessmentPoints = [
 const careSteps = [
   {
     icon: ClipboardList,
-    title: "先聽清楚你點樣唔舒服",
-    copy: "有些人是心慌，有些人是胃脹，有些人是胸口翳住。先把你的感受講清楚，才知道從哪裡調。",
+    title: "先了解主要不適",
+    copy: "有些人以心悸為主，有些人以胃脹、胸悶或睡眠不穩為主。先了解症狀的先後和輕重，才可判斷調理重點。",
   },
   {
     icon: Stethoscope,
@@ -73,7 +73,7 @@ const careSteps = [
   {
     icon: TrendingUp,
     title: "覆診看見實際變化",
-    copy: "覆診時會再問：睡好一點未、胸口有沒有鬆、心慌有沒有少、精神有沒有回來。身體會慢慢告訴我們方向有沒有走對。",
+    copy: "覆診時會比較睡眠、胸悶、心悸、胃口和精神狀態的變化，讓調理方向更清晰。",
   },
 ] as const;
 
@@ -122,14 +122,14 @@ function PosterTile({
 export const metadata: Metadata = {
   title: "廣泛性焦慮症中醫調理與 GAD-7 評估 | 張敏言醫師 | 醫天圓",
   description:
-    "從中醫情志病、肝鬱、心脾兩虛、陰虛火旺等角度了解廣泛性焦慮症。完成 GAD-7 後，可預約張敏言醫師以中醫辨證跟進睡眠、心慌、胸悶和壓力狀態。",
+    "從中醫情志病、肝鬱、心脾兩虛、陰虛火旺等角度了解廣泛性焦慮症。完成 GAD-7 後，可預約張敏言醫師以中醫辨證跟進睡眠、心悸、胸悶和壓力狀態。",
   alternates: {
     canonical: publicUrl(pagePath),
   },
   openGraph: {
     title: "廣泛性焦慮症中醫調理與 GAD-7 評估 | 張敏言醫師",
     description:
-      "完成 GAD-7 後，帶同睡眠、胃口、心慌、胸悶和壓力情況，由張敏言醫師按中醫辨證跟進。",
+      "完成 GAD-7 後，帶同睡眠、胃口、心悸、胸悶和壓力情況，由張敏言醫師按中醫辨證跟進。",
     url: publicUrl(pagePath),
     type: "article",
     images: [publicUrl(doctorAvatar)],
@@ -226,7 +226,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
 
             <div className="max-w-3xl">
               <div className={`${styles.brushKicker} text-sm`}>
-                成日擔心、瞓唔好、個心定唔落？
+                長期擔心、睡眠欠安、心神不寧？
               </div>
               <h1 className={`${styles.brushTitle} mt-5 text-[2.75rem] sm:text-6xl lg:text-[5.35rem]`}>
                 <span className={styles.brushGreen}>情緒低落、</span>
@@ -237,7 +237,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                 <span className={`${styles.highlightStroke} block w-fit whitespace-nowrap`}>肝氣鬱結</span>
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-relaxed text-[#496153]">
-                有時不是你「諗太多」，而是身體已經長期繃緊。若你近來經常擔心、失眠、心慌、胃脹、胸悶或肩頸緊，張敏言醫師會先從中醫辨證看你的體質，再用 GAD-7 記低當刻狀態，方便之後覆診比較。
+                長期焦慮不一定只是「想太多」，身體亦可能已經處於繃緊狀態。若你近來經常擔心、失眠、心悸、胃脹、胸悶或肩頸繃緊，張敏言醫師會先從中醫辨證了解體質，再配合 GAD-7 記錄當刻狀態，方便覆診比較。
               </p>
             </div>
 
@@ -323,10 +323,10 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                 中醫如何看焦慮
               </div>
               <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
-                焦慮不一定只是「想太多」，身體其實會先出聲
+                焦慮不一定只是「想太多」，身體也會反映壓力
               </h2>
               <p className="mt-4 text-base leading-relaxed text-[#496153]">
-                很多人仍然照常上班、照顧家人，表面好像撐得到，但身體已經開始用胸悶、胃脹、心慌、失眠、易怒或疲倦提醒你。中醫看情緒，會連同肝、心、脾、腎和氣血一起看。
+                很多人仍然照常上班、照顧家人，表面看似應付得到，但身體已開始透過胸悶、胃脹、心悸、失眠、易怒或疲倦反映壓力。中醫看情緒，會連同肝、心、脾、腎和氣血一起判斷。
               </p>
             </div>
             <div className="hidden lg:block">
@@ -362,20 +362,20 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                 同樣是焦慮，每個人的根源未必一樣
               </h2>
               <p className="mt-4 text-base leading-relaxed text-[#496153]">
-                有人是一有壓力就胸口頂住，有人是長期多思多慮後變得很倦，有人是夜晚特別心煩。張敏言醫師會按你的舌脈、睡眠、消化、情緒誘因和身體反應，分辨應先疏肝、養心、健脾，還是清熱化痰。
+                有人壓力一大便胸悶，有人長期思慮後變得疲倦，有人夜間特別心煩。張敏言醫師會按舌脈、睡眠、消化、情緒誘因和身體反應，分辨應先疏肝、養心、健脾，還是清熱化痰。
               </p>
               <div className={`${styles.sketchPanel} mt-6 rounded-[22px] p-4`}>
                 <PosterTile
-                  green="胸口頂住？"
-                  brown="瞓極唔實？"
-                  footer="望舌切脈 · 先找根源"
+                  green="胸悶不舒？"
+                  brown="睡眠不穩？"
+                  footer="望舌切脈 · 辨清根源"
                   variant="posterImageTwo"
                   compact
                 />
                 <div className="p-1 pt-4">
-                  <p className="text-sm font-semibold text-[#6f5423]">張醫師會問清楚</p>
+                  <p className="text-sm font-semibold text-[#6f5423]">張醫師會仔細了解</p>
                   <p className="mt-2 text-sm leading-relaxed text-[#5d513d]">
-                    你最近點瞓、點食、個心慌唔慌、胸口有冇頂住、胃口同大便點樣，全部都值得講。再配合舌脈，先知身體究竟卡在哪裡。
+                    近期睡眠、飲食、心悸、胸悶、胃口及大便情況，均有助判斷焦慮背後的體質偏差。再配合舌脈，才能辨清身體哪一部分需要先調理。
                   </p>
                 </div>
               </div>
@@ -408,10 +408,10 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
             <div>
               <p className={`${styles.markerTag} text-sm`}>醫天圓跟進方式</p>
               <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
-                每次覆診，都要看你有沒有真的鬆一點
+                每次覆診，都要看身體是否逐步回穩
               </h2>
               <p className="mt-4 text-base leading-relaxed text-[#496153]">
-                情緒調理不應只停留在「好似好咗啲」。我們會一起看：睡眠是否穩定一點、心悸有沒有少、胸口有沒有鬆、胃口和精神有沒有回來，擔心的程度有沒有下降。
+                情緒調理不應只停留在模糊感覺。覆診時會一起比較睡眠是否穩定、心悸是否減少、胸悶是否放鬆、胃口和精神是否改善，以及擔心程度有沒有下降。
               </p>
               <div className="mt-6 grid gap-3">
                 {tcmAssessmentPoints.map((point) => (
@@ -423,7 +423,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
               </div>
               <div className="mt-6 max-w-[280px]">
                 <PosterTile
-                  green="瞓得唔實？"
+                  green="睡眠不穩？"
                   brown="心神要安"
                   footer="養心安神 · 睡眠跟進"
                   variant="posterImageThree"
@@ -460,7 +460,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                 帶同你的分數和身體感受，預約張敏言醫師
               </h2>
               <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/78">
-                初診時可以把量表分數、最近最困擾你的事、睡眠、胃口、胸悶、心悸、月經或其他身體訊號一併告訴醫師。預約成功後，診所會以 WhatsApp 確認。
+                初診時可把量表分數、近期主要困擾、睡眠、胃口、胸悶、心悸、月經或其他身體訊號一併告訴醫師。預約成功後，診所會以 WhatsApp 確認。
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link
@@ -491,7 +491,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                 ))}
               </div>
               <p className="mt-4 text-xs leading-relaxed text-white/70">
-                GAD-7 只是幫你先記低近況。到診時，仍要把睡眠、胃口、心慌、胸悶、壓力來源和舌脈一併看清楚。
+                GAD-7 可先記錄近況。到診時，仍需一併了解睡眠、胃口、心悸、胸悶、壓力來源和舌脈變化。
               </p>
             </div>
           </div>
