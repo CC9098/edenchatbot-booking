@@ -52,6 +52,25 @@ interface ConsultationEmailData {
   reason: string;
 }
 
+interface OverseasConsultationEmailData {
+  submissionId: string;
+  patientChineseName: string;
+  patientEnglishName?: string | null;
+  patientEmail: string;
+  whatsapp: string;
+  country: string;
+  city: string;
+  timezone: string;
+  preferredDate: string;
+  preferredTime: string;
+  alternateTimes?: string | null;
+  emergencyFlags: string[];
+  mainConcern: string;
+  paymentPayerName: string;
+  paymentTime: string;
+  paymentProofUploaded: boolean;
+}
+
 interface CancellationEmailData {
   patientName: string;
   patientEmail: string;
@@ -110,6 +129,15 @@ function getConfiguredDoctorNotificationEmail(doctorId?: string): string {
 
 function getBaseUrl(): string {
   return getPublicBaseUrl();
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 async function sendHtmlEmail(to: string, subject: string, htmlBody: string): Promise<{ success: boolean; error?: string }> {
@@ -787,4 +815,92 @@ export async function sendConsultationNotificationEmail(
     console.error('Consultation email error:', error);
     return { success: false, error: error.message || 'Failed to send consultation email' };
   }
+}
+
+function buildOverseasConsultationClinicHtml(data: OverseasConsultationEmailData): string {
+  const adminUrl = `${getBaseUrl().replace(/\/$/, '')}/nurse/overseas-consultations`;
+  const emergencyText = data.emergencyFlags.length ? data.emergencyFlags.join(', ') : '沒有';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, 'Noto Sans TC', sans-serif; color: #24302b; line-height: 1.6; margin: 0; padding: 20px; background: #f6f7f3; }
+    .card { max-width: 720px; margin: 0 auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; }
+    h1 { margin: 0 0 16px; font-size: 20px; color: #166534; }
+    table { width: 100%; border-collapse: collapse; }
+    td { border-top: 1px solid #edf0ed; padding: 10px 0; vertical-align: top; }
+    td:first-child { width: 150px; color: #667085; }
+    .warning { margin: 14px 0; padding: 12px; border: 1px solid #fed7aa; border-radius: 8px; background: #fff7ed; color: #9a3412; }
+    a { color: #166534; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>新海外網診預約申請</h1>
+    ${data.emergencyFlags.length ? `<div class="warning"><strong>急症篩查有「是」：</strong>${escapeHtml(emergencyText)}</div>` : ''}
+    <table>
+      <tr><td>申請編號</td><td>${escapeHtml(data.submissionId)}</td></tr>
+      <tr><td>姓名</td><td><strong>${escapeHtml(data.patientChineseName)}</strong> ${escapeHtml(data.patientEnglishName || '')}</td></tr>
+      <tr><td>WhatsApp</td><td>${escapeHtml(data.whatsapp)}</td></tr>
+      <tr><td>Email</td><td>${escapeHtml(data.patientEmail)}</td></tr>
+      <tr><td>所在地</td><td>${escapeHtml(data.country)} ${escapeHtml(data.city)} (${escapeHtml(data.timezone)})</td></tr>
+      <tr><td>首選時間</td><td>${escapeHtml(data.preferredDate)} ${escapeHtml(data.preferredTime)}</td></tr>
+      <tr><td>其他時段</td><td>${escapeHtml(data.alternateTimes || '-')}</td></tr>
+      <tr><td>主要調理問題</td><td>${escapeHtml(data.mainConcern)}</td></tr>
+      <tr><td>付款證明</td><td>${data.paymentProofUploaded ? '已上載' : '未上載'}</td></tr>
+      <tr><td>付款人</td><td>${escapeHtml(data.paymentPayerName)} / ${escapeHtml(data.paymentTime)}</td></tr>
+      <tr><td>後台</td><td><a href="${adminUrl}">${adminUrl}</a></td></tr>
+    </table>
+  </div>
+</body>
+</html>`;
+}
+
+function buildOverseasConsultationPatientHtml(data: OverseasConsultationEmailData): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, 'Noto Sans TC', sans-serif; color: #24302b; line-height: 1.6; margin: 0; padding: 20px; background: #f6f7f3; }
+    .card { max-width: 640px; margin: 0 auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; }
+    h1 { margin: 0 0 14px; font-size: 20px; color: #166534; }
+    ul { padding-left: 20px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>已收到海外網診預約申請</h1>
+    <p>${escapeHtml(data.patientChineseName)} 您好，我們已收到您的資料及付款證明。診所職員會核對後透過 WhatsApp 或 Email 確認網診時間。</p>
+    <ul>
+      <li>HKD$400 為海外網診基本費。</li>
+      <li>中藥費需由醫師診症後確認。</li>
+      <li>如需海外寄送，另收行政費 HKD$250。</li>
+      <li>香港郵政實際郵費及海外當地費用另計。</li>
+    </ul>
+    <p>如您出現急症、嚴重不適或病情突然惡化，請立即在當地求醫。</p>
+  </div>
+</body>
+</html>`;
+}
+
+export async function sendOverseasConsultationNotificationEmails(
+  data: OverseasConsultationEmailData
+): Promise<{ clinic: { success: boolean; error?: string }; patient: { success: boolean; error?: string } }> {
+  const clinicTo = process.env.CLINIC_NOTIFICATION_EMAIL?.trim();
+  const clinic = clinicTo
+    ? await sendHtmlEmail(clinicTo, `新海外網診預約：${data.patientChineseName} (${data.whatsapp})`, buildOverseasConsultationClinicHtml(data))
+    : { success: false, error: 'Missing CLINIC_NOTIFICATION_EMAIL' };
+
+  const patient = await sendHtmlEmail(
+    data.patientEmail,
+    '已收到海外網診預約申請',
+    buildOverseasConsultationPatientHtml(data),
+  );
+
+  return { clinic, patient };
 }

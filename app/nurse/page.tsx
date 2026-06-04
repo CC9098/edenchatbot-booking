@@ -8,6 +8,7 @@ import {
   MessageCircle,
   Send,
   ClipboardCheck,
+  Globe2,
   UserRoundPlus,
   type LucideIcon,
 } from "lucide-react";
@@ -61,6 +62,14 @@ const NURSE_ACTIONS: RoleHomeAction[] = [
     icon: GraduationCap,
     className: "border-orange-200 bg-orange-50 hover:border-orange-300 hover:bg-orange-100/70",
     iconClassName: "border-orange-200 bg-white text-orange-800",
+  },
+  {
+    title: "海外寄藥申請",
+    subtitle: "核對 HKD400、急症提示、藥費和郵寄狀態。",
+    href: "/nurse/overseas-consultations",
+    icon: Globe2,
+    className: "border-violet-200 bg-violet-50 hover:border-violet-300 hover:bg-violet-100/70",
+    iconClassName: "border-violet-200 bg-white text-violet-800",
   },
   {
     title: "前台放行測驗",
