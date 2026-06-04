@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   ClipboardList,
   HeartPulse,
+  Leaf,
   MessageCircle,
   ShieldCheck,
   Stethoscope,
@@ -25,27 +26,57 @@ const tsuenWanBookingHref =
   "/booking?doctor=cheungmy&clinic=tsuenwan&visitType=first&source=gad7-anxiety-page";
 
 const symptomCards = [
-  { title: "腦停不下來", copy: "工作、家庭、健康、金錢都反覆擔心，很難停止。" },
-  { title: "身體長期繃緊", copy: "肩頸、胸口、胃部或頭部不適，休息後仍未放鬆。" },
-  { title: "睡眠受影響", copy: "難入睡、早醒、夢多，醒來仍覺疲倦。" },
-  { title: "情緒易爆線", copy: "容易煩躁、被小事觸動，專注力和耐性下降。" },
+  { title: "肝失疏泄", copy: "長期鬱悶、胸脅不舒、容易嘆氣或煩躁，情緒一郁，身體也跟著繃緊。" },
+  { title: "心神不寧", copy: "心悸、驚醒、多夢、難以安睡，常覺心裡不踏實，像一直放不下事情。" },
+  { title: "脾失健運", copy: "思慮太多後胃口差、胃脹、疲倦、精神不集中，越累越容易擔心。" },
+  { title: "腎陰不足", copy: "夜晚特別焦躁、口乾、潮熱或睡眠淺，身心難以沉降下來。" },
+] as const;
+
+const tcmPatterns = [
+  {
+    title: "肝鬱氣滯",
+    signs: "胸悶、胸脅脹、易怒、經前情緒波動、常覺一口氣頂住。",
+    principle: "重點在疏肝解鬱、調暢氣機，先讓身體由「繃緊」回到可流動。",
+  },
+  {
+    title: "心脾兩虛",
+    signs: "多思多慮、心悸、失眠、健忘、疲倦、胃口差或大便偏爛。",
+    principle: "重點在健脾養心、補益氣血，改善因虛弱而引起的心神不安。",
+  },
+  {
+    title: "陰虛火旺／心腎不交",
+    signs: "入睡困難、睡眠淺、手足心熱、口乾、夜晚焦躁較明顯。",
+    principle: "重點在滋陰清熱、交通心腎，令晚上較容易安定下來。",
+  },
+  {
+    title: "痰熱擾心",
+    signs: "心煩、胸悶、痰多或胃脘不舒，思緒混亂，易驚易緊張。",
+    principle: "重點在化痰清熱、和胃寧神，處理情緒與脾胃互相牽動。",
+  },
+] as const;
+
+const tcmAssessmentPoints = [
+  "舌象：舌色、舌苔厚薄、是否偏紅或齒痕，反映虛實寒熱與脾胃狀態。",
+  "脈象：弦、細、滑、數等變化，可協助判斷氣滯、痰熱、陰虛或氣血不足。",
+  "身體訊號：睡眠、胃口、大便、胸悶、心悸、肩頸繃緊、月經及精神狀態。",
+  "情志誘因：壓力來源、擔心主題、發作時段，以及是否與工作、家庭或生活節奏有關。",
 ] as const;
 
 const careSteps = [
   {
     icon: ClipboardList,
-    title: "初診先建立基線",
-    copy: "以 GAD-7 記錄過去兩星期的焦慮程度，再了解睡眠、消化、心悸、胸悶、月經或其他身體訊號。",
+    title: "先辨情志與臟腑",
+    copy: "焦慮在中醫屬情志病範圍，需看肝、心、脾、腎的失衡，以及氣、血、痰、火、陰陽的變化。",
   },
   {
     icon: Stethoscope,
-    title: "按體質辨證調理",
-    copy: "焦慮背後可以涉及肝氣鬱結、心脾不足、陰虛火旺、氣血不暢等不同狀態，需要按人處理。",
+    title: "望聞問切定證型",
+    copy: "同樣是焦慮，有人偏肝鬱，有人偏心脾不足，有人偏陰虛火旺，治法和調理重點不應一式一樣。",
   },
   {
     icon: TrendingUp,
-    title: "覆診追蹤分數變化",
-    copy: "不是只問「好似好啲未」，而是比較分數、睡眠、身體繃緊和日常功能有沒有實際改善。",
+    title: "量表追蹤療效方向",
+    copy: "GAD-7 不是取代辨證，而是用來把焦慮程度量化，覆診時配合舌脈、睡眠和身體症狀比較變化。",
   },
 ] as const;
 
@@ -57,16 +88,16 @@ const scoreBands = [
 ] as const;
 
 export const metadata: Metadata = {
-  title: "廣泛性焦慮症 GAD-7 自我評估 | 張敏言醫師 | 醫天圓",
+  title: "廣泛性焦慮症中醫調理與 GAD-7 評估 | 張敏言醫師 | 醫天圓",
   description:
-    "經常擔心、緊張、失眠或身體繃緊，可能不只是壓力大。使用 GAD-7 焦慮量表初步評估，預約張敏言醫師以中醫辨證及覆診追蹤跟進。",
+    "從中醫情志病、肝鬱、心脾兩虛、陰虛火旺等角度了解廣泛性焦慮症。使用 GAD-7 焦慮量表建立基線，預約張敏言醫師以中醫辨證及覆診追蹤跟進。",
   alternates: {
     canonical: publicUrl(pagePath),
   },
   openGraph: {
-    title: "廣泛性焦慮症 GAD-7 自我評估 | 張敏言醫師",
+    title: "廣泛性焦慮症中醫調理與 GAD-7 評估 | 張敏言醫師",
     description:
-      "先用 GAD-7 建立焦慮基線，再由張敏言醫師按症狀、體質和覆診分數持續跟進。",
+      "以中醫情志病角度辨證，再用 GAD-7 建立焦慮基線，由張敏言醫師按症狀、體質和覆診分數持續跟進。",
     url: publicUrl(pagePath),
     type: "article",
     images: [publicUrl(doctorAvatar)],
@@ -85,7 +116,7 @@ function pageStructuredData() {
         url,
         name: "廣泛性焦慮症 GAD-7 自我評估",
         description:
-          "介紹廣泛性焦慮症常見症狀、GAD-7 初步評估及張敏言醫師的中醫跟進方式。",
+          "介紹廣泛性焦慮症的中醫情志病觀點、常見證型、GAD-7 初步評估及張敏言醫師的中醫跟進方式。",
         about: {
           "@type": "MedicalCondition",
           name: "廣泛性焦慮症",
@@ -126,15 +157,15 @@ function pageStructuredData() {
             name: "GAD-7 可以診斷焦慮症嗎？",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "GAD-7 是初步篩查及追蹤工具，不能代替正式診斷。分數需配合臨床評估、症狀、持續時間和生活影響一同判斷。",
+              text: "GAD-7 是初步篩查及追蹤工具，不能代替正式診斷。中醫跟進時，分數需配合情志誘因、舌脈、睡眠、消化、心悸、胸悶及生活影響一同判斷。",
             },
           },
           {
             "@type": "Question",
-            name: "為甚麼覆診要重做量表？",
+            name: "中醫如何理解廣泛性焦慮症？",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "焦慮調理需要看趨勢。覆診重做量表可比較分數、睡眠、身體繃緊和日常功能是否改善。",
+              text: "中醫多從情志病、鬱證、驚悸、不寐等範圍理解焦慮，按肝失疏泄、心神不寧、心脾兩虛、陰虛火旺或痰熱擾心等證型辨證處理。",
             },
           },
         ],
@@ -166,14 +197,14 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
             <div className="max-w-3xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#c8b37c] bg-white/80 px-4 py-2 text-sm font-semibold text-[#6f5423]">
                 <ShieldCheck className="h-4 w-4" />
-                GAD-7 量表評估 + 中醫辨證跟進
+                中醫情志病辨證 + GAD-7 量表追蹤
               </div>
               <h1 className="mt-5 text-4xl font-semibold leading-tight text-[#0d4c2d] sm:text-5xl lg:text-6xl">
-                你以為只是壓力大？
-                <span className="block">可能是廣泛性焦慮症訊號</span>
+                焦慮不只在腦裡，
+                <span className="block">也反映在肝、心、脾、腎</span>
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-relaxed text-[#496153]">
-                經常擔心、難以放鬆、失眠、心慌、胃脹或肩頸繃緊，都值得先量度。張敏言醫師會以 GAD-7 建立基線，再按體質和覆診變化跟進。
+                從中醫角度，長期擔心、失眠、心慌、胃脹、胸悶和肩頸繃緊，常與情志失調、肝失疏泄、心神不寧或脾腎不足有關。張敏言醫師會先辨證，再用 GAD-7 量表建立基線和追蹤變化。
               </p>
             </div>
 
@@ -195,7 +226,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
             </div>
 
             <div className="grid max-w-3xl gap-3 sm:grid-cols-3">
-              {["先量度焦慮程度", "每次覆診追蹤", "按體質調理身心"].map((item) => (
+              {["情志病角度分析", "望聞問切辨證", "量表追蹤改善"].map((item) => (
                 <div key={item} className="rounded-[18px] border border-[#d8e2d8] bg-white/82 p-4">
                   <CheckCircle2 className="h-5 w-5 text-[#1f6b3f]" />
                   <p className="mt-3 text-sm font-semibold text-[#20382a]">{item}</p>
@@ -217,7 +248,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                 />
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0d4c2d]/90 via-[#0d4c2d]/40 to-transparent p-5 text-white">
                   <p className="text-sm font-semibold tracking-[0.12em] text-white/78">
-                    情緒與身心調理
+                    中醫情志病調理
                   </p>
                   <h2 className="mt-2 text-3xl font-semibold">張敏言醫師</h2>
                   <p className="mt-2 text-sm text-white/82">註冊中醫師｜針灸 Acupuncture</p>
@@ -257,13 +288,13 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
           <div className="max-w-3xl">
             <div className="flex items-center gap-2 text-sm font-semibold tracking-[0.12em] text-[#8a6b39]">
               <Brain className="h-4 w-4" />
-              廣泛性焦慮症
+              中醫如何看焦慮
             </div>
             <h2 className="mt-3 text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl">
-              焦慮不一定會大喊大叫，它常常藏在身體裡
+              焦慮不一定只是「想太多」，它可能是氣機、臟腑與心神失衡
             </h2>
             <p className="mt-4 text-base leading-relaxed text-[#496153]">
-              很多香港人仍能上班、照顧家庭、完成責任，但內在長期拉緊。當擔心變得頻密、難以控制，並開始影響睡眠、工作、關係或身體狀態，就值得認真評估。
+              中醫將情緒與身體視為一體。七情過度或持續太久，可影響臟腑氣血運行，出現鬱證、驚悸、不寐、胸悶、胃脹、疲倦等表現。很多香港人仍能上班和照顧家庭，但身體其實長期處於繃緊狀態。
             </p>
           </div>
 
@@ -279,6 +310,47 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
         </div>
       </section>
 
+      <section className="bg-white px-5 py-14 sm:px-8 lg:px-12">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,0.58fr)_minmax(0,0.7fr)] lg:items-start">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold tracking-[0.12em] text-[#8a6b39]">
+                <Leaf className="h-4 w-4" />
+                辨證分型
+              </div>
+              <h2 className="mt-3 text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl">
+                同樣是焦慮，中醫不會只用一個方法處理
+              </h2>
+              <p className="mt-4 text-base leading-relaxed text-[#496153]">
+                廣泛性焦慮症在現代診斷上有一套名稱，但中醫臨床更重視「證」。張敏言醫師會按每位病人的情志誘因、舌脈、睡眠、消化和身體反應，判斷背後屬實、屬虛、屬熱、屬痰，或多個證型互相交錯。
+              </p>
+              <div className="mt-6 rounded-[22px] border border-[#d7c6a7] bg-[#fbf8ef] p-5">
+                <p className="text-sm font-semibold text-[#6f5423]">醫天圓的重點</p>
+                <p className="mt-2 text-sm leading-relaxed text-[#5d513d]">
+                  GAD-7 幫助量度焦慮程度；中醫辨證則幫助理解為何會焦慮、身體哪一部分失衡，以及調理方向是否需要改變。
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              {tcmPatterns.map((pattern) => (
+                <article key={pattern.title} className="rounded-[24px] border border-[#d8e2d8] bg-[#fbfdf9] p-5">
+                  <h3 className="text-lg font-semibold text-[#0d4c2d]">{pattern.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-[#496153]">
+                    <span className="font-semibold text-[#20382a]">常見表現：</span>
+                    {pattern.signs}
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-[#496153]">
+                    <span className="font-semibold text-[#20382a]">調理思路：</span>
+                    {pattern.principle}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <Gad7Assessment />
 
       <section className="bg-white px-5 py-14 sm:px-8 lg:px-12">
@@ -287,11 +359,19 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
             <div>
               <p className="text-sm font-semibold tracking-[0.12em] text-[#8a6b39]">醫天圓跟進方式</p>
               <h2 className="mt-3 text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl">
-                特色不是只問感覺，而是一路量度有沒有進步
+                特色是「辨證」加「量度」，一路看調理方向有沒有走對
               </h2>
               <p className="mt-4 text-base leading-relaxed text-[#496153]">
-                情緒調理最怕「好似好咗啲」但沒有方向。GAD-7 讓初診、覆診和調理目標更清晰，病人也更容易看見自己是否真的放鬆、睡得好、少了心慌和身體繃緊。
+                情緒調理最怕只說「好似好咗啲」，但不知道是睡眠改善、心悸減少、胸悶放鬆，還是擔心程度下降。張敏言醫師會用中醫辨證定方向，再用 GAD-7 和身體症狀追蹤變化。
               </p>
+              <div className="mt-6 grid gap-3">
+                {tcmAssessmentPoints.map((point) => (
+                  <p key={point} className="flex gap-3 rounded-[18px] border border-[#d8e2d8] bg-[#fbfdf9] p-4 text-sm leading-relaxed text-[#496153]">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1f6b3f]" />
+                    {point}
+                  </p>
+                ))}
+              </div>
             </div>
 
             <div className="grid gap-4">
@@ -319,10 +399,10 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
             <div>
               <p className="text-sm font-semibold tracking-[0.12em] text-white/72">預約評估</p>
               <h2 className="mt-3 text-3xl font-semibold leading-tight sm:text-4xl">
-                帶同 GAD-7 分數預約張敏言醫師
+                帶同 GAD-7 分數，預約張敏言醫師作中醫辨證
               </h2>
               <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/78">
-                初診時可把量表分數、主要困擾和持續時間一併告訴醫師。預約成功後，診所會以 WhatsApp 確認。
+                初診時可把量表分數、主要困擾、睡眠、胃口、胸悶、心悸、月經或其他身體訊號一併告訴醫師。預約成功後，診所會以 WhatsApp 確認。
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link
@@ -353,7 +433,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                 ))}
               </div>
               <p className="mt-4 text-xs leading-relaxed text-white/70">
-                GAD-7 是初步篩查及追蹤工具，不能代替正式診斷。分數要配合症狀、持續時間和生活影響一同判斷。
+                GAD-7 是初步篩查及追蹤工具，不能代替正式診斷。中醫跟進時，分數要配合舌脈、證型、症狀、持續時間和生活影響一同判斷。
               </p>
             </div>
           </div>
@@ -365,7 +445,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
           <div className="rounded-[20px] border border-[#d8e2d8] bg-[#fbfdf9] p-5">
             <p className="font-semibold text-[#0d4c2d]">重要提醒</p>
             <p className="mt-2">
-              本頁內容只作健康教育及預約前參考。GAD-7 不能代替醫師、心理學家或精神科醫生的正式評估。如你正接受心理治療或西醫治療，請按原有醫療建議繼續跟進。
+              本頁內容只作健康教育及預約前參考。中醫辨證及 GAD-7 不能代替醫師、心理學家或精神科醫生的正式評估。如你正接受心理治療或西醫治療，請按原有醫療建議繼續跟進。
             </p>
           </div>
           <div className="rounded-[20px] border border-[#fed7aa] bg-[#fff7ed] p-5 text-[#7c2d12]">

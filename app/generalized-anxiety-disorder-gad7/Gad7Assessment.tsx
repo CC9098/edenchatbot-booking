@@ -96,10 +96,10 @@ export function Gad7Assessment() {
               GAD-7 焦慮量表
             </div>
             <h2 className="mt-3 text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl">
-              先量度，再決定如何跟進
+              量表不是取代辨證，而是讓調理有清晰基線
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#496153]">
-              請回想過去兩星期。每題選擇最接近你的情況，系統會即時計算總分。這不是診斷，而是讓初診和覆診有清晰基線。
+              請回想過去兩星期。每題選擇最接近你的情況，系統會即時計算總分。張敏言醫師會把分數與舌脈、睡眠、胃口、胸悶、心悸和情志誘因一同參考。
             </p>
 
             <div className="mt-8 overflow-hidden rounded-[24px] border border-[#d8e2d8] bg-white shadow-[0_22px_60px_-44px_rgba(15,63,42,0.75)]">
@@ -173,11 +173,11 @@ export function Gad7Assessment() {
             <div className="mt-5 space-y-2 text-sm leading-relaxed text-[#496153]">
               <p className="flex gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1f6b3f]" />
-                初診記錄分數，覆診比較趨勢。
+                初診記錄分數，配合中醫辨證建立調理方向。
               </p>
               <p className="flex gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1f6b3f]" />
-                配合睡眠、胃口、心悸、胸悶和精神狀態一同評估。
+                覆診比較焦慮、睡眠、胃口、心悸、胸悶和精神狀態。
               </p>
             </div>
 
