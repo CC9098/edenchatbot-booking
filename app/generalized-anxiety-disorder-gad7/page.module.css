@@ -146,12 +146,6 @@
   box-shadow: 0 18px 60px -48px rgba(75, 42, 13, 0.8);
 }
 
-.spotIllustration {
-  border: 1px solid rgba(153, 111, 49, 0.18);
-  background: rgba(255, 252, 242, 0.66);
-  box-shadow: 0 18px 50px -42px rgba(57, 38, 14, 0.72);
-}
-
 .doctorPortrait {
   border: 1px solid rgba(153, 111, 49, 0.28);
   background: rgba(255, 252, 242, 0.84);
@@ -200,6 +194,159 @@
 .sectionBand {
   position: relative;
   z-index: 1;
+}
+
+.posterTile {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(153, 111, 49, 0.28);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(13, 76, 45, 0.12), transparent 18%),
+    linear-gradient(135deg, rgba(255, 250, 234, 0.96), rgba(248, 239, 213, 0.92));
+  background-position: center;
+  background-size: cover;
+  box-shadow: 0 22px 60px -48px rgba(57, 38, 14, 0.78);
+}
+
+.posterTile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: auto;
+  height: auto;
+  background: linear-gradient(135deg, rgba(255, 250, 234, 0.08), rgba(255, 250, 234, 0.38));
+}
+
+.posterTile::after {
+  content: "";
+  position: absolute;
+  left: 10%;
+  right: 12%;
+  bottom: 24%;
+  z-index: 0;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(224, 177, 47, 0.08), rgba(224, 177, 47, 0.86), rgba(224, 177, 47, 0.12));
+  transform: rotate(-2deg);
+}
+
+.posterImageOne {
+  background-image:
+    linear-gradient(135deg, rgba(255, 250, 234, 0.06), rgba(255, 250, 234, 0.2)),
+    url("/images/gad7-tcm-posters/poster-bg-1.webp");
+}
+
+.posterImageTwo {
+  background-image:
+    linear-gradient(135deg, rgba(255, 250, 234, 0.08), rgba(255, 250, 234, 0.18)),
+    url("/images/gad7-tcm-posters/poster-bg-2.webp");
+}
+
+.posterImageThree {
+  background-image:
+    linear-gradient(135deg, rgba(255, 250, 234, 0.08), rgba(255, 250, 234, 0.2)),
+    url("/images/gad7-tcm-posters/poster-bg-3.webp");
+}
+
+.posterImageFour {
+  background-image:
+    linear-gradient(135deg, rgba(255, 250, 234, 0.08), rgba(255, 250, 234, 0.16)),
+    url("/images/gad7-tcm-posters/poster-bg-4.webp");
+}
+
+.posterLeafWash {
+  position: absolute;
+  inset: -20px -28px auto auto;
+  width: 150px;
+  height: 130px;
+  background-image:
+    radial-gradient(ellipse at 50% 50%, rgba(31, 87, 41, 0.45) 0 35%, transparent 38%),
+    radial-gradient(ellipse at 50% 50%, rgba(31, 87, 41, 0.28) 0 32%, transparent 35%);
+  background-position: 20px 22px, 82px 58px;
+  background-repeat: no-repeat;
+  background-size: 62px 36px, 54px 32px;
+  opacity: 0.45;
+  transform: rotate(-16deg);
+}
+
+.posterBurst {
+  position: absolute;
+  top: 20px;
+  left: 18px;
+  z-index: 1;
+  display: grid;
+  gap: 7px;
+}
+
+.posterBurst span {
+  display: block;
+  width: 22px;
+  height: 4px;
+  border-radius: 999px;
+  background: #0d4c2d;
+  transform-origin: left center;
+}
+
+.posterBurst span:nth-child(1) {
+  transform: rotate(34deg);
+}
+
+.posterBurst span:nth-child(2) {
+  transform: rotate(12deg);
+}
+
+.posterBurst span:nth-child(3) {
+  transform: rotate(-18deg);
+}
+
+.posterText {
+  position: relative;
+  z-index: 1;
+  color: #0b4428;
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: 0;
+  font-family: "BiauKai", "DFKai-SB", "Kaiti TC", "KaiTi", serif;
+  text-shadow:
+    0.018em 0.02em 0 rgba(42, 29, 14, 0.08),
+    -0.012em 0.01em 0 rgba(11, 68, 40, 0.12);
+}
+
+.posterText span {
+  display: inline-block;
+}
+
+.posterText span:first-child {
+  transform: rotate(-1.3deg);
+}
+
+.posterText span:nth-child(2) {
+  transform: rotate(0.8deg);
+}
+
+.posterBrown {
+  color: #4b250f;
+}
+
+.posterFooter {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  color: #0d4c2d;
+  font-weight: 800;
+}
+
+.posterFooter::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.18rem;
+  height: 0.16rem;
+  border-radius: 999px;
+  background: #0d4c2d;
 }
 
 @media (max-width: 640px) {

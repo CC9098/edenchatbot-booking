@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import styles from "./page.module.css";
@@ -30,7 +29,7 @@ function getSeverity(score: number) {
       tone: "text-[#9a3412]",
       bg: "bg-[#fff7ed]",
       border: "border-[#fed7aa]",
-      message: "建議盡快由專業人士進一步評估，並以量表持續追蹤變化。",
+      message: "這個分數反映你最近承受得比較辛苦，建議盡快找專業人士傾清楚。",
     };
   }
 
@@ -40,7 +39,7 @@ function getSeverity(score: number) {
       tone: "text-[#8a5b10]",
       bg: "bg-[#fffbeb]",
       border: "border-[#fde68a]",
-      message: "分數已達常用的進一步評估參考線，建議預約檢視症狀與生活影響。",
+      message: "擔心和緊張可能已經影響睡眠、工作或日常生活，值得預約了解。",
     };
   }
 
@@ -50,7 +49,7 @@ function getSeverity(score: number) {
       tone: "text-[#1f6b3f]",
       bg: "bg-[#eef8ef]",
       border: "border-[#cfe8d4]",
-      message: "可先記錄基線，配合睡眠、胃口、胸悶、心悸等身體訊號一同觀察。",
+      message: "可以先把這個狀態記低，再留意睡眠、胃口、胸悶和心悸有沒有變化。",
     };
   }
 
@@ -59,7 +58,7 @@ function getSeverity(score: number) {
     tone: "text-[#1f6b3f]",
     bg: "bg-white",
     border: "border-[#d8e2d8]",
-    message: "如症狀已影響工作、睡眠或家庭生活，即使分數較低亦可預約了解。",
+    message: "分數較低不代表一定沒有困擾。如你已經睡不好或影響生活，也可以預約傾一傾。",
   };
 }
 
@@ -97,10 +96,10 @@ export function Gad7Assessment() {
               GAD-7 焦慮量表
             </div>
             <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
-              量表不是取代辨證，而是讓調理有清晰基線
+              先看看這兩星期，你的擔心去到甚麼程度
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#496153]">
-              請回想過去兩星期。每題選擇最接近你的情況，系統會即時計算總分。張敏言醫師會把分數與舌脈、睡眠、胃口、胸悶、心悸和情志誘因一同參考。
+              請回想過去兩星期，每題選擇最接近你的情況。這個分數不是用來標籤你，而是讓張敏言醫師更清楚你現在承受多少，再配合舌脈、睡眠、胃口、胸悶和心悸一起看。
             </p>
 
             <div className={`${styles.sketchPanel} mt-8 overflow-hidden rounded-[24px]`}>
@@ -152,14 +151,17 @@ export function Gad7Assessment() {
           </div>
 
           <aside className={`${styles.sketchPanel} sticky top-6 rounded-[26px] p-5`}>
-            <div className={`${styles.spotIllustration} mx-auto mb-5 max-w-[230px] overflow-hidden rounded-[22px]`}>
-              <Image
-                src="/images/gad7-tcm/gad7-tracking.webp"
-                alt="GAD-7 量表追蹤變化插圖"
-                width={360}
-                height={260}
-                className="h-auto w-full"
-              />
+            <div className={`${styles.posterTile} ${styles.posterImageFour} mx-auto mb-5 max-w-[240px] p-5`}>
+              <div className={styles.posterBurst} aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
+              <div className={`${styles.posterText} pt-8 text-3xl`}>
+                <span className="block">每次覆診</span>
+                <span className={`${styles.posterBrown} mt-1 block`}>睇住變化</span>
+              </div>
+              <p className={`${styles.posterFooter} mt-7 text-sm`}>量表追蹤 · 有數可依</p>
             </div>
             <p className="text-sm font-semibold tracking-[0.12em] text-[#8a6b39]">即時計分</p>
             <div className="mt-4 flex items-end gap-3">
@@ -176,18 +178,18 @@ export function Gad7Assessment() {
               <p className="mt-2 text-sm leading-relaxed text-[#496153]">
                 {isComplete
                   ? severity.message
-                  : `已完成 ${completedCount} / ${questions.length} 題。完成 7 題後，系統會顯示總分及分級參考。`}
+                  : `已完成 ${completedCount} / ${questions.length} 題。完成後會看到分數，方便預約時一併告訴張醫師。`}
               </p>
             </div>
 
             <div className="mt-5 space-y-2 text-sm leading-relaxed text-[#496153]">
               <p className="flex gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1f6b3f]" />
-                初診記錄分數，配合中醫辨證建立調理方向。
+                初診時把分數和身體感受一併講清楚。
               </p>
               <p className="flex gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1f6b3f]" />
-                覆診比較焦慮、睡眠、胃口、心悸、胸悶和精神狀態。
+                覆診時再看睡眠、胃口、心悸、胸悶和精神有沒有回穩。
               </p>
             </div>
 
