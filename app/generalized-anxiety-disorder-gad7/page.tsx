@@ -73,7 +73,7 @@ const careSteps = [
   {
     icon: TrendingUp,
     title: "覆診看見實際變化",
-    copy: "每次覆診不只憑感覺說好一點，而是一起看分數、睡眠、心悸、胸悶和精神有沒有慢慢回穩。",
+    copy: "覆診時會再問：睡好一點未、胸口有沒有鬆、心慌有沒有少、精神有沒有回來。身體會慢慢告訴我們方向有沒有走對。",
   },
 ] as const;
 
@@ -122,14 +122,14 @@ function PosterTile({
 export const metadata: Metadata = {
   title: "廣泛性焦慮症中醫調理與 GAD-7 評估 | 張敏言醫師 | 醫天圓",
   description:
-    "從中醫情志病、肝鬱、心脾兩虛、陰虛火旺等角度了解廣泛性焦慮症。使用 GAD-7 焦慮量表建立基線，預約張敏言醫師以中醫辨證及覆診追蹤跟進。",
+    "從中醫情志病、肝鬱、心脾兩虛、陰虛火旺等角度了解廣泛性焦慮症。完成 GAD-7 後，可預約張敏言醫師以中醫辨證跟進睡眠、心慌、胸悶和壓力狀態。",
   alternates: {
     canonical: publicUrl(pagePath),
   },
   openGraph: {
     title: "廣泛性焦慮症中醫調理與 GAD-7 評估 | 張敏言醫師",
     description:
-      "以中醫情志病角度辨證，再用 GAD-7 建立焦慮基線，由張敏言醫師按症狀、體質和覆診分數持續跟進。",
+      "完成 GAD-7 後，帶同睡眠、胃口、心慌、胸悶和壓力情況，由張敏言醫師按中醫辨證跟進。",
     url: publicUrl(pagePath),
     type: "article",
     images: [publicUrl(doctorAvatar)],
@@ -189,7 +189,7 @@ function pageStructuredData() {
             name: "GAD-7 可以診斷焦慮症嗎？",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "GAD-7 是初步篩查及追蹤工具，不能代替正式診斷。中醫跟進時，分數需配合情志誘因、舌脈、睡眠、消化、心悸、胸悶及生活影響一同判斷。",
+              text: "GAD-7 可幫助整理近兩星期的焦慮情況，但不能單靠分數判斷病情。中醫跟進時，需一併看情志誘因、舌脈、睡眠、消化、心悸、胸悶及生活影響。",
             },
           },
           {
@@ -366,16 +366,16 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
               </p>
               <div className={`${styles.sketchPanel} mt-6 rounded-[22px] p-4`}>
                 <PosterTile
-                  green="唔只睇分數"
-                  brown="先要辨證"
-                  footer="望聞問切 · 舌脈同參"
+                  green="胸口頂住？"
+                  brown="瞓極唔實？"
+                  footer="望舌切脈 · 先找根源"
                   variant="posterImageTwo"
                   compact
                 />
                 <div className="p-1 pt-4">
-                  <p className="text-sm font-semibold text-[#6f5423]">張醫師會點看</p>
+                  <p className="text-sm font-semibold text-[#6f5423]">張醫師會問清楚</p>
                   <p className="mt-2 text-sm leading-relaxed text-[#5d513d]">
-                    分數只是一個入口。真正要看的是：你為甚麼會一直緊張，身體哪裡先出問題，調理後睡眠、心慌、胸悶和胃口有沒有慢慢改善。
+                    你最近點瞓、點食、個心慌唔慌、胸口有冇頂住、胃口同大便點樣，全部都值得講。再配合舌脈，先知身體究竟卡在哪裡。
                   </p>
                 </div>
               </div>
@@ -491,7 +491,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                 ))}
               </div>
               <p className="mt-4 text-xs leading-relaxed text-white/70">
-                GAD-7 可以幫你先整理近兩星期的狀態，但不能單靠分數判斷病情。真正跟進時，仍要一併看舌脈、症狀、持續時間和日常生活受影響的程度。
+                GAD-7 只是幫你先記低近況。到診時，仍要把睡眠、胃口、心慌、胸悶、壓力來源和舌脈一併看清楚。
               </p>
             </div>
           </div>

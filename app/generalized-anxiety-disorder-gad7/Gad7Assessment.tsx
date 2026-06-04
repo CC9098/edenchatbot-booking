@@ -96,10 +96,10 @@ export function Gad7Assessment() {
               GAD-7 焦慮量表
             </div>
             <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
-              先看看這兩星期，你的擔心去到甚麼程度
+              這兩星期，你有沒有一直繃住？
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#496153]">
-              請回想過去兩星期，每題選擇最接近你的情況。這個分數不是用來標籤你，而是讓張敏言醫師更清楚你現在承受多少，再配合舌脈、睡眠、胃口、胸悶和心悸一起看。
+              請回想過去兩星期，每題選擇最接近你的情況。做完後，你可以帶同分數和最近的睡眠、胃口、心慌、胸悶情況，一併同張敏言醫師講清楚。
             </p>
 
             <div className={`${styles.sketchPanel} mt-8 overflow-hidden rounded-[24px]`}>
@@ -161,7 +161,7 @@ export function Gad7Assessment() {
                 <span className="block">每次覆診</span>
                 <span className={`${styles.posterBrown} mt-1 block`}>睇住變化</span>
               </div>
-              <p className={`${styles.posterFooter} mt-7 text-sm`}>量表追蹤 · 有數可依</p>
+              <p className={`${styles.posterFooter} mt-7 text-sm`}>覆診再看 · 慢慢回穩</p>
             </div>
             <p className="text-sm font-semibold tracking-[0.12em] text-[#8a6b39]">即時計分</p>
             <div className="mt-4 flex items-end gap-3">
