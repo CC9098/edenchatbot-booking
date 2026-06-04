@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import styles from "./page.module.css";
@@ -151,6 +152,15 @@ export function Gad7Assessment() {
           </div>
 
           <aside className={`${styles.sketchPanel} sticky top-6 rounded-[26px] p-5`}>
+            <div className={`${styles.spotIllustration} mx-auto mb-5 max-w-[230px] overflow-hidden rounded-[22px]`}>
+              <Image
+                src="/images/gad7-tcm/gad7-tracking.webp"
+                alt="GAD-7 量表追蹤變化插圖"
+                width={360}
+                height={260}
+                className="h-auto w-full"
+              />
+            </div>
             <p className="text-sm font-semibold tracking-[0.12em] text-[#8a6b39]">即時計分</p>
             <div className="mt-4 flex items-end gap-3">
               <p className="text-6xl font-semibold leading-none text-[#0d4c2d]">

@@ -16,6 +16,7 @@ import { jsonLd, publicUrl, SITE_NAME } from "@/lib/structured-data";
 
 const pagePath = "/generalized-anxiety-disorder-gad7";
 const doctorAvatar = "/doctor-avatars/clean/cheungmy.webp";
+const illustrationBase = "/images/gad7-tcm";
 const bookingHref = "/booking?doctor=cheungmy&visitType=first&source=gad7-anxiety-page";
 const jordanBookingHref =
   "/booking?doctor=cheungmy&clinic=jordan&visitType=first&source=gad7-anxiety-page";
@@ -282,16 +283,27 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
 
       <section className={`${styles.sectionBand} px-5 py-14 sm:px-8 lg:px-12`}>
         <div className="mx-auto max-w-6xl">
-          <div className="max-w-3xl">
-            <div className={`${styles.markerTag} text-sm`}>
-              中醫如何看焦慮
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,0.74fr)_260px] lg:items-end">
+            <div className="max-w-3xl">
+              <div className={`${styles.markerTag} text-sm`}>
+                中醫如何看焦慮
+              </div>
+              <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
+                焦慮不一定只是「想太多」，它可能是氣機、臟腑與心神失衡
+              </h2>
+              <p className="mt-4 text-base leading-relaxed text-[#496153]">
+                中醫將情緒與身體視為一體。七情過度或持續太久，可影響臟腑氣血運行，出現鬱證、驚悸、不寐、胸悶、胃脹、疲倦等表現。很多香港人仍能上班和照顧家庭，但身體其實長期處於繃緊狀態。
+              </p>
             </div>
-            <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
-              焦慮不一定只是「想太多」，它可能是氣機、臟腑與心神失衡
-            </h2>
-            <p className="mt-4 text-base leading-relaxed text-[#496153]">
-              中醫將情緒與身體視為一體。七情過度或持續太久，可影響臟腑氣血運行，出現鬱證、驚悸、不寐、胸悶、胃脹、疲倦等表現。很多香港人仍能上班和照顧家庭，但身體其實長期處於繃緊狀態。
-            </p>
+            <div className={`${styles.spotIllustration} hidden overflow-hidden rounded-[26px] lg:block`}>
+              <Image
+                src={`${illustrationBase}/liver-qi-flow.webp`}
+                alt="中醫肝氣疏泄與氣機流動插圖"
+                width={360}
+                height={260}
+                className="h-auto w-full"
+              />
+            </div>
           </div>
 
           <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -318,11 +330,22 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
               <p className="mt-4 text-base leading-relaxed text-[#496153]">
                 廣泛性焦慮症在現代診斷上有一套名稱，但中醫臨床更重視「證」。張敏言醫師會按每位病人的情志誘因、舌脈、睡眠、消化和身體反應，判斷背後屬實、屬虛、屬熱、屬痰，或多個證型互相交錯。
               </p>
-              <div className={`${styles.sketchPanel} mt-6 rounded-[22px] p-5`}>
-                <p className="text-sm font-semibold text-[#6f5423]">醫天圓的重點</p>
-                <p className="mt-2 text-sm leading-relaxed text-[#5d513d]">
-                  GAD-7 幫助量度焦慮程度；中醫辨證則幫助理解為何會焦慮、身體哪一部分失衡，以及調理方向是否需要改變。
-                </p>
+              <div className={`${styles.sketchPanel} mt-6 overflow-hidden rounded-[22px]`}>
+                <div className="px-5 pt-5">
+                  <Image
+                    src={`${illustrationBase}/tongue-pulse-assessment.webp`}
+                    alt="中醫舌診與脈診評估插圖"
+                    width={360}
+                    height={260}
+                    className="mx-auto h-auto w-full max-w-[260px]"
+                  />
+                </div>
+                <div className="p-5 pt-3">
+                  <p className="text-sm font-semibold text-[#6f5423]">醫天圓的重點</p>
+                  <p className="mt-2 text-sm leading-relaxed text-[#5d513d]">
+                    GAD-7 幫助量度焦慮程度；中醫辨證則幫助理解為何會焦慮、身體哪一部分失衡，以及調理方向是否需要改變。
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -365,6 +388,15 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                     {point}
                   </p>
                 ))}
+              </div>
+              <div className={`${styles.spotIllustration} mt-6 max-w-[240px] overflow-hidden rounded-[24px]`}>
+                <Image
+                  src={`${illustrationBase}/heart-sleep-balance.webp`}
+                  alt="心神安寧與睡眠平衡插圖"
+                  width={360}
+                  height={260}
+                  className="h-auto w-full"
+                />
               </div>
             </div>
 

@@ -146,6 +146,12 @@
   box-shadow: 0 18px 60px -48px rgba(75, 42, 13, 0.8);
 }
 
+.spotIllustration {
+  border: 1px solid rgba(153, 111, 49, 0.18);
+  background: rgba(255, 252, 242, 0.66);
+  box-shadow: 0 18px 50px -42px rgba(57, 38, 14, 0.72);
+}
+
 .doctorPortrait {
   border: 1px solid rgba(153, 111, 49, 0.28);
   background: rgba(255, 252, 242, 0.84);
