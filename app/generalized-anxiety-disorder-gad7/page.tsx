@@ -3,18 +3,15 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
-  Brain,
   CalendarDays,
   CheckCircle2,
   ClipboardList,
-  HeartPulse,
-  Leaf,
   MessageCircle,
-  ShieldCheck,
   Stethoscope,
   TrendingUp,
 } from "lucide-react";
 import { Gad7Assessment } from "./Gad7Assessment";
+import styles from "./page.module.css";
 import { jsonLd, publicUrl, SITE_NAME } from "@/lib/structured-data";
 
 const pagePath = "/generalized-anxiety-disorder-gad7";
@@ -176,17 +173,15 @@ function pageStructuredData() {
 
 export default function GeneralizedAnxietyDisorderGad7Page() {
   return (
-    <main className="min-h-screen bg-[#f4f6f1] text-[#20382a]">
+    <main className={`${styles.pageShell} min-h-screen text-[#20382a]`}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLd(pageStructuredData()) }}
       />
 
-      <section className="relative isolate overflow-hidden bg-white">
-        <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(244,246,241,0.98)_0%,rgba(244,246,241,0.92)_48%,rgba(255,255,255,0.18)_100%)]" />
-        <div className="absolute inset-y-0 right-0 hidden w-[46%] bg-[#e7f1e8] lg:block" />
-        <div className="relative mx-auto grid min-h-[92vh] max-w-7xl gap-8 px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,0.92fr)_minmax(420px,0.7fr)] lg:items-center lg:px-12">
-          <div className="space-y-7 pb-10 pt-4 lg:pb-16">
+      <section className={`${styles.sectionBand} relative isolate px-4 py-4 sm:px-6 lg:px-8`}>
+        <div className={`${styles.paperHero} relative mx-auto grid min-h-[88vh] max-w-7xl gap-8 rounded-[34px] px-5 py-6 sm:px-8 lg:grid-cols-[minmax(0,0.92fr)_minmax(400px,0.62fr)] lg:items-center lg:px-14`}>
+          <div className="relative z-10 space-y-7 pb-10 pt-4 lg:pb-14">
             <Link
               href="https://edenclinic.hk"
               className="inline-flex text-sm font-semibold text-[#1f6b3f] transition hover:text-[#0f4227]"
@@ -195,13 +190,16 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
             </Link>
 
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#c8b37c] bg-white/80 px-4 py-2 text-sm font-semibold text-[#6f5423]">
-                <ShieldCheck className="h-4 w-4" />
+              <div className={`${styles.brushKicker} text-sm`}>
                 中醫情志病辨證 + GAD-7 量表追蹤
               </div>
-              <h1 className="mt-5 text-4xl font-semibold leading-tight text-[#0d4c2d] sm:text-5xl lg:text-6xl">
-                焦慮不只在腦裡，
-                <span className="block">也反映在肝、心、脾、腎</span>
+              <h1 className={`${styles.brushTitle} mt-5 text-[2.75rem] sm:text-6xl lg:text-[5.35rem]`}>
+                <span className={styles.brushGreen}>情緒低落、</span>
+                <br />
+                <span className={styles.brushBrown}>長期緊張？</span>
+                <br />
+                <span className="block text-[0.82em]">可能是</span>
+                <span className={`${styles.highlightStroke} block w-fit whitespace-nowrap`}>肝氣鬱結</span>
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-relaxed text-[#496153]">
                 從中醫角度，長期擔心、失眠、心慌、胃脹、胸悶和肩頸繃緊，常與情志失調、肝失疏泄、心神不寧或脾腎不足有關。張敏言醫師會先辨證，再用 GAD-7 量表建立基線和追蹤變化。
@@ -211,32 +209,31 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
             <div className="grid gap-3 sm:grid-cols-[auto_auto] sm:justify-start">
               <Link
                 href="#gad7"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[16px] bg-[#0d4c2d] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#0a3c24]"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] bg-[#0d4c2d] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#0a3c24]"
               >
                 立即做 GAD-7
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
                 href={bookingHref}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[16px] border border-[#b8cbb8] bg-white px-6 py-3 text-sm font-semibold text-[#0d4c2d] transition hover:bg-[#f4faf4]"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] border border-[#b8cbb8] bg-white/75 px-6 py-3 text-sm font-semibold text-[#0d4c2d] transition hover:bg-white"
               >
                 預約張敏言醫師
                 <CalendarDays className="h-4 w-4" />
               </Link>
             </div>
 
-            <div className="grid max-w-3xl gap-3 sm:grid-cols-3">
-              {["情志病角度分析", "望聞問切辨證", "量表追蹤改善"].map((item) => (
-                <div key={item} className="rounded-[18px] border border-[#d8e2d8] bg-white/82 p-4">
-                  <CheckCircle2 className="h-5 w-5 text-[#1f6b3f]" />
-                  <p className="mt-3 text-sm font-semibold text-[#20382a]">{item}</p>
+            <div className="grid max-w-3xl grid-cols-3 gap-3">
+              {["情志分析", "望聞問切", "量表追蹤"].map((item) => (
+                <div key={item} className={`${styles.roundSeal} flex min-h-24 items-center justify-center p-3 text-center sm:min-h-32`}>
+                  <p className="text-xs font-bold leading-snug text-[#0d4c2d] sm:text-sm">{item}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="pb-10 lg:pb-0">
-            <div className="overflow-hidden rounded-[28px] border border-[#d7c6a7] bg-white shadow-[0_34px_90px_-54px_rgba(15,63,42,0.9)]">
+          <div className="relative z-10 pb-10 lg:pb-0">
+            <div className={`${styles.doctorPortrait} overflow-hidden rounded-[28px]`}>
               <div className="relative aspect-[4/5] bg-[#e7f1e8]">
                 <Image
                   src={doctorAvatar}
@@ -248,14 +245,14 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                 />
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0d4c2d]/90 via-[#0d4c2d]/40 to-transparent p-5 text-white">
                   <p className="text-sm font-semibold tracking-[0.12em] text-white/78">
-                    中醫情志病調理
+                    調身，也調心
                   </p>
                   <h2 className="mt-2 text-3xl font-semibold">張敏言醫師</h2>
                   <p className="mt-2 text-sm text-white/82">註冊中醫師｜針灸 Acupuncture</p>
                 </div>
               </div>
               <div className="grid gap-3 p-5">
-                <div className="rounded-[18px] bg-[#f4f6f1] p-4">
+                <div className={`${styles.sketchPanel} rounded-[18px] p-4`}>
                   <p className="text-sm font-semibold text-[#0d4c2d]">應診時間</p>
                   <p className="mt-2 text-sm leading-relaxed text-[#496153]">
                     佐敦：星期四 11:00-14:00
@@ -266,13 +263,13 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Link
                     href={jordanBookingHref}
-                    className="inline-flex min-h-11 items-center justify-center rounded-[14px] bg-[#0d4c2d] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0a3c24]"
+                    className="inline-flex min-h-11 items-center justify-center rounded-[12px] bg-[#0d4c2d] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0a3c24]"
                   >
                     預約佐敦
                   </Link>
                   <Link
                     href={tsuenWanBookingHref}
-                    className="inline-flex min-h-11 items-center justify-center rounded-[14px] border border-[#b8cbb8] bg-white px-4 py-2 text-sm font-semibold text-[#0d4c2d] transition hover:bg-[#f4faf4]"
+                    className="inline-flex min-h-11 items-center justify-center rounded-[12px] border border-[#b8cbb8] bg-white/70 px-4 py-2 text-sm font-semibold text-[#0d4c2d] transition hover:bg-white"
                   >
                     預約荃灣
                   </Link>
@@ -283,14 +280,13 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
         </div>
       </section>
 
-      <section className="px-5 py-14 sm:px-8 lg:px-12">
+      <section className={`${styles.sectionBand} px-5 py-14 sm:px-8 lg:px-12`}>
         <div className="mx-auto max-w-6xl">
           <div className="max-w-3xl">
-            <div className="flex items-center gap-2 text-sm font-semibold tracking-[0.12em] text-[#8a6b39]">
-              <Brain className="h-4 w-4" />
+            <div className={`${styles.markerTag} text-sm`}>
               中醫如何看焦慮
             </div>
-            <h2 className="mt-3 text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl">
+            <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
               焦慮不一定只是「想太多」，它可能是氣機、臟腑與心神失衡
             </h2>
             <p className="mt-4 text-base leading-relaxed text-[#496153]">
@@ -300,9 +296,8 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
 
           <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {symptomCards.map((item) => (
-              <article key={item.title} className="rounded-[22px] border border-[#d8e2d8] bg-white p-5 shadow-sm">
-                <HeartPulse className="h-5 w-5 text-[#1f6b3f]" />
-                <h3 className="mt-4 text-lg font-semibold text-[#0d4c2d]">{item.title}</h3>
+              <article key={item.title} className={`${styles.speechBubble} p-5 pb-6`}>
+                <h3 className="text-lg font-extrabold text-[#0d4c2d]">{item.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-[#496153]">{item.copy}</p>
               </article>
             ))}
@@ -310,21 +305,20 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
         </div>
       </section>
 
-      <section className="bg-white px-5 py-14 sm:px-8 lg:px-12">
+      <section className={`${styles.sectionBand} bg-[#fffaf0]/70 px-5 py-14 sm:px-8 lg:px-12`}>
         <div className="mx-auto max-w-6xl">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,0.58fr)_minmax(0,0.7fr)] lg:items-start">
             <div>
-              <div className="flex items-center gap-2 text-sm font-semibold tracking-[0.12em] text-[#8a6b39]">
-                <Leaf className="h-4 w-4" />
+              <div className={`${styles.markerTag} text-sm`}>
                 辨證分型
               </div>
-              <h2 className="mt-3 text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl">
+              <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
                 同樣是焦慮，中醫不會只用一個方法處理
               </h2>
               <p className="mt-4 text-base leading-relaxed text-[#496153]">
                 廣泛性焦慮症在現代診斷上有一套名稱，但中醫臨床更重視「證」。張敏言醫師會按每位病人的情志誘因、舌脈、睡眠、消化和身體反應，判斷背後屬實、屬虛、屬熱、屬痰，或多個證型互相交錯。
               </p>
-              <div className="mt-6 rounded-[22px] border border-[#d7c6a7] bg-[#fbf8ef] p-5">
+              <div className={`${styles.sketchPanel} mt-6 rounded-[22px] p-5`}>
                 <p className="text-sm font-semibold text-[#6f5423]">醫天圓的重點</p>
                 <p className="mt-2 text-sm leading-relaxed text-[#5d513d]">
                   GAD-7 幫助量度焦慮程度；中醫辨證則幫助理解為何會焦慮、身體哪一部分失衡，以及調理方向是否需要改變。
@@ -334,8 +328,8 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
 
             <div className="grid gap-4">
               {tcmPatterns.map((pattern) => (
-                <article key={pattern.title} className="rounded-[24px] border border-[#d8e2d8] bg-[#fbfdf9] p-5">
-                  <h3 className="text-lg font-semibold text-[#0d4c2d]">{pattern.title}</h3>
+                <article key={pattern.title} className={`${styles.sketchPanel} rounded-[24px] p-5`}>
+                  <h3 className="text-lg font-extrabold text-[#0d4c2d]">{pattern.title}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-[#496153]">
                     <span className="font-semibold text-[#20382a]">常見表現：</span>
                     {pattern.signs}
@@ -353,12 +347,12 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
 
       <Gad7Assessment />
 
-      <section className="bg-white px-5 py-14 sm:px-8 lg:px-12">
+      <section className={`${styles.sectionBand} bg-[#fffaf0]/70 px-5 py-14 sm:px-8 lg:px-12`}>
         <div className="mx-auto max-w-6xl">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,0.55fr)_minmax(0,0.7fr)] lg:items-start">
             <div>
-              <p className="text-sm font-semibold tracking-[0.12em] text-[#8a6b39]">醫天圓跟進方式</p>
-              <h2 className="mt-3 text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl">
+              <p className={`${styles.markerTag} text-sm`}>醫天圓跟進方式</p>
+              <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
                 特色是「辨證」加「量度」，一路看調理方向有沒有走對
               </h2>
               <p className="mt-4 text-base leading-relaxed text-[#496153]">
@@ -366,7 +360,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
               </p>
               <div className="mt-6 grid gap-3">
                 {tcmAssessmentPoints.map((point) => (
-                  <p key={point} className="flex gap-3 rounded-[18px] border border-[#d8e2d8] bg-[#fbfdf9] p-4 text-sm leading-relaxed text-[#496153]">
+                  <p key={point} className={`${styles.sketchPanel} flex gap-3 rounded-[18px] p-4 text-sm leading-relaxed text-[#496153]`}>
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#1f6b3f]" />
                     {point}
                   </p>
@@ -376,13 +370,13 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
 
             <div className="grid gap-4">
               {careSteps.map((step) => (
-                <article key={step.title} className="rounded-[24px] border border-[#d8e2d8] bg-[#fbfdf9] p-5">
+                <article key={step.title} className={`${styles.sketchPanel} rounded-[24px] p-5`}>
                   <div className="flex gap-4">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[#e7f1e8] text-[#1f6b3f]">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#0d4c2d]/30 bg-[#fffaf0] text-[#1f6b3f]">
                       <step.icon className="h-5 w-5" />
                     </span>
                     <div>
-                      <h3 className="text-lg font-semibold text-[#0d4c2d]">{step.title}</h3>
+                      <h3 className="text-lg font-extrabold text-[#0d4c2d]">{step.title}</h3>
                       <p className="mt-2 text-sm leading-relaxed text-[#496153]">{step.copy}</p>
                     </div>
                   </div>
@@ -393,8 +387,8 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
         </div>
       </section>
 
-      <section className="px-5 py-14 sm:px-8 lg:px-12">
-        <div className="mx-auto max-w-6xl rounded-[28px] border border-[#d7c6a7] bg-[#0d4c2d] p-6 text-white shadow-[0_28px_80px_-54px_rgba(15,63,42,0.9)] sm:p-8 lg:p-10">
+      <section className={`${styles.sectionBand} px-5 py-14 sm:px-8 lg:px-12`}>
+        <div className="mx-auto max-w-6xl rounded-[26px] border border-[#d7c6a7] bg-[#0d4c2d] p-6 text-white shadow-[0_28px_80px_-54px_rgba(15,63,42,0.9)] sm:p-8 lg:p-10">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,0.72fr)_minmax(320px,0.42fr)] lg:items-center">
             <div>
               <p className="text-sm font-semibold tracking-[0.12em] text-white/72">預約評估</p>

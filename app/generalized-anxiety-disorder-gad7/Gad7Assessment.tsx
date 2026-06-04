@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, BarChart3, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import styles from "./page.module.css";
 
 const responseOptions = [
   { value: 0, label: "完全沒有" },
@@ -87,29 +88,28 @@ export function Gad7Assessment() {
   );
 
   return (
-    <section id="gad7" className="bg-[#f4f6f1] px-5 py-14 sm:px-8 lg:px-12">
+    <section id="gad7" className={`${styles.sectionBand} bg-[#f8efd8]/70 px-5 py-14 sm:px-8 lg:px-12`}>
       <div className="mx-auto max-w-6xl">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,0.74fr)_minmax(360px,0.42fr)] lg:items-start">
           <div>
-            <div className="flex items-center gap-2 text-sm font-semibold tracking-[0.12em] text-[#8a6b39]">
-              <BarChart3 className="h-4 w-4" />
+            <div className={`${styles.markerTag} text-sm`}>
               GAD-7 焦慮量表
             </div>
-            <h2 className="mt-3 text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl">
+            <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
               量表不是取代辨證，而是讓調理有清晰基線
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#496153]">
               請回想過去兩星期。每題選擇最接近你的情況，系統會即時計算總分。張敏言醫師會把分數與舌脈、睡眠、胃口、胸悶、心悸和情志誘因一同參考。
             </p>
 
-            <div className="mt-8 overflow-hidden rounded-[24px] border border-[#d8e2d8] bg-white shadow-[0_22px_60px_-44px_rgba(15,63,42,0.75)]">
+            <div className={`${styles.sketchPanel} mt-8 overflow-hidden rounded-[24px]`}>
               {questions.map((question, questionIndex) => (
                 <div
                   key={question}
-                  className="grid gap-4 border-b border-[#edf1ea] p-4 last:border-b-0 sm:p-5 lg:grid-cols-[minmax(0,0.82fr)_minmax(360px,1fr)] lg:items-center"
+                  className="grid gap-4 border-b border-[#dfd2b0] p-4 last:border-b-0 sm:p-5 lg:grid-cols-[minmax(0,0.82fr)_minmax(360px,1fr)] lg:items-center"
                 >
                   <div className="flex gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#e7f1e8] text-sm font-semibold text-[#1f6b3f]">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#0d4c2d]/40 bg-[#fffaf0] text-sm font-semibold text-[#1f6b3f]">
                       {questionIndex + 1}
                     </span>
                     <p className="pt-1 text-base font-semibold leading-relaxed text-[#20382a]">
@@ -132,10 +132,10 @@ export function Gad7Assessment() {
                             );
                           }}
                           className={[
-                            "min-h-12 rounded-[14px] border px-2 py-2 text-sm font-semibold transition",
+                            "min-h-12 cursor-pointer rounded-[12px] border px-2 py-2 text-sm font-semibold transition",
                             selected
                               ? "border-[#0d4c2d] bg-[#0d4c2d] text-white shadow-sm"
-                              : "border-[#d8e2d8] bg-[#fbfdf9] text-[#496153] hover:border-[#9fc6a6] hover:bg-[#f4faf4]",
+                              : "border-[#d7c6a7] bg-[#fffaf0] text-[#496153] hover:border-[#9fc6a6] hover:bg-white",
                           ].join(" ")}
                           aria-pressed={selected}
                         >
@@ -150,7 +150,7 @@ export function Gad7Assessment() {
             </div>
           </div>
 
-          <aside className="sticky top-6 rounded-[26px] border border-[#d7c6a7] bg-white p-5 shadow-[0_24px_70px_-48px_rgba(15,63,42,0.8)]">
+          <aside className={`${styles.sketchPanel} sticky top-6 rounded-[26px] p-5`}>
             <p className="text-sm font-semibold tracking-[0.12em] text-[#8a6b39]">即時計分</p>
             <div className="mt-4 flex items-end gap-3">
               <p className="text-6xl font-semibold leading-none text-[#0d4c2d]">
@@ -183,7 +183,7 @@ export function Gad7Assessment() {
 
             <Link
               href={bookingHref}
-              className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[16px] bg-[#0d4c2d] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0a3c24]"
+              className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[14px] bg-[#0d4c2d] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0a3c24]"
             >
               {isComplete ? "帶同分數預約張敏言醫師" : "直接預約張敏言醫師"}
               <ArrowRight className="h-4 w-4" />
