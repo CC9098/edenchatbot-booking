@@ -5,6 +5,7 @@ export type BookingInitialSelection = {
   doctorId?: DoctorId;
   clinicId?: ClinicId;
   visitType?: BookingVisitType;
+  gad7Score?: number;
 };
 
 function getFirstParam(value: string | string[] | undefined): string | undefined {
@@ -21,6 +22,11 @@ export function parseBookingInitialSelection(
   const doctorParam = getFirstParam(searchParams?.doctor);
   const clinicParam = getFirstParam(searchParams?.clinic);
   const visitTypeParam = getFirstParam(searchParams?.visitType);
+  const gad7Param = getFirstParam(searchParams?.gad7);
+  const gad7Score =
+    gad7Param && /^\d{1,2}$/.test(gad7Param)
+      ? Number(gad7Param)
+      : undefined;
 
   return {
     doctorId: doctorParam && isDoctorId(doctorParam) ? doctorParam : undefined,
@@ -28,6 +34,10 @@ export function parseBookingInitialSelection(
     visitType:
       visitTypeParam === "first" || visitTypeParam === "followup"
         ? visitTypeParam
+        : undefined,
+    gad7Score:
+      typeof gad7Score === "number" && gad7Score >= 0 && gad7Score <= 21
+        ? gad7Score
         : undefined,
   };
 }

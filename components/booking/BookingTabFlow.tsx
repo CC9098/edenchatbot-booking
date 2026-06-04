@@ -95,6 +95,7 @@ type BookingTabFlowProps = {
     doctorId?: DoctorId;
     clinicId?: ClinicId;
     visitType?: VisitType;
+    gad7Score?: number;
   };
   staffPatientUserId?: string | null;
   initialPatientProfileId?: string | null;
@@ -189,10 +190,16 @@ const INITIAL_FORM_VALUES: BookingFormValues = {
 };
 
 function buildInitialFormValues(
-  initialContact?: BookingTabFlowProps['initialContact']
+  initialContact?: BookingTabFlowProps['initialContact'],
+  initialSelection?: BookingTabFlowProps['initialSelection']
 ): BookingFormValues {
+  const gad7Symptoms =
+    typeof initialSelection?.gad7Score === 'number'
+      ? `GAD-7 焦慮量表：${initialSelection.gad7Score}/21。主要困擾：長期擔心、緊張、失眠或身體繃緊，想由張敏言醫師評估。`
+      : '';
+
   if (!initialContact) {
-    return { ...INITIAL_FORM_VALUES };
+    return { ...INITIAL_FORM_VALUES, symptoms: gad7Symptoms };
   }
 
   const contactPrefill = buildBookingContactPrefill(initialContact);
@@ -203,6 +210,7 @@ function buildInitialFormValues(
     lastName: contactPrefill.lastName,
     phone: contactPrefill.phone,
     email: contactPrefill.email,
+    symptoms: gad7Symptoms,
   };
 }
 
@@ -701,7 +709,7 @@ export function BookingTabFlow({
   const [bookableDatesError, setBookableDatesError] = useState('');
 
   const [formValues, setFormValues] = useState<BookingFormValues>(() =>
-    buildInitialFormValues(initialContact)
+    buildInitialFormValues(initialContact, initialSelection)
   );
   const [formErrors, setFormErrors] = useState<BookingFormErrors>({});
   const previousClinicIdRef = useRef<ClinicId | ''>(initialSelection?.clinicId ?? '');
