@@ -9,6 +9,7 @@ import {
   Send,
   ClipboardCheck,
   Globe2,
+  Image,
   UserRoundPlus,
   type LucideIcon,
 } from "lucide-react";
@@ -46,6 +47,14 @@ const NURSE_ACTIONS: RoleHomeAction[] = [
     icon: Send,
     className: "border-indigo-200 bg-indigo-50 hover:border-indigo-300 hover:bg-indigo-100/70",
     iconClassName: "border-indigo-200 bg-white text-indigo-800",
+  },
+  {
+    title: "圖片短期連結",
+    subtitle: "拖入 JPG / PNG，複製 Chatwoot 圖片 URL。",
+    href: "/nurse/whatsapp-media",
+    icon: Image,
+    className: "border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:bg-emerald-100/70",
+    iconClassName: "border-emerald-200 bg-white text-emerald-800",
   },
   {
     title: "新姑娘上手",
