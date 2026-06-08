@@ -4,6 +4,7 @@ export const STAFF_PATIENT_MESSAGE_PURPOSE_IDS = [
   "follow_up",
   "manage_link",
   "online_waiting",
+  "payment_notice",
 ] as const;
 
 export type StaffPatientMessagePurpose = (typeof STAFF_PATIENT_MESSAGE_PURPOSE_IDS)[number];
@@ -58,6 +59,12 @@ export const STAFF_PATIENT_MESSAGE_PURPOSE_OPTIONS: StaffPatientMessagePurposeOp
     noteLabel: "候診說明（選填）",
     notePlaceholder: "例如：醫師即將進入，請保持 Google Meet 開啟。",
   },
+  {
+    id: "payment_notice",
+    label: "收款通知",
+    shortLabel: "收款",
+    description: "發送已審批收款 template，病人可直接查看金額和付款方法。",
+  },
 ];
 
 export const STAFF_PATIENT_MESSAGE_PURPOSE_BY_ID = Object.fromEntries(
@@ -71,14 +78,38 @@ export type BuildStaffPatientMessageTextInput = {
   note?: string;
   linkUrl?: string;
   manageUrl?: string;
+  medicineDays?: string;
+  consultationFee?: string;
+  treatmentFee?: string;
+  extraFee?: string;
+  totalAmount?: string;
 };
+
+function getStaffPatientMessageNote(input: BuildStaffPatientMessageTextInput): string {
+  const note = input.note?.trim();
+  if (note) return note;
+
+  switch (input.purpose) {
+    case "intake_link":
+      return "如已提交，請不用重覆填寫。";
+    case "pre_visit":
+      return "溫馨提示：到診前請準備相關病歷、藥物紀錄或報告，並按預約時間到達診所。";
+    case "follow_up":
+      return "姑娘需要跟進你的查詢，請直接回覆此 WhatsApp 訊息，我們會盡快處理。";
+    case "online_waiting":
+      return "如醫師仍未進入網上診症，請保持 Google Meet 或網上診症入口開啟，姑娘會盡快跟進。";
+    case "manage_link":
+    case "payment_notice":
+      return "";
+  }
+}
 
 export function isStaffPatientMessagePurpose(value: string): value is StaffPatientMessagePurpose {
   return STAFF_PATIENT_MESSAGE_PURPOSE_IDS.includes(value as StaffPatientMessagePurpose);
 }
 
 export function buildStaffPatientMessageText(input: BuildStaffPatientMessageTextInput): string {
-  const note = input.note?.trim();
+  const note = getStaffPatientMessageNote(input);
   const linkUrl = input.linkUrl?.trim();
   const manageUrl = input.manageUrl?.trim();
   const lines = ["醫天圓中醫診所通知", "", `你好 ${input.patientName}，`];
@@ -114,6 +145,15 @@ export function buildStaffPatientMessageText(input: BuildStaffPatientMessageText
         linkUrl ? `網上診症入口：${linkUrl}` : "",
       );
       break;
+    case "payment_notice":
+      lines.push(
+        `中醫師為你開了 ${input.medicineDays || "＿"} 天藥。`,
+        `診金：$${input.consultationFee || "＿"}`,
+        `其他收費：$${input.treatmentFee || "＿"} ${input.extraFee || ""}`.trim(),
+        `價錢為：$${input.totalAmount || "＿"}`,
+        "付款方法會隨 WhatsApp template 一併發送。",
+      );
+      break;
   }
 
   lines.push("", `診所：${input.clinicNameZh}`, "如有問題，可直接回覆此訊息。");
@@ -130,10 +170,21 @@ export function buildStaffPatientTemplateBodyParams(
     };
   }
 
+  if (input.purpose === "payment_notice") {
+    return {
+      "1": input.patientName,
+      "2": input.medicineDays?.trim() || "",
+      "3": input.consultationFee?.trim() || "",
+      "4": input.treatmentFee?.trim() || "",
+      "5": input.extraFee?.trim() || "",
+      "6": input.totalAmount?.trim() || "",
+    };
+  }
+
   return {
     patient_name: input.patientName,
     clinic_name: input.clinicNameZh,
-    staff_note: input.note?.trim() || "",
+    staff_note: getStaffPatientMessageNote(input),
     action_url: input.linkUrl?.trim() || "",
   };
 }

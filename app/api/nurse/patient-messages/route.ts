@@ -30,6 +30,11 @@ const nursePatientMessageSchema = z.object({
   appointmentTime: z.string().trim().max(20).optional().default(""),
   meetLink: z.string().trim().max(500).optional().default(""),
   visitType: z.enum(["first", "followup"]).optional().default("followup"),
+  medicineDays: z.string().trim().max(20, "藥物日數太長").optional().default(""),
+  consultationFee: z.string().trim().max(40, "診金太長").optional().default(""),
+  treatmentFee: z.string().trim().max(40, "其他收費太長").optional().default(""),
+  extraFee: z.string().trim().max(80, "收費說明太長").optional().default(""),
+  totalAmount: z.string().trim().max(40, "總額太長").optional().default(""),
 });
 
 function formatZodIssues(error: z.ZodError) {
@@ -81,6 +86,23 @@ export async function POST(request: NextRequest) {
         { error: "連結必須以 http:// 或 https:// 開頭。" },
         { status: 400 },
       );
+    }
+
+    if (messageData.purpose === "payment_notice") {
+      const missingPaymentFields = [
+        ["medicineDays", messageData.medicineDays],
+        ["consultationFee", messageData.consultationFee],
+        ["treatmentFee", messageData.treatmentFee],
+        ["extraFee", messageData.extraFee],
+        ["totalAmount", messageData.totalAmount],
+      ].filter(([, value]) => !value);
+
+      if (missingPaymentFields.length > 0) {
+        return NextResponse.json(
+          { error: "請填齊收款通知欄位。" },
+          { status: 400 },
+        );
+      }
     }
 
     const clinic = CLINIC_BY_ID[messageData.clinicId];
@@ -136,6 +158,11 @@ export async function POST(request: NextRequest) {
           note: messageData.note,
           linkUrl: messageData.linkUrl,
           manageUrl,
+          medicineDays: messageData.medicineDays,
+          consultationFee: messageData.consultationFee,
+          treatmentFee: messageData.treatmentFee,
+          extraFee: messageData.extraFee,
+          totalAmount: messageData.totalAmount,
         });
 
     const preview = buildStaffPatientMessageText({
@@ -145,6 +172,11 @@ export async function POST(request: NextRequest) {
       note: messageData.note,
       linkUrl: messageData.linkUrl,
       manageUrl,
+      medicineDays: messageData.medicineDays,
+      consultationFee: messageData.consultationFee,
+      treatmentFee: messageData.treatmentFee,
+      extraFee: messageData.extraFee,
+      totalAmount: messageData.totalAmount,
     });
 
     if (!whatsappResult.success) {

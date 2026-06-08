@@ -1,5 +1,10 @@
 import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import {
+  buildCampaignContextNote,
+  mergeCampaignLabels,
+  type ChatwootCampaignContext,
+} from '@/lib/chatwoot-campaign-context';
+import {
   buildStaffPatientMessageText,
   buildStaffPatientTemplateBodyParams,
   type StaffPatientMessagePurpose,
@@ -87,6 +92,7 @@ interface ChatwootConversation {
   id?: number;
   inbox_id?: number;
   status?: string | null;
+  labels?: string[] | null;
 }
 
 interface ChatwootConversationListResponse {
@@ -128,6 +134,7 @@ interface BookingWhatsappNotificationInput extends BookingWhatsappConfirmationIn
   email: string;
   clinicWhatsappPhone?: string | null;
   manageAccessToken?: string;
+  campaignContext?: ChatwootCampaignContext;
 }
 
 interface BookingWhatsappReminderNotificationInput extends BookingWhatsappReminderInput {
@@ -211,6 +218,12 @@ interface StaffPatientWhatsappMessageInput {
   note?: string;
   linkUrl?: string;
   manageUrl?: string;
+  medicineDays?: string;
+  consultationFee?: string;
+  treatmentFee?: string;
+  extraFee?: string;
+  totalAmount?: string;
+  campaignContext?: ChatwootCampaignContext;
 }
 
 interface SendWhatsappBookingConfirmationResult {
@@ -366,6 +379,30 @@ class ChatwootWhatsappClient {
     );
   }
 
+  createPrivateNote(accountId: number, conversationId: number, content: string) {
+    return this.request<ChatwootMessage>(
+      `/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          content,
+          message_type: 'outgoing',
+          private: true,
+        }),
+      },
+    );
+  }
+
+  setConversationLabels(accountId: number, conversationId: number, labels: string[]) {
+    return this.request(
+      `/api/v1/accounts/${accountId}/conversations/${conversationId}/labels`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ labels }),
+      },
+    );
+  }
+
   listMessages(accountId: number, conversationId: number) {
     return this.request<ChatwootMessageListResponse>(
       `/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`,
@@ -471,6 +508,25 @@ function isActiveConversation(conversation: ChatwootConversation | null | undefi
 
   const status = String(conversation.status || '').trim().toLowerCase();
   return status !== 'resolved';
+}
+
+async function recordCampaignContext(
+  client: ChatwootWhatsappClient,
+  accountId: number,
+  conversationId: number,
+  context: ChatwootCampaignContext | undefined,
+  existingConversation: ChatwootConversation | null,
+): Promise<void> {
+  if (!context?.title?.trim()) {
+    return;
+  }
+
+  await client.createPrivateNote(accountId, conversationId, buildCampaignContextNote(context));
+
+  const labels = mergeCampaignLabels(existingConversation?.labels || undefined, context.label);
+  if (labels.length > 0) {
+    await client.setConversationLabels(accountId, conversationId, labels);
+  }
 }
 
 async function resolveAccountId(
@@ -780,6 +836,7 @@ function getStaffPatientMessageTemplateConfigs(
     configuredLanguage?: string;
     configuredCategory?: string;
     fallbackNames: string[];
+    defaultCategory?: string;
   }> = {
     intake_link: {
       configuredName: process.env.CHATWOOT_WHATSAPP_STAFF_INTAKE_TEMPLATE_NAME,
@@ -805,15 +862,22 @@ function getStaffPatientMessageTemplateConfigs(
       configuredCategory: process.env.CHATWOOT_WHATSAPP_STAFF_ONLINE_WAITING_TEMPLATE_CATEGORY,
       fallbackNames: ['staff_patient_online_waiting'],
     },
+    payment_notice: {
+      configuredName: process.env.CHATWOOT_WHATSAPP_STAFF_PAYMENT_TEMPLATE_NAME,
+      configuredLanguage: process.env.CHATWOOT_WHATSAPP_STAFF_PAYMENT_TEMPLATE_LANGUAGE,
+      configuredCategory: process.env.CHATWOOT_WHATSAPP_STAFF_PAYMENT_TEMPLATE_CATEGORY,
+      fallbackNames: ['online_payment'],
+      defaultCategory: 'MARKETING',
+    },
   };
 
   const options = templateOptions[purpose];
   return getConfiguredOrSyncedTemplateConfigs(inbox, {
     configuredName: options.configuredName,
     configuredLanguage: options.configuredLanguage,
-    configuredCategory: options.configuredCategory || process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY,
+    configuredCategory: options.configuredCategory || (options.defaultCategory ? undefined : process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY),
     fallbackNames: options.fallbackNames,
-    defaultCategory: 'UTILITY',
+    defaultCategory: options.defaultCategory || 'UTILITY',
   });
 }
 
@@ -1434,6 +1498,7 @@ async function sendBookingWhatsappNotification(
     phone: string;
     email: string;
     clinicWhatsappPhone?: string | null;
+    campaignContext?: ChatwootCampaignContext;
   },
   options: {
     buildContent: () => string;
@@ -1540,6 +1605,11 @@ async function sendBookingWhatsappNotification(
         : (await client.createMessage(accountId, conversationId, { content }), null);
     }
 
+    await recordCampaignContext(client, accountId, conversationId, input.campaignContext, existingConversation)
+      .catch((error) => {
+        console.warn(`[chatwoot-whatsapp] Campaign context record failed: ${getSafeErrorMessage(error)}`);
+      });
+
     return {
       success: true,
       whatsappSent: true,
@@ -1553,6 +1623,11 @@ async function sendBookingWhatsappNotification(
       deliveryStatus = options.fallbackTextOnTemplateFailure
         ? await sendTextMessageWithFailureCheck(client, accountId, conversationId, content)
         : (await client.createMessage(accountId, conversationId, { content }), null);
+
+      await recordCampaignContext(client, accountId, conversationId, input.campaignContext, existingConversation)
+        .catch((error) => {
+          console.warn(`[chatwoot-whatsapp] Campaign context record failed: ${getSafeErrorMessage(error)}`);
+        });
 
       return {
         success: true,
@@ -1597,6 +1672,11 @@ async function sendBookingWhatsappNotification(
           })
       : (await client.createMessage(accountId, conversationId, { content }), null);
   }
+
+  await recordCampaignContext(client, accountId, conversationId, input.campaignContext, existingConversation)
+    .catch((error) => {
+      console.warn(`[chatwoot-whatsapp] Campaign context record failed: ${getSafeErrorMessage(error)}`);
+    });
 
   return {
     success: true,
@@ -1867,6 +1947,7 @@ export async function sendStaffPatientWhatsappMessage(
         phone: input.phone,
         email: input.email || '',
         clinicWhatsappPhone: input.clinicWhatsappPhone,
+        campaignContext: input.campaignContext,
       },
       {
         buildContent: () => buildStaffPatientMessageText(input),

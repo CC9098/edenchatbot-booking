@@ -10,6 +10,7 @@ import {
   sendPatientOnlineConsultWaitingWhatsapp,
   sendStaffPatientWhatsappMessage,
 } from '@/lib/chatwoot-whatsapp';
+import { buildStaffPatientTemplateBodyParams } from '@/lib/staff-patient-messages';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -19,6 +20,44 @@ function jsonResponse(body: unknown, status = 200) {
     },
   });
 }
+
+test('buildStaffPatientTemplateBodyParams sends a default follow-up note when optional note is blank', () => {
+  const params = buildStaffPatientTemplateBodyParams({
+    patientName: '燕子',
+    clinicNameZh: '荃灣',
+    purpose: 'follow_up',
+    note: '',
+  });
+
+  assert.equal(params.patient_name, '燕子');
+  assert.equal(params.clinic_name, '荃灣');
+  assert.equal(
+    params.staff_note,
+    '姑娘需要跟進你的查詢，請直接回覆此 WhatsApp 訊息，我們會盡快處理。',
+  );
+});
+
+test('buildStaffPatientTemplateBodyParams maps payment notice fields to online payment template variables', () => {
+  const params = buildStaffPatientTemplateBodyParams({
+    patientName: '高思穎',
+    clinicNameZh: '荃灣',
+    purpose: 'payment_notice',
+    medicineDays: '7',
+    consultationFee: '380',
+    treatmentFee: '680',
+    extraFee: '藥費',
+    totalAmount: '1060',
+  });
+
+  assert.deepEqual(params, {
+    '1': '高思穎',
+    '2': '7',
+    '3': '380',
+    '4': '680',
+    '5': '藥費',
+    '6': '1060',
+  });
+});
 
 test('sendStaffPatientWhatsappMessage sends an approved intake template with a URL button', async () => {
   const originalFetch = global.fetch;
@@ -143,6 +182,290 @@ test('sendStaffPatientWhatsappMessage sends an approved intake template with a U
       sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter,
       '/intake?case=abc',
     );
+  } finally {
+    global.fetch = originalFetch;
+
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (typeof value === 'undefined') {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});
+
+test('sendStaffPatientWhatsappMessage sends payment notices with the online payment template', async () => {
+  const originalFetch = global.fetch;
+  const originalEnv = {
+    CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
+    CHATWOOT_API_ACCESS_TOKEN: process.env.CHATWOOT_API_ACCESS_TOKEN,
+    CHATWOOT_ACCOUNT_ID: process.env.CHATWOOT_ACCOUNT_ID,
+    CHATWOOT_WHATSAPP_INBOX_ID: process.env.CHATWOOT_WHATSAPP_INBOX_ID,
+    CHATWOOT_WHATSAPP_STAFF_PAYMENT_TEMPLATE_NAME: process.env.CHATWOOT_WHATSAPP_STAFF_PAYMENT_TEMPLATE_NAME,
+    CHATWOOT_WHATSAPP_STAFF_PAYMENT_TEMPLATE_LANGUAGE: process.env.CHATWOOT_WHATSAPP_STAFF_PAYMENT_TEMPLATE_LANGUAGE,
+    CHATWOOT_WHATSAPP_STAFF_PAYMENT_TEMPLATE_CATEGORY: process.env.CHATWOOT_WHATSAPP_STAFF_PAYMENT_TEMPLATE_CATEGORY,
+  };
+
+  const sentMessagePayloads: Array<Record<string, any>> = [];
+
+  process.env.CHATWOOT_BASE_URL = 'https://chatwoot.example';
+  process.env.CHATWOOT_API_ACCESS_TOKEN = 'test-token';
+  process.env.CHATWOOT_ACCOUNT_ID = '';
+  process.env.CHATWOOT_WHATSAPP_INBOX_ID = '';
+  process.env.CHATWOOT_WHATSAPP_STAFF_PAYMENT_TEMPLATE_NAME = '';
+  process.env.CHATWOOT_WHATSAPP_STAFF_PAYMENT_TEMPLATE_LANGUAGE = '';
+  process.env.CHATWOOT_WHATSAPP_STAFF_PAYMENT_TEMPLATE_CATEGORY = '';
+
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const parsedUrl = new URL(requestUrl);
+    const method = init?.method || 'GET';
+    const path = `${parsedUrl.pathname}${parsedUrl.search}`;
+
+    if (method === 'GET' && path === '/api/v1/profile') {
+      return jsonResponse({ account_id: 1 });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/inboxes') {
+      return jsonResponse({
+        payload: [{
+          id: 7,
+          channel_type: 'Channel::Whatsapp',
+          phone_number: '+85267333801',
+          message_templates: [{
+            name: 'online_payment',
+            language: 'zh_HK',
+            status: 'approved',
+            category: 'MARKETING',
+          }],
+        }],
+      });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/inboxes/7/sync_templates') {
+      return jsonResponse({ message: 'ok' });
+    }
+
+    if (method === 'GET' && path.startsWith('/api/v1/accounts/1/contacts/search?')) {
+      return jsonResponse({
+        payload: [{
+          id: 99,
+          phone_number: '+85291234567',
+          email: '',
+        }],
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/99/contactable_inboxes') {
+      return jsonResponse({
+        payload: [{
+          source_id: '85291234567',
+          inbox: { id: 7 },
+        }],
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/99/conversations') {
+      return jsonResponse({ payload: [] });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/conversations') {
+      return jsonResponse({ id: 42 });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/conversations/42/messages') {
+      const payload = JSON.parse(String(init?.body || '{}'));
+      sentMessagePayloads.push(payload);
+
+      return jsonResponse({
+        id: 101,
+        status: 'sent',
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/conversations/42/messages') {
+      return jsonResponse({
+        payload: [{
+          id: 101,
+          status: 'delivered',
+        }],
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${method} ${path}`);
+  }) as typeof global.fetch;
+
+  try {
+    const result = await sendStaffPatientWhatsappMessage({
+      patientName: '高思穎',
+      phone: '91234567',
+      clinicNameZh: '荃灣',
+      purpose: 'payment_notice',
+      medicineDays: '7',
+      consultationFee: '380',
+      treatmentFee: '680',
+      extraFee: '藥費',
+      totalAmount: '1060',
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(sentMessagePayloads.length, 1);
+    assert.equal(sentMessagePayloads[0]?.template_params?.name, 'online_payment');
+    assert.equal(sentMessagePayloads[0]?.template_params?.category, 'MARKETING');
+    assert.deepEqual(sentMessagePayloads[0]?.template_params?.processed_params?.body, {
+      '1': '高思穎',
+      '2': '7',
+      '3': '380',
+      '4': '680',
+      '5': '藥費',
+      '6': '1060',
+    });
+  } finally {
+    global.fetch = originalFetch;
+
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (typeof value === 'undefined') {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});
+
+test('sendStaffPatientWhatsappMessage records campaign context on the same Chatwoot conversation', async () => {
+  const originalFetch = global.fetch;
+  const originalEnv = {
+    CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
+    CHATWOOT_API_ACCESS_TOKEN: process.env.CHATWOOT_API_ACCESS_TOKEN,
+    CHATWOOT_ACCOUNT_ID: process.env.CHATWOOT_ACCOUNT_ID,
+    CHATWOOT_WHATSAPP_INBOX_ID: process.env.CHATWOOT_WHATSAPP_INBOX_ID,
+    CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME,
+    CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE,
+    CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY,
+  };
+
+  const sentMessagePayloads: Array<Record<string, any>> = [];
+  const labelPayloads: Array<Record<string, any>> = [];
+
+  process.env.CHATWOOT_BASE_URL = 'https://chatwoot.example';
+  process.env.CHATWOOT_API_ACCESS_TOKEN = 'test-token';
+  process.env.CHATWOOT_ACCOUNT_ID = '';
+  process.env.CHATWOOT_WHATSAPP_INBOX_ID = '';
+  process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME = 'staff_patient_follow_up';
+  process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE = 'zh_HK';
+  process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY = 'UTILITY';
+
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const parsedUrl = new URL(requestUrl);
+    const method = init?.method || 'GET';
+    const path = `${parsedUrl.pathname}${parsedUrl.search}`;
+
+    if (method === 'GET' && path === '/api/v1/profile') {
+      return jsonResponse({ account_id: 1 });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/inboxes') {
+      return jsonResponse({
+        payload: [{
+          id: 7,
+          channel_type: 'Channel::Whatsapp',
+          phone_number: '+85267333801',
+          message_templates: [{
+            name: 'staff_patient_follow_up',
+            language: 'zh_HK',
+            status: 'approved',
+            category: 'UTILITY',
+          }],
+        }],
+      });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/inboxes/7/sync_templates') {
+      return jsonResponse({ message: 'ok' });
+    }
+
+    if (method === 'GET' && path.startsWith('/api/v1/accounts/1/contacts/search?')) {
+      return jsonResponse({
+        payload: [{
+          id: 99,
+          phone_number: '+85291234567',
+          email: '',
+        }],
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/99/contactable_inboxes') {
+      return jsonResponse({
+        payload: [{
+          source_id: '85291234567',
+          inbox: { id: 7 },
+        }],
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/contacts/99/conversations') {
+      return jsonResponse({ payload: [] });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/conversations') {
+      return jsonResponse({ id: 42 });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/conversations/42/messages') {
+      const payload = JSON.parse(String(init?.body || '{}'));
+      sentMessagePayloads.push(payload);
+
+      return jsonResponse({
+        id: payload.private ? 102 : 101,
+        status: 'sent',
+      });
+    }
+
+    if (method === 'GET' && path === '/api/v1/accounts/1/conversations/42/messages') {
+      return jsonResponse({
+        payload: [{
+          id: 101,
+          status: 'delivered',
+        }],
+      });
+    }
+
+    if (method === 'POST' && path === '/api/v1/accounts/1/conversations/42/labels') {
+      const payload = JSON.parse(String(init?.body || '{}'));
+      labelPayloads.push(payload);
+      return jsonResponse({ payload: payload.labels });
+    }
+
+    throw new Error(`Unexpected fetch: ${method} ${path}`);
+  }) as typeof global.fetch;
+
+  try {
+    const result = await sendStaffPatientWhatsappMessage({
+      patientName: '陳小明',
+      phone: '91234567',
+      clinicNameZh: '佐敦',
+      purpose: 'follow_up',
+      note: '如想報名請回覆此訊息。',
+      campaignContext: {
+        title: '2026夏季天灸',
+        label: '2026夏季天灸',
+        sentAt: '2026-06-08 11:23',
+        source: 'Eden 群發',
+        messagePreview: '🔥 【2026 三伏天灸】限時早鳥報名開始',
+      },
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.conversationId, 42);
+    assert.equal(sentMessagePayloads.some((payload) => payload.template_params?.name === 'staff_patient_follow_up'), true);
+    const privateNote = sentMessagePayloads.find((payload) => payload.private === true);
+    assert.equal(typeof privateNote?.content, 'string');
+    assert.match(privateNote?.content, /2026夏季天灸/);
+    assert.match(privateNote?.content, /病人如回覆「報名」/);
+    assert.deepEqual(labelPayloads, [{ labels: ['2026夏季天灸'] }]);
   } finally {
     global.fetch = originalFetch;
 

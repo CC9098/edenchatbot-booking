@@ -38,6 +38,11 @@ type FormState = {
   linkUrl: string;
   note: string;
   manageAction: "" | "reschedule" | "cancel";
+  medicineDays: string;
+  consultationFee: string;
+  treatmentFee: string;
+  extraFee: string;
+  totalAmount: string;
 };
 
 const DEFAULT_FORM_STATE: FormState = {
@@ -48,6 +53,11 @@ const DEFAULT_FORM_STATE: FormState = {
   linkUrl: "",
   note: "",
   manageAction: "",
+  medicineDays: "",
+  consultationFee: "",
+  treatmentFee: "",
+  extraFee: "",
+  totalAmount: "",
 };
 
 function getErrorText(payload: unknown): string {
@@ -93,6 +103,11 @@ export function NursePatientMessageClient({ clinics }: { clinics: ClinicOption[]
       note: form.note,
       linkUrl: form.linkUrl,
       manageUrl: form.purpose === "manage_link" ? "系統會產生預約管理連結" : undefined,
+      medicineDays: form.medicineDays,
+      consultationFee: form.consultationFee,
+      treatmentFee: form.treatmentFee,
+      extraFee: form.extraFee,
+      totalAmount: form.totalAmount,
     });
   }, [form, selectedClinic?.nameZh]);
 
@@ -283,6 +298,69 @@ export function NursePatientMessageClient({ clinics }: { clinics: ClinicOption[]
                 placeholder="https://..."
               />
             </label>
+          ) : null}
+
+          {form.purpose === "payment_notice" ? (
+            <section className="grid gap-4 sm:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-slate-800">藥物日數</span>
+                <input
+                  required
+                  value={form.medicineDays}
+                  onChange={(event) => setForm((current) => ({ ...current, medicineDays: event.target.value }))}
+                  className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  placeholder="例如：7"
+                  inputMode="numeric"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-slate-800">診金</span>
+                <input
+                  required
+                  value={form.consultationFee}
+                  onChange={(event) => setForm((current) => ({ ...current, consultationFee: event.target.value }))}
+                  className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  placeholder="例如：380"
+                  inputMode="decimal"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-slate-800">其他收費</span>
+                <input
+                  required
+                  value={form.treatmentFee}
+                  onChange={(event) => setForm((current) => ({ ...current, treatmentFee: event.target.value }))}
+                  className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  placeholder="例如：680"
+                  inputMode="decimal"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-slate-800">收費說明</span>
+                <input
+                  required
+                  value={form.extraFee}
+                  onChange={(event) => setForm((current) => ({ ...current, extraFee: event.target.value }))}
+                  className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  placeholder="例如：藥費"
+                />
+              </label>
+
+              <label className="space-y-2 sm:col-span-2">
+                <span className="text-sm font-semibold text-slate-800">總額</span>
+                <input
+                  required
+                  value={form.totalAmount}
+                  onChange={(event) => setForm((current) => ({ ...current, totalAmount: event.target.value }))}
+                  className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  placeholder="例如：1060"
+                  inputMode="decimal"
+                />
+              </label>
+            </section>
           ) : null}
 
           {selectedPurpose.noteLabel ? (
