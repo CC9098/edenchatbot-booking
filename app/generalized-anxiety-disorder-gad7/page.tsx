@@ -319,55 +319,75 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
         <article className="mx-auto max-w-4xl">
           <p className={`${styles.markerTag} text-sm`}>張敏言醫師文章</p>
           <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
-            廣泛性焦慮症：為甚麼你明明很辛苦，卻遲遲不想求醫？
+            懷疑自己有廣泛性焦慮症，是否也卡在「想求助」與「想逃避」之間？
           </h2>
 
           <div className="mt-7 space-y-5 text-base leading-relaxed text-[#496153]">
             <p>
-              每天清晨，鬧鐘還沒響，你可能已經在一陣莫名心悸或胃部翻騰中醒來。腦海自動開啟無數個循環劇本：今天簡報會不會出錯？最近頭痛會不會是嚴重疾病？剛才同事的眼神，是否代表自己說錯了話？
+              每天清晨，鬧鐘還沒響，你可能就已經在一陣莫名心悸或胃部翻騰中醒來。腦海裡自動開啟了無數個無限循環的劇本：「萬一今天簡報搞砸了怎麼辦？」「身體這陣子一直頭痛，是不是得了什麼絕症？」「剛剛同事的眼神，是不是我說錯了什麼話？」
             </p>
             <p>
-              這種無法關閉的過度擔憂，加上長期失眠、肌肉繃緊、慢性疲勞、胸悶、胃痛或自律神經失調，會令人筋疲力竭。你可能偷偷搜尋過很多次，每一個症狀都似乎指向同一個名字：廣泛性焦慮症，Generalized Anxiety Disorder，GAD。
+              這種毫無理由、無法關閉的過度擔憂，加上長期失眠、肌肉緊繃、慢性疲勞，讓你筋疲力竭。你在心裡偷偷搜尋過無數次，每一個症狀都指向了同一個名詞：廣泛性焦慮症，Generalized Anxiety Disorder，GAD。
             </p>
             <p>
-              你懷疑自己需要幫助，但每次想到要看精神科醫生或心理醫生，內心又湧起更大的抗拒。這不是因為你不想好起來，而是焦慮本身已經在你和醫療之間築起了一道高牆。
+              你懷疑自己生病了，但每當想到「看醫生」，內心深處卻湧起更大的抗拒。
             </p>
-          </div>
-
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            <div className={`${styles.sketchPanel} rounded-[22px] p-5`}>
-              <h3 className="text-lg font-extrabold text-[#0d4c2d]">災難化思考</h3>
-              <p className="mt-2 text-sm leading-relaxed text-[#496153]">
-                大腦開始恐嚇你：如果確診了，是否就變成精神病患者？藥物會否上癮、變遲鈍，甚至失去情感？
-              </p>
-            </div>
-            <div className={`${styles.sketchPanel} rounded-[22px] p-5`}>
-              <h3 className="text-lg font-extrabold text-[#0d4c2d]">高功能者的羞恥感</h3>
-              <p className="mt-2 text-sm leading-relaxed text-[#496153]">
-                習慣掌控一切的人，往往最難承認自己失控。於是用意志力硬撐，把求助誤解成失敗。
-              </p>
-            </div>
-            <div className={`${styles.sketchPanel} rounded-[22px] p-5`}>
-              <h3 className="text-lg font-extrabold text-[#0d4c2d]">以為只是身體病</h3>
-              <p className="mt-2 text-sm leading-relaxed text-[#496153]">
-                心悸、胃痛、胸悶和頭痛都很真實，令人反覆看不同專科，卻避開情緒這個核心線索。
-              </p>
-            </div>
           </div>
 
           <div className="mt-8 rounded-[26px] border border-[#d7c6a7] bg-[#fffaf0] p-6 sm:p-8">
-            <h3 className="text-2xl font-semibold text-[#0d4c2d]">中醫，或許能成為比較溫柔的第一道門</h3>
-            <div className="mt-4 space-y-4 text-base leading-relaxed text-[#496153]">
-              <p>
-                如果你暫時仍然跨不出那一步去看精神科或心理諮商，請不要因此放棄。在華人社會裡，說一句「最近睡不好，想調理身體」，往往比說「我可能有焦慮症」容易得多。
-              </p>
-              <p>
-                中醫重視「形神一體」。失眠、胸悶、胃潰瘍、肌肉繃緊、疲倦、煩躁，不會被分開看待，而是身心失衡的綜合表現。把問題放回氣血、臟腑、寒熱、虛實之中，很多人會比較容易卸下自責。
-              </p>
-              <p>
-                當身體開始放鬆，大腦也較容易平靜。中藥、針灸、推拿及生活調整，可以先從睡眠、胸悶、胃口、腸胃、疲倦感入手，讓復原的齒輪重新轉動。
-              </p>
+            <h3 className="text-2xl font-semibold text-[#0d4c2d]">
+              為甚麼你懂，卻遲遲不想看精神科醫生或心理醫生？
+            </h3>
+            <p className="mt-4 text-base leading-relaxed text-[#496153]">
+              不想就醫，並非因為你不想好起來，而是「焦慮」本身就在你和醫院之間築起了一道高牆。
+            </p>
+
+            <div className="mt-6 grid gap-4">
+              <div className={`${styles.sketchPanel} rounded-[22px] p-5`}>
+                <h4 className="text-lg font-extrabold text-[#0d4c2d]">無止境的災難化思考</h4>
+                <p className="mt-2 text-sm leading-relaxed text-[#496153]">
+                  你的大腦開始恐嚇你：「如果確診了，我是不是就變成精神病患？」「吃西藥會不會上癮？會不會讓我大腦變遲鈍、變成失去情感的喪屍？」
+                </p>
+              </div>
+              <div className={`${styles.sketchPanel} rounded-[22px] p-5`}>
+                <h4 className="text-lg font-extrabold text-[#0d4c2d]">高功能者的完美主義與恥辱感</h4>
+                <p className="mt-2 text-sm leading-relaxed text-[#496153]">
+                  習慣掌控一切、在工作上拼命的你，無法接受自己「失控」了。你對自己說「這只是壓力大、是我抗壓性太差」，試圖用意志力硬撐，認為去看心理醫生就是承認自己是一個失敗者。
+                </p>
+              </div>
+              <div className={`${styles.sketchPanel} rounded-[22px] p-5`}>
+                <h4 className="text-lg font-extrabold text-[#0d4c2d]">以為只是身體生病</h4>
+                <p className="mt-2 text-sm leading-relaxed text-[#496153]">
+                  心悸、胃痛、自律神經失調的症狀太過真實，你寧可頻繁出入家醫科、心臟科、腸胃科，也不願面對這一切其實源自大腦與心靈的呼救。
+                </p>
+              </div>
             </div>
+
+            <p className="mt-6 text-base leading-relaxed text-[#496153]">
+              於是，你陷入了「極度焦慮 / 想求助 / 面對就醫更焦慮 / 選擇逃避」的惡性循環，任由症狀將你吞噬。
+            </p>
+          </div>
+
+          <div className="mt-8 space-y-5 text-base leading-relaxed text-[#496153]">
+            <h3 className="text-2xl font-semibold text-[#0d4c2d]">中醫，或許能成為你最溫柔的「第一道門」</h3>
+            <p>
+              如果你真的跨不出那一步去西醫身心科或心理諮商，請不要就此放棄。在醫療的十字路口上，中醫，其實是一個能讓你卸下所有防備的溫柔起點。
+            </p>
+            <p>
+              說一句「我最近睡不好，去中醫調一下身體」，在華人社會中再自然不過。中醫診所明亮、溫馨的氛圍，沒有任何精神疾病的標籤，能讓你比較沒有病恥感地走進去接受照顧。
+            </p>
+            <p>
+              中醫講求「形神一體」，你的失眠、胸悶、胃潰瘍、肌肉緊繃，在中醫眼裡不是分開的疾病，而是身體失衡的綜合表現。
+            </p>
+            <p>
+              在西醫裡，你可能覺得是自己心理軟弱；但在中醫的把脈問診中，情緒問題可以被理解為「氣血不順、臟腑失調」。它溫柔地告訴你：這不是你的錯，不是你想太多，只是身體暫時失衡了，調回來就好。
+            </p>
+            <p>
+              中醫的治療能帶來身體放鬆。當醫師在太衝、神門、內關等穴位扎上針，或者進行溫和的推拿時，原本緊繃到極點的身體有機會慢慢放下防備。配合酸棗仁湯、柴胡疏肝散等中藥調理，能讓害怕西藥副作用的你，重新點燃對醫療的信任。
+            </p>
+            <p>
+              讓中醫成為第一道門，最大的價值在於「打破僵局」。它不強迫你立刻面對最赤裸的心理創傷，而是透過調配中藥、針灸，以及中醫師在把脈時溫和的傾聽與疏導，先幫你的身體減壓。當你的身體不再那麼緊繃、晚上終於能睡個好覺時，你那被焦慮綁架的大腦，自然就會騰出空間來恢復理智。
+            </p>
           </div>
         </article>
       </section>
@@ -378,10 +398,10 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
             <div>
               <p className={`${styles.markerTag} text-sm`}>4 至 8 週觀察</p>
               <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
-                如何判斷中醫調理是否適合你？
+                跨出這一步，讓復原的齒輪開始轉動
               </h2>
               <p className="mt-4 text-base leading-relaxed text-[#496153]">
-                接受中醫調理後，可以用 4 至 8 週作初步觀察。重點不是追求一次完全好轉，而是看身體和情緒是否開始有方向地回穩。
+                在接受中醫調理的過程中，通常建議給予 4 至 8 週的觀察期。你可以透過以下三個層面，客觀評估中醫是否切實改善了你的狀況。
               </p>
             </div>
 
@@ -389,19 +409,19 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
               <article className={`${styles.sketchPanel} rounded-[24px] p-5`}>
                 <h3 className="text-lg font-extrabold text-[#0d4c2d]">睡眠與體力</h3>
                 <p className="mt-2 text-sm leading-relaxed text-[#496153]">
-                  入睡困難、半夜易醒或惡夢是否減少？早上醒來時，是否開始有一點充電感，而不是越睡越累？
+                  入睡困難、半夜易醒，或是惡夢連連的狀況是否有減輕？早起時是否開始覺得身體有充電感，而不是越睡越累？
                 </p>
               </article>
               <article className={`${styles.sketchPanel} rounded-[24px] p-5`}>
-                <h3 className="text-lg font-extrabold text-[#0d4c2d]">身體症狀</h3>
+                <h3 className="text-lg font-extrabold text-[#0d4c2d]">軀體症狀的緩解</h3>
                 <p className="mt-2 text-sm leading-relaxed text-[#496153]">
-                  心悸、胸悶、胃脹胃痛、小腹繃緊、肩頸酸痛或頭腦昏沉，發作頻率和劇烈程度是否下降？
+                  原本頻繁出現的心悸、胸悶、莫名的小腹緊繃、胃脹胃痛，或是肩頸酸痛，發作的頻率和劇烈程度是否有下降？
                 </p>
               </article>
               <article className={`${styles.sketchPanel} rounded-[24px] p-5`}>
-                <h3 className="text-lg font-extrabold text-[#0d4c2d]">情緒彈性</h3>
+                <h3 className="text-lg font-extrabold text-[#0d4c2d]">情緒的彈性</h3>
                 <p className="mt-2 text-sm leading-relaxed text-[#496153]">
-                  面對同樣壓力時，是否比較能「踩得住煞車」？雖然仍會擔心，但是否較少陷入災難化思考？
+                  面對同樣的日常壓力源時，你是否發現自己「比較踩得住煞車」？雖然可能還是會擔憂，但大腦是否開始能從「災難化思考」的死胡同裡轉彎，不再那麼容易陷入恐慌或崩潰？
                 </p>
               </article>
             </div>
@@ -410,7 +430,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
           <div className="mt-8 rounded-[24px] border border-[#fed7aa] bg-[#fff7ed] p-5 text-[#7c2d12]">
             <p className="font-semibold">何時需要進一步評估？</p>
             <p className="mt-2 text-sm leading-relaxed">
-              如果規律調理 1 至 2 個月後，失眠、恐慌或無法停止的焦慮完全沒有減輕，甚至持續惡化，應盡快尋求精神科醫生、家庭醫生或心理專業人士作進一步評估。正在服用精神科藥物者，切勿自行停藥或突然減量。
+              如果以上三個答案都是肯定的，代表中醫調理可能適合你，可以安心跟隨中醫師的步伐繼續穩定治療。如果穩定治療一段時間後，經過 1 到 2 個月的規律服藥與針灸，失眠、恐慌或無法停止的焦慮感依然完全沒有減輕，甚至持續惡化，這不是中醫不好，而是身體在提醒你應尋求西醫身心科、精神科或心理諮商的進一步專業評估。正在服用精神科藥物者，切勿自行停藥或突然減量。
             </p>
           </div>
         </div>
@@ -437,7 +457,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                   睡眠極淺易醒，醒後疲憊更甚於未睡。日間極度困倦，全身沉重，頭腦昏蒙，記憶力與專注力明顯下降。
                 </p>
                 <p>
-                  情緒鬱悶焦慮，易怒而強忍，夜間精神亢奮難以入眠，並伴情緒性暴食。胃腸症狀突出，包括頻繁噯氣、食後腹脹絞痛、飯後極度睏倦、慢性便秘及矢氣多。
+                  情緒鬱悶焦慮、易怒而強忍，夜間精神亢奮難以入眠，伴情緒性暴食。胃腸症狀突出，頻繁噯氣，食後腹脹絞痛，飯後極度睏倦，需深睡半至一小時；便秘數日一行，矢氣多。
                 </p>
                 <p>
                   舌體胖大有齒痕，舌質淡白，苔略厚而水滑。
@@ -462,7 +482,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                     少陽樞機不利，兼陽明腑實。
                   </p>
                   <p>
-                    長期焦慮、易怒強忍、夜間亢奮難眠，屬肝鬱氣滯、少陽樞機不利；飯後睏倦、全身沉重、舌胖齒痕、苔水滑，反映肝鬱乘脾、脾虛濕盛。腹脹便秘與裡急後重，合參少陽陽明之病機。
+                    患者長期焦慮、易怒強忍、情緒性暴食、夜間亢奮難眠，為肝鬱氣滯、少陽樞機不利之象。肝鬱乘脾，脾虛濕盛，故見飯後極度睏倦、全身沉重乏力、舌胖齒痕、苔水滑。濕鬱化熱，痰熱內擾，則睡眠淺易醒、煩躁怕熱、便秘裡急後重。怕熱而手心冷，為陽鬱不達四末之陰陽失調。綜合腹脹便秘與裡急後重，正屬少陽陽明合病。
                   </p>
                 </div>
               </div>
@@ -474,7 +494,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                     治以和解少陽、鎮驚安神，兼輕下熱結、行氣除滿。
                   </p>
                   <p>
-                    方以柴胡桂枝龍骨牡蠣湯合小承氣湯加減。柴胡、黃芩疏解少陽鬱熱；大黃、厚朴、枳實通腑泄熱、行氣導滯；桂枝通陽化氣；龍骨、牡蠣重鎮安神；白芍、甘草養血柔肝、緩急止痛；石菖蒲化痰開竅；香附疏肝解鬱；天花粉清熱生津。
+                    予柴胡桂枝龍骨牡蠣湯合小承氣湯加減。方中柴胡、黃芩疏解少陽鬱熱；小承氣湯中大黃、厚朴、枳實通腑泄熱、行氣導滯；桂枝通陽化氣以達四末；龍骨、牡蠣重鎮安神、收斂浮陽；白芍、甘草酸甘化陰、緩急止痛、養血柔肝；石菖蒲化痰開竅、醒脾安神；香附加強疏肝解鬱；天花粉清熱生津，兼防便秘傷陰。全方共奏和解少陽、通腑安神、理氣化痰之功。
                   </p>
                 </div>
               </div>
@@ -485,13 +505,13 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
             <h3 className="text-xl font-semibold text-[#0d4c2d]">治療結果與醫者按</h3>
             <div className="mt-4 space-y-4 text-base leading-relaxed text-[#496153]">
               <p>
-                患者初診後即見睡眠改善、大便通暢、精神轉佳，顯示方證相應。本病根於肝鬱脾虛、痰熱內擾，調治仍需時間，宜持續 3 至 6 個月以固其本。
+                患者初診後即見睡眠改善、大便通暢、精神轉佳，顯示方證相應。本病根於肝鬱脾虛、痰熱內擾，調治需時，宜堅持 3 至 6 個月以固其本。
               </p>
               <p>
-                囑患者續用原有西藥，切勿驟停。症狀偶有反覆，並不代表方向錯誤，而是身體修復過程中常見的波動。
+                囑續用西藥，切勿驟停。症狀偶有反覆，乃正虛復邪之常，無礙整體向愈。
               </p>
               <p>
-                本例體現《傷寒論》「觀其脈證，知犯何逆，隨證治之」之旨，尤其適合伴有明顯胃腸、睡眠及疲勞表現的焦慮症患者。臨床可按即時舌脈調整藥物比例，並配合百會、印堂、內關、神門等穴，以加強安神、調氣及放鬆身心。
+                本例體現《傷寒論》「觀其脈證，知犯何逆，隨證治之」之旨，尤其適合伴有明顯軀體症狀，如胃腸、睡眠、疲勞的焦慮症患者。臨床應用時應根據即時舌脈調整藥物比例，並可配合針灸，如百會、印堂、內關、神門，以加速控症，體現「針藥並用」之綜合治療策略。
               </p>
             </div>
           </div>
