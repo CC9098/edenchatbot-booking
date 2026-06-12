@@ -15,7 +15,7 @@ import styles from "./page.module.css";
 import { jsonLd, publicUrl, SITE_NAME } from "@/lib/structured-data";
 
 const pagePath = "/generalized-anxiety-disorder-gad7";
-const doctorAvatar = "/doctor-avatars/clean/cheungmy.webp";
+const doctorAvatar = "/images/doctors/cheungmy-gad-real.jpg";
 const bookingHref = "/booking?doctor=cheungmy&visitType=first&source=gad7-anxiety-page";
 const jordanBookingHref =
   "/booking?doctor=cheungmy&clinic=jordan&visitType=first&source=gad7-anxiety-page";
