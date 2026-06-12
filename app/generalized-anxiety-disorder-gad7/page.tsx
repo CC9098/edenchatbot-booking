@@ -120,16 +120,16 @@ function PosterTile({
 }
 
 export const metadata: Metadata = {
-  title: "廣泛性焦慮症中醫調理與 GAD-7 評估 | 張敏言醫師 | 醫天圓",
+  title: "廣泛性焦慮症：卡在想求助與想逃避之間 | 張敏言醫師 | 醫天圓",
   description:
-    "從中醫情志病、肝鬱、心脾兩虛、陰虛火旺等角度了解廣泛性焦慮症。完成 GAD-7 後，可預約張敏言醫師以中醫辨證跟進睡眠、心悸、胸悶和壓力狀態。",
+    "懷疑自己有廣泛性焦慮症，卻遲遲不敢求醫？張敏言醫師從中醫角度說明焦慮、失眠、心悸、胃腸不適與臨床調理方向。",
   alternates: {
     canonical: publicUrl(pagePath),
   },
   openGraph: {
-    title: "廣泛性焦慮症中醫調理與 GAD-7 評估 | 張敏言醫師",
+    title: "廣泛性焦慮症：卡在想求助與想逃避之間 | 張敏言醫師",
     description:
-      "完成 GAD-7 後，帶同睡眠、胃口、心悸、胸悶和壓力情況，由張敏言醫師按中醫辨證跟進。",
+      "當焦慮令你想求助又想逃避，中醫或許可以成為比較容易踏出的第一道門。",
     url: publicUrl(pagePath),
     type: "article",
     images: [publicUrl(doctorAvatar)],
@@ -148,7 +148,7 @@ function pageStructuredData() {
         url,
         name: "廣泛性焦慮症 GAD-7 自我評估",
         description:
-          "介紹廣泛性焦慮症的中醫情志病觀點、常見證型、GAD-7 初步評估及張敏言醫師的中醫跟進方式。",
+          "介紹廣泛性焦慮症患者常見的求助阻力、中醫第一步調理、GAD-7 初步評估及張敏言醫師臨床醫案。",
         about: {
           "@type": "MedicalCondition",
           name: "廣泛性焦慮症",
@@ -226,18 +226,18 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
 
             <div className="max-w-3xl">
               <div className={`${styles.brushKicker} text-sm`}>
-                長期擔心、睡眠欠安、心神不寧？
+                懷疑自己有廣泛性焦慮症？
               </div>
               <h1 className={`${styles.brushTitle} mt-5 text-[2.75rem] sm:text-6xl lg:text-[5.35rem]`}>
-                <span className={styles.brushGreen}>情緒低落、</span>
+                <span className={styles.brushGreen}>想求助，</span>
                 <br />
-                <span className={styles.brushBrown}>長期緊張？</span>
+                <span className={styles.brushBrown}>又想逃避？</span>
                 <br />
-                <span className="block text-[0.82em]">可能是</span>
-                <span className={`${styles.highlightStroke} block w-fit whitespace-nowrap`}>肝氣鬱結</span>
+                <span className="block text-[0.82em]">先從身體</span>
+                <span className={`${styles.highlightStroke} block w-fit whitespace-nowrap`}>鬆一點開始</span>
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-relaxed text-[#496153]">
-                長期焦慮不一定只是「想太多」，身體亦可能已經處於繃緊狀態。若你近來經常擔心、失眠、心悸、胃脹、胸悶或肩頸繃緊，張敏言醫師會先從中醫辨證了解體質，再配合 GAD-7 記錄當刻狀態，方便覆診比較。
+                當腦海停不下來，身體又出現失眠、心悸、胃脹、胸悶或慢性疲倦，求助本身也會變成壓力。張敏言醫師會先從中醫辨證了解身體狀態，再配合 GAD-7 記錄近況，讓第一步不必那麼沉重。
               </p>
             </div>
 
@@ -310,6 +310,189 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                   </Link>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={`${styles.sectionBand} px-5 py-14 sm:px-8 lg:px-12`}>
+        <article className="mx-auto max-w-4xl">
+          <p className={`${styles.markerTag} text-sm`}>張敏言醫師文章</p>
+          <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
+            廣泛性焦慮症：為甚麼你明明很辛苦，卻遲遲不想求醫？
+          </h2>
+
+          <div className="mt-7 space-y-5 text-base leading-relaxed text-[#496153]">
+            <p>
+              每天清晨，鬧鐘還沒響，你可能已經在一陣莫名心悸或胃部翻騰中醒來。腦海自動開啟無數個循環劇本：今天簡報會不會出錯？最近頭痛會不會是嚴重疾病？剛才同事的眼神，是否代表自己說錯了話？
+            </p>
+            <p>
+              這種無法關閉的過度擔憂，加上長期失眠、肌肉繃緊、慢性疲勞、胸悶、胃痛或自律神經失調，會令人筋疲力竭。你可能偷偷搜尋過很多次，每一個症狀都似乎指向同一個名字：廣泛性焦慮症，Generalized Anxiety Disorder，GAD。
+            </p>
+            <p>
+              你懷疑自己需要幫助，但每次想到要看精神科醫生或心理醫生，內心又湧起更大的抗拒。這不是因為你不想好起來，而是焦慮本身已經在你和醫療之間築起了一道高牆。
+            </p>
+          </div>
+
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            <div className={`${styles.sketchPanel} rounded-[22px] p-5`}>
+              <h3 className="text-lg font-extrabold text-[#0d4c2d]">災難化思考</h3>
+              <p className="mt-2 text-sm leading-relaxed text-[#496153]">
+                大腦開始恐嚇你：如果確診了，是否就變成精神病患者？藥物會否上癮、變遲鈍，甚至失去情感？
+              </p>
+            </div>
+            <div className={`${styles.sketchPanel} rounded-[22px] p-5`}>
+              <h3 className="text-lg font-extrabold text-[#0d4c2d]">高功能者的羞恥感</h3>
+              <p className="mt-2 text-sm leading-relaxed text-[#496153]">
+                習慣掌控一切的人，往往最難承認自己失控。於是用意志力硬撐，把求助誤解成失敗。
+              </p>
+            </div>
+            <div className={`${styles.sketchPanel} rounded-[22px] p-5`}>
+              <h3 className="text-lg font-extrabold text-[#0d4c2d]">以為只是身體病</h3>
+              <p className="mt-2 text-sm leading-relaxed text-[#496153]">
+                心悸、胃痛、胸悶和頭痛都很真實，令人反覆看不同專科，卻避開情緒這個核心線索。
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-[26px] border border-[#d7c6a7] bg-[#fffaf0] p-6 sm:p-8">
+            <h3 className="text-2xl font-semibold text-[#0d4c2d]">中醫，或許能成為比較溫柔的第一道門</h3>
+            <div className="mt-4 space-y-4 text-base leading-relaxed text-[#496153]">
+              <p>
+                如果你暫時仍然跨不出那一步去看精神科或心理諮商，請不要因此放棄。在華人社會裡，說一句「最近睡不好，想調理身體」，往往比說「我可能有焦慮症」容易得多。
+              </p>
+              <p>
+                中醫重視「形神一體」。失眠、胸悶、胃潰瘍、肌肉繃緊、疲倦、煩躁，不會被分開看待，而是身心失衡的綜合表現。把問題放回氣血、臟腑、寒熱、虛實之中，很多人會比較容易卸下自責。
+              </p>
+              <p>
+                當身體開始放鬆，大腦也較容易平靜。中藥、針灸、推拿及生活調整，可以先從睡眠、胸悶、胃口、腸胃、疲倦感入手，讓復原的齒輪重新轉動。
+              </p>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section className={`${styles.sectionBand} bg-[#fffaf0]/70 px-5 py-14 sm:px-8 lg:px-12`}>
+        <div className="mx-auto max-w-6xl">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,0.55fr)_minmax(0,0.7fr)] lg:items-start">
+            <div>
+              <p className={`${styles.markerTag} text-sm`}>4 至 8 週觀察</p>
+              <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
+                如何判斷中醫調理是否適合你？
+              </h2>
+              <p className="mt-4 text-base leading-relaxed text-[#496153]">
+                接受中醫調理後，可以用 4 至 8 週作初步觀察。重點不是追求一次完全好轉，而是看身體和情緒是否開始有方向地回穩。
+              </p>
+            </div>
+
+            <div className="grid gap-4">
+              <article className={`${styles.sketchPanel} rounded-[24px] p-5`}>
+                <h3 className="text-lg font-extrabold text-[#0d4c2d]">睡眠與體力</h3>
+                <p className="mt-2 text-sm leading-relaxed text-[#496153]">
+                  入睡困難、半夜易醒或惡夢是否減少？早上醒來時，是否開始有一點充電感，而不是越睡越累？
+                </p>
+              </article>
+              <article className={`${styles.sketchPanel} rounded-[24px] p-5`}>
+                <h3 className="text-lg font-extrabold text-[#0d4c2d]">身體症狀</h3>
+                <p className="mt-2 text-sm leading-relaxed text-[#496153]">
+                  心悸、胸悶、胃脹胃痛、小腹繃緊、肩頸酸痛或頭腦昏沉，發作頻率和劇烈程度是否下降？
+                </p>
+              </article>
+              <article className={`${styles.sketchPanel} rounded-[24px] p-5`}>
+                <h3 className="text-lg font-extrabold text-[#0d4c2d]">情緒彈性</h3>
+                <p className="mt-2 text-sm leading-relaxed text-[#496153]">
+                  面對同樣壓力時，是否比較能「踩得住煞車」？雖然仍會擔心，但是否較少陷入災難化思考？
+                </p>
+              </article>
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-[24px] border border-[#fed7aa] bg-[#fff7ed] p-5 text-[#7c2d12]">
+            <p className="font-semibold">何時需要進一步評估？</p>
+            <p className="mt-2 text-sm leading-relaxed">
+              如果規律調理 1 至 2 個月後，失眠、恐慌或無法停止的焦慮完全沒有減輕，甚至持續惡化，應盡快尋求精神科醫生、家庭醫生或心理專業人士作進一步評估。正在服用精神科藥物者，切勿自行停藥或突然減量。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className={`${styles.sectionBand} px-5 py-14 sm:px-8 lg:px-12`}>
+        <div className="mx-auto max-w-6xl">
+          <p className={`${styles.markerTag} text-sm`}>臨床醫案</p>
+          <h2 className={`${styles.brushUnderline} mt-5 inline-block text-3xl font-semibold leading-tight text-[#0d4c2d] sm:text-4xl`}>
+            廣泛性焦慮症伴腸胃功能紊亂
+          </h2>
+          <p className="mt-4 max-w-3xl text-base leading-relaxed text-[#496153]">
+            以下醫案已作去識別化處理，只供臨床思路分享，不能自行照方服用。
+          </p>
+
+          <div className="mt-8 grid gap-5 lg:grid-cols-[minmax(0,0.58fr)_minmax(0,0.62fr)]">
+            <div className={`${styles.sketchPanel} rounded-[26px] p-6`}>
+              <h3 className="text-xl font-semibold text-[#0d4c2d]">患者概況與臨床表現</h3>
+              <div className="mt-4 space-y-4 text-sm leading-relaxed text-[#496153]">
+                <p>
+                  男性，廣泛性焦慮症病史多年，長期服用精神科藥物，近半年症狀加重。
+                </p>
+                <p>
+                  睡眠極淺易醒，醒後疲憊更甚於未睡。日間極度困倦，全身沉重，頭腦昏蒙，記憶力與專注力明顯下降。
+                </p>
+                <p>
+                  情緒鬱悶焦慮，易怒而強忍，夜間精神亢奮難以入眠，並伴情緒性暴食。胃腸症狀突出，包括頻繁噯氣、食後腹脹絞痛、飯後極度睏倦、慢性便秘及矢氣多。
+                </p>
+                <p>
+                  舌體胖大有齒痕，舌質淡白，苔略厚而水滑。
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-5">
+              <div className={`${styles.sketchPanel} rounded-[26px] p-6`}>
+                <h3 className="text-xl font-semibold text-[#0d4c2d]">診斷與辨證</h3>
+                <div className="mt-4 space-y-3 text-sm leading-relaxed text-[#496153]">
+                  <p>
+                    <span className="font-semibold text-[#20382a]">西醫診斷：</span>
+                    廣泛性焦慮症，伴腸胃功能紊亂、慢性便秘。
+                  </p>
+                  <p>
+                    <span className="font-semibold text-[#20382a]">中醫診斷：</span>
+                    鬱證兼便秘。
+                  </p>
+                  <p>
+                    <span className="font-semibold text-[#20382a]">證型：</span>
+                    少陽樞機不利，兼陽明腑實。
+                  </p>
+                  <p>
+                    長期焦慮、易怒強忍、夜間亢奮難眠，屬肝鬱氣滯、少陽樞機不利；飯後睏倦、全身沉重、舌胖齒痕、苔水滑，反映肝鬱乘脾、脾虛濕盛。腹脹便秘與裡急後重，合參少陽陽明之病機。
+                  </p>
+                </div>
+              </div>
+
+              <div className={`${styles.sketchPanel} rounded-[26px] p-6`}>
+                <h3 className="text-xl font-semibold text-[#0d4c2d]">治法與方藥</h3>
+                <div className="mt-4 space-y-3 text-sm leading-relaxed text-[#496153]">
+                  <p>
+                    治以和解少陽、鎮驚安神，兼輕下熱結、行氣除滿。
+                  </p>
+                  <p>
+                    方以柴胡桂枝龍骨牡蠣湯合小承氣湯加減。柴胡、黃芩疏解少陽鬱熱；大黃、厚朴、枳實通腑泄熱、行氣導滯；桂枝通陽化氣；龍骨、牡蠣重鎮安神；白芍、甘草養血柔肝、緩急止痛；石菖蒲化痰開竅；香附疏肝解鬱；天花粉清熱生津。
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-[26px] border border-[#d7c6a7] bg-[#fffaf0] p-6 sm:p-8">
+            <h3 className="text-xl font-semibold text-[#0d4c2d]">治療結果與醫者按</h3>
+            <div className="mt-4 space-y-4 text-base leading-relaxed text-[#496153]">
+              <p>
+                患者初診後即見睡眠改善、大便通暢、精神轉佳，顯示方證相應。本病根於肝鬱脾虛、痰熱內擾，調治仍需時間，宜持續 3 至 6 個月以固其本。
+              </p>
+              <p>
+                囑患者續用原有西藥，切勿驟停。症狀偶有反覆，並不代表方向錯誤，而是身體修復過程中常見的波動。
+              </p>
+              <p>
+                本例體現《傷寒論》「觀其脈證，知犯何逆，隨證治之」之旨，尤其適合伴有明顯胃腸、睡眠及疲勞表現的焦慮症患者。臨床可按即時舌脈調整藥物比例，並配合百會、印堂、內關、神門等穴，以加強安神、調氣及放鬆身心。
+              </p>
             </div>
           </div>
         </div>
