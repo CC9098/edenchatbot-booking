@@ -276,7 +276,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
                   fill
                   priority
                   sizes="(min-width: 1024px) 420px, 88vw"
-                  className="object-cover object-center"
+                  className="object-cover object-[center_top]"
                 />
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0d4c2d]/90 via-[#0d4c2d]/40 to-transparent p-5 text-white">
                   <p className="text-sm font-semibold tracking-[0.12em] text-white/78">
