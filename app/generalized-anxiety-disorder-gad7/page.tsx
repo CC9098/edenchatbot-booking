@@ -258,9 +258,9 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
               </Link>
             </div>
 
-            <div className="grid max-w-3xl grid-cols-3 gap-3">
+            <div className="grid max-w-2xl grid-cols-3 gap-3 sm:gap-4">
               {["問清壓力", "看舌切脈", "覆診跟進"].map((item) => (
-                <div key={item} className={`${styles.roundSeal} flex min-h-24 items-center justify-center p-3 text-center sm:min-h-32`}>
+                <div key={item} className={`${styles.roundSeal} flex min-h-20 items-center justify-center p-3 text-center sm:min-h-24`}>
                   <p className="text-xs font-bold leading-snug text-[#0d4c2d] sm:text-sm">{item}</p>
                 </div>
               ))}
