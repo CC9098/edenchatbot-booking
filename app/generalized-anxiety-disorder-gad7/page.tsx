@@ -336,35 +336,35 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
 
           <div className="mt-8 rounded-[26px] border border-[#d7c6a7] bg-[#fffaf0] p-6 sm:p-8">
             <h3 className="text-2xl font-semibold text-[#0d4c2d]">
-              為甚麼你懂，卻遲遲不想看精神科醫生或心理醫生？
+              為甚麼明明想改善，卻遲遲未踏出第一步？
             </h3>
             <p className="mt-4 text-base leading-relaxed text-[#496153]">
-              不想就醫，並非因為你不想好起來，而是「焦慮」本身就在你和醫院之間築起了一道高牆。
+              遲遲未求助，並非因為你不重視自己，而是焦慮本身已經令人更難作決定，也更容易擔心下一步會帶來壓力。
             </p>
 
             <div className="mt-6 grid gap-4">
               <div className={`${styles.sketchPanel} rounded-[22px] p-5`}>
-                <h4 className="text-lg font-extrabold text-[#0d4c2d]">無止境的災難化思考</h4>
+                <h4 className="text-lg font-extrabold text-[#0d4c2d]">擔心一層一層加深</h4>
                 <p className="mt-2 text-sm leading-relaxed text-[#496153]">
-                  你的大腦開始恐嚇你：「如果確診了，我是不是就變成精神病患？」「吃西藥會不會上癮？會不會讓我大腦變遲鈍、變成失去情感的喪屍？」
+                  很多人會反覆想：「如果真的需要治療，是不是代表情況很嚴重？」「藥物會不會不適合我？會不會影響工作和情緒？」這些擔心未必一定會發生，卻足以令人更難踏出第一步。
                 </p>
               </div>
               <div className={`${styles.sketchPanel} rounded-[22px] p-5`}>
-                <h4 className="text-lg font-extrabold text-[#0d4c2d]">高功能者的完美主義與恥辱感</h4>
+                <h4 className="text-lg font-extrabold text-[#0d4c2d]">習慣撐住的人，也會怕自己撐不下去</h4>
                 <p className="mt-2 text-sm leading-relaxed text-[#496153]">
-                  習慣掌控一切、在工作上拼命的你，無法接受自己「失控」了。你對自己說「這只是壓力大、是我抗壓性太差」，試圖用意志力硬撐，認為去看心理醫生就是承認自己是一個失敗者。
+                  一直在工作、家庭和責任中努力維持的人，往往最容易把自己的需要放到最後。你可能會想：「只是壓力大吧」「再忍一忍就會過去。」但身心反應正在提醒你，需要多一點照顧和支持。
                 </p>
               </div>
               <div className={`${styles.sketchPanel} rounded-[22px] p-5`}>
-                <h4 className="text-lg font-extrabold text-[#0d4c2d]">以為只是身體生病</h4>
+                <h4 className="text-lg font-extrabold text-[#0d4c2d]">身體症狀令人更不安</h4>
                 <p className="mt-2 text-sm leading-relaxed text-[#496153]">
-                  心悸、胃痛、自律神經失調的症狀太過真實，你寧可頻繁出入家醫科、心臟科、腸胃科，也不願面對這一切其實源自大腦與心靈的呼救。
+                  心悸、胃痛、胸悶、手震或自律神經失調的感覺都很真實。很多人會先到不同科別檢查身體，這是很自然的反應；同時，情緒、壓力與身體反應也值得一併了解。
                 </p>
               </div>
             </div>
 
             <p className="mt-6 text-base leading-relaxed text-[#496153]">
-              於是，你陷入了「極度焦慮 / 想求助 / 面對就醫更焦慮 / 選擇逃避」的惡性循環，任由症狀將你吞噬。
+              於是，你可能一邊想求助，一邊又擔心面對診斷或治療；拖得越久，睡眠、身體和情緒越容易互相影響。這並不是你的錯，而是焦慮常見的困局。
             </p>
           </div>
 
@@ -380,7 +380,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
               中醫講求「形神一體」，你的失眠、胸悶、胃潰瘍、肌肉緊繃，在中醫眼裡不是分開的疾病，而是身體失衡的綜合表現。
             </p>
             <p>
-              在西醫裡，你可能覺得是自己心理軟弱；但在中醫的把脈問診中，情緒問題可以被理解為「氣血不順、臟腑失調」。它溫柔地告訴你：這不是你的錯，不是你想太多，只是身體暫時失衡了，調回來就好。
+              你可能會把責任放回自己身上，覺得只是自己撐得不夠好；但在中醫的把脈問診中，情緒問題可以被理解為「氣血不順、臟腑失調」。這提醒我們：不用把所有不適都歸咎於意志力，身體也可以一步一步調整。
             </p>
             <p>
               中醫的治療能帶來身體放鬆。當醫師在太衝、神門、內關等穴位扎上針，或者進行溫和的推拿時，原本緊繃到極點的身體有機會慢慢放下防備。配合酸棗仁湯、柴胡疏肝散等中藥調理，能讓害怕西藥副作用的你，重新點燃對醫療的信任。
@@ -421,7 +421,7 @@ export default function GeneralizedAnxietyDisorderGad7Page() {
               <article className={`${styles.sketchPanel} rounded-[24px] p-5`}>
                 <h3 className="text-lg font-extrabold text-[#0d4c2d]">情緒的彈性</h3>
                 <p className="mt-2 text-sm leading-relaxed text-[#496153]">
-                  面對同樣的日常壓力源時，你是否發現自己「比較踩得住煞車」？雖然可能還是會擔憂，但大腦是否開始能從「災難化思考」的死胡同裡轉彎，不再那麼容易陷入恐慌或崩潰？
+                  面對同樣的日常壓力時，是否比較能停一停、回一回氣？雖然仍可能會擔心，但思緒是否較容易轉回當下，不再那麼快被恐慌牽著走？
                 </p>
               </article>
             </div>
