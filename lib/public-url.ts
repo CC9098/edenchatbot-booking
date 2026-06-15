@@ -1,4 +1,4 @@
-const DEFAULT_PUBLIC_BASE_URL = "https://edenchatbot-booking.vercel.app";
+const DEFAULT_PUBLIC_BASE_URL = "https://app.edenclinic.hk";
 const LOCALHOST_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
 
 function normalizeBaseUrl(value?: string | null): string | null {

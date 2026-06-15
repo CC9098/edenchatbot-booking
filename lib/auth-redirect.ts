@@ -1,4 +1,4 @@
-const DEFAULT_PUBLIC_WEB_URL = "https://edenchatbot-booking.vercel.app";
+const DEFAULT_PUBLIC_WEB_URL = "https://app.edenclinic.hk";
 const DEFAULT_MOBILE_SCHEME = "com.cc9098.edenchatbotbooking";
 const DEFAULT_AUTH_NEXT = "/chat";
 
