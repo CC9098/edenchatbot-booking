@@ -11,6 +11,10 @@ import {
   getWebAuthCallbackUrl,
   sanitizeAuthNextPath,
 } from "@/lib/auth-redirect";
+import {
+  createPendingStaffAuthResume,
+  STAFF_AUTH_RESUME_STORAGE_KEY,
+} from "@/lib/staff-auth-resume";
 
 type LoginMethod = "whatsapp" | "google" | "email";
 type EmailAuthMode = "signin" | "signup";
@@ -227,6 +231,16 @@ function LoginForm() {
     clearMessages();
     setLoading(true);
     const supabase = createBrowserClient();
+    const pendingStaffResume = createPendingStaffAuthResume(nextPath);
+
+    if (pendingStaffResume) {
+      window.localStorage.setItem(
+        STAFF_AUTH_RESUME_STORAGE_KEY,
+        JSON.stringify(pendingStaffResume),
+      );
+    } else {
+      window.localStorage.removeItem(STAFF_AUTH_RESUME_STORAGE_KEY);
+    }
 
     if (Capacitor.isNativePlatform()) {
       const { data, error } = await supabase.auth.signInWithOAuth({
