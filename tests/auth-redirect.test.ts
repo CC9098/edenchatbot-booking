@@ -40,6 +40,10 @@ test("staff auth resume only stores doctor and nurse destinations", () => {
     path: "/doctor?tab=bookings",
     expiresAt: now + 10 * 60 * 1000,
   });
+  assert.deepEqual(createPendingStaffAuthResume("/chatwoot/eden-tools", now), {
+    path: "/chatwoot/eden-tools",
+    expiresAt: now + 10 * 60 * 1000,
+  });
   assert.equal(createPendingStaffAuthResume("/chat", now), null);
   assert.equal(createPendingStaffAuthResume("https://evil.example/nurse", now), null);
 });
@@ -48,6 +52,10 @@ test("staff auth resume rejects expired or non-staff stored paths", () => {
   assert.equal(
     parsePendingStaffAuthResume(JSON.stringify({ path: "/nurse/knowledge", expiresAt: 2_000 }), 1_500),
     "/nurse/knowledge",
+  );
+  assert.equal(
+    parsePendingStaffAuthResume(JSON.stringify({ path: "/chatwoot/eden-tools", expiresAt: 2_000 }), 1_500),
+    "/chatwoot/eden-tools",
   );
   assert.equal(
     parsePendingStaffAuthResume(JSON.stringify({ path: "/nurse/knowledge", expiresAt: 2_000 }), 2_001),

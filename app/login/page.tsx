@@ -58,7 +58,8 @@ function LoginForm() {
     nextPath.startsWith("/doctor?") ||
     nextPath === "/nurse" ||
     nextPath.startsWith("/nurse/") ||
-    nextPath.startsWith("/nurse?");
+    nextPath.startsWith("/nurse?") ||
+    nextPath.startsWith("/chatwoot/");
 
   const defaultMethod: LoginMethod = isStaffConsoleEntry ? "google" : "whatsapp";
   const [activeMethod, setActiveMethod] = useState<LoginMethod>(defaultMethod);

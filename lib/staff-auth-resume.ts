@@ -16,7 +16,8 @@ export function isStaffAuthPath(path: string) {
     path.startsWith("/doctor?") ||
     path === "/nurse" ||
     path.startsWith("/nurse/") ||
-    path.startsWith("/nurse?")
+    path.startsWith("/nurse?") ||
+    path === "/chatwoot/eden-tools"
   );
 }
 

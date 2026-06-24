@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -25,6 +25,12 @@ type ClinicOption = {
   nameZh: string;
 };
 
+type ContactSearchResult = {
+  id: number;
+  name: string;
+  phoneNumber: string;
+};
+
 type SendState =
   | { status: "idle" }
   | { status: "success"; text: string; conversationId?: number; deliveryStatus?: string | null }
@@ -43,6 +49,20 @@ type FormState = {
   treatmentFee: string;
   extraFee: string;
   totalAmount: string;
+};
+
+type PatientMessagePrefill = {
+  patientName?: string;
+  phone?: string;
+  note?: string;
+  conversationId?: number | null;
+};
+
+type NursePatientMessageClientProps = {
+  clinics: ClinicOption[];
+  embedded?: boolean;
+  prefill?: PatientMessagePrefill;
+  latestIncomingMessage?: string;
 };
 
 const DEFAULT_FORM_STATE: FormState = {
@@ -87,13 +107,81 @@ function getErrorText(payload: unknown): string {
   return "未能發送 WhatsApp 訊息。";
 }
 
-export function NursePatientMessageClient({ clinics }: { clinics: ClinicOption[] }) {
+export function NursePatientMessageClient({
+  clinics,
+  embedded = false,
+  prefill,
+  latestIncomingMessage = "",
+}: NursePatientMessageClientProps) {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM_STATE);
   const [sendState, setSendState] = useState<SendState>({ status: "idle" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [appliedPrefillKey, setAppliedPrefillKey] = useState("");
+  const [contactQuery, setContactQuery] = useState("");
+  const [contactResults, setContactResults] = useState<ContactSearchResult[]>([]);
+  const [isSearchingContacts, setIsSearchingContacts] = useState(false);
+  const [contactSearchError, setContactSearchError] = useState("");
 
   const selectedClinic = clinics.find((clinic) => clinic.id === form.clinicId) || clinics[0];
   const selectedPurpose = STAFF_PATIENT_MESSAGE_PURPOSE_BY_ID[form.purpose];
+  const prefillKey = [
+    prefill?.conversationId || "",
+    prefill?.patientName || "",
+    prefill?.phone || "",
+  ].join("|");
+
+  useEffect(() => {
+    if (!prefillKey || prefillKey === appliedPrefillKey) return;
+
+    setForm((current) => ({
+      ...current,
+      patientName: prefill?.patientName?.trim() || current.patientName,
+      phone: prefill?.phone?.trim() || current.phone,
+      note: prefill?.note?.trim() && !current.note ? prefill.note.trim() : current.note,
+    }));
+    setAppliedPrefillKey(prefillKey);
+  }, [appliedPrefillKey, prefill, prefillKey]);
+
+  useEffect(() => {
+    if (!embedded || contactQuery.trim().length < 2) {
+      setContactResults([]);
+      setContactSearchError("");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      try {
+        setIsSearchingContacts(true);
+        setContactSearchError("");
+        const params = new URLSearchParams({ q: contactQuery.trim() });
+        const response = await fetch(`/api/nurse/chatwoot-contacts/search?${params.toString()}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          setContactResults([]);
+          setContactSearchError(payload.error || "搜尋失敗");
+          return;
+        }
+
+        setContactResults(Array.isArray(payload.contacts) ? payload.contacts : []);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setContactResults([]);
+        setContactSearchError(error instanceof Error ? error.message : "搜尋失敗");
+      } finally {
+        if (!controller.signal.aborted) setIsSearchingContacts(false);
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [contactQuery, embedded]);
 
   const previewText = useMemo(() => {
     return buildStaffPatientMessageText({
@@ -110,6 +198,27 @@ export function NursePatientMessageClient({ clinics }: { clinics: ClinicOption[]
       totalAmount: form.totalAmount,
     });
   }, [form, selectedClinic?.nameZh]);
+
+  function fillContact(contact: ContactSearchResult) {
+    setForm((current) => ({
+      ...current,
+      patientName: contact.name || current.patientName,
+      phone: contact.phoneNumber || current.phone,
+    }));
+    setContactQuery("");
+    setContactResults([]);
+  }
+
+  function useLatestIncomingAsForwardDraft() {
+    const message = latestIncomingMessage.trim();
+    if (!message) return;
+
+    setForm((current) => ({
+      ...current,
+      purpose: "follow_up",
+      note: message.slice(0, 240),
+    }));
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -155,33 +264,82 @@ export function NursePatientMessageClient({ clinics }: { clinics: ClinicOption[]
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-lg border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+    <div className={embedded ? "space-y-4 p-3" : "space-y-6"}>
+      <section className={embedded ? "space-y-3" : "rounded-lg border border-emerald-100 bg-white p-5 shadow-sm sm:p-6"}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <Link
-              href="/nurse"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 hover:text-emerald-900"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              返回姑娘主頁
-            </Link>
-            <p className="mt-4 text-sm font-semibold text-emerald-800">WhatsApp 通知</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-normal text-slate-950">
-              傳新病人訊息
-            </h1>
-            <p className="mt-3 text-sm leading-7 text-slate-600">
-              姑娘只揀用途和填變數；系統會用 Meta template 優先發送，避免每次重新打字。
+            {!embedded ? (
+              <Link
+                href="/nurse"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 hover:text-emerald-900"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                返回姑娘主頁
+              </Link>
+            ) : null}
+            <p className={embedded ? "text-sm font-semibold text-emerald-800" : "mt-4 text-sm font-semibold text-emerald-800"}>
+              WhatsApp 通知
             </p>
+            <h1 className={embedded ? "mt-1 text-xl font-semibold tracking-normal text-slate-950" : "mt-2 text-3xl font-semibold tracking-normal text-slate-950"}>
+              {embedded ? "Eden 工具" : "傳新病人訊息"}
+            </h1>
           </div>
-          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-900">
+          <div className="inline-flex w-fit items-center gap-2 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
             <ShieldCheck className="h-4 w-4" />
             Staff only
           </div>
         </div>
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+      {embedded ? (
+        <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-slate-800">搜尋客戶</span>
+              <input
+                value={contactQuery}
+                onChange={(event) => setContactQuery(event.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                placeholder="姓名 / 電話"
+              />
+            </label>
+
+            <button
+              type="button"
+              onClick={useLatestIncomingAsForwardDraft}
+              disabled={!latestIncomingMessage.trim()}
+              className="self-end inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+            >
+              <MessageSquareText className="h-4 w-4" />
+              帶入最近訊息
+            </button>
+          </div>
+
+          {isSearchingContacts ? (
+            <p className="text-sm text-slate-500">搜尋中...</p>
+          ) : null}
+          {contactSearchError ? (
+            <p className="text-sm text-rose-700">{contactSearchError}</p>
+          ) : null}
+          {contactResults.length > 0 ? (
+            <div className="grid gap-2">
+              {contactResults.map((contact) => (
+                <button
+                  key={contact.id}
+                  type="button"
+                  onClick={() => fillContact(contact)}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 text-left text-sm transition hover:border-emerald-200 hover:bg-emerald-50"
+                >
+                  <span className="min-w-0 truncate font-semibold text-slate-900">{contact.name}</span>
+                  <span className="shrink-0 text-slate-500">{contact.phoneNumber}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      <div className={embedded ? "grid gap-4" : "grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]"}>
         <form onSubmit={handleSubmit} className="space-y-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <section className="grid gap-4 sm:grid-cols-2">
             <label className="space-y-2">
