@@ -61,6 +61,7 @@ type PatientMessagePrefill = {
 type NursePatientMessageClientProps = {
   clinics: ClinicOption[];
   embedded?: boolean;
+  authToken?: string;
   prefill?: PatientMessagePrefill;
   latestIncomingMessage?: string;
 };
@@ -110,6 +111,7 @@ function getErrorText(payload: unknown): string {
 export function NursePatientMessageClient({
   clinics,
   embedded = false,
+  authToken = "",
   prefill,
   latestIncomingMessage = "",
 }: NursePatientMessageClientProps) {
@@ -157,6 +159,7 @@ export function NursePatientMessageClient({
         const params = new URLSearchParams({ q: contactQuery.trim() });
         const response = await fetch(`/api/nurse/chatwoot-contacts/search?${params.toString()}`, {
           cache: "no-store",
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
           signal: controller.signal,
         });
         const payload = await response.json().catch(() => ({}));
@@ -181,7 +184,7 @@ export function NursePatientMessageClient({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [contactQuery, embedded]);
+  }, [authToken, contactQuery, embedded]);
 
   const previewText = useMemo(() => {
     return buildStaffPatientMessageText({
@@ -230,6 +233,7 @@ export function NursePatientMessageClient({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify({
           ...form,

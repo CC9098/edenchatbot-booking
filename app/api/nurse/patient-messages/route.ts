@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { AuthError, getCurrentUser, requireStaffRole } from "@/lib/auth-helpers";
+import { AuthError } from "@/lib/auth-helpers";
+import { requireStaffRoleWithChatwootEdenToolsToken } from "@/lib/chatwoot-eden-tools-session";
 import { sendBookingConfirmationWhatsapp, sendStaffPatientWhatsappMessage } from "@/lib/chatwoot-whatsapp";
 import { normalizePhoneForSearch } from "@/lib/contact-utils";
 import {
@@ -56,12 +57,7 @@ function isHttpUrl(value: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const staffRole = await requireStaffRole(user.id);
+    const { userId, staffRole } = await requireStaffRoleWithChatwootEdenToolsToken(request);
     const body = await request.json();
     const parsed = nursePatientMessageSchema.safeParse(body);
 
@@ -181,7 +177,7 @@ export async function POST(request: NextRequest) {
 
     if (!whatsappResult.success) {
       console.warn(
-        `[nurse/patient-messages] WhatsApp send failed for staff=${user.id} role=${staffRole.role} purpose=${messageData.purpose}: ${whatsappResult.error}`,
+        `[nurse/patient-messages] WhatsApp send failed for staff=${userId} role=${staffRole.role} purpose=${messageData.purpose}: ${whatsappResult.error}`,
       );
       return NextResponse.json(
         {
@@ -195,7 +191,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.info(
-      `[nurse/patient-messages] staff=${user.id} role=${staffRole.role} sent purpose=${messageData.purpose} to phoneLast4=${phoneDigits ? phoneDigits.slice(-4) : "unknown"} conversation=${whatsappResult.conversationId || "unknown"}`,
+      `[nurse/patient-messages] staff=${userId} role=${staffRole.role} sent purpose=${messageData.purpose} to phoneLast4=${phoneDigits ? phoneDigits.slice(-4) : "unknown"} conversation=${whatsappResult.conversationId || "unknown"}`,
     );
 
     return NextResponse.json({

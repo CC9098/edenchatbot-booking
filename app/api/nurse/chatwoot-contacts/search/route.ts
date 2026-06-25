@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { AuthError, getCurrentUser, requireStaffRole } from "@/lib/auth-helpers";
+import { AuthError } from "@/lib/auth-helpers";
+import { requireStaffRoleWithChatwootEdenToolsToken } from "@/lib/chatwoot-eden-tools-session";
 
 export const dynamic = "force-dynamic";
 
@@ -69,12 +70,7 @@ async function resolveAccountId(
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    await requireStaffRole(user.id);
+    await requireStaffRoleWithChatwootEdenToolsToken(request);
 
     const query = (request.nextUrl.searchParams.get("q") || "").trim();
     if (query.length < 2) {
