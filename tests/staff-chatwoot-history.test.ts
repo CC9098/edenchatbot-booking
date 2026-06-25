@@ -19,6 +19,8 @@ test("normalizes visible incoming and outgoing Chatwoot messages", () => {
         message_type: 1,
         created_at: 1_782_384_300,
         private: false,
+        status: "read",
+        source_id: "wamid.123",
       },
     ]),
     [
@@ -27,6 +29,8 @@ test("normalizes visible incoming and outgoing Chatwoot messages", () => {
         direction: "incoming",
         content: "你好",
         createdAt: "2026-06-25T10:44:32.000Z",
+        status: null,
+        sourceId: null,
         attachments: [],
       },
       {
@@ -34,6 +38,8 @@ test("normalizes visible incoming and outgoing Chatwoot messages", () => {
         direction: "outgoing",
         content: "已收到",
         createdAt: "2026-06-25T10:45:00.000Z",
+        status: "read",
+        sourceId: "wamid.123",
         attachments: [],
       },
     ],
@@ -87,6 +93,8 @@ test("keeps attachment-only WhatsApp messages", () => {
         direction: "incoming",
         content: "",
         createdAt: "2026-06-25T10:45:03.000Z",
+        status: null,
+        sourceId: null,
         attachments: [
           {
             id: 8,
@@ -95,6 +103,33 @@ test("keeps attachment-only WhatsApp messages", () => {
             label: "pdf",
           },
         ],
+      },
+    ],
+  );
+});
+
+test("keeps failed outgoing status visible for WhatsApp delivery evidence", () => {
+  assert.deepEqual(
+    normalizeChatwootHistoryMessages([
+      {
+        id: 6,
+        content: "HI",
+        message_type: 1,
+        created_at: 1_782_384_304,
+        private: false,
+        status: "failed",
+        source_id: null,
+      },
+    ]),
+    [
+      {
+        id: 6,
+        direction: "outgoing",
+        content: "HI",
+        createdAt: "2026-06-25T10:45:04.000Z",
+        status: "failed",
+        sourceId: null,
+        attachments: [],
       },
     ],
   );

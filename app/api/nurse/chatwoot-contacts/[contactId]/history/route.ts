@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 type ChatwootConversation = {
   id?: number;
   status?: string | null;
+  can_reply?: boolean | null;
   inbox_id?: number | null;
   created_at?: number | string | null;
   updated_at?: number | string | null;
@@ -72,6 +73,7 @@ export async function GET(
         return {
           id: conversation.id,
           status: conversation.status || null,
+          canReply: conversation.can_reply ?? null,
           messages: normalizeChatwootHistoryMessages(messagesResponse.payload || []).slice(-80),
         };
       }),

@@ -13,6 +13,8 @@ export type RawChatwootHistoryMessage = {
   message_type?: number | string | null;
   created_at?: number | string | null;
   private?: boolean | null;
+  status?: string | null;
+  source_id?: string | null;
   attachments?: RawChatwootAttachment[] | null;
 };
 
@@ -21,6 +23,8 @@ export type StaffChatwootHistoryMessage = {
   direction: "incoming" | "outgoing";
   content: string;
   createdAt: string | null;
+  status: string | null;
+  sourceId: string | null;
   attachments: Array<{
     id: number;
     fileType: string;
@@ -87,6 +91,8 @@ export function normalizeChatwootHistoryMessages(
         direction,
         content,
         createdAt: normalizeCreatedAt(message.created_at),
+        status: message.status || null,
+        sourceId: message.source_id || null,
         attachments,
       };
     })

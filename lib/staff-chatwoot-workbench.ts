@@ -3,6 +3,8 @@ export type StaffChatwootWorkbenchMessage = {
   direction: "incoming" | "outgoing";
   content: string;
   createdAt: string | null;
+  status: string | null;
+  sourceId: string | null;
   attachments: Array<{
     id: number;
     fileType: string;
@@ -14,6 +16,7 @@ export type StaffChatwootWorkbenchMessage = {
 export type StaffChatwootWorkbenchConversation = {
   id: number;
   status: string | null;
+  canReply?: boolean | null;
   messages: StaffChatwootWorkbenchMessage[];
 };
 
@@ -47,4 +50,22 @@ export function getChatwootWorkbenchScrollKey(
 
   const lastMessage = activeConversation.messages.at(-1);
   return `${activeConversation.id}:${activeConversation.messages.length}:${lastMessage?.id || 0}`;
+}
+
+export function getChatwootWorkbenchConversationStatusLabel(
+  conversation: Pick<StaffChatwootWorkbenchConversation, "status" | "canReply">,
+): string {
+  if (conversation.canReply === false || conversation.status === "resolved") return "已關閉";
+  if (conversation.status === "open") return "可回覆";
+  if (conversation.status === "pending") return "待處理";
+  if (conversation.status === "snoozed") return "稍後處理";
+  return "";
+}
+
+export function canReplyToChatwootWorkbenchConversation(
+  conversation: Pick<StaffChatwootWorkbenchConversation, "status" | "canReply">,
+): boolean {
+  if (conversation.canReply === false) return false;
+  if (conversation.status === "resolved") return false;
+  return true;
 }

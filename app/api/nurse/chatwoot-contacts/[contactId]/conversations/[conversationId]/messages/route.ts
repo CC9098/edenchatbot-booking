@@ -4,7 +4,9 @@ import { AuthError } from "@/lib/auth-helpers";
 import { requireStaffRoleWithChatwootEdenToolsToken } from "@/lib/chatwoot-eden-tools-session";
 import {
   buildChatwootComposerJsonBody,
+  getChatwootConversationReplyError,
   getChatwootComposerText,
+  isFailedChatwootDeliveryStatus,
   isAllowedChatwootComposerAttachment,
 } from "@/lib/staff-chatwoot-composer";
 import {
@@ -21,9 +23,11 @@ export const dynamic = "force-dynamic";
 
 type ChatwootConversation = {
   id?: number;
+  status?: string | null;
+  can_reply?: boolean | null;
 };
 
-async function verifyConversationBelongsToContact(
+async function findContactConversation(
   baseUrl: string,
   apiAccessToken: string,
   accountId: number,
@@ -36,7 +40,7 @@ async function verifyConversationBelongsToContact(
     `/api/v1/accounts/${accountId}/contacts/${contactId}/conversations`,
   );
 
-  return (conversationsResponse.payload || []).some((conversation) => conversation.id === conversationId);
+  return (conversationsResponse.payload || []).find((conversation) => conversation.id === conversationId) || null;
 }
 
 async function postChatwootMessage({
@@ -133,7 +137,7 @@ export async function POST(
 
     const { baseUrl, apiAccessToken, accountId: configuredAccountId } = getStaffChatwootConfig();
     const accountId = await resolveStaffChatwootAccountId(baseUrl, apiAccessToken, configuredAccountId);
-    const belongsToContact = await verifyConversationBelongsToContact(
+    const conversation = await findContactConversation(
       baseUrl,
       apiAccessToken,
       accountId,
@@ -141,8 +145,13 @@ export async function POST(
       conversationId,
     );
 
-    if (!belongsToContact) {
+    if (!conversation) {
       return NextResponse.json({ error: "Conversation does not belong to this contact" }, { status: 404 });
+    }
+
+    const replyError = getChatwootConversationReplyError(conversation);
+    if (replyError) {
+      return NextResponse.json({ error: replyError }, { status: 409 });
     }
 
     const message = await postChatwootMessage({
@@ -154,6 +163,13 @@ export async function POST(
       attachment,
     });
     const [normalizedMessage] = normalizeChatwootHistoryMessages([message]);
+
+    if (isFailedChatwootDeliveryStatus(message.status)) {
+      return NextResponse.json({
+        error: "WhatsApp 未能送出。請改用 approved template，或請病人先回覆 WhatsApp。",
+        message: normalizedMessage || null,
+      }, { status: 502 });
+    }
 
     return NextResponse.json({
       success: true,

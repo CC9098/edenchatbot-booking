@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   appendChatwootWorkbenchMessage,
+  canReplyToChatwootWorkbenchConversation,
+  getChatwootWorkbenchConversationStatusLabel,
   getChatwootWorkbenchScrollKey,
   type StaffChatwootWorkbenchConversation,
 } from "@/lib/staff-chatwoot-workbench";
@@ -17,6 +19,8 @@ const conversations: StaffChatwootWorkbenchConversation[] = [
         direction: "incoming",
         content: "你好",
         createdAt: "2026-06-25T10:44:32.000Z",
+        status: null,
+        sourceId: null,
         attachments: [],
       },
     ],
@@ -29,6 +33,8 @@ test("appends a sent Chatwoot message into the active workbench conversation", (
     direction: "outgoing",
     content: "已收到",
     createdAt: "2026-06-25T10:45:00.000Z",
+    status: "sent",
+    sourceId: "wamid.123",
     attachments: [],
   });
 
@@ -50,6 +56,8 @@ test("changes scroll key when the active conversation receives a new message", (
       direction: "outgoing",
       content: "一陣覆你",
       createdAt: "2026-06-25T10:46:00.000Z",
+      status: "sent",
+      sourceId: "wamid.124",
       attachments: [],
     }),
     841,
@@ -57,4 +65,11 @@ test("changes scroll key when the active conversation receives a new message", (
 
   assert.notEqual(after, before);
   assert.equal(after, "841:2:12");
+});
+
+test("translates Chatwoot internal conversation status for staff", () => {
+  assert.equal(getChatwootWorkbenchConversationStatusLabel({ status: "resolved", canReply: false }), "已關閉");
+  assert.equal(getChatwootWorkbenchConversationStatusLabel({ status: "open", canReply: true }), "可回覆");
+  assert.equal(canReplyToChatwootWorkbenchConversation({ status: "resolved", canReply: false }), false);
+  assert.equal(canReplyToChatwootWorkbenchConversation({ status: "open", canReply: true }), true);
 });

@@ -23,6 +23,8 @@ import {
 import { shouldSearchStaffContactQuery } from "@/lib/staff-contact-search";
 import {
   appendChatwootWorkbenchMessage,
+  canReplyToChatwootWorkbenchConversation,
+  getChatwootWorkbenchConversationStatusLabel,
   getChatwootWorkbenchScrollKey,
   type StaffChatwootWorkbenchConversation,
   type StaffChatwootWorkbenchMessage,
@@ -227,6 +229,10 @@ export function NursePatientMessageClient({
     () => getChatwootWorkbenchScrollKey(historyConversations, activeHistoryConversationId),
     [activeHistoryConversationId, historyConversations],
   );
+  const activeHistoryConversation = historyConversations.find((conversation) => conversation.id === activeHistoryConversationId) || null;
+  const canReplyToActiveHistoryConversation = activeHistoryConversation
+    ? canReplyToChatwootWorkbenchConversation(activeHistoryConversation)
+    : false;
 
   useEffect(() => {
     if (!activeHistoryScrollKey) return;
@@ -350,6 +356,11 @@ export function NursePatientMessageClient({
 
   async function sendComposerMessage() {
     if (!selectedContact || !activeHistoryConversationId || isSendingComposerMessage) return;
+
+    if (!canReplyToActiveHistoryConversation) {
+      setComposerError("此對話已關閉。普通文字未能送出，請改用 approved template，或請病人先回覆 WhatsApp。");
+      return;
+    }
 
     const content = composerText.trim();
     if (!content && !composerFile) {
@@ -523,12 +534,15 @@ export function NursePatientMessageClient({
                     className="flex w-full items-center justify-between gap-2 text-left text-xs font-semibold text-slate-500"
                   >
                     <span>對話 #{conversation.id}</span>
-                    {conversation.status ? <span>{conversation.status}</span> : null}
+                    {getChatwootWorkbenchConversationStatusLabel(conversation) ? (
+                      <span>{getChatwootWorkbenchConversationStatusLabel(conversation)}</span>
+                    ) : null}
                   </button>
                   {conversation.messages.length > 0 ? (
                     <div className="space-y-2">
                       {conversation.messages.map((message) => {
                         const incoming = message.direction === "incoming";
+                        const failed = message.direction === "outgoing" && message.status === "failed";
 
                         return (
                           <div
@@ -537,7 +551,9 @@ export function NursePatientMessageClient({
                           >
                             <div
                               className={`max-w-[82%] rounded-lg px-3 py-2 text-sm shadow-sm ${
-                                incoming
+                                failed
+                                  ? "border border-rose-200 bg-rose-50 text-rose-950"
+                                  : incoming
                                   ? "bg-white text-slate-900"
                                   : "bg-emerald-700 text-white"
                               }`}
@@ -556,6 +572,8 @@ export function NursePatientMessageClient({
                                       className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold ${
                                         incoming
                                           ? "bg-slate-100 text-slate-700"
+                                          : failed
+                                          ? "bg-rose-100 text-rose-800"
                                           : "bg-emerald-800 text-emerald-50"
                                       }`}
                                     >
@@ -566,8 +584,11 @@ export function NursePatientMessageClient({
                                 </div>
                               ) : null}
                               {message.createdAt ? (
-                                <p className={`mt-1 text-[11px] ${incoming ? "text-slate-400" : "text-emerald-100"}`}>
+                                <p className={`mt-1 text-[11px] ${
+                                  failed ? "text-rose-600" : incoming ? "text-slate-400" : "text-emerald-100"
+                                }`}>
                                   {formatMessageTime(message.createdAt)}
+                                  {failed ? " · 未送出" : ""}
                                 </p>
                               ) : null}
                             </div>
@@ -600,9 +621,15 @@ export function NursePatientMessageClient({
                   </button>
                 ) : null}
               </div>
+              {!canReplyToActiveHistoryConversation ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                  已關閉：普通文字未能送出，請改用 approved template。
+                </p>
+              ) : null}
               <textarea
                 value={composerText}
                 onChange={(event) => setComposerText(event.target.value)}
+                disabled={!canReplyToActiveHistoryConversation}
                 className="min-h-20 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 placeholder="輸入 WhatsApp 訊息"
                 maxLength={2000}
@@ -614,6 +641,7 @@ export function NursePatientMessageClient({
                   <input
                     type="file"
                     accept="image/*"
+                    disabled={!canReplyToActiveHistoryConversation}
                     className="sr-only"
                     onChange={(event) => setComposerFile(event.target.files?.[0] || null)}
                   />
@@ -621,7 +649,7 @@ export function NursePatientMessageClient({
                 <button
                   type="button"
                   onClick={() => void sendComposerMessage()}
-                  disabled={isSendingComposerMessage}
+                  disabled={isSendingComposerMessage || !canReplyToActiveHistoryConversation}
                   className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
                   {isSendingComposerMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
