@@ -148,6 +148,11 @@ export function NursePatientMessageClient({
   const [historyConversations, setHistoryConversations] = useState<ContactHistoryConversation[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState("");
+  const [activeHistoryConversationId, setActiveHistoryConversationId] = useState<number | null>(null);
+  const [composerText, setComposerText] = useState("");
+  const [composerFile, setComposerFile] = useState<File | null>(null);
+  const [isSendingComposerMessage, setIsSendingComposerMessage] = useState(false);
+  const [composerError, setComposerError] = useState("");
 
   const selectedClinic = clinics.find((clinic) => clinic.id === form.clinicId) || clinics[0];
   const selectedPurpose = STAFF_PATIENT_MESSAGE_PURPOSE_BY_ID[form.purpose];
@@ -246,7 +251,9 @@ export function NursePatientMessageClient({
         return;
       }
 
-      setHistoryConversations(Array.isArray(payload.conversations) ? payload.conversations : []);
+      const nextConversations = Array.isArray(payload.conversations) ? payload.conversations : [];
+      setHistoryConversations(nextConversations);
+      setActiveHistoryConversationId(nextConversations[0]?.id || null);
     } catch (error) {
       if (controller.signal.aborted) return;
       setHistoryError(error instanceof Error ? error.message : "讀取對話紀錄失敗");
@@ -262,6 +269,9 @@ export function NursePatientMessageClient({
       phone: contact.phoneNumber || current.phone,
     }));
     setSelectedContact(contact);
+    setComposerText("");
+    setComposerFile(null);
+    setComposerError("");
     setContactQuery("");
     setContactResults([]);
     void loadContactHistory(contact);
@@ -330,6 +340,67 @@ export function NursePatientMessageClient({
       hour: "2-digit",
       minute: "2-digit",
     }).format(new Date(value));
+  }
+
+  async function sendComposerMessage() {
+    if (!selectedContact || !activeHistoryConversationId || isSendingComposerMessage) return;
+
+    const content = composerText.trim();
+    if (!content && !composerFile) {
+      setComposerError("請輸入訊息或選擇圖片。");
+      return;
+    }
+
+    try {
+      setIsSendingComposerMessage(true);
+      setComposerError("");
+
+      const endpoint = `/api/nurse/chatwoot-contacts/${selectedContact.id}/conversations/${activeHistoryConversationId}/messages`;
+      const requestInit: RequestInit = {
+        method: "POST",
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+      };
+
+      if (composerFile) {
+        const body = new FormData();
+        body.set("content", content);
+        body.set("attachment", composerFile);
+        requestInit.body = body;
+      } else {
+        requestInit.headers = {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        };
+        requestInit.body = JSON.stringify({ content });
+      }
+
+      const response = await fetch(endpoint, requestInit);
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || !payload.success) {
+        setComposerError(payload.error || "發送失敗");
+        return;
+      }
+
+      if (payload.message) {
+        setHistoryConversations((current) =>
+          current.map((conversation) =>
+            conversation.id === activeHistoryConversationId
+              ? { ...conversation, messages: [...conversation.messages, payload.message] }
+              : conversation,
+          ),
+        );
+      } else {
+        void loadContactHistory(selectedContact);
+      }
+
+      setComposerText("");
+      setComposerFile(null);
+    } catch (error) {
+      setComposerError(error instanceof Error ? error.message : "發送失敗");
+    } finally {
+      setIsSendingComposerMessage(false);
+    }
   }
 
   return (
@@ -436,11 +507,22 @@ export function NursePatientMessageClient({
           {historyConversations.length > 0 ? (
             <div className="max-h-[420px] space-y-4 overflow-y-auto pr-1">
               {historyConversations.map((conversation) => (
-                <div key={conversation.id} className="space-y-2 rounded-lg border border-slate-100 bg-slate-50 p-3">
-                  <div className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-500">
+                <div
+                  key={conversation.id}
+                  className={`space-y-2 rounded-lg border bg-slate-50 p-3 ${
+                    conversation.id === activeHistoryConversationId
+                      ? "border-emerald-200"
+                      : "border-slate-100"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setActiveHistoryConversationId(conversation.id)}
+                    className="flex w-full items-center justify-between gap-2 text-left text-xs font-semibold text-slate-500"
+                  >
                     <span>對話 #{conversation.id}</span>
                     {conversation.status ? <span>{conversation.status}</span> : null}
-                  </div>
+                  </button>
                   {conversation.messages.length > 0 ? (
                     <div className="space-y-2">
                       {conversation.messages.map((message) => {
@@ -496,6 +578,54 @@ export function NursePatientMessageClient({
                   )}
                 </div>
               ))}
+            </div>
+          ) : null}
+
+          {historyConversations.length > 0 && activeHistoryConversationId ? (
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-900">回覆對話 #{activeHistoryConversationId}</p>
+                {composerFile ? (
+                  <button
+                    type="button"
+                    onClick={() => setComposerFile(null)}
+                    className="text-xs font-semibold text-slate-500 hover:text-rose-700"
+                  >
+                    移除圖片
+                  </button>
+                ) : null}
+              </div>
+              <textarea
+                value={composerText}
+                onChange={(event) => setComposerText(event.target.value)}
+                className="min-h-20 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                placeholder="輸入 WhatsApp 訊息"
+                maxLength={2000}
+              />
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                  <Paperclip className="h-4 w-4" />
+                  {composerFile ? composerFile.name : "圖片"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={(event) => setComposerFile(event.target.files?.[0] || null)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void sendComposerMessage()}
+                  disabled={isSendingComposerMessage}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isSendingComposerMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  發送
+                </button>
+              </div>
+              {composerError ? (
+                <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{composerError}</p>
+              ) : null}
             </div>
           ) : null}
         </section>
