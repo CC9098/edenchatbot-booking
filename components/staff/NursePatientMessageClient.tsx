@@ -8,6 +8,7 @@ import {
   LinkIcon,
   Loader2,
   MessageSquareText,
+  Paperclip,
   Send,
   ShieldCheck,
   TriangleAlert,
@@ -30,6 +31,25 @@ type ContactSearchResult = {
   id: number;
   name: string;
   phoneNumber: string;
+};
+
+type ContactHistoryMessage = {
+  id: number;
+  direction: "incoming" | "outgoing";
+  content: string;
+  createdAt: string | null;
+  attachments: Array<{
+    id: number;
+    fileType: string;
+    url: string;
+    label: string;
+  }>;
+};
+
+type ContactHistoryConversation = {
+  id: number;
+  status: string | null;
+  messages: ContactHistoryMessage[];
 };
 
 type SendState =
@@ -124,6 +144,10 @@ export function NursePatientMessageClient({
   const [contactResults, setContactResults] = useState<ContactSearchResult[]>([]);
   const [isSearchingContacts, setIsSearchingContacts] = useState(false);
   const [contactSearchError, setContactSearchError] = useState("");
+  const [selectedContact, setSelectedContact] = useState<ContactSearchResult | null>(null);
+  const [historyConversations, setHistoryConversations] = useState<ContactHistoryConversation[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState("");
 
   const selectedClinic = clinics.find((clinic) => clinic.id === form.clinicId) || clinics[0];
   const selectedPurpose = STAFF_PATIENT_MESSAGE_PURPOSE_BY_ID[form.purpose];
@@ -203,14 +227,44 @@ export function NursePatientMessageClient({
     });
   }, [form, selectedClinic?.nameZh]);
 
+  async function loadContactHistory(contact: ContactSearchResult) {
+    const controller = new AbortController();
+    try {
+      setIsLoadingHistory(true);
+      setHistoryError("");
+      setHistoryConversations([]);
+
+      const response = await fetch(`/api/nurse/chatwoot-contacts/${contact.id}/history`, {
+        cache: "no-store",
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setHistoryError(payload.error || "讀取對話紀錄失敗");
+        return;
+      }
+
+      setHistoryConversations(Array.isArray(payload.conversations) ? payload.conversations : []);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setHistoryError(error instanceof Error ? error.message : "讀取對話紀錄失敗");
+    } finally {
+      if (!controller.signal.aborted) setIsLoadingHistory(false);
+    }
+  }
+
   function fillContact(contact: ContactSearchResult) {
     setForm((current) => ({
       ...current,
       patientName: contact.name || current.patientName,
       phone: contact.phoneNumber || current.phone,
     }));
+    setSelectedContact(contact);
     setContactQuery("");
     setContactResults([]);
+    void loadContactHistory(contact);
   }
 
   function useLatestIncomingAsForwardDraft() {
@@ -266,6 +320,16 @@ export function NursePatientMessageClient({
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function formatMessageTime(value: string | null) {
+    if (!value) return "";
+    return new Intl.DateTimeFormat("zh-HK", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
   }
 
   return (
@@ -338,6 +402,99 @@ export function NursePatientMessageClient({
                   <span className="min-w-0 truncate font-semibold text-slate-900">{contact.name}</span>
                   <span className="shrink-0 text-slate-500">{contact.phoneNumber}</span>
                 </button>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {embedded && selectedContact ? (
+        <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">過往對話</p>
+              <p className="text-sm text-slate-500">
+                {selectedContact.name} · {selectedContact.phoneNumber}
+              </p>
+            </div>
+            {isLoadingHistory ? (
+              <div className="inline-flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                載入中
+              </div>
+            ) : null}
+          </div>
+
+          {historyError ? (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{historyError}</p>
+          ) : null}
+
+          {!isLoadingHistory && !historyError && historyConversations.length === 0 ? (
+            <p className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">未有過往對話。</p>
+          ) : null}
+
+          {historyConversations.length > 0 ? (
+            <div className="max-h-[420px] space-y-4 overflow-y-auto pr-1">
+              {historyConversations.map((conversation) => (
+                <div key={conversation.id} className="space-y-2 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <div className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-500">
+                    <span>對話 #{conversation.id}</span>
+                    {conversation.status ? <span>{conversation.status}</span> : null}
+                  </div>
+                  {conversation.messages.length > 0 ? (
+                    <div className="space-y-2">
+                      {conversation.messages.map((message) => {
+                        const incoming = message.direction === "incoming";
+
+                        return (
+                          <div
+                            key={message.id}
+                            className={`flex ${incoming ? "justify-start" : "justify-end"}`}
+                          >
+                            <div
+                              className={`max-w-[82%] rounded-lg px-3 py-2 text-sm shadow-sm ${
+                                incoming
+                                  ? "bg-white text-slate-900"
+                                  : "bg-emerald-700 text-white"
+                              }`}
+                            >
+                              {message.content ? (
+                                <p className="whitespace-pre-wrap break-words leading-6">{message.content}</p>
+                              ) : null}
+                              {message.attachments.length > 0 ? (
+                                <div className="mt-2 space-y-1">
+                                  {message.attachments.map((attachment) => (
+                                    <a
+                                      key={attachment.id}
+                                      href={attachment.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold ${
+                                        incoming
+                                          ? "bg-slate-100 text-slate-700"
+                                          : "bg-emerald-800 text-emerald-50"
+                                      }`}
+                                    >
+                                      <Paperclip className="h-3 w-3" />
+                                      {attachment.label}
+                                    </a>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {message.createdAt ? (
+                                <p className={`mt-1 text-[11px] ${incoming ? "text-slate-400" : "text-emerald-100"}`}>
+                                  {formatMessageTime(message.createdAt)}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">此對話未有可顯示 WhatsApp 訊息。</p>
+                  )}
+                </div>
               ))}
             </div>
           ) : null}

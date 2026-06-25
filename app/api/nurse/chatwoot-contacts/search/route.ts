@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { AuthError } from "@/lib/auth-helpers";
 import { requireStaffRoleWithChatwootEdenToolsToken } from "@/lib/chatwoot-eden-tools-session";
+import {
+  getStaffChatwootConfig,
+  resolveStaffChatwootAccountId,
+  staffChatwootRequest,
+} from "@/lib/staff-chatwoot-api";
 import { shouldSearchStaffContactQuery } from "@/lib/staff-contact-search";
 
 export const dynamic = "force-dynamic";
@@ -13,62 +18,6 @@ type ChatwootContact = {
   email?: string | null;
 };
 
-function getChatwootConfig() {
-  const baseUrl = (process.env.CHATWOOT_BASE_URL || "").trim().replace(/\/$/, "");
-  const apiAccessToken = (process.env.CHATWOOT_API_ACCESS_TOKEN || "").trim();
-  const configuredAccountId = Number(process.env.CHATWOOT_ACCOUNT_ID || "");
-
-  if (!baseUrl || !apiAccessToken) {
-    throw new Error("Chatwoot is not configured");
-  }
-
-  return {
-    baseUrl,
-    apiAccessToken,
-    accountId: Number.isFinite(configuredAccountId) && configuredAccountId > 0
-      ? configuredAccountId
-      : null,
-  };
-}
-
-async function chatwootRequest<T>(
-  baseUrl: string,
-  apiAccessToken: string,
-  path: string,
-): Promise<T> {
-  const response = await fetch(`${baseUrl}${path}`, {
-    headers: {
-      api_access_token: apiAccessToken,
-      "Content-Type": "application/json",
-    },
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`[Chatwoot] ${response.status}: ${text.slice(0, 200)}`);
-  }
-
-  return response.json() as Promise<T>;
-}
-
-async function resolveAccountId(
-  baseUrl: string,
-  apiAccessToken: string,
-  configuredAccountId: number | null,
-): Promise<number> {
-  if (configuredAccountId) return configuredAccountId;
-
-  const profile = await chatwootRequest<{
-    account_id?: number;
-    accounts?: Array<{ id?: number }>;
-  }>(baseUrl, apiAccessToken, "/api/v1/profile");
-
-  const accountId = profile.account_id || profile.accounts?.find((account) => account.id)?.id;
-  if (!accountId) throw new Error("Unable to resolve Chatwoot account");
-  return accountId;
-}
-
 export async function GET(request: NextRequest) {
   try {
     await requireStaffRoleWithChatwootEdenToolsToken(request);
@@ -78,10 +27,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ contacts: [] });
     }
 
-    const { baseUrl, apiAccessToken, accountId: configuredAccountId } = getChatwootConfig();
-    const accountId = await resolveAccountId(baseUrl, apiAccessToken, configuredAccountId);
+    const { baseUrl, apiAccessToken, accountId: configuredAccountId } = getStaffChatwootConfig();
+    const accountId = await resolveStaffChatwootAccountId(baseUrl, apiAccessToken, configuredAccountId);
     const searchParams = new URLSearchParams({ q: query });
-    const response = await chatwootRequest<{ payload?: ChatwootContact[] }>(
+    const response = await staffChatwootRequest<{ payload?: ChatwootContact[] }>(
       baseUrl,
       apiAccessToken,
       `/api/v1/accounts/${accountId}/contacts/search?${searchParams.toString()}`,
