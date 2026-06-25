@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -21,6 +21,12 @@ import {
   type StaffPatientMessagePurpose,
 } from "@/lib/staff-patient-messages";
 import { shouldSearchStaffContactQuery } from "@/lib/staff-contact-search";
+import {
+  appendChatwootWorkbenchMessage,
+  getChatwootWorkbenchScrollKey,
+  type StaffChatwootWorkbenchConversation,
+  type StaffChatwootWorkbenchMessage,
+} from "@/lib/staff-chatwoot-workbench";
 
 type ClinicOption = {
   id: string;
@@ -33,24 +39,8 @@ type ContactSearchResult = {
   phoneNumber: string;
 };
 
-type ContactHistoryMessage = {
-  id: number;
-  direction: "incoming" | "outgoing";
-  content: string;
-  createdAt: string | null;
-  attachments: Array<{
-    id: number;
-    fileType: string;
-    url: string;
-    label: string;
-  }>;
-};
-
-type ContactHistoryConversation = {
-  id: number;
-  status: string | null;
-  messages: ContactHistoryMessage[];
-};
+type ContactHistoryMessage = StaffChatwootWorkbenchMessage;
+type ContactHistoryConversation = StaffChatwootWorkbenchConversation;
 
 type SendState =
   | { status: "idle" }
@@ -153,6 +143,7 @@ export function NursePatientMessageClient({
   const [composerFile, setComposerFile] = useState<File | null>(null);
   const [isSendingComposerMessage, setIsSendingComposerMessage] = useState(false);
   const [composerError, setComposerError] = useState("");
+  const activeHistoryBottomRef = useRef<HTMLDivElement | null>(null);
 
   const selectedClinic = clinics.find((clinic) => clinic.id === form.clinicId) || clinics[0];
   const selectedPurpose = STAFF_PATIENT_MESSAGE_PURPOSE_BY_ID[form.purpose];
@@ -231,6 +222,21 @@ export function NursePatientMessageClient({
       totalAmount: form.totalAmount,
     });
   }, [form, selectedClinic?.nameZh]);
+
+  const activeHistoryScrollKey = useMemo(
+    () => getChatwootWorkbenchScrollKey(historyConversations, activeHistoryConversationId),
+    [activeHistoryConversationId, historyConversations],
+  );
+
+  useEffect(() => {
+    if (!activeHistoryScrollKey) return;
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      activeHistoryBottomRef.current?.scrollIntoView({ block: "end" });
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [activeHistoryScrollKey]);
 
   async function loadContactHistory(contact: ContactSearchResult) {
     const controller = new AbortController();
@@ -384,11 +390,7 @@ export function NursePatientMessageClient({
 
       if (payload.message) {
         setHistoryConversations((current) =>
-          current.map((conversation) =>
-            conversation.id === activeHistoryConversationId
-              ? { ...conversation, messages: [...conversation.messages, payload.message] }
-              : conversation,
-          ),
+          appendChatwootWorkbenchMessage(current, activeHistoryConversationId, payload.message),
         );
       } else {
         void loadContactHistory(selectedContact);
@@ -572,6 +574,9 @@ export function NursePatientMessageClient({
                           </div>
                         );
                       })}
+                      {conversation.id === activeHistoryConversationId ? (
+                        <div ref={activeHistoryBottomRef} aria-hidden="true" />
+                      ) : null}
                     </div>
                   ) : (
                     <p className="text-sm text-slate-500">此對話未有可顯示 WhatsApp 訊息。</p>
