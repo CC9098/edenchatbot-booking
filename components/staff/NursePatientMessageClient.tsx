@@ -19,6 +19,7 @@ import {
   buildStaffPatientMessageText,
   type StaffPatientMessagePurpose,
 } from "@/lib/staff-patient-messages";
+import { shouldSearchStaffContactQuery } from "@/lib/staff-contact-search";
 
 type ClinicOption = {
   id: string;
@@ -145,7 +146,7 @@ export function NursePatientMessageClient({
   }, [appliedPrefillKey, prefill, prefillKey]);
 
   useEffect(() => {
-    if (!embedded || contactQuery.trim().length < 2) {
+    if (!embedded || !shouldSearchStaffContactQuery(contactQuery)) {
       setContactResults([]);
       setContactSearchError("");
       return;

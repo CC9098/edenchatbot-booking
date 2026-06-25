@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { AuthError } from "@/lib/auth-helpers";
 import { requireStaffRoleWithChatwootEdenToolsToken } from "@/lib/chatwoot-eden-tools-session";
+import { shouldSearchStaffContactQuery } from "@/lib/staff-contact-search";
 
 export const dynamic = "force-dynamic";
 
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
     await requireStaffRoleWithChatwootEdenToolsToken(request);
 
     const query = (request.nextUrl.searchParams.get("q") || "").trim();
-    if (query.length < 2) {
+    if (!shouldSearchStaffContactQuery(query)) {
       return NextResponse.json({ contacts: [] });
     }
 
