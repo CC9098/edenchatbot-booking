@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   appendChatwootWorkbenchMessage,
   canReplyToChatwootWorkbenchConversation,
+  getChatwootWorkbenchComposerMode,
   getChatwootWorkbenchConversationStatusLabel,
   getChatwootWorkbenchScrollKey,
   type StaffChatwootWorkbenchConversation,
@@ -72,4 +73,9 @@ test("translates Chatwoot internal conversation status for staff", () => {
   assert.equal(getChatwootWorkbenchConversationStatusLabel({ status: "open", canReply: true }), "可回覆");
   assert.equal(canReplyToChatwootWorkbenchConversation({ status: "resolved", canReply: false }), false);
   assert.equal(canReplyToChatwootWorkbenchConversation({ status: "open", canReply: true }), true);
+});
+
+test("uses template composer mode when a WhatsApp conversation is closed", () => {
+  assert.equal(getChatwootWorkbenchComposerMode({ status: "resolved", canReply: false }), "template");
+  assert.equal(getChatwootWorkbenchComposerMode({ status: "open", canReply: true }), "direct");
 });

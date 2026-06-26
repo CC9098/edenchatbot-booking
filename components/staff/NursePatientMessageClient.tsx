@@ -23,7 +23,7 @@ import {
 import { shouldSearchStaffContactQuery } from "@/lib/staff-contact-search";
 import {
   appendChatwootWorkbenchMessage,
-  canReplyToChatwootWorkbenchConversation,
+  getChatwootWorkbenchComposerMode,
   getChatwootWorkbenchConversationStatusLabel,
   getChatwootWorkbenchScrollKey,
   type StaffChatwootWorkbenchConversation,
@@ -230,9 +230,8 @@ export function NursePatientMessageClient({
     [activeHistoryConversationId, historyConversations],
   );
   const activeHistoryConversation = historyConversations.find((conversation) => conversation.id === activeHistoryConversationId) || null;
-  const canReplyToActiveHistoryConversation = activeHistoryConversation
-    ? canReplyToChatwootWorkbenchConversation(activeHistoryConversation)
-    : false;
+  const activeComposerMode = getChatwootWorkbenchComposerMode(activeHistoryConversation);
+  const isTemplateComposerMode = activeComposerMode === "template";
 
   useEffect(() => {
     if (!activeHistoryScrollKey) return;
@@ -357,20 +356,48 @@ export function NursePatientMessageClient({
   async function sendComposerMessage() {
     if (!selectedContact || !activeHistoryConversationId || isSendingComposerMessage) return;
 
-    if (!canReplyToActiveHistoryConversation) {
-      setComposerError("此對話已關閉。普通文字未能送出，請改用 approved template，或請病人先回覆 WhatsApp。");
-      return;
-    }
-
     const content = composerText.trim();
     if (!content && !composerFile) {
       setComposerError("請輸入訊息或選擇圖片。");
       return;
     }
 
+    if (isTemplateComposerMode && composerFile) {
+      setComposerError("已關閉對話會自動用 template 發送，暫時不支援圖片。");
+      return;
+    }
+
     try {
       setIsSendingComposerMessage(true);
       setComposerError("");
+
+      if (isTemplateComposerMode) {
+        const response = await fetch("/api/nurse/patient-messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          },
+          body: JSON.stringify({
+            patientName: selectedContact.name || "病人",
+            phone: selectedContact.phoneNumber,
+            clinicId: form.clinicId,
+            purpose: "follow_up",
+            note: content,
+          }),
+        });
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok || !payload.success) {
+          setComposerError(payload.error || "Template 發送失敗");
+          return;
+        }
+
+        setComposerText("");
+        setComposerFile(null);
+        void loadContactHistory(selectedContact);
+        return;
+      }
 
       const endpoint = `/api/nurse/chatwoot-contacts/${selectedContact.id}/conversations/${activeHistoryConversationId}/messages`;
       const requestInit: RequestInit = {
@@ -621,27 +648,28 @@ export function NursePatientMessageClient({
                   </button>
                 ) : null}
               </div>
-              {!canReplyToActiveHistoryConversation ? (
+              {isTemplateComposerMode ? (
                 <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
-                  已關閉：普通文字未能送出，請改用 approved template。
+                  已關閉：會自動用 template 發送。
                 </p>
               ) : null}
               <textarea
                 value={composerText}
                 onChange={(event) => setComposerText(event.target.value)}
-                disabled={!canReplyToActiveHistoryConversation}
                 className="min-h-20 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 placeholder="輸入 WhatsApp 訊息"
-                maxLength={2000}
+                maxLength={isTemplateComposerMode ? 240 : 2000}
               />
               <div className="flex flex-wrap items-center gap-3">
-                <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                <label className={`inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition ${
+                  isTemplateComposerMode ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:bg-slate-50"
+                }`}>
                   <Paperclip className="h-4 w-4" />
                   {composerFile ? composerFile.name : "圖片"}
                   <input
                     type="file"
                     accept="image/*"
-                    disabled={!canReplyToActiveHistoryConversation}
+                    disabled={isTemplateComposerMode}
                     className="sr-only"
                     onChange={(event) => setComposerFile(event.target.files?.[0] || null)}
                   />
@@ -649,11 +677,11 @@ export function NursePatientMessageClient({
                 <button
                   type="button"
                   onClick={() => void sendComposerMessage()}
-                  disabled={isSendingComposerMessage || !canReplyToActiveHistoryConversation}
+                  disabled={isSendingComposerMessage}
                   className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
                   {isSendingComposerMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  發送
+                  {isTemplateComposerMode ? "用 template 發送" : "發送"}
                 </button>
               </div>
               {composerError ? (

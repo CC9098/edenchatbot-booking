@@ -156,7 +156,7 @@ export function buildStaffPatientMessageText(input: BuildStaffPatientMessageText
       break;
   }
 
-  lines.push("", `診所：${input.clinicNameZh}`, "如有問題，可直接回覆此訊息。");
+  lines.push("", `診所：${input.clinicNameZh}`, "如有問題，請直接回覆此 WhatsApp。");
 
   return lines.filter((line, index, allLines) => line || allLines[index - 1] !== "").join("\n");
 }

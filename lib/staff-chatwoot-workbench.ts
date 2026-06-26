@@ -69,3 +69,10 @@ export function canReplyToChatwootWorkbenchConversation(
   if (conversation.status === "resolved") return false;
   return true;
 }
+
+export function getChatwootWorkbenchComposerMode(
+  conversation: Pick<StaffChatwootWorkbenchConversation, "status" | "canReply"> | null,
+): "direct" | "template" {
+  if (!conversation) return "direct";
+  return canReplyToChatwootWorkbenchConversation(conversation) ? "direct" : "template";
+}
