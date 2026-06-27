@@ -9,6 +9,9 @@ export const STAFF_PATIENT_MESSAGE_PURPOSE_IDS = [
 
 export type StaffPatientMessagePurpose = (typeof STAFF_PATIENT_MESSAGE_PURPOSE_IDS)[number];
 
+export const STAFF_PATIENT_GENERAL_NOTE_TEMPLATE_NAME = "staff_patient_general_note";
+export const STAFF_PATIENT_LEGACY_FOLLOW_UP_TEMPLATE_NAME = "staff_patient_follow_up";
+
 export type StaffPatientMessagePurposeOption = {
   id: StaffPatientMessagePurpose;
   label: string;
@@ -39,11 +42,11 @@ export const STAFF_PATIENT_MESSAGE_PURPOSE_OPTIONS: StaffPatientMessagePurposeOp
   },
   {
     id: "follow_up",
-    label: "姑娘跟進",
+    label: "一般跟進",
     shortLabel: "跟進",
-    description: "通知病人姑娘需要跟進，請病人直接回覆 WhatsApp。",
-    noteLabel: "跟進內容（選填）",
-    notePlaceholder: "例如：姑娘想確認你的預約資料，請回覆此訊息。",
+    description: "傳 approved template，內容由姑娘輸入。",
+    noteLabel: "訊息內容",
+    notePlaceholder: "例如：你要的收據已準備好，可以到診所領取。",
   },
   {
     id: "manage_link",
@@ -95,7 +98,7 @@ function getStaffPatientMessageNote(input: BuildStaffPatientMessageTextInput): s
     case "pre_visit":
       return "溫馨提示：到診前請準備相關病歷、藥物紀錄或報告，並按預約時間到達診所。";
     case "follow_up":
-      return "姑娘需要跟進你的查詢，請直接回覆此 WhatsApp 訊息，我們會盡快處理。";
+      return "診所有事項需要跟進。";
     case "online_waiting":
       return "如醫師仍未進入網上診症，請保持 Google Meet 或網上診症入口開啟，姑娘會盡快跟進。";
     case "manage_link":
@@ -112,6 +115,19 @@ export function buildStaffPatientMessageText(input: BuildStaffPatientMessageText
   const note = getStaffPatientMessageNote(input);
   const linkUrl = input.linkUrl?.trim();
   const manageUrl = input.manageUrl?.trim();
+
+  if (input.purpose === "follow_up") {
+    return [
+      "醫天圓中醫診所通知",
+      "",
+      "你好，以下是診所給你的跟進訊息：",
+      "",
+      note,
+      "",
+      "如有問題，請直接回覆此 WhatsApp。",
+    ].filter((line, index, allLines) => line || allLines[index - 1] !== "").join("\n");
+  }
+
   const lines = ["醫天圓中醫診所通知", "", `你好 ${input.patientName}，`];
 
   switch (input.purpose) {
@@ -125,11 +141,6 @@ export function buildStaffPatientMessageText(input: BuildStaffPatientMessageText
     case "pre_visit":
       lines.push(
         note || "溫馨提示：到診前請準備相關病歷、藥物紀錄或報告，並按預約時間到達診所。",
-      );
-      break;
-    case "follow_up":
-      lines.push(
-        note || "姑娘需要跟進你的查詢，請直接回覆此 WhatsApp 訊息，我們會盡快處理。",
       );
       break;
     case "manage_link":
@@ -163,6 +174,7 @@ export function buildStaffPatientMessageText(input: BuildStaffPatientMessageText
 
 export function buildStaffPatientTemplateBodyParams(
   input: BuildStaffPatientMessageTextInput,
+  templateName?: string,
 ): Record<string, string> {
   if (input.purpose === "manage_link") {
     return {
@@ -178,6 +190,16 @@ export function buildStaffPatientTemplateBodyParams(
       "4": input.treatmentFee?.trim() || "",
       "5": input.extraFee?.trim() || "",
       "6": input.totalAmount?.trim() || "",
+    };
+  }
+
+  if (
+    input.purpose === "follow_up" &&
+    templateName &&
+    templateName !== STAFF_PATIENT_LEGACY_FOLLOW_UP_TEMPLATE_NAME
+  ) {
+    return {
+      "1": getStaffPatientMessageNote(input),
     };
   }
 

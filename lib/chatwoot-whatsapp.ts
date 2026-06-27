@@ -5,6 +5,8 @@ import {
   type ChatwootCampaignContext,
 } from '@/lib/chatwoot-campaign-context';
 import {
+  STAFF_PATIENT_GENERAL_NOTE_TEMPLATE_NAME,
+  STAFF_PATIENT_LEGACY_FOLLOW_UP_TEMPLATE_NAME,
   buildStaffPatientMessageText,
   buildStaffPatientTemplateBodyParams,
   type StaffPatientMessagePurpose,
@@ -831,6 +833,13 @@ function getStaffPatientMessageTemplateConfigs(
     return getManageLinkTemplateConfigs(inbox);
   }
 
+  const configuredFollowUpTemplateName = (
+    process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME || ''
+  ).trim();
+  const effectiveFollowUpTemplateName = configuredFollowUpTemplateName === STAFF_PATIENT_LEGACY_FOLLOW_UP_TEMPLATE_NAME
+    ? undefined
+    : process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME;
+
   const templateOptions: Record<Exclude<StaffPatientMessagePurpose, 'manage_link'>, {
     configuredName?: string;
     configuredLanguage?: string;
@@ -851,10 +860,13 @@ function getStaffPatientMessageTemplateConfigs(
       fallbackNames: ['staff_patient_pre_visit'],
     },
     follow_up: {
-      configuredName: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME,
+      configuredName: effectiveFollowUpTemplateName,
       configuredLanguage: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE,
       configuredCategory: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY,
-      fallbackNames: ['staff_patient_follow_up'],
+      fallbackNames: [
+        STAFF_PATIENT_GENERAL_NOTE_TEMPLATE_NAME,
+        STAFF_PATIENT_LEGACY_FOLLOW_UP_TEMPLATE_NAME,
+      ],
     },
     online_waiting: {
       configuredName: process.env.CHATWOOT_WHATSAPP_STAFF_ONLINE_WAITING_TEMPLATE_NAME,
@@ -1024,12 +1036,16 @@ async function sendMessageWithTemplateFallback(
   conversationId: number,
   content: string,
   templateConfigs: TemplateConfig[],
-  bodyParams: Record<string, string>,
+  buildBodyParams: Record<string, string> | ((templateConfig: TemplateConfig) => Record<string, string>),
 ) {
   let lastError: unknown = null;
-  const processedParamCandidates = buildTemplateProcessedParamCandidates(bodyParams);
 
   for (const templateConfig of templateConfigs) {
+    const bodyParams = typeof buildBodyParams === 'function'
+      ? buildBodyParams(templateConfig)
+      : buildBodyParams;
+    const processedParamCandidates = buildTemplateProcessedParamCandidates(bodyParams);
+
     for (const processedParams of processedParamCandidates) {
       try {
         const message = await client.createMessage(accountId, conversationId, {
@@ -1502,7 +1518,7 @@ async function sendBookingWhatsappNotification(
   },
   options: {
     buildContent: () => string;
-    buildBodyParams: () => Record<string, string>;
+    buildBodyParams: (templateConfig?: TemplateConfig) => Record<string, string>;
     getTemplateConfigs: (inbox: ChatwootInbox) => TemplateConfig[];
     preferTemplateIfAvailable?: boolean;
     fallbackTextOnTemplateFailure?: boolean;
@@ -1571,7 +1587,6 @@ async function sendBookingWhatsappNotification(
 
   const content = options.buildContent();
   const templateConfigs = options.getTemplateConfigs(inbox);
-  const bodyParams = options.buildBodyParams();
   let deliveryStatus: string | null | undefined;
   let activeConversationTextError: unknown = null;
 
@@ -1583,7 +1598,7 @@ async function sendBookingWhatsappNotification(
         conversationId,
         content,
         templateConfigs,
-        bodyParams,
+        options.buildBodyParams,
       );
     } catch (error) {
       if (
@@ -1650,7 +1665,7 @@ async function sendBookingWhatsappNotification(
       conversationId,
       content,
       templateConfigs,
-      bodyParams,
+      options.buildBodyParams,
     );
   } else {
     if (activeConversationTextError) {
@@ -1951,7 +1966,7 @@ export async function sendStaffPatientWhatsappMessage(
       },
       {
         buildContent: () => buildStaffPatientMessageText(input),
-        buildBodyParams: () => buildStaffPatientTemplateBodyParams(input),
+        buildBodyParams: (templateConfig) => buildStaffPatientTemplateBodyParams(input, templateConfig?.name),
         getTemplateConfigs: (inbox) => getStaffPatientMessageTemplateConfigs(inbox, input.purpose),
         preferTemplateIfAvailable: true,
         fallbackTextOnTemplateFailure: true,
