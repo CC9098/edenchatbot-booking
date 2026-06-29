@@ -1955,7 +1955,7 @@ export async function sendStaffPatientWhatsappMessage(
       },
       {
         buildContent: () => buildStaffPatientMessageText(input),
-        buildBodyParams: (templateConfig) => buildStaffPatientTemplateBodyParams(input, templateConfig?.name),
+        buildBodyParams: () => buildStaffPatientTemplateBodyParams(input),
         getTemplateConfigs: (inbox) => getStaffPatientMessageTemplateConfigs(inbox, input.purpose),
         preferTemplateIfAvailable: true,
         fallbackTextOnTemplateFailure: true,

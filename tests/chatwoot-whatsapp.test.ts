@@ -27,7 +27,7 @@ test('buildStaffPatientTemplateBodyParams maps staff follow-up template to one s
     clinicNameZh: '荃灣',
     purpose: 'follow_up',
     note: '你要的收據已準備好，可以到診所領取。',
-  }, 'staff_patient_follow_up');
+  });
 
   assert.deepEqual(params, {
     '1': '你要的收據已準備好，可以到診所領取。',
@@ -40,7 +40,7 @@ test('buildStaffPatientTemplateBodyParams sends a neutral default follow-up note
     clinicNameZh: '荃灣',
     purpose: 'follow_up',
     note: '',
-  }, 'staff_patient_follow_up');
+  });
 
   assert.deepEqual(params, {
     '1': '診所有事項需要跟進。',
@@ -493,7 +493,7 @@ test('sendStaffPatientWhatsappMessage records campaign context on the same Chatw
   }
 });
 
-test('sendStaffPatientWhatsappMessage uses the configured one-variable follow-up template when synced', async () => {
+test('sendStaffPatientWhatsappMessage uses staff_patient_follow_up as the one-variable follow-up template', async () => {
   const originalFetch = global.fetch;
   const originalEnv = {
     CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
@@ -531,20 +531,12 @@ test('sendStaffPatientWhatsappMessage uses the configured one-variable follow-up
           id: 7,
           channel_type: 'Channel::Whatsapp',
           phone_number: '+85267333801',
-          message_templates: [
-            {
-              name: 'staff_patient_follow_up',
-              language: 'zh_HK',
-              status: 'approved',
-              category: 'UTILITY',
-            },
-            {
-              name: 'staff_patient_general_note',
-              language: 'zh_HK',
-              status: 'approved',
-              category: 'UTILITY',
-            },
-          ],
+          message_templates: [{
+            name: 'staff_patient_follow_up',
+            language: 'zh_HK',
+            status: 'approved',
+            category: 'UTILITY',
+          }],
         }],
       });
     }
@@ -618,6 +610,7 @@ test('sendStaffPatientWhatsappMessage uses the configured one-variable follow-up
     assert.deepEqual(sentMessagePayloads[0]?.template_params?.processed_params?.body, {
       '1': '你要的收據已準備好，可以到診所領取。',
     });
+    assert.deepEqual(Object.keys(sentMessagePayloads[0]?.template_params?.processed_params?.body || {}), ['1']);
     assert.equal('patient_name' in sentMessagePayloads[0]?.template_params?.processed_params?.body, false);
     assert.equal('clinic_name' in sentMessagePayloads[0]?.template_params?.processed_params?.body, false);
     assert.equal('staff_note' in sentMessagePayloads[0]?.template_params?.processed_params?.body, false);

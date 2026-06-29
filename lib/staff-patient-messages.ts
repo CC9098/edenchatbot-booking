@@ -173,7 +173,6 @@ export function buildStaffPatientMessageText(input: BuildStaffPatientMessageText
 
 export function buildStaffPatientTemplateBodyParams(
   input: BuildStaffPatientMessageTextInput,
-  templateName?: string,
 ): Record<string, string> {
   if (input.purpose === "manage_link") {
     return {
