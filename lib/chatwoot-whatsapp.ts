@@ -5,8 +5,7 @@ import {
   type ChatwootCampaignContext,
 } from '@/lib/chatwoot-campaign-context';
 import {
-  STAFF_PATIENT_GENERAL_NOTE_TEMPLATE_NAME,
-  STAFF_PATIENT_LEGACY_FOLLOW_UP_TEMPLATE_NAME,
+  STAFF_PATIENT_FOLLOW_UP_TEMPLATE_NAME,
   buildStaffPatientMessageText,
   buildStaffPatientTemplateBodyParams,
   type StaffPatientMessagePurpose,
@@ -833,13 +832,6 @@ function getStaffPatientMessageTemplateConfigs(
     return getManageLinkTemplateConfigs(inbox);
   }
 
-  const configuredFollowUpTemplateName = (
-    process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME || ''
-  ).trim();
-  const effectiveFollowUpTemplateName = configuredFollowUpTemplateName === STAFF_PATIENT_LEGACY_FOLLOW_UP_TEMPLATE_NAME
-    ? undefined
-    : process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME;
-
   const templateOptions: Record<Exclude<StaffPatientMessagePurpose, 'manage_link'>, {
     configuredName?: string;
     configuredLanguage?: string;
@@ -860,13 +852,10 @@ function getStaffPatientMessageTemplateConfigs(
       fallbackNames: ['staff_patient_pre_visit'],
     },
     follow_up: {
-      configuredName: effectiveFollowUpTemplateName,
+      configuredName: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME,
       configuredLanguage: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE,
       configuredCategory: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY,
-      fallbackNames: [
-        STAFF_PATIENT_GENERAL_NOTE_TEMPLATE_NAME,
-        STAFF_PATIENT_LEGACY_FOLLOW_UP_TEMPLATE_NAME,
-      ],
+      fallbackNames: [STAFF_PATIENT_FOLLOW_UP_TEMPLATE_NAME],
     },
     online_waiting: {
       configuredName: process.env.CHATWOOT_WHATSAPP_STAFF_ONLINE_WAITING_TEMPLATE_NAME,

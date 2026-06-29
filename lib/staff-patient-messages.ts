@@ -9,8 +9,7 @@ export const STAFF_PATIENT_MESSAGE_PURPOSE_IDS = [
 
 export type StaffPatientMessagePurpose = (typeof STAFF_PATIENT_MESSAGE_PURPOSE_IDS)[number];
 
-export const STAFF_PATIENT_GENERAL_NOTE_TEMPLATE_NAME = "staff_patient_general_note";
-export const STAFF_PATIENT_LEGACY_FOLLOW_UP_TEMPLATE_NAME = "staff_patient_follow_up";
+export const STAFF_PATIENT_FOLLOW_UP_TEMPLATE_NAME = "staff_patient_follow_up";
 
 export type StaffPatientMessagePurposeOption = {
   id: StaffPatientMessagePurpose;
@@ -193,11 +192,7 @@ export function buildStaffPatientTemplateBodyParams(
     };
   }
 
-  if (
-    input.purpose === "follow_up" &&
-    templateName &&
-    templateName !== STAFF_PATIENT_LEGACY_FOLLOW_UP_TEMPLATE_NAME
-  ) {
+  if (input.purpose === "follow_up") {
     return {
       "1": getStaffPatientMessageNote(input),
     };

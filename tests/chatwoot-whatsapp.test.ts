@@ -21,29 +21,29 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+test('buildStaffPatientTemplateBodyParams maps staff follow-up template to one staff note variable', () => {
+  const params = buildStaffPatientTemplateBodyParams({
+    patientName: '燕子',
+    clinicNameZh: '荃灣',
+    purpose: 'follow_up',
+    note: '你要的收據已準備好，可以到診所領取。',
+  }, 'staff_patient_follow_up');
+
+  assert.deepEqual(params, {
+    '1': '你要的收據已準備好，可以到診所領取。',
+  });
+});
+
 test('buildStaffPatientTemplateBodyParams sends a neutral default follow-up note when optional note is blank', () => {
   const params = buildStaffPatientTemplateBodyParams({
     patientName: '燕子',
     clinicNameZh: '荃灣',
     purpose: 'follow_up',
     note: '',
-  });
-
-  assert.equal(params.patient_name, '燕子');
-  assert.equal(params.clinic_name, '荃灣');
-  assert.equal(params.staff_note, '診所有事項需要跟進。');
-});
-
-test('buildStaffPatientTemplateBodyParams maps generic follow-up template to one staff note variable', () => {
-  const params = buildStaffPatientTemplateBodyParams({
-    patientName: '燕子',
-    clinicNameZh: '荃灣',
-    purpose: 'follow_up',
-    note: '你要的收據已準備好，可以到診所領取。',
-  }, 'staff_patient_general_note');
+  }, 'staff_patient_follow_up');
 
   assert.deepEqual(params, {
-    '1': '你要的收據已準備好，可以到診所領取。',
+    '1': '診所有事項需要跟進。',
   });
 });
 
@@ -476,6 +476,10 @@ test('sendStaffPatientWhatsappMessage records campaign context on the same Chatw
     assert.match(privateNote?.content, /2026夏季天灸/);
     assert.match(privateNote?.content, /病人如回覆「報名」/);
     assert.deepEqual(labelPayloads, [{ labels: ['2026夏季天灸'] }]);
+    const publicTemplateMessage = sentMessagePayloads.find((payload) => payload.template_params);
+    assert.deepEqual(publicTemplateMessage?.template_params?.processed_params?.body, {
+      '1': '如想報名請回覆此訊息。',
+    });
   } finally {
     global.fetch = originalFetch;
 
@@ -489,7 +493,7 @@ test('sendStaffPatientWhatsappMessage records campaign context on the same Chatw
   }
 });
 
-test('sendStaffPatientWhatsappMessage prefers the generic one-variable follow-up template when synced', async () => {
+test('sendStaffPatientWhatsappMessage uses the configured one-variable follow-up template when synced', async () => {
   const originalFetch = global.fetch;
   const originalEnv = {
     CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
@@ -610,7 +614,7 @@ test('sendStaffPatientWhatsappMessage prefers the generic one-variable follow-up
     assert.equal(result.success, true);
     assert.equal(result.whatsappSent, true);
     assert.equal(sentMessagePayloads.length, 1);
-    assert.equal(sentMessagePayloads[0]?.template_params?.name, 'staff_patient_general_note');
+    assert.equal(sentMessagePayloads[0]?.template_params?.name, 'staff_patient_follow_up');
     assert.deepEqual(sentMessagePayloads[0]?.template_params?.processed_params?.body, {
       '1': '你要的收據已準備好，可以到診所領取。',
     });
@@ -764,6 +768,9 @@ test('sendStaffPatientWhatsappMessage creates a missing Chatwoot contact before 
     });
     assert.equal(sentMessagePayloads.length, 1);
     assert.equal(sentMessagePayloads[0]?.template_params?.name, 'staff_patient_follow_up');
+    assert.deepEqual(sentMessagePayloads[0]?.template_params?.processed_params?.body, {
+      '1': '姑娘想確認你的預約資料。',
+    });
   } finally {
     global.fetch = originalFetch;
 
@@ -892,9 +899,9 @@ test('sendStaffPatientWhatsappMessage falls back to text inside an active conver
     assert.equal(result.whatsappSent, true);
     assert.equal(result.conversationId, 42);
     assert.equal(result.deliveryStatus, 'delivered');
-    assert.equal(sentMessagePayloads.length, 1);
-    assert.equal(sentMessagePayloads[0]?.template_params, undefined);
-    const textContent = String(sentMessagePayloads[0]?.content || '');
+    assert.equal(sentMessagePayloads.length > 1, true);
+    assert.equal(sentMessagePayloads.at(-1)?.template_params, undefined);
+    const textContent = String(sentMessagePayloads.at(-1)?.content || '');
     assert.match(textContent, /以下是診所給你的跟進訊息：/);
     assert.match(textContent, /姑娘想確認你的預約資料。/);
     assert.doesNotMatch(textContent, /你好 陳小明/);
