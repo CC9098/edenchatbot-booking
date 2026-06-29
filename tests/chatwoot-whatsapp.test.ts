@@ -618,6 +618,9 @@ test('sendStaffPatientWhatsappMessage uses the configured one-variable follow-up
     assert.deepEqual(sentMessagePayloads[0]?.template_params?.processed_params?.body, {
       '1': '你要的收據已準備好，可以到診所領取。',
     });
+    assert.equal('patient_name' in sentMessagePayloads[0]?.template_params?.processed_params?.body, false);
+    assert.equal('clinic_name' in sentMessagePayloads[0]?.template_params?.processed_params?.body, false);
+    assert.equal('staff_note' in sentMessagePayloads[0]?.template_params?.processed_params?.body, false);
   } finally {
     global.fetch = originalFetch;
 
