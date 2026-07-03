@@ -838,6 +838,7 @@ function getStaffPatientMessageTemplateConfigs(
     configuredCategory?: string;
     fallbackNames: string[];
     defaultCategory?: string;
+    requireSyncedTemplate?: boolean;
   }> = {
     intake_link: {
       configuredName: process.env.CHATWOOT_WHATSAPP_STAFF_INTAKE_TEMPLATE_NAME,
@@ -852,10 +853,11 @@ function getStaffPatientMessageTemplateConfigs(
       fallbackNames: ['staff_patient_pre_visit'],
     },
     follow_up: {
-      configuredName: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME,
+      configuredName: STAFF_PATIENT_FOLLOW_UP_TEMPLATE_NAME,
       configuredLanguage: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE,
       configuredCategory: process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY,
-      fallbackNames: [STAFF_PATIENT_FOLLOW_UP_TEMPLATE_NAME],
+      fallbackNames: [],
+      requireSyncedTemplate: true,
     },
     online_waiting: {
       configuredName: process.env.CHATWOOT_WHATSAPP_STAFF_ONLINE_WAITING_TEMPLATE_NAME,
@@ -879,6 +881,7 @@ function getStaffPatientMessageTemplateConfigs(
     configuredCategory: options.configuredCategory || (options.defaultCategory ? undefined : process.env.CHATWOOT_WHATSAPP_TEMPLATE_CATEGORY),
     fallbackNames: options.fallbackNames,
     defaultCategory: options.defaultCategory || 'UTILITY',
+    requireSyncedTemplate: options.requireSyncedTemplate,
   });
 }
 
@@ -890,6 +893,7 @@ function getConfiguredOrSyncedTemplateConfigs(
     configuredCategory?: string;
     fallbackNames: string[];
     defaultCategory: string;
+    requireSyncedTemplate?: boolean;
   },
 ): TemplateConfig[] {
   const configuredName = (options.configuredName || '').trim();
@@ -930,6 +934,10 @@ function getConfiguredOrSyncedTemplateConfigs(
       category: (template.category || category).trim(),
       language: (template.language || preferredLanguages[0] || 'zh_HK').trim(),
     })).filter((template) => Boolean(template.name));
+  }
+
+  if (options.requireSyncedTemplate) {
+    return [];
   }
 
   if (configuredName) {

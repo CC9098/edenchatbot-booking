@@ -363,7 +363,7 @@ test('sendStaffPatientWhatsappMessage records campaign context on the same Chatw
   process.env.CHATWOOT_API_ACCESS_TOKEN = 'test-token';
   process.env.CHATWOOT_ACCOUNT_ID = '';
   process.env.CHATWOOT_WHATSAPP_INBOX_ID = '';
-  process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME = 'staff_patient_follow_up';
+  process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME = 'staff_patient_general_note';
   process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE = 'zh_HK';
   process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY = 'UTILITY';
 
@@ -385,6 +385,11 @@ test('sendStaffPatientWhatsappMessage records campaign context on the same Chatw
           phone_number: '+85267333801',
           message_templates: [{
             name: 'staff_patient_follow_up',
+            language: 'zh_HK',
+            status: 'approved',
+            category: 'UTILITY',
+          }, {
+            name: 'staff_patient_general_note',
             language: 'zh_HK',
             status: 'approved',
             category: 'UTILITY',
@@ -511,7 +516,7 @@ test('sendStaffPatientWhatsappMessage uses staff_patient_follow_up as the one-va
   process.env.CHATWOOT_API_ACCESS_TOKEN = 'test-token';
   process.env.CHATWOOT_ACCOUNT_ID = '';
   process.env.CHATWOOT_WHATSAPP_INBOX_ID = '';
-  process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME = 'staff_patient_follow_up';
+  process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME = 'staff_patient_general_note';
   process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE = 'zh_HK';
   process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY = 'UTILITY';
 
@@ -533,6 +538,11 @@ test('sendStaffPatientWhatsappMessage uses staff_patient_follow_up as the one-va
           phone_number: '+85267333801',
           message_templates: [{
             name: 'staff_patient_follow_up',
+            language: 'zh_HK',
+            status: 'approved',
+            category: 'UTILITY',
+          }, {
+            name: 'staff_patient_general_note',
             language: 'zh_HK',
             status: 'approved',
             category: 'UTILITY',
@@ -895,7 +905,7 @@ test('sendStaffPatientWhatsappMessage falls back to text inside an active conver
     assert.equal(result.whatsappSent, true);
     assert.equal(result.conversationId, 42);
     assert.equal(result.deliveryStatus, 'delivered');
-    assert.equal(sentMessagePayloads.length > 1, true);
+    assert.equal(sentMessagePayloads.length, 1);
     assert.equal(sentMessagePayloads.at(-1)?.template_params, undefined);
     const textContent = String(sentMessagePayloads.at(-1)?.content || '');
     assert.match(textContent, /以下是診所給你的跟進訊息：/);
