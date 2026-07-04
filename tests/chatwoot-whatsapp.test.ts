@@ -363,7 +363,6 @@ test('sendStaffPatientWhatsappMessage records campaign context on the same Chatw
   process.env.CHATWOOT_API_ACCESS_TOKEN = 'test-token';
   process.env.CHATWOOT_ACCOUNT_ID = '';
   process.env.CHATWOOT_WHATSAPP_INBOX_ID = '';
-  process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME = 'staff_patient_general_note';
   process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE = 'zh_HK';
   process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY = 'UTILITY';
 
@@ -385,11 +384,6 @@ test('sendStaffPatientWhatsappMessage records campaign context on the same Chatw
           phone_number: '+85267333801',
           message_templates: [{
             name: 'staff_patient_follow_up',
-            language: 'zh_HK',
-            status: 'approved',
-            category: 'UTILITY',
-          }, {
-            name: 'staff_patient_general_note',
             language: 'zh_HK',
             status: 'approved',
             category: 'UTILITY',
@@ -516,7 +510,6 @@ test('sendStaffPatientWhatsappMessage uses staff_patient_follow_up as the one-va
   process.env.CHATWOOT_API_ACCESS_TOKEN = 'test-token';
   process.env.CHATWOOT_ACCOUNT_ID = '';
   process.env.CHATWOOT_WHATSAPP_INBOX_ID = '';
-  process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_NAME = 'staff_patient_general_note';
   process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_LANGUAGE = 'zh_HK';
   process.env.CHATWOOT_WHATSAPP_STAFF_FOLLOW_UP_TEMPLATE_CATEGORY = 'UTILITY';
 
@@ -538,11 +531,6 @@ test('sendStaffPatientWhatsappMessage uses staff_patient_follow_up as the one-va
           phone_number: '+85267333801',
           message_templates: [{
             name: 'staff_patient_follow_up',
-            language: 'zh_HK',
-            status: 'approved',
-            category: 'UTILITY',
-          }, {
-            name: 'staff_patient_general_note',
             language: 'zh_HK',
             status: 'approved',
             category: 'UTILITY',
