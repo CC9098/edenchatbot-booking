@@ -16,6 +16,7 @@ import {
   type DoctorId,
 } from "../shared/clinic-data";
 import { CALENDAR_MAPPINGS } from "../shared/schedule-config";
+import { signManagePayload, toBase64Url } from "../lib/widget-manage-token";
 
 type Candidate = {
   doctorId: DoctorId;
@@ -47,6 +48,7 @@ const availabilityRequestSchema = z
     clinicId: z.string(),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     durationMinutes: z.number().int().positive(),
+    visitType: z.enum(["first", "followup"]).optional(),
   })
   .strict();
 
@@ -64,24 +66,25 @@ const createRequestSchema = z
     patientName: z.string().min(2),
     phone: z.string().min(8),
     email: z.string().email(),
+    visitType: z.enum(["first", "followup"]),
+    needReceipt: z.enum(["no", "yes_insurance", "yes_not_insurance"]),
+    medicationPickup: z.string(),
     notes: z.string().optional(),
   })
   .strict();
 
 const rescheduleRequestSchema = z
   .object({
-    eventId: z.string().min(1),
-    calendarId: z.string().min(1),
+    manageToken: z.string().min(1),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     time: z.string().regex(/^\d{2}:\d{2}$/),
-    durationMinutes: z.number().int().positive(),
+    clinicId: z.string().min(1).optional(),
   })
   .strict();
 
 const cancelRequestSchema = z
   .object({
-    eventId: z.string().min(1),
-    calendarId: z.string().min(1),
+    manageToken: z.string().min(1),
   })
   .strict();
 
@@ -110,6 +113,27 @@ function formatYyyyMmDdInHk(date: Date): string {
   }
 
   return `${y}-${m}-${d}`;
+}
+
+function normalizePhoneDigits(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
+function createWidgetBookingManageToken(params: {
+  intakeId: string;
+  bookingId: string;
+  phone: string;
+}): string {
+  const encodedPayload = toBase64Url(
+    JSON.stringify({
+      intakeId: params.intakeId,
+      bookingId: params.bookingId,
+      phoneDigits: normalizePhoneDigits(params.phone),
+      expiresAtMs: Date.now() + 15 * 60 * 1000,
+    })
+  );
+  const signature = signManagePayload(encodedPayload);
+  return `${encodedPayload}.${signature}`;
 }
 
 function buildCandidateMappings(): Candidate[] {
@@ -165,11 +189,12 @@ async function fetchAvailability(
     clinicId: candidate.clinicId,
     date,
     durationMinutes,
+    visitType: "followup" as const,
   };
 
   availabilityRequestSchema.parse(payload);
 
-  const response = await api.post("/api/chat/booking/availability", {
+  const response = await api.post("/api/availability", {
     data: payload,
     timeout: API_TIMEOUT_MS,
   });
@@ -305,6 +330,9 @@ test.describe("B-mode booking real flow", () => {
         patientName,
         phone,
         email,
+        visitType: "followup" as const,
+        needReceipt: "no" as const,
+        medicationPickup: "none",
         notes,
       };
 
@@ -318,16 +346,18 @@ test.describe("B-mode booking real flow", () => {
         const dryEventId = `dry-run-${Date.now()}`;
 
         const reschedulePayload = {
-          eventId: dryEventId,
-          calendarId: slotPlan.candidate.calendarId,
+          manageToken: createWidgetBookingManageToken({
+            intakeId: dryEventId,
+            bookingId: dryEventId,
+            phone,
+          }),
           date: slotPlan.rescheduleDate,
           time: slotPlan.rescheduleTime,
-          durationMinutes: DURATION_MINUTES,
+          clinicId: slotPlan.candidate.clinicId,
         };
 
         const cancelPayload = {
-          eventId: dryEventId,
-          calendarId: slotPlan.candidate.calendarId,
+          manageToken: reschedulePayload.manageToken,
         };
 
         rescheduleRequestSchema.parse(reschedulePayload);
@@ -339,13 +369,14 @@ test.describe("B-mode booking real flow", () => {
         return;
       }
 
-      const createResponse = await api.post("/api/chat/booking/create", {
+      const createResponse = await api.post("/api/booking-whatsapp", {
         data: createPayload,
         timeout: API_TIMEOUT_MS,
       });
       const createJson = (await createResponse.json()) as {
         success?: boolean;
         bookingId?: string;
+        intakeId?: string;
         error?: string;
       };
 
@@ -355,19 +386,24 @@ test.describe("B-mode booking real flow", () => {
       ).toBeTruthy();
       expect(createJson.success).toBeTruthy();
       expect(typeof createJson.bookingId === "string" && createJson.bookingId.length > 0).toBeTruthy();
+      expect(typeof createJson.intakeId === "string" && createJson.intakeId.length > 0).toBeTruthy();
 
       const bookingId = createJson.bookingId as string;
+      const manageToken = createWidgetBookingManageToken({
+        intakeId: createJson.intakeId as string,
+        bookingId,
+        phone,
+      });
 
       const reschedulePayload = {
-        eventId: bookingId,
-        calendarId: slotPlan.candidate.calendarId,
+        manageToken,
         date: slotPlan.rescheduleDate,
         time: slotPlan.rescheduleTime,
-        durationMinutes: DURATION_MINUTES,
+        clinicId: slotPlan.candidate.clinicId,
       };
       rescheduleRequestSchema.parse(reschedulePayload);
 
-      const rescheduleResponse = await api.post("/api/chat/booking/reschedule", {
+      const rescheduleResponse = await api.post("/api/widget-booking/reschedule", {
         data: reschedulePayload,
         timeout: API_TIMEOUT_MS,
       });
@@ -383,12 +419,11 @@ test.describe("B-mode booking real flow", () => {
       expect(rescheduleJson.success).toBeTruthy();
 
       const cancelPayload = {
-        eventId: bookingId,
-        calendarId: slotPlan.candidate.calendarId,
+        manageToken,
       };
       cancelRequestSchema.parse(cancelPayload);
 
-      const cancelResponse = await api.post("/api/chat/booking/cancel", {
+      const cancelResponse = await api.post("/api/widget-booking/cancel", {
         data: cancelPayload,
         timeout: API_TIMEOUT_MS,
       });

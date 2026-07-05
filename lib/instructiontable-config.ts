@@ -467,10 +467,10 @@ export const instructiontable5W1HMap: Record<string, Instructiontable5W1H> = {
     who: "admin 可管理；本人可查看。",
   },
   booking_intake: {
-    why: "保存 chat/booking 結構化預約資料。",
+    why: "保存現行預約流程的結構化資料。",
     what: "預約資料、event id、狀態與改期紀錄。",
-    how: "booking routes + helper 寫入更新。",
-    where: "DB `public.booking_intake`; `app/api/booking/route.ts`, `lib/booking-intake-storage.ts`。",
+    how: "booking, WhatsApp booking 與 widget 管理 routes 透過 helper 寫入更新。",
+    where: "DB `public.booking_intake`; `app/api/booking/route.ts`, `app/api/booking-whatsapp/route.ts`, `app/api/widget-booking/*`, `lib/booking-intake-storage.ts`。",
     when: "建立、確認、取消、改期時。",
     who: "用戶可查看自己記錄；後端可完整維護。",
   },
