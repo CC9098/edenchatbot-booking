@@ -51,14 +51,10 @@ npm run test:e2e
 
 ### 4. Booking 回歸測試 ✅
 **涵蓋項目**:
-- ✅ `POST /api/booking` 無效輸入回傳 400
-- ✅ `GET /api/booking` 缺少參數回傳 400
-- ✅ `DELETE /api/booking` 缺少參數回傳 400
-- ✅ `PATCH /api/booking` 無效改期 payload 回傳 400
-- ✅ `/cancel` 頁面成功取消流程
-- ✅ `/cancel` 頁面失敗處理
-- ✅ `/reschedule` 頁面成功改期流程
-- ✅ `/reschedule` 頁面失敗處理
+- ✅ retired `/api/booking` 回傳 410
+- ✅ `/cancel` legacy link redirect 到 `/manage-booking?action=cancel`
+- ✅ `/reschedule` legacy link redirect 到 `/manage-booking?action=reschedule`
+- ✅ `/manage-booking` 經 `/api/widget-booking/*` 管理取消/改期
 
 **結論**: 現有 booking/cancel/reschedule 功能完全不受 MVP v1 影響，向後相容 ✅
 

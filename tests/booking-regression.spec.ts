@@ -1,407 +1,60 @@
 import { expect, test } from "@playwright/test";
 
-const MOCK_EVENT_ID = "evt-regression-001";
-const MOCK_CALENDAR_ID = "cal-regression-001";
+const RETIRED_BOOKING_MESSAGE =
+  "此服務已更新，請經 /manage-booking 管理預約";
 
-const MOCK_BOOKING_EVENT = {
-  summary: "中醫諮詢",
-  description:
-    "Doctor / 醫師: 陳家富醫師 (Dr. Chan)\nClinic / 診所: 中環 (Central)",
-  start: {
-    dateTime: "2026-03-10T03:00:00.000Z",
-  },
-};
-
-test.describe("booking regression - /api/booking, /cancel, /reschedule", () => {
-  test("POST /api/booking returns 400 for invalid payload", async ({ request }) => {
-    const res = await request.post("/api/booking", {
+test.describe("retired booking self-management surfaces", () => {
+  test("POST and PATCH /api/booking return 410", async ({ request }) => {
+    const postRes = await request.post("/api/booking", {
       data: {},
     });
+    expect(postRes.status()).toBe(410);
+    await expectRetiredBookingResponse(postRes);
 
-    expect(res.status()).toBe(400);
-    const body = (await res.json()) as { error?: string; details?: unknown[] };
-    expect(body.error).toBe("Invalid input");
-    expect(Array.isArray(body.details)).toBeTruthy();
-    expect((body.details || []).length).toBeGreaterThan(0);
-  });
-
-  test("GET and DELETE /api/booking return 400 when params are missing", async ({
-    request,
-  }) => {
-    const getRes = await request.get("/api/booking");
-    expect(getRes.status()).toBe(400);
-    const getBody = (await getRes.json()) as { error?: string };
-    expect(getBody.error).toContain("Missing eventId or calendarId");
-
-    const deleteRes = await request.delete("/api/booking");
-    expect(deleteRes.status()).toBe(400);
-    const deleteBody = (await deleteRes.json()) as { error?: string };
-    expect(deleteBody.error).toContain("Missing eventId or calendarId");
-  });
-
-  test("PATCH /api/booking returns 400 for invalid reschedule payload", async ({
-    request,
-  }) => {
-    const res = await request.patch("/api/booking", {
-      data: {
-        eventId: MOCK_EVENT_ID,
-        calendarId: MOCK_CALENDAR_ID,
-        date: "2026/03/10",
-        time: "11-00",
-      },
+    const patchRes = await request.patch("/api/booking", {
+      data: {},
     });
-
-    expect(res.status()).toBe(400);
-    const body = (await res.json()) as { error?: string; details?: unknown[] };
-    expect(body.error).toBe("Invalid input");
-    expect(Array.isArray(body.details)).toBeTruthy();
-    expect((body.details || []).length).toBeGreaterThan(0);
+    expect(patchRes.status()).toBe(410);
+    await expectRetiredBookingResponse(patchRes);
   });
 
-  test("cancel page - success path cancels booking and shows confirmation", async ({
+  test("legacy /reschedule links redirect to manage-booking reschedule flow", async ({
     page,
   }) => {
-    await page.route(
-      `**/api/booking?eventId=${MOCK_EVENT_ID}&calendarId=${MOCK_CALENDAR_ID}`,
-      async (route, request) => {
-        if (request.method() === "GET") {
-          await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify(MOCK_BOOKING_EVENT),
-          });
-          return;
-        }
+    await page.goto("/reschedule?eventId=evt-old&calendarId=cal-old");
 
-        if (request.method() === "DELETE") {
-          await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify({ success: true }),
-          });
-          return;
-        }
-
-        await route.fallback();
-      }
-    );
-
-    await page.goto(
-      `/cancel?eventId=${MOCK_EVENT_ID}&calendarId=${MOCK_CALENDAR_ID}`
-    );
-
-    await expect(page.getByRole("heading", { name: "取消預約" })).toBeVisible();
-    await expect(page.getByText("11:00")).toBeVisible();
-    await expect(page.getByRole("button", { name: "確認取消" })).toBeVisible();
-
-    const cancelResponsePromise = page.waitForResponse(
-      (res) =>
-        res.url().includes("/api/booking") &&
-        res.request().method() === "DELETE"
-    );
-
-    await page.getByRole("button", { name: "確認取消" }).click();
-    const cancelRes = await cancelResponsePromise;
-    expect(cancelRes.ok()).toBeTruthy();
-    const cancelBody = (await cancelRes.json()) as { success?: boolean };
-    expect(cancelBody.success).toBeTruthy();
-
-    await expect(page.getByText("預約已取消")).toBeVisible();
+    await expect(page).toHaveURL(/\/manage-booking\?action=reschedule$/);
   });
 
-  test("cancel page - failure path handles invalid link and delete failure", async ({
+  test("legacy /reschedule links preserve token when present", async ({
     page,
   }) => {
-    await page.goto("/cancel");
-    await expect(page.getByText("預約連結無效")).toBeVisible();
+    await page.goto("/reschedule?token=tok-old&eventId=evt-old");
 
-    await page.route(
-      `**/api/booking?eventId=${MOCK_EVENT_ID}&calendarId=${MOCK_CALENDAR_ID}`,
-      async (route, request) => {
-        if (request.method() === "GET") {
-          await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify(MOCK_BOOKING_EVENT),
-          });
-          return;
-        }
-
-        if (request.method() === "DELETE") {
-          await route.fulfill({
-            status: 500,
-            contentType: "application/json",
-            body: JSON.stringify({ error: "Failed to cancel booking" }),
-          });
-          return;
-        }
-
-        await route.fallback();
-      }
+    await expect(page).toHaveURL(
+      /\/manage-booking\?action=reschedule&token=tok-old$/,
     );
-
-    await page.goto(
-      `/cancel?eventId=${MOCK_EVENT_ID}&calendarId=${MOCK_CALENDAR_ID}`
-    );
-
-    const failResponsePromise = page.waitForResponse(
-      (res) =>
-        res.url().includes("/api/booking") &&
-        res.request().method() === "DELETE"
-    );
-
-    await page.getByRole("button", { name: "確認取消" }).click();
-    const failRes = await failResponsePromise;
-    expect(failRes.status()).toBe(500);
-    const failBody = (await failRes.json()) as { error?: string };
-    expect(failBody.error).toContain("Failed to cancel booking");
-
-    await expect(page.getByText("取消預約失敗")).toBeVisible();
   });
 
-  test("reschedule page - success path loads slots and updates booking", async ({
+  test("legacy /cancel links redirect to manage-booking cancel flow", async ({
     page,
   }) => {
-    await page.route(
-      `**/api/booking?eventId=${MOCK_EVENT_ID}&calendarId=${MOCK_CALENDAR_ID}`,
-      async (route, request) => {
-        if (request.method() === "GET") {
-          await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify(MOCK_BOOKING_EVENT),
-          });
-          return;
-        }
-        await route.fallback();
-      }
-    );
+    await page.goto("/cancel?eventId=evt-old&calendarId=cal-old");
 
-    await page.route("**/api/availability", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          slots: ["11:00", "11:15"],
-        }),
-      });
-    });
-
-    await page.route("**/api/booking", async (route, request) => {
-      if (request.method() !== "PATCH") {
-        await route.fallback();
-        return;
-      }
-
-      const body = request.postDataJSON() as {
-        eventId?: string;
-        calendarId?: string;
-        date?: string;
-        time?: string;
-      };
-      expect(body.eventId).toBe(MOCK_EVENT_ID);
-      expect(body.calendarId).toBe(MOCK_CALENDAR_ID);
-      expect(typeof body.date).toBe("string");
-      expect(body.time).toBe("11:00");
-
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ success: true }),
-      });
-    });
-
-    await page.goto(
-      `/reschedule?eventId=${MOCK_EVENT_ID}&calendarId=${MOCK_CALENDAR_ID}`
-    );
-
-    await expect(page.getByText("11:00")).toBeVisible();
-    await page.getByRole("button", { name: "選擇新時段" }).click();
-    await expect(page.getByRole("heading", { name: "選擇日期" })).toBeVisible();
-
-    const firstDateButton = page.getByRole("button").filter({ hasText: /\d+\/\d+/ }).first();
-    const [slotsResponse] = await Promise.all([
-      page.waitForResponse(
-        (res) =>
-          res.url().includes("/api/availability") &&
-          res.request().method() === "POST"
-      ),
-      firstDateButton.click(),
-    ]);
-    expect(slotsResponse.ok()).toBeTruthy();
-    const slotsBody = (await slotsResponse.json()) as { slots?: string[] };
-    expect(slotsBody.slots).toEqual(["11:00", "11:15"]);
-
-    await page.getByRole("button", { name: "11:00" }).click();
-
-    const patchResponsePromise = page.waitForResponse(
-      (res) =>
-        res.url().includes("/api/booking") &&
-        res.request().method() === "PATCH"
-    );
-    await page.getByRole("button", { name: "確認更改" }).click();
-    const patchRes = await patchResponsePromise;
-    expect(patchRes.ok()).toBeTruthy();
-    const patchBody = (await patchRes.json()) as { success?: boolean };
-    expect(patchBody.success).toBeTruthy();
-
-    await expect(page.getByText("改期成功！")).toBeVisible();
+    await expect(page).toHaveURL(/\/manage-booking\?action=cancel$/);
   });
 
-  test("reschedule page - can switch clinic before submitting", async ({
-    page,
-  }) => {
-    await page.route(
-      `**/api/booking?eventId=${MOCK_EVENT_ID}&calendarId=${MOCK_CALENDAR_ID}`,
-      async (route, request) => {
-        if (request.method() === "GET") {
-          await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify(MOCK_BOOKING_EVENT),
-          });
-          return;
-        }
-        await route.fallback();
-      }
+  test("legacy /cancel links preserve token when present", async ({ page }) => {
+    await page.goto("/cancel?token=tok-old&eventId=evt-old");
+
+    await expect(page).toHaveURL(
+      /\/manage-booking\?action=cancel&token=tok-old$/,
     );
-
-    await page.route("**/api/public/bookable-schedules", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          doctors: [
-            {
-              doctorId: "chan",
-              doctorNameZh: "陳家富醫師",
-              doctorNameEn: "Dr. Chan",
-              summary: "",
-              clinics: [
-                { clinicId: "central", clinicNameZh: "中環", clinicNameEn: "Central", schedule: {}, summary: "" },
-                { clinicId: "jordan", clinicNameZh: "佐敦", clinicNameEn: "Jordan", schedule: {}, summary: "" },
-                { clinicId: "tsuenwan", clinicNameZh: "荃灣", clinicNameEn: "Tsuen Wan", schedule: {}, summary: "" },
-              ],
-            },
-          ],
-        }),
-      });
-    });
-
-    await page.route("**/api/availability", async (route, request) => {
-      const body = request.postDataJSON() as { clinicId?: string };
-      expect(body.clinicId).toBe("central");
-
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          slots: ["12:00"],
-        }),
-      });
-    });
-
-    await page.route("**/api/booking", async (route, request) => {
-      if (request.method() !== "PATCH") {
-        await route.fallback();
-        return;
-      }
-
-      const body = request.postDataJSON() as {
-        clinicId?: string;
-        time?: string;
-      };
-      expect(body.clinicId).toBe("central");
-      expect(body.time).toBe("12:00");
-
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ success: true }),
-      });
-    });
-
-    await page.goto(
-      `/reschedule?eventId=${MOCK_EVENT_ID}&calendarId=${MOCK_CALENDAR_ID}`
-    );
-
-    await page.getByRole("button", { name: "中環" }).click();
-    await page.getByRole("button", { name: "選擇新時段" }).click();
-
-    await page.getByRole("button").filter({ hasText: /\d+\/\d+/ }).first().click();
-    await page.getByRole("button", { name: "12:00" }).click();
-    await page.getByRole("button", { name: "確認更改" }).click();
-
-    await expect(page.getByText("新診所：")).toBeVisible();
-    await expect(page.getByText("中環")).toBeVisible();
-  });
-
-  test("reschedule page - failure path handles invalid link and API 400", async ({
-    page,
-  }) => {
-    await page.goto("/reschedule");
-    await expect(page.getByText("預約連結無效")).toBeVisible();
-
-    await page.route(
-      `**/api/booking?eventId=${MOCK_EVENT_ID}&calendarId=${MOCK_CALENDAR_ID}`,
-      async (route, request) => {
-        if (request.method() === "GET") {
-          await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify(MOCK_BOOKING_EVENT),
-          });
-          return;
-        }
-        await route.fallback();
-      }
-    );
-
-    await page.route("**/api/availability", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          slots: ["11:00"],
-        }),
-      });
-    });
-
-    await page.route("**/api/booking", async (route, request) => {
-      if (request.method() !== "PATCH") {
-        await route.fallback();
-        return;
-      }
-
-      await route.fulfill({
-        status: 400,
-        contentType: "application/json",
-        body: JSON.stringify({ error: "Invalid input" }),
-      });
-    });
-
-    await page.goto(
-      `/reschedule?eventId=${MOCK_EVENT_ID}&calendarId=${MOCK_CALENDAR_ID}`
-    );
-    await page.getByRole("button", { name: "選擇新時段" }).click();
-    await page.getByRole("button").filter({ hasText: /\d+\/\d+/ }).first().click();
-    await page.getByRole("button", { name: "11:00" }).click();
-
-    const failPatchPromise = page.waitForResponse(
-      (res) =>
-        res.url().includes("/api/booking") &&
-        res.request().method() === "PATCH"
-    );
-    await page.getByRole("button", { name: "確認更改" }).click();
-    const failPatch = await failPatchPromise;
-    expect(failPatch.status()).toBe(400);
-    const failBody = (await failPatch.json()) as { error?: string };
-    expect(failBody.error).toBe("Invalid input");
-
-    await expect(page.getByRole("heading", { name: "發生錯誤" })).toBeVisible();
-    await expect(page.getByText("Invalid input")).toBeVisible();
   });
 });
+
+async function expectRetiredBookingResponse(response: {
+  json(): Promise<unknown>;
+}) {
+  expect(await response.json()).toEqual({ error: RETIRED_BOOKING_MESSAGE });
+}

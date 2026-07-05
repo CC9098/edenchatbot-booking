@@ -189,7 +189,9 @@ Reference migrations:
 - `POST /api/chat/booking/create` (bridge booking create; optional treatment option IDs)
 - `POST /api/chat/v2`
 - `POST /api/availability`
-- `POST|GET|DELETE|PATCH /api/booking`
+- `POST /api/booking-whatsapp` (public WhatsApp booking create)
+- `POST /api/widget-booking/*` (self-manage verify, reschedule, cancel)
+- `POST|GET|DELETE|PATCH /api/booking` (retired 2026-07; returns 410)
 - `POST /api/doctor/bookings` (staff-assisted booking console)
 - `POST /api/consultation`
 - `GET /api/articles`, `GET /api/articles/[slug]`

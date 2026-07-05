@@ -235,7 +235,7 @@
         <h3>後端執行</h3>
         <ul>
           <li><code>POST /api/availability</code> 查時段</li>
-          <li><code>POST /api/booking</code> 建立預約</li>
+          <li><code>POST /api/booking-whatsapp</code> 建立 WhatsApp 確認預約</li>
           <li><code>POST /api/doctor/bookings</code> 姑娘代客建立預約（staff-auth + booking_intake）</li>
           <li>同步 <code>booking_intake</code> + Google Calendar + Gmail</li>
           <li><code>GET /api/cron/booking-reminders</code>（CRON_SECRET 保護；掃描 now+23h 至 now+25h 視窗，派發 24h 提醒）</li>
@@ -284,7 +284,7 @@
           <li><code>/api/chat</code> (legacy/simple)</li>
           <li><code>/api/chat/booking/create</code> (bridge booking create；支援可選 treatmentOptions)</li>
           <li><code>/api/chat/v2</code> (main intelligent flow)</li>
-          <li><code>/api/availability</code> + <code>/api/booking</code></li>
+          <li><code>/api/availability</code> + <code>/api/booking-whatsapp</code> + <code>/api/widget-booking/*</code></li>
           <li><code>/api/doctor/bookings</code> (staff console 代約建立)</li>
           <li><code>/api/cron/pos-sync-daily</code> (CRON_SECRET 保護；輸出每日 POS sync 候選清單/摘要)</li>
           <li><code>/api/cron/booking-reminders</code> (CRON_SECRET 保護；24h 提醒派發，支援 <code>dryRun=1</code>)</li>

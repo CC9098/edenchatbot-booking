@@ -45,7 +45,7 @@ import {
 import type { PatientProfile } from '@/app/api/patient-profiles/route';
 
 type BookingStep = 'setup' | 'timeslot' | 'details' | 'success';
-type FlowVariant = 'booking' | 'whatsapp' | 'staff';
+type FlowVariant = 'whatsapp' | 'staff';
 type BookingPresentationVariant = 'default' | 'minimalPreview';
 type VisitType = 'first' | 'followup';
 type ReceiptType = 'no' | 'yes_insurance' | 'yes_not_insurance';
@@ -684,7 +684,7 @@ export function BookingTabFlow({
   staffPatientUserId,
   initialPatientProfileId,
   embedMode = false,
-  flowVariant = 'booking',
+  flowVariant = 'whatsapp',
   presentationVariant = 'default',
 }: BookingTabFlowProps) {
   const isWhatsappFlow = flowVariant === 'whatsapp';
@@ -1580,9 +1580,7 @@ export function BookingTabFlow({
       : 'none';
     const submitEndpoint = isStaffFlow
       ? '/api/doctor/bookings'
-      : isWhatsappFlow
-        ? '/api/booking-whatsapp'
-        : '/api/booking';
+      : '/api/booking-whatsapp';
     const requestBody = isStaffFlow || isWhatsappFlow
       ? {
           ...payload,

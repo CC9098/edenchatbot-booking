@@ -54,7 +54,7 @@ Checks:
 - Confirm patient data APIs return `403` for cross-account access.
 
 5. Booking regression
-- Verify existing `/api/booking`, `/cancel`, `/reschedule` flows still work.
+- Verify retired `/api/booking` returns `410`, and legacy `/cancel` / `/reschedule` links redirect to `/manage-booking`.
 
 ## 4) Playwright E2E (Phase 3 automation)
 Run from project root:

@@ -1,7 +1,7 @@
 # MVP v1 Multi-Codex 執行計劃
 
 ## 1) 目標（MVP v1）
-- 保留現有 Eden booking flow 作為執行層（`/api/availability`、`/api/booking`、取消/改期頁）。
+- 保留現有 Eden booking flow 作為執行層（`/api/availability`、`/api/booking-whatsapp`、`/manage-booking`）。
 - 新增 3 個分型聊天室（`depleting` / `crossing` / `hoarding`），各自獨立 `session/localStorage`。
 - 聊天模式統一為 `G1/G2/G3/B`。
 - `B` 模式只可經現有 booking API 執行，不允許 LLM 直接改 Google Calendar。
@@ -176,4 +176,3 @@
 3) 測試結果
 4) 風險與回滾方案
 ```
-
