@@ -121,6 +121,7 @@ export function buildBookingUrl(options?: {
   doctorId?: string;
   clinicId?: string;
   visitType?: BookingVisitType;
+  source?: string;
   embed?: boolean;
 }): string {
   const params = new URLSearchParams();
@@ -135,6 +136,10 @@ export function buildBookingUrl(options?: {
 
   if (options?.visitType) {
     params.set("visitType", options.visitType);
+  }
+
+  if (options?.source) {
+    params.set("source", options.source);
   }
 
   const pathname = options?.embed ? "/embed/booking" : "/booking";

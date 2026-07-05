@@ -96,6 +96,7 @@ type BookingTabFlowProps = {
     clinicId?: ClinicId;
     visitType?: VisitType;
     gad7Score?: number;
+    source?: string;
   };
   staffPatientUserId?: string | null;
   initialPatientProfileId?: string | null;
@@ -1495,8 +1496,12 @@ export function BookingTabFlow({
     const selectedTreatmentLine = selectedTreatmentDetails.length > 0
       ? `治療項目: ${formatSelectedTreatments(selectedTreatmentDetails, values.treatmentOtherDetails)}`
       : null;
+    const sourceLine = initialSelection?.source
+      ? `預約來源: ${initialSelection.source}`
+      : null;
     const notes = visitType === 'first'
       ? [
+          sourceLine,
           selectedServiceLine,
           selectedPriceLine,
           selectedTreatmentLine,
@@ -1510,6 +1515,7 @@ export function BookingTabFlow({
           `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
         ].filter((value): value is string => Boolean(value))
       : [
+          sourceLine,
           selectedServiceLine,
           selectedPriceLine,
           selectedTreatmentLine,
