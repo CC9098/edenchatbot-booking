@@ -2,6 +2,7 @@ import { createHmac, randomInt, randomUUID, timingSafeEqual } from "crypto";
 
 import { sendBookingManageOtpWhatsapp } from "@/lib/chatwoot-whatsapp";
 import { normalizePhoneForSearch, toHKE164 } from "@/lib/contact-utils";
+import { getChatwootWhatsappSenderPhone } from "@/lib/whatsapp-booking";
 import { createServiceClient } from "@/lib/supabase";
 import {
   ensureSupabaseUserForPhone,
@@ -11,7 +12,6 @@ import {
 
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_TTL_MINUTES = 10;
-const DEFAULT_CLINIC_WHATSAPP_PHONE = "85267333234";
 const DEFAULT_RESEND_COOLDOWN_SECONDS = 60;
 const DEFAULT_MAX_REQUESTS_PER_HOUR = 5;
 
@@ -244,7 +244,7 @@ export async function requestLoginOtp(phone: string): Promise<RequestLoginOtpRes
       email: "",
       code,
       expiryMinutes: OTP_TTL_MINUTES,
-      clinicWhatsappPhone: DEFAULT_CLINIC_WHATSAPP_PHONE,
+      clinicWhatsappPhone: getChatwootWhatsappSenderPhone(),
     });
 
     if (!whatsappResult.success) {
