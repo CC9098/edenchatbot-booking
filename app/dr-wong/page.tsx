@@ -18,8 +18,8 @@ const drWongFollowUpBookingUrl =
 const clinicActions = [
   {
     clinicName: "佐敦",
-    phone: "67333801",
-    href: `https://wa.me/85267333801?text=${whatsappMessage}`,
+    phone: "59293042",
+    href: `https://wa.me/85259293042?text=${whatsappMessage}`,
   },
 ];
 
