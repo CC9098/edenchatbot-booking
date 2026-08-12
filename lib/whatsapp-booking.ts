@@ -1,6 +1,5 @@
 import { type BookingVisitType } from '@/lib/booking-intake-storage';
 import { buildManageBookingUrl } from '@/lib/public-url';
-import { CLINIC_BY_ID, type ClinicId } from '@/shared/clinic-data';
 
 const VISIT_TYPE_LABELS: Record<BookingVisitType, string> = {
   first: '首診',
@@ -8,6 +7,7 @@ const VISIT_TYPE_LABELS: Record<BookingVisitType, string> = {
 };
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
+const DEFAULT_CHATWOOT_WHATSAPP_SENDER_PHONE = '+85251899065';
 
 export interface BookingWhatsappConfirmationInput {
   bookingId: string;
@@ -62,14 +62,20 @@ export function normalizeWhatsappSourceId(value: string): string {
   return normalizeWhatsappPhoneNumber(value).replace(/^\+/, '');
 }
 
-export function getClinicWhatsappPhone(clinicId: string): string | null {
-  const clinic = CLINIC_BY_ID[clinicId as ClinicId];
-  if (!clinic?.whatsappUrl) {
-    return null;
-  }
+export function getChatwootWhatsappSenderPhone(): string {
+  const configuredPhone = process.env.CHATWOOT_WHATSAPP_SENDER_PHONE?.trim();
+  return normalizeWhatsappPhoneNumber(
+    configuredPhone || DEFAULT_CHATWOOT_WHATSAPP_SENDER_PHONE,
+  );
+}
 
-  const normalizedDigits = digitsOnly(clinic.whatsappUrl);
-  return normalizedDigits ? `+${normalizedDigits}` : null;
+/**
+ * @deprecated Chatwoot currently sends every clinic notification through the
+ * Tsuen Wan Cloud API inbox. Keep this alias until the existing call sites are
+ * renamed; public clinic contact links live in shared/clinic-data.ts instead.
+ */
+export function getClinicWhatsappPhone(_clinicId: string): string {
+  return getChatwootWhatsappSenderPhone();
 }
 
 function buildPatientManageBookingUrl(manageAccessToken?: string): string {
