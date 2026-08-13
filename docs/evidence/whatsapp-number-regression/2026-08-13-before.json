@@ -1,0 +1,88 @@
+{
+  "capturedAt": "2026-08-13T07:24:00Z",
+  "scope": "EdenChatbotBooking production public chatbot contact audit",
+  "systems": [
+    "WordPress widget 客服 bot",
+    "養生bot / chat v2",
+    "Chatwoot / WhatsApp bot"
+  ],
+  "releaseTruth": {
+    "githubRepository": "CC9098/edenchatbot-booking",
+    "githubMainSha": "74c0393a0d9491978a0bee28d3179d324f606b2e",
+    "localShaBeforeThisTurn": "74c0393a0d9491978a0bee28d3179d324f606b2e",
+    "productionDeploymentId": "dpl_FmzYojibJikvH2zYTv6HKPhPz6r2",
+    "productionDeploymentState": "READY",
+    "productionDeploymentUrl": "https://edenchatbot-booking-f0ido25d6-cc9098s-projects.vercel.app",
+    "canonicalLiveUrl": "https://app.edenclinic.hk",
+    "aliasRedirect": "https://edenchatbot-booking.vercel.app -> https://app.edenclinic.hk"
+  },
+  "sourceAudit": {
+    "sharedClinicData": "Central/Jordan current contacts; Tsuen Wan unchanged",
+    "wordpressPromptSource": "lib/legacy-chat-response.ts imports shared/clinic-data.ts",
+    "chatV2PromptSource": "app/api/chat/v2/route.ts imports shared/clinic-data.ts and appends contact data after DB prompt/knowledge",
+    "chatwootSource": "app/api/chatwoot/agent-bot/route.ts -> lib/chatwoot-agent-bot.ts -> shared/clinic-data.ts",
+    "retiredNumberHitsInRuntimeSources": 0,
+    "retiredNumberHitsOutsideRuntimeSources": 4,
+    "outsideRuntimeHitClassification": "tests/chatwoot-whatsapp.test.ts fixture and three historical staff-import Markdown files; excluded from chatbot answer construction",
+    "chatwootSender": "+85251899065",
+    "centralOrJordanChatwootRoutingChanged": false
+  },
+  "liveChecks": {
+    "wordpressWidget": [
+      {
+        "query": "中環姑娘 WhatsApp 幾多號碼？請畀我可點擊連結。",
+        "httpStatus": 200,
+        "response": "你好呀！😊 \n\n中環診所姑娘嘅 WhatsApp 號碼係 **5926 9537**。\n\n你可以直接點擊下面呢個連結聯絡姑娘：\n👉 [按此聯絡姑娘](https://wa.me/85259269537)\n\n**中環診所資料補充：**\n- **電話：** 5926 9537\n- **應診時間：** 週一至五 11:00-14:00, 15:30-19:30（週六日及公眾假期休息）\n\n如果有任何查詢或者想預約睇醫師，隨時點擊上面個連結搵姑娘幫手啦！❤️"
+      },
+      {
+        "query": "想問佐敦診所電話同 WhatsApp，廣東話答我。",
+        "httpStatus": 200,
+        "response": "你好呀！佐敦診所嘅聯絡資料如下：\n\n- **聯絡電話**：5929 3042\n- **WhatsApp**：[按此聯絡姑娘](https://wa.me/85259293042)\n\n（順便提供埋地址畀你參考：九龍佐敦寶靈街6號佐敦中心7樓全層）\n\n如果你想預約睇醫生，亦可以直接經 [網上預約平台](https://app.edenclinic.hk/booking) 睇下空位。如果有任何問題，隨時 WhatsApp 聯絡我哋嘅姑娘啦！😊"
+      },
+      {
+        "query": "荃灣 WhatsApp 幾多？",
+        "httpStatus": 200,
+        "response": "你好呀！荃灣診所嘅 WhatsApp 號碼係 **5189 9065** 呀！\n\n你可以直接點擊下面呢個連結聯絡我哋姑娘：\n📲 WhatsApp：[按此聯絡姑娘](https://wa.me/85251899065)\n\n**荃灣診所資料：**\n- **聯絡電話：** 2698 5422 / 5189 9065\n- **地址：** 荃灣富麗花園商場A座地下20號舖（[荃灣診所 Google 地圖](https://maps.app.goo.gl/i18v8oYQAoG65XM66?g_st=ic)）\n- **應診時間：** 週一、二、四至日 10:30-14:00，15:30-19:00（週三及公眾假期休息）\n\n如果有任何想查詢或者想預約睇醫生，隨時發訊息畀我哋姑娘啦！😊"
+      }
+    ],
+    "chatV2": [
+      {
+        "query": "中環姑娘 WhatsApp 幾多號碼？請畀我可點擊連結。",
+        "httpStatus": 200,
+        "mode": "G1",
+        "response": "中環診所姑娘嘅 WhatsApp 電話係 5926 9537，你可以點擊 [按此聯絡姑娘](https://wa.me/85259269537) 直接發送訊息。如果有預約或診務需要幫忙，歡迎隨時聯絡我哋！"
+      },
+      {
+        "query": "佐敦診所電話同 WhatsApp 幾多？用廣東話答。",
+        "httpStatus": 200,
+        "mode": "G1",
+        "response": "佐敦診所嘅電話係 5929 3042。你可以直接打嚟，或者點擊 WhatsApp [按此聯絡姑娘](https://wa.me/85259293042) 聯絡我哋查詢同預約。"
+      },
+      {
+        "query": "荃灣 WhatsApp 幾多？",
+        "httpStatus": 200,
+        "mode": "G1",
+        "response": "荃灣診所嘅 WhatsApp 號碼係 5189 9065。\n\n你可以直接點擊 [按此聯絡姑娘](https://wa.me/85251899065) 發送訊息，如果需要致電門市查詢，亦可以撥打 2698 5422。"
+      }
+    ],
+    "chatwootWebhookRoute": {
+      "url": "https://app.edenclinic.hk/api/chatwoot/agent-bot",
+      "request": { "event": "health_check" },
+      "httpStatus": 200,
+      "response": { "ok": true, "ignored": "unsupported_event" },
+      "externalWhatsAppConversationReplay": "not run: no safe authenticated test conversation/Chatwoot connector was available in this checkout"
+    }
+  },
+  "acceptance": {
+    "allCapturedChatbotResponsesContainZeroRetiredNumbers": true,
+    "allCapturedHrefValuesContainZeroRetiredNumbers": true,
+    "centralCurrentNumberObserved": true,
+    "jordanCurrentNumberObserved": true,
+    "tsuenWanSenderAndPublicNumberPreserved": true,
+    "facebookInstagramTouched": false
+  },
+  "toolingLimits": [
+    "Vercel runtime logs/runtime errors MCP returned HTTP 500, so server log/DB row readback is not claimed from that tool.",
+    "Production Chatwoot WhatsApp message replay was not claimed without an authenticated safe test conversation; deployed route and deterministic source path were separately checked."
+  ]
+}
