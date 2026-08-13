@@ -1,0 +1,74 @@
+{
+  "capturedAt": "2026-08-13T07:35:11.355Z",
+  "scope": "EdenChatbotBooking production post-deployment public chatbot contact acceptance",
+  "releaseTruth": {
+    "githubMainMergeSha": "af979cd72298cd8a929e935b91e86d2f7338ea87",
+    "pullRequest": "https://github.com/CC9098/edenchatbot-booking/pull/11",
+    "productionDeploymentUrl": "https://edenchatbot-booking-bne8kowau-cc9098s-projects.vercel.app",
+    "productionDeploymentState": "READY",
+    "productionDeploymentGitSha": "af979cd72298cd8a929e935b91e86d2f7338ea87",
+    "canonicalLiveUrl": "https://app.edenclinic.hk"
+  },
+  "systems": {
+    "wordpressWidget": [
+      {
+        "query": "中環姑娘 WhatsApp 幾多號碼？請畀我可點擊連結。",
+        "status": 200,
+        "response": "你好呀！中環診所嘅 WhatsApp 號碼係 **5926 9537** 😊。\n\n你可以直接點擊下面嘅連結聯絡我哋嘅姑娘預約或查詢：\n\n👉 WhatsApp：[按此聯絡姑娘](https://wa.me/85259269537)\n\n如果仲有其他問題，隨時話我知啦！"
+      },
+      {
+        "query": "佐敦診所電話同 WhatsApp 幾多？用廣東話答。",
+        "status": 200,
+        "response": "你好呀！佐敦診所嘅聯絡資料如下：\n\n- **聯絡電話**：5929 3042\n- **WhatsApp**：[按此聯絡姑娘](https://wa.me/85259293042)\n\n如果想預約或者有任何問題，隨時可以 WhatsApp 聯絡姑娘，或者可以直接上我哋嘅 [網上預約平台](https://app.edenclinic.hk/booking) 睇睇空位呀！😊"
+      },
+      {
+        "query": "荃灣 WhatsApp 幾多？",
+        "status": 200,
+        "response": "你好！荃灣診所嘅 WhatsApp 號碼係 **5189 9065** 😊\n\n你可以點擊以下連結直接 WhatsApp 聯絡我哋姑娘：\n👉 [按此聯絡姑娘](https://wa.me/85251899065)\n\n另外，如果需要致電荃灣診所，電話係：2698 5422 / 5189 9065。如果有任何想查詢或者想預約睇醫生，隨時聯絡我哋啦！"
+      }
+    ],
+    "chatV2": [
+      {
+        "query": "中環姑娘 WhatsApp 幾多號碼？請畀我可點擊連結。",
+        "status": 200,
+        "mode": "G1",
+        "response": "中環診所姑娘嘅 WhatsApp 電話係 5926 9537。你可以直接點擊 [按此聯絡姑娘](https://wa.me/85259269537) 發送訊息查詢或預約。姑娘會喺應診時間（週一至五 11:00-14:00、15:30-19:30）內盡快回覆你。"
+      },
+      {
+        "query": "佐敦診所電話同 WhatsApp 幾多？用廣東話答。",
+        "status": 200,
+        "mode": "G1",
+        "response": "佐敦診所嘅電話係 5929 3042。\n\n你亦都可以點擊 [按此聯絡姑娘](https://wa.me/85259293042) 直接用 WhatsApp 同佐敦診所聯絡或者預約。\n\n診所地址喺九龍佐敦寶靈街6號佐敦中心7樓全層，有需要隨時搵我哋！"
+      },
+      {
+        "query": "荃灣 WhatsApp 幾多？",
+        "status": 200,
+        "mode": "G1",
+        "response": "荃灣診所嘅 WhatsApp 號碼係 5189 9065，你可以直接點擊 [按此聯絡姑娘](https://wa.me/85251899065) 發送訊息。\n\n如果想打電話查詢，亦可以致電 2698 5422 或 5189 9065 聯絡我哋！"
+      }
+    ],
+    "chatwootWebhookRoute": {
+      "url": "https://app.edenclinic.hk/api/chatwoot/agent-bot",
+      "request": { "event": "health_check" },
+      "status": 200,
+      "body": { "ok": true, "ignored": "unsupported_event" },
+      "externalWhatsAppConversationReplay": "not run: no safe authenticated test conversation/Chatwoot connector was available"
+    }
+  },
+  "acceptance": {
+    "wordpressAllHttp2xx": true,
+    "chatV2AllHttp2xx": true,
+    "allCapturedChatbotResponsesContainZeroRetiredNumbers": true,
+    "allCapturedHrefValuesContainZeroRetiredNumbers": true,
+    "retiredInResponse": [],
+    "retiredInHref": [],
+    "centralCurrentNumberObserved": true,
+    "jordanCurrentNumberObserved": true,
+    "tsuenWanPublicNumberAndChatwootSenderPreserved": true,
+    "facebookInstagramTouched": false
+  },
+  "limits": [
+    "The Chatwoot production webhook endpoint was exercised safely with an ignored health payload; an authenticated real WhatsApp conversation replay remains unverified.",
+    "Vercel observability MCP returned HTTP 500; deployment READY and SHA were verified through the authenticated Vercel CLI output instead."
+  ]
+}
