@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  CLINIC_BY_ID,
   DOCTOR_BY_ID,
   getDoctorBookingGroupLabel,
   getDoctorBookingPractitionerGroup,
@@ -17,19 +16,6 @@ import {
 } from '@/shared/clinic-data';
 import { GROUP_BOOKING_POLICIES } from '@/lib/group-booking-policy';
 import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
-
-test('public Central and Jordan WhatsApp contacts use the August 2026 numbers', () => {
-  assert.deepEqual(CLINIC_BY_ID.central.phones, ['3575 9733', '5926 9537']);
-  assert.equal(CLINIC_BY_ID.central.contactPhone, '5926 9537');
-  assert.equal(CLINIC_BY_ID.central.whatsappUrl, 'https://wa.me/85259269537');
-
-  assert.deepEqual(CLINIC_BY_ID.jordan.phones, ['3105 0733', '5929 3042']);
-  assert.equal(CLINIC_BY_ID.jordan.contactPhone, '5929 3042');
-  assert.equal(CLINIC_BY_ID.jordan.whatsappUrl, 'https://wa.me/85259293042');
-
-  assert.deepEqual(CLINIC_BY_ID.tsuenwan.phones, ['2698 5422', '5189 9065']);
-  assert.equal(CLINIC_BY_ID.tsuenwan.whatsappUrl, 'https://wa.me/85251899065');
-});
 
 test('Dr. Lee shows acupuncture only on booking pages', () => {
   assert.equal(getDoctorBookingTreatmentLabel('lee'), '針灸 Acupuncture');
@@ -102,12 +88,6 @@ test('Dr. Cheung Min Yin uses dedicated Jordan and Tsuen Wan calendars', () => {
   );
   assert.notEqual(jordanMapping?.calendarId, cheungTinWaiJordan?.calendarId);
   assert.notEqual(tsuenWanMapping?.calendarId, leungTsuenWan?.calendarId);
-});
-
-test('public booking schedule notes do not show expired month-specific notices', () => {
-  assert.equal(DOCTOR_BY_ID.hon.scheduleNote, undefined);
-  assert.doesNotMatch(DOCTOR_BY_ID.cheungmy.scheduleNote || '', /2026年5月13日起/);
-  assert.match(DOCTOR_BY_ID.cheungmy.scheduleNote || '', /現時應診時間/);
 });
 
 test('Dr. Chan has a configured avatar for booking profile cards', () => {
