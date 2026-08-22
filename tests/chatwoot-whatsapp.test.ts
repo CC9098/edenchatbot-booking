@@ -778,7 +778,7 @@ test('sendStaffPatientWhatsappMessage creates a missing Chatwoot contact before 
   }
 });
 
-test('sendStaffPatientWhatsappMessage falls back to text inside an active conversation', async () => {
+test('sendStaffPatientWhatsappMessage falls back to text when Chatwoot confirms the conversation can reply', async () => {
   const originalFetch = global.fetch;
   const originalEnv = {
     CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
@@ -850,6 +850,7 @@ test('sendStaffPatientWhatsappMessage falls back to text inside an active conver
           id: 42,
           inbox_id: 7,
           status: 'open',
+          can_reply: true,
         }],
       });
     }
@@ -1035,7 +1036,7 @@ test('sendStaffPatientWhatsappMessage blocks proactive staff text when no approv
   }
 });
 
-test('sendStaffPatientWhatsappMessage reports template failure for inactive proactive sends', async () => {
+test('sendStaffPatientWhatsappMessage does not fall back to text when Chatwoot says can_reply is false', async () => {
   const originalFetch = global.fetch;
   const originalEnv = {
     CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
@@ -1108,7 +1109,14 @@ test('sendStaffPatientWhatsappMessage reports template failure for inactive proa
     }
 
     if (method === 'GET' && path === '/api/v1/accounts/1/contacts/99/conversations') {
-      return jsonResponse({ payload: [] });
+      return jsonResponse({
+        payload: [{
+          id: 42,
+          inbox_id: 7,
+          status: 'open',
+          can_reply: false,
+        }],
+      });
     }
 
     if (method === 'POST' && path === '/api/v1/accounts/1/conversations') {
@@ -1134,7 +1142,13 @@ test('sendStaffPatientWhatsappMessage reports template failure for inactive proa
 
     if (method === 'GET' && path === '/api/v1/accounts/1/conversations/42/messages') {
       return jsonResponse({
-        payload: [{ id: 301, status: 'failed' }],
+        payload: [{
+          id: 301,
+          status: 'failed',
+          content_attributes: {
+            external_error: '131049: This message was not delivered to maintain healthy ecosystem engagement.',
+          },
+        }],
       });
     }
 
@@ -1158,6 +1172,8 @@ test('sendStaffPatientWhatsappMessage reports template failure for inactive proa
     assert.equal(result.success, false);
     assert.equal(result.whatsappSent, false);
     assert.match(result.error || '', /WhatsApp template delivery failed for staff_patient_follow_up/);
+    assert.match(result.error || '', /131049/);
+    assert.doesNotMatch(result.error || '', /with params/);
     assert.equal(sentMessagePayloads.some((payload) => payload.template_params?.name === 'staff_patient_follow_up'), true);
     assert.equal(sentMessagePayloads.some((payload) => !payload.template_params), false);
     assert.equal(deletedMessagePaths.length > 0, true);

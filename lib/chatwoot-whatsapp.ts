@@ -93,6 +93,7 @@ interface ChatwootConversation {
   id?: number;
   inbox_id?: number;
   status?: string | null;
+  can_reply?: boolean | null;
   labels?: string[] | null;
 }
 
@@ -108,6 +109,9 @@ interface ChatwootMessage {
   id?: number;
   status?: string | null;
   content?: string | null;
+  content_attributes?: {
+    external_error?: string | null;
+  } | null;
 }
 
 interface ChatwootMessageListResponse {
@@ -506,6 +510,7 @@ function findExistingConversation(
 
 function isActiveConversation(conversation: ChatwootConversation | null | undefined): boolean {
   if (!conversation?.id) return false;
+  if (conversation.can_reply === false) return false;
 
   const status = String(conversation.status || '').trim().toLowerCase();
   return status !== 'resolved';
@@ -1067,7 +1072,7 @@ async function sendMessageWithTemplateFallback(
             await client.deleteMessage(accountId, conversationId, message.id).catch(() => undefined);
           }
 
-          const detail = buildTemplateFailureDetail(templateConfig, processedParams, deliveryStatus.message);
+          const detail = buildTemplateFailureDetail(templateConfig, deliveryStatus.message);
           lastError = new Error(detail);
           continue;
         }
@@ -1434,11 +1439,11 @@ function normalizeMessageStatus(status: string | null | undefined): string | nul
 
 function buildTemplateFailureDetail(
   templateConfig: TemplateConfig,
-  processedParams: TemplateProcessedParams,
   message: ChatwootMessage | undefined,
 ): string {
   const status = normalizeMessageStatus(message?.status) || 'unknown';
-  return `[Chatwoot] WhatsApp template delivery failed for ${templateConfig.name} (${templateConfig.language}, status=${status}) with params ${JSON.stringify(processedParams)}`;
+  const externalError = message?.content_attributes?.external_error?.trim();
+  return `[Chatwoot] WhatsApp template delivery failed for ${templateConfig.name} (${templateConfig.language}, status=${status})${externalError ? `: ${externalError}` : ''}`;
 }
 
 function buildNoTemplateForOutboundTextError(): Error {
@@ -1450,6 +1455,15 @@ function buildNoTemplateForOutboundTextError(): Error {
 function buildTextDeliveryFailureError(error: unknown): Error {
   return new Error(
     `${getSafeErrorMessage(error)}. Possible cause: the WhatsApp customer-service window is closed, so free-text outbound delivery is blocked. Use an approved template or ask the patient to reply first.`,
+  );
+}
+
+function buildTemplateAndTextDeliveryFailureError(
+  templateError: unknown,
+  textError: unknown,
+): Error {
+  return new Error(
+    `${getSafeErrorMessage(templateError)}. Fallback WhatsApp text delivery also failed: ${getSafeErrorMessage(textError)}`,
   );
 }
 
@@ -1499,7 +1513,10 @@ async function sendTextMessageWithFailureCheck(
     if (message.id) {
       await client.deleteMessage(accountId, conversationId, message.id).catch(() => undefined);
     }
-    throw new Error('[Chatwoot] WhatsApp text delivery failed');
+    const externalError = deliveryStatus.message?.content_attributes?.external_error?.trim();
+    throw new Error(
+      `[Chatwoot] WhatsApp text delivery failed${externalError ? `: ${externalError}` : ''}`,
+    );
   }
 
   return deliveryStatus.status;
@@ -1612,7 +1629,7 @@ async function sendBookingWhatsappNotification(
       deliveryStatus = options.fallbackTextOnTemplateFailure
         ? await sendTextMessageWithFailureCheck(client, accountId, conversationId, content)
             .catch((textError) => {
-              throw buildTextDeliveryFailureError(textError);
+              throw buildTemplateAndTextDeliveryFailureError(error, textError);
             })
         : (await client.createMessage(accountId, conversationId, { content }), null);
     }

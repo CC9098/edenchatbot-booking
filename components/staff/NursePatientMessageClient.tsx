@@ -18,6 +18,7 @@ import {
   STAFF_PATIENT_MESSAGE_PURPOSE_BY_ID,
   STAFF_PATIENT_MESSAGE_PURPOSE_OPTIONS,
   buildStaffPatientMessageText,
+  getStaffPatientNoteMaxLength,
   type StaffPatientMessagePurpose,
 } from "@/lib/staff-patient-messages";
 import { shouldSearchStaffContactQuery } from "@/lib/staff-contact-search";
@@ -103,6 +104,22 @@ function getErrorText(payload: unknown): string {
   ) {
     const error = (payload as { error: string }).error;
 
+    if (error.includes("131049")) {
+      return "Meta 暫停向此病人發送此類訊息。請勿重覆按發送；可等病人回覆 WhatsApp，或改用電話、SMS 或電郵。";
+    }
+
+    if (error.includes("131026")) {
+      return "病人的 WhatsApp 未能接收此訊息。請核對電話號碼；如號碼正確，改用電話、SMS 或電郵。";
+    }
+
+    if (error.includes("WhatsApp template delivery failed") && error.includes("WhatsApp text delivery also failed")) {
+      return "Approved template 先發送失敗，普通文字後備亦未能送出。請檢查訊息內容及完整連結；如仍失敗，請改用電話、SMS 或電郵。";
+    }
+
+    if (error.includes("131047")) {
+      return "WhatsApp 24 小時客服窗口已關閉。請改用 approved template，或等病人回覆 WhatsApp。";
+    }
+
     if (error.includes("No approved WhatsApp template")) {
       return "未有可用的 approved template，不能主動發普通文字；請確認 template 已同步，或請病人先回覆 WhatsApp。";
     }
@@ -112,7 +129,7 @@ function getErrorText(payload: unknown): string {
     }
 
     if (error.includes("WhatsApp template delivery failed")) {
-      return "Template 發送失敗，請確認 Meta / Chatwoot template 名稱、語言及同步狀態。";
+      return "Template 發送失敗。請檢查訊息內容及完整連結；如仍失敗，請通知管理員檢查 Meta / Chatwoot。";
     }
 
     return error;
@@ -149,6 +166,8 @@ export function NursePatientMessageClient({
 
   const selectedClinic = clinics.find((clinic) => clinic.id === form.clinicId) || clinics[0];
   const selectedPurpose = STAFF_PATIENT_MESSAGE_PURPOSE_BY_ID[form.purpose];
+  const noteMaxLength = getStaffPatientNoteMaxLength(form.purpose);
+  const isNoteTooLong = form.note.length > noteMaxLength;
   const prefillKey = [
     prefill?.conversationId || "",
     prefill?.patientName || "",
@@ -232,6 +251,8 @@ export function NursePatientMessageClient({
   const activeHistoryConversation = historyConversations.find((conversation) => conversation.id === activeHistoryConversationId) || null;
   const activeComposerMode = getChatwootWorkbenchComposerMode(activeHistoryConversation);
   const isTemplateComposerMode = activeComposerMode === "template";
+  const composerMaxLength = isTemplateComposerMode ? getStaffPatientNoteMaxLength("follow_up") : 2000;
+  const isComposerTooLong = composerText.length > composerMaxLength;
 
   useEffect(() => {
     if (!activeHistoryScrollKey) return;
@@ -295,12 +316,17 @@ export function NursePatientMessageClient({
     setForm((current) => ({
       ...current,
       purpose: "follow_up",
-      note: message.slice(0, 240),
+      note: message,
     }));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isNoteTooLong) {
+      setSendState({ status: "error", text: `訊息內容最多 ${noteMaxLength} 字。` });
+      return;
+    }
+
     setIsSubmitting(true);
     setSendState({ status: "idle" });
 
@@ -357,6 +383,11 @@ export function NursePatientMessageClient({
     if (!selectedContact || !activeHistoryConversationId || isSendingComposerMessage) return;
 
     const content = composerText.trim();
+    if (content.length > composerMaxLength) {
+      setComposerError(`訊息內容最多 ${composerMaxLength} 字。`);
+      return;
+    }
+
     if (!content && !composerFile) {
       setComposerError("請輸入訊息或選擇圖片。");
       return;
@@ -658,7 +689,7 @@ export function NursePatientMessageClient({
                 onChange={(event) => setComposerText(event.target.value)}
                 className="min-h-20 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 placeholder="輸入 WhatsApp 訊息"
-                maxLength={isTemplateComposerMode ? 240 : 2000}
+                aria-invalid={isComposerTooLong}
               />
               <div className="flex flex-wrap items-center gap-3">
                 <label className={`inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition ${
@@ -677,12 +708,15 @@ export function NursePatientMessageClient({
                 <button
                   type="button"
                   onClick={() => void sendComposerMessage()}
-                  disabled={isSendingComposerMessage}
+                  disabled={isSendingComposerMessage || isComposerTooLong}
                   className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
                   {isSendingComposerMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   {isTemplateComposerMode ? "用 template 發送" : "發送"}
                 </button>
+                <span className={`ml-auto text-xs ${isComposerTooLong ? "font-semibold text-rose-700" : "text-slate-500"}`}>
+                  {composerText.length}/{composerMaxLength}
+                </span>
               </div>
               {composerError ? (
                 <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{composerError}</p>
@@ -876,13 +910,18 @@ export function NursePatientMessageClient({
 
           {selectedPurpose.noteLabel ? (
             <label className="space-y-2">
-              <span className="text-sm font-semibold text-slate-800">{selectedPurpose.noteLabel}</span>
+              <span className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-800">
+                <span>{selectedPurpose.noteLabel}</span>
+                <span className={isNoteTooLong ? "text-rose-700" : "font-normal text-slate-500"}>
+                  {form.note.length}/{noteMaxLength}
+                </span>
+              </span>
               <textarea
                 value={form.note}
                 onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))}
                 className="min-h-28 w-full rounded-lg border border-slate-200 px-3 py-3 text-sm leading-6 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 placeholder={selectedPurpose.notePlaceholder}
-                maxLength={240}
+                aria-invalid={isNoteTooLong}
               />
             </label>
           ) : null}
@@ -916,7 +955,7 @@ export function NursePatientMessageClient({
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isNoteTooLong}
             className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

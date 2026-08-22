@@ -6,9 +6,11 @@ import { requireStaffRoleWithChatwootEdenToolsToken } from "@/lib/chatwoot-eden-
 import { sendBookingConfirmationWhatsapp, sendStaffPatientWhatsappMessage } from "@/lib/chatwoot-whatsapp";
 import { normalizePhoneForSearch } from "@/lib/contact-utils";
 import {
+  STAFF_PATIENT_FOLLOW_UP_NOTE_MAX_LENGTH,
   STAFF_PATIENT_MESSAGE_PURPOSE_BY_ID,
   STAFF_PATIENT_MESSAGE_PURPOSE_IDS,
   buildStaffPatientMessageText,
+  getStaffPatientNoteMaxLength,
 } from "@/lib/staff-patient-messages";
 import { buildManageBookingUrl } from "@/lib/public-url";
 import { createManageAccessToken } from "@/lib/widget-booking-management";
@@ -23,7 +25,7 @@ const nursePatientMessageSchema = z.object({
   clinicId: z.enum(CLINIC_IDS),
   purpose: z.enum(STAFF_PATIENT_MESSAGE_PURPOSE_IDS),
   linkUrl: z.string().trim().max(1200, "連結太長").optional().default(""),
-  note: z.string().trim().max(240, "內容太長").optional().default(""),
+  note: z.string().trim().max(STAFF_PATIENT_FOLLOW_UP_NOTE_MAX_LENGTH, "內容太長").optional().default(""),
   manageAction: z.enum(["reschedule", "cancel"]).optional(),
   bookingId: z.string().trim().max(120).optional().default(""),
   doctorNameZh: z.string().trim().max(80).optional().default(""),
@@ -69,6 +71,14 @@ export async function POST(request: NextRequest) {
     }
 
     const messageData = parsed.data;
+    const noteMaxLength = getStaffPatientNoteMaxLength(messageData.purpose);
+    if (messageData.note.length > noteMaxLength) {
+      return NextResponse.json(
+        { error: `訊息內容最多 ${noteMaxLength} 字。` },
+        { status: 400 },
+      );
+    }
+
     const purposeConfig = STAFF_PATIENT_MESSAGE_PURPOSE_BY_ID[messageData.purpose];
     if (purposeConfig.requiresLink && !messageData.linkUrl) {
       return NextResponse.json(

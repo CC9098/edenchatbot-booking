@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildStaffPatientMessageText } from "@/lib/staff-patient-messages";
+import {
+  STAFF_PATIENT_DEFAULT_NOTE_MAX_LENGTH,
+  STAFF_PATIENT_FOLLOW_UP_NOTE_MAX_LENGTH,
+  buildStaffPatientMessageText,
+  buildStaffPatientTemplateBodyParams,
+  getStaffPatientNoteMaxLength,
+} from "@/lib/staff-patient-messages";
 
 test("staff follow-up message ends with the WhatsApp reply instruction", () => {
   const message = buildStaffPatientMessageText({
@@ -27,4 +33,37 @@ test("staff follow-up message stays generic for arbitrary staff notes", () => {
   assert.doesNotMatch(message, /你好 chet/);
   assert.doesNotMatch(message, /姑娘需要跟進你的查詢/);
   assert.doesNotMatch(message, /診所：佐敦/);
+});
+
+test("staff follow-up keeps two complete links and removes template-unsafe line breaks", () => {
+  const prescriptionUrl =
+    "https://os.ectcm.com/PrintPrescription/PrintPrescription?clientID=1234567&clientRegisterID=7654321&doctorID=2468&paperSize=A4&langcode=CN";
+  const invoiceUrl =
+    "https://os.ectcm.com/InvoiceDetail/PrintInvoiceReceipt?clientRegisterID=7654321&invoiceType=S&clientID=1234567&invoiceID=9876543";
+  const note = `${prescriptionUrl}\n\n${invoiceUrl}`;
+
+  assert.ok(note.length > STAFF_PATIENT_DEFAULT_NOTE_MAX_LENGTH);
+
+  const params = buildStaffPatientTemplateBodyParams({
+    patientName: "測試病人",
+    clinicNameZh: "佐敦",
+    purpose: "follow_up",
+    note,
+  });
+  const message = buildStaffPatientMessageText({
+    patientName: "測試病人",
+    clinicNameZh: "佐敦",
+    purpose: "follow_up",
+    note,
+  });
+
+  assert.equal(params["1"], `${prescriptionUrl} ${invoiceUrl}`);
+  assert.match(message, new RegExp(`${prescriptionUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} ${invoiceUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  assert.doesNotMatch(params["1"], /[\r\n\t]/);
+});
+
+test("staff follow-up has a larger explicit note limit than other staff messages", () => {
+  assert.equal(getStaffPatientNoteMaxLength("follow_up"), STAFF_PATIENT_FOLLOW_UP_NOTE_MAX_LENGTH);
+  assert.equal(getStaffPatientNoteMaxLength("pre_visit"), STAFF_PATIENT_DEFAULT_NOTE_MAX_LENGTH);
+  assert.ok(STAFF_PATIENT_FOLLOW_UP_NOTE_MAX_LENGTH > STAFF_PATIENT_DEFAULT_NOTE_MAX_LENGTH);
 });

@@ -10,6 +10,8 @@ export const STAFF_PATIENT_MESSAGE_PURPOSE_IDS = [
 export type StaffPatientMessagePurpose = (typeof STAFF_PATIENT_MESSAGE_PURPOSE_IDS)[number];
 
 export const STAFF_PATIENT_FOLLOW_UP_TEMPLATE_NAME = "staff_patient_follow_up";
+export const STAFF_PATIENT_DEFAULT_NOTE_MAX_LENGTH = 240;
+export const STAFF_PATIENT_FOLLOW_UP_NOTE_MAX_LENGTH = 900;
 
 export type StaffPatientMessagePurposeOption = {
   id: StaffPatientMessagePurpose;
@@ -87,9 +89,21 @@ export type BuildStaffPatientMessageTextInput = {
   totalAmount?: string;
 };
 
+export function getStaffPatientNoteMaxLength(purpose: StaffPatientMessagePurpose): number {
+  return purpose === "follow_up"
+    ? STAFF_PATIENT_FOLLOW_UP_NOTE_MAX_LENGTH
+    : STAFF_PATIENT_DEFAULT_NOTE_MAX_LENGTH;
+}
+
+function normalizeFollowUpTemplateNote(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
 function getStaffPatientMessageNote(input: BuildStaffPatientMessageTextInput): string {
   const note = input.note?.trim();
-  if (note) return note;
+  if (note) {
+    return input.purpose === "follow_up" ? normalizeFollowUpTemplateNote(note) : note;
+  }
 
   switch (input.purpose) {
     case "intake_link":
