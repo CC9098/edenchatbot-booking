@@ -315,7 +315,7 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
   {
     doctorId: "cheungmy",
     clinicId: "jordan",
-    calendarId: "r0ea9kabll5gdc7ll2s13n5hko@group.calendar.google.com",
+    calendarId: "02340d736967498edcb5f3d62ff286e79ea51e63cb6f992393d28ffc91c0e38f@group.calendar.google.com",
     isActive: true,
     effectiveFrom: "2026-05-01",
     schedule: {
@@ -331,7 +331,7 @@ export const CALENDAR_MAPPINGS: CalendarMapping[] = [
   {
     doctorId: "cheungmy",
     clinicId: "tsuenwan",
-    calendarId: "ibk3t07kqhdvp5lfvpim401vqo@group.calendar.google.com",
+    calendarId: "abff9765dbe5f9b5b39c0809afc3ec41500331c1afbf55e9797efbb31b5b7185@group.calendar.google.com",
     isActive: true,
     effectiveFrom: "2026-05-01",
     schedule: {
