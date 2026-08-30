@@ -38,6 +38,7 @@ const nursePatientMessageSchema = z.object({
   treatmentFee: z.string().trim().max(40, "其他收費太長").optional().default(""),
   extraFee: z.string().trim().max(80, "收費說明太長").optional().default(""),
   totalAmount: z.string().trim().max(40, "總額太長").optional().default(""),
+  conversationId: z.number().int().positive().nullable().optional(),
 });
 
 function formatZodIssues(error: z.ZodError) {
@@ -154,6 +155,7 @@ export async function POST(request: NextRequest) {
           meetLink: messageData.meetLink,
           onlineConsultUrl: messageData.linkUrl,
           clinicWhatsappPhone,
+          conversationId: messageData.conversationId,
         })
       : await sendStaffPatientWhatsappMessage({
           patientName: messageData.patientName,
@@ -169,6 +171,7 @@ export async function POST(request: NextRequest) {
           treatmentFee: messageData.treatmentFee,
           extraFee: messageData.extraFee,
           totalAmount: messageData.totalAmount,
+          conversationId: messageData.conversationId,
         });
 
     const preview = buildStaffPatientMessageText({

@@ -54,6 +54,7 @@ function ChatwootDashboardEdenToolsInner({
   }, []);
 
   const prefill = useMemo(() => ({
+    contactId: context?.contactId || null,
     patientName: context?.contactName || "",
     phone: context?.contactPhone || "",
     conversationId: context?.conversationId || null,

@@ -15,6 +15,10 @@ export type RawChatwootHistoryMessage = {
   private?: boolean | null;
   status?: string | null;
   source_id?: string | null;
+  content_attributes?: {
+    in_reply_to?: unknown;
+    in_reply_to_external_id?: unknown;
+  } | null;
   attachments?: RawChatwootAttachment[] | null;
 };
 
@@ -25,6 +29,8 @@ export type StaffChatwootHistoryMessage = {
   createdAt: string | null;
   status: string | null;
   sourceId: string | null;
+  replyToMessageId: number | null;
+  replyToExternalId: string | null;
   attachments: Array<{
     id: number;
     fileType: string;
@@ -74,6 +80,27 @@ function normalizeAttachments(attachments: RawChatwootHistoryMessage["attachment
     });
 }
 
+function normalizeReplyToMessageId(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value > 0 ? value : null;
+  }
+
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  if (!/^[1-9]\d*$/.test(trimmed)) return null;
+
+  const parsed = Number(trimmed);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normalizeReplyToExternalId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 export function normalizeChatwootHistoryMessages(
   messages: RawChatwootHistoryMessage[],
 ): StaffChatwootHistoryMessage[] {
@@ -93,6 +120,8 @@ export function normalizeChatwootHistoryMessages(
         createdAt: normalizeCreatedAt(message.created_at),
         status: message.status || null,
         sourceId: message.source_id || null,
+        replyToMessageId: normalizeReplyToMessageId(message.content_attributes?.in_reply_to),
+        replyToExternalId: normalizeReplyToExternalId(message.content_attributes?.in_reply_to_external_id),
         attachments,
       };
     })

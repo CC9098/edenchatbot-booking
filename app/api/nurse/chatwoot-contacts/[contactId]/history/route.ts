@@ -11,6 +11,13 @@ import {
   normalizeChatwootHistoryMessages,
   type RawChatwootHistoryMessage,
 } from "@/lib/staff-chatwoot-history";
+import {
+  compareChatwootConversationFreshness,
+  getChatwootConversationFreshness,
+  getChatwootConversationLastActivityAt,
+  normalizeChatwootTimestamp,
+  parseChatwootTimestamp,
+} from "@/lib/staff-chatwoot-conversation-freshness";
 
 export const dynamic = "force-dynamic";
 
@@ -23,15 +30,6 @@ type ChatwootConversation = {
   updated_at?: number | string | null;
   last_activity_at?: number | string | null;
 };
-
-function getNumericTime(value: number | string | null | undefined): number {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return 0;
-}
 
 export async function GET(
   request: NextRequest,
@@ -53,14 +51,26 @@ export async function GET(
       `/api/v1/accounts/${accountId}/contacts/${contactId}/conversations`,
     );
 
-    const conversations = (conversationsResponse.payload || [])
+    const allConversations = (Array.isArray(conversationsResponse.payload)
+      ? conversationsResponse.payload
+      : [])
       .filter((conversation) => conversation.id)
       .sort((a, b) => {
-        const bTime = getNumericTime(b.last_activity_at || b.updated_at || b.created_at);
-        const aTime = getNumericTime(a.last_activity_at || a.updated_at || a.created_at);
+        const bTime = parseChatwootTimestamp(getChatwootConversationLastActivityAt(b)) ?? -Infinity;
+        const aTime = parseChatwootTimestamp(getChatwootConversationLastActivityAt(a)) ?? -Infinity;
         return bTime - aTime;
-      })
-      .slice(0, 5);
+      });
+    const requestedConversationId = Number(request.nextUrl.searchParams.get("conversationId"));
+    const requestedConversation = Number.isInteger(requestedConversationId) && requestedConversationId > 0
+      ? allConversations.find((conversation) => conversation.id === requestedConversationId)
+      : null;
+    const conversations = allConversations.slice(0, 5);
+    if (
+      requestedConversation &&
+      !conversations.some((conversation) => conversation.id === requestedConversation.id)
+    ) {
+      conversations.splice(Math.max(conversations.length - 1, 0), 1, requestedConversation);
+    }
 
     const history = await Promise.all(
       conversations.map(async (conversation) => {
@@ -70,14 +80,34 @@ export async function GET(
           `/api/v1/accounts/${accountId}/conversations/${conversation.id}/messages`,
         );
 
+        const rawMessages = Array.isArray(messagesResponse.payload) ? messagesResponse.payload : [];
+        const normalizedMessages = normalizeChatwootHistoryMessages(rawMessages);
+        const rawMessageById = new Map(
+          rawMessages
+            .filter((message) => message.id)
+            .map((message) => [message.id as number, message]),
+        );
+        const visibleMessages = normalizedMessages.map((message) => {
+          const rawMessage = rawMessageById.get(message.id);
+          if (!rawMessage || rawMessage.created_at === undefined) return message;
+
+          return {
+            ...message,
+            createdAt: normalizeChatwootTimestamp(rawMessage.created_at),
+          };
+        });
+
         return {
           id: conversation.id,
           status: conversation.status || null,
           canReply: conversation.can_reply ?? null,
-          messages: normalizeChatwootHistoryMessages(messagesResponse.payload || []).slice(-80),
+          messages: visibleMessages.slice(-80),
+          ...getChatwootConversationFreshness(conversation, visibleMessages),
         };
       }),
     );
+
+    history.sort(compareChatwootConversationFreshness);
 
     return NextResponse.json({ conversations: history });
   } catch (error) {

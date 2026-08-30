@@ -5,6 +5,8 @@ export type StaffChatwootWorkbenchMessage = {
   createdAt: string | null;
   status: string | null;
   sourceId: string | null;
+  replyToMessageId?: number | null;
+  replyToExternalId?: string | null;
   attachments: Array<{
     id: number;
     fileType: string;
@@ -17,8 +19,51 @@ export type StaffChatwootWorkbenchConversation = {
   id: number;
   status: string | null;
   canReply?: boolean | null;
+  lastActivityAt?: string | null;
+  latestVisibleMessageAt?: string | null;
+  latestIncomingMessageAt?: string | null;
+  activityOnlySinceLastVisible?: boolean;
   messages: StaffChatwootWorkbenchMessage[];
 };
+
+type ChatwootReplyMessageReference = Pick<
+  StaffChatwootWorkbenchMessage,
+  "id" | "replyToMessageId" | "replyToExternalId"
+>;
+
+function isValidReplyToMessageId(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+function normalizeReplyToExternalId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+export function resolveChatwootWorkbenchReplyParent(
+  conversation: Pick<StaffChatwootWorkbenchConversation, "messages">,
+  message: ChatwootReplyMessageReference,
+): StaffChatwootWorkbenchMessage | null {
+  if (isValidReplyToMessageId(message.replyToMessageId)) {
+    const parentById = conversation.messages.find(
+      (candidate) => candidate.id === message.replyToMessageId && candidate.id !== message.id,
+    );
+    if (parentById) return parentById;
+  }
+
+  const replyToExternalId = normalizeReplyToExternalId(message.replyToExternalId);
+  if (!replyToExternalId) return null;
+
+  return (
+    conversation.messages.find(
+      (candidate) =>
+        candidate.id !== message.id &&
+        normalizeReplyToExternalId(candidate.sourceId) === replyToExternalId,
+    ) || null
+  );
+}
 
 export function appendChatwootWorkbenchMessage(
   conversations: StaffChatwootWorkbenchConversation[],

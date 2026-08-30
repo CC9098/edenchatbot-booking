@@ -95,6 +95,18 @@ interface ChatwootConversation {
   status?: string | null;
   can_reply?: boolean | null;
   labels?: string[] | null;
+  created_at?: number | string | null;
+  updated_at?: number | string | null;
+  last_activity_at?: number | string | null;
+  timestamp?: number | string | null;
+  last_non_activity_message?: ChatwootConversationMessage | null;
+}
+
+interface ChatwootConversationMessage {
+  id?: number;
+  message_type?: number | string | null;
+  private?: boolean | null;
+  created_at?: number | string | null;
 }
 
 interface ChatwootConversationListResponse {
@@ -140,6 +152,7 @@ interface BookingWhatsappNotificationInput extends BookingWhatsappConfirmationIn
   clinicWhatsappPhone?: string | null;
   manageAccessToken?: string;
   campaignContext?: ChatwootCampaignContext;
+  conversationId?: number | null;
 }
 
 interface BookingWhatsappReminderNotificationInput extends BookingWhatsappReminderInput {
@@ -229,6 +242,7 @@ interface StaffPatientWhatsappMessageInput {
   extraFee?: string;
   totalAmount?: string;
   campaignContext?: ChatwootCampaignContext;
+  conversationId?: number | null;
 }
 
 interface SendWhatsappBookingConfirmationResult {
@@ -490,9 +504,80 @@ function extractContactFromCreateResponse(
   return matchingContact || candidates.find((candidate) => Boolean(candidate.id)) || null;
 }
 
-function findExistingConversation(
+function parseChatwootTimestamp(value: number | string | null | undefined): number | null {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return null;
+    return Math.abs(value) < 100_000_000_000 ? value * 1000 : value;
+  }
+
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const numericValue = Number(trimmed);
+  if (Number.isFinite(numericValue)) {
+    return Math.abs(numericValue) < 100_000_000_000 ? numericValue * 1000 : numericValue;
+  }
+
+  const parsed = Date.parse(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getConversationLatestRealMessageAt(
+  conversation: ChatwootConversation,
+): number | null {
+  const message = conversation.last_non_activity_message;
+  if (!message || message.private === true) return null;
+
+  const messageType = String(message.message_type ?? '').trim().toLowerCase();
+  if (messageType === 'activity' || messageType === '2') return null;
+
+  return parseChatwootTimestamp(message.created_at);
+}
+
+function getConversationLastActivityAt(conversation: ChatwootConversation): number | null {
+  for (const value of [
+    conversation.last_activity_at,
+    conversation.timestamp,
+    conversation.updated_at,
+    conversation.created_at,
+  ]) {
+    const timestamp = parseChatwootTimestamp(value);
+    if (timestamp !== null) return timestamp;
+  }
+
+  return null;
+}
+
+function compareConversationsForOutbound(
+  a: ChatwootConversation,
+  b: ChatwootConversation,
+): number {
+  const aMessageAt = getConversationLatestRealMessageAt(a);
+  const bMessageAt = getConversationLatestRealMessageAt(b);
+
+  if (aMessageAt !== null || bMessageAt !== null) {
+    if (aMessageAt === null) return 1;
+    if (bMessageAt === null) return -1;
+    if (aMessageAt !== bMessageAt) return bMessageAt - aMessageAt;
+  } else {
+    const aActivityAt = getConversationLastActivityAt(a);
+    const bActivityAt = getConversationLastActivityAt(b);
+    if (aActivityAt !== null || bActivityAt !== null) {
+      if (aActivityAt === null) return 1;
+      if (bActivityAt === null) return -1;
+      if (aActivityAt !== bActivityAt) return bActivityAt - aActivityAt;
+    }
+  }
+
+  return (b.id || 0) - (a.id || 0);
+}
+
+export function findExistingConversation(
   conversations: ChatwootConversation[],
   inboxId: number,
+  preferredConversationId?: number | null,
 ): ChatwootConversation | null {
   const sameInboxConversations = conversations.filter(
     (conversation) => conversation.inbox_id === inboxId && conversation.id,
@@ -501,11 +586,19 @@ function findExistingConversation(
     return null;
   }
 
-  const preferredConversation = sameInboxConversations.find(
+  if (preferredConversationId) {
+    const explicitConversation = sameInboxConversations.find(
+      (conversation) => conversation.id === preferredConversationId,
+    );
+    if (explicitConversation) return explicitConversation;
+  }
+
+  const activeConversations = sameInboxConversations.filter(
     (conversation) => conversation.status && conversation.status !== 'resolved',
   );
+  const candidates = activeConversations.length > 0 ? activeConversations : sameInboxConversations;
 
-  return preferredConversation || sameInboxConversations[0];
+  return [...candidates].sort(compareConversationsForOutbound)[0] || null;
 }
 
 function isActiveConversation(conversation: ChatwootConversation | null | undefined): boolean {
@@ -1529,6 +1622,7 @@ async function sendBookingWhatsappNotification(
     email: string;
     clinicWhatsappPhone?: string | null;
     campaignContext?: ChatwootCampaignContext;
+    conversationId?: number | null;
   },
   options: {
     buildContent: () => string;
@@ -1577,7 +1671,11 @@ async function sendBookingWhatsappNotification(
   );
 
   const conversationsResponse = await client.getContactConversations(accountId, contact.contactId);
-  const existingConversation = findExistingConversation(conversationsResponse.payload || [], inboxId);
+  const existingConversation = findExistingConversation(
+    conversationsResponse.payload || [],
+    inboxId,
+    input.conversationId,
+  );
 
   let conversationId = existingConversation?.id;
   if (!conversationId) {
@@ -1977,6 +2075,7 @@ export async function sendStaffPatientWhatsappMessage(
         email: input.email || '',
         clinicWhatsappPhone: input.clinicWhatsappPhone,
         campaignContext: input.campaignContext,
+        conversationId: input.conversationId,
       },
       {
         buildContent: () => buildStaffPatientMessageText(input),
