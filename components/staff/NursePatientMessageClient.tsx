@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -27,6 +27,7 @@ import {
   getChatwootWorkbenchComposerMode,
   getChatwootWorkbenchConversationStatusLabel,
   getChatwootWorkbenchScrollKey,
+  resolveChatwootWorkbenchReplyParent,
   type StaffChatwootWorkbenchConversation,
   type StaffChatwootWorkbenchMessage,
 } from "@/lib/staff-chatwoot-workbench";
@@ -66,6 +67,7 @@ type FormState = {
 };
 
 type PatientMessagePrefill = {
+  contactId?: number | null;
   patientName?: string;
   phone?: string;
   note?: string;
@@ -138,6 +140,16 @@ function getErrorText(payload: unknown): string {
   return "未能發送 WhatsApp 訊息。";
 }
 
+function getQuotedMessagePreview(message: StaffChatwootWorkbenchMessage | null): string {
+  if (!message) return "原訊息未載入";
+
+  const content = message.content.trim();
+  if (content) return content.length > 120 ? `${content.slice(0, 120)}…` : content;
+
+  const attachment = message.attachments[0];
+  return attachment ? `附件：${attachment.label}` : "原訊息未載入";
+}
+
 export function NursePatientMessageClient({
   clinics,
   embedded = false,
@@ -163,12 +175,14 @@ export function NursePatientMessageClient({
   const [isSendingComposerMessage, setIsSendingComposerMessage] = useState(false);
   const [composerError, setComposerError] = useState("");
   const activeHistoryBottomRef = useRef<HTMLDivElement | null>(null);
+  const autoLoadedContactKeyRef = useRef("");
 
   const selectedClinic = clinics.find((clinic) => clinic.id === form.clinicId) || clinics[0];
   const selectedPurpose = STAFF_PATIENT_MESSAGE_PURPOSE_BY_ID[form.purpose];
   const noteMaxLength = getStaffPatientNoteMaxLength(form.purpose);
   const isNoteTooLong = form.note.length > noteMaxLength;
   const prefillKey = [
+    prefill?.contactId || "",
     prefill?.conversationId || "",
     prefill?.patientName || "",
     prefill?.phone || "",
@@ -253,6 +267,9 @@ export function NursePatientMessageClient({
   const isTemplateComposerMode = activeComposerMode === "template";
   const composerMaxLength = isTemplateComposerMode ? getStaffPatientNoteMaxLength("follow_up") : 2000;
   const isComposerTooLong = composerText.length > composerMaxLength;
+  const openHistoryConversationCount = historyConversations.filter((conversation) =>
+    ["open", "pending", "snoozed"].includes(conversation.status || ""),
+  ).length;
 
   useEffect(() => {
     if (!activeHistoryScrollKey) return;
@@ -264,14 +281,22 @@ export function NursePatientMessageClient({
     return () => window.cancelAnimationFrame(animationFrame);
   }, [activeHistoryScrollKey]);
 
-  async function loadContactHistory(contact: ContactSearchResult) {
+  const loadContactHistory = useCallback(async (
+    contact: ContactSearchResult,
+    preferredConversationId: number | null = null,
+  ) => {
     const controller = new AbortController();
     try {
       setIsLoadingHistory(true);
       setHistoryError("");
       setHistoryConversations([]);
 
-      const response = await fetch(`/api/nurse/chatwoot-contacts/${contact.id}/history`, {
+      const historyParams = new URLSearchParams();
+      if (preferredConversationId) {
+        historyParams.set("conversationId", String(preferredConversationId));
+      }
+      const historyQuery = historyParams.size ? `?${historyParams.toString()}` : "";
+      const response = await fetch(`/api/nurse/chatwoot-contacts/${contact.id}/history${historyQuery}`, {
         cache: "no-store",
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
         signal: controller.signal,
@@ -285,14 +310,45 @@ export function NursePatientMessageClient({
 
       const nextConversations = Array.isArray(payload.conversations) ? payload.conversations : [];
       setHistoryConversations(nextConversations);
-      setActiveHistoryConversationId(nextConversations[0]?.id || null);
+      const preferredConversationExists = preferredConversationId
+        ? nextConversations.some((conversation: ContactHistoryConversation) => conversation.id === preferredConversationId)
+        : false;
+      setActiveHistoryConversationId(
+        preferredConversationExists ? preferredConversationId : nextConversations[0]?.id || null,
+      );
     } catch (error) {
       if (controller.signal.aborted) return;
       setHistoryError(error instanceof Error ? error.message : "讀取對話紀錄失敗");
     } finally {
       if (!controller.signal.aborted) setIsLoadingHistory(false);
     }
-  }
+  }, [authToken]);
+
+  useEffect(() => {
+    if (!embedded || !prefill?.contactId || !prefill.phone?.trim()) return;
+
+    const contactKey = `${prefill.contactId}|${prefill.phone.trim()}|${prefill.conversationId || ""}`;
+    if (autoLoadedContactKeyRef.current === contactKey) return;
+    autoLoadedContactKeyRef.current = contactKey;
+
+    const contact = {
+      id: prefill.contactId,
+      name: prefill.patientName?.trim() || prefill.phone.trim(),
+      phoneNumber: prefill.phone.trim(),
+    };
+    setSelectedContact(contact);
+    setComposerText("");
+    setComposerFile(null);
+    setComposerError("");
+    void loadContactHistory(contact, prefill.conversationId || null);
+  }, [
+    embedded,
+    loadContactHistory,
+    prefill?.contactId,
+    prefill?.conversationId,
+    prefill?.patientName,
+    prefill?.phone,
+  ]);
 
   function fillContact(contact: ContactSearchResult) {
     setForm((current) => ({
@@ -340,6 +396,9 @@ export function NursePatientMessageClient({
         body: JSON.stringify({
           ...form,
           manageAction: form.manageAction || undefined,
+          conversationId: embedded
+            ? activeHistoryConversationId || prefill?.conversationId || undefined
+            : undefined,
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -415,6 +474,7 @@ export function NursePatientMessageClient({
             clinicId: form.clinicId,
             purpose: "follow_up",
             note: content,
+            conversationId: activeHistoryConversationId,
           }),
         });
         const payload = await response.json().catch(() => ({}));
@@ -426,7 +486,7 @@ export function NursePatientMessageClient({
 
         setComposerText("");
         setComposerFile(null);
-        void loadContactHistory(selectedContact);
+        void loadContactHistory(selectedContact, activeHistoryConversationId);
         return;
       }
 
@@ -462,7 +522,7 @@ export function NursePatientMessageClient({
           appendChatwootWorkbenchMessage(current, activeHistoryConversationId, payload.message),
         );
       } else {
-        void loadContactHistory(selectedContact);
+        void loadContactHistory(selectedContact, activeHistoryConversationId);
       }
 
       setComposerText("");
@@ -571,36 +631,73 @@ export function NursePatientMessageClient({
             <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{historyError}</p>
           ) : null}
 
+          <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            預約前確認：本人 / 家人。引用顯示唔完整時，先向病人核對。
+          </p>
+
+          {openHistoryConversationCount > 1 ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+              同一聯絡人有 {openHistoryConversationCount} 個進行中對話。請按「病人訊息」時間揀，唔好按列表位置。
+            </p>
+          ) : null}
+
           {!isLoadingHistory && !historyError && historyConversations.length === 0 ? (
             <p className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">未有過往對話。</p>
           ) : null}
 
           {historyConversations.length > 0 ? (
             <div className="max-h-[420px] space-y-4 overflow-y-auto pr-1">
-              {historyConversations.map((conversation) => (
-                <div
-                  key={conversation.id}
-                  className={`space-y-2 rounded-lg border bg-slate-50 p-3 ${
-                    conversation.id === activeHistoryConversationId
-                      ? "border-emerald-200"
-                      : "border-slate-100"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setActiveHistoryConversationId(conversation.id)}
-                    className="flex w-full items-center justify-between gap-2 text-left text-xs font-semibold text-slate-500"
+              {historyConversations.map((conversation) => {
+                const isCurrentChatwootConversation = conversation.id === prefill?.conversationId;
+
+                return (
+                  <div
+                    key={conversation.id}
+                    className={`space-y-2 rounded-lg border bg-slate-50 p-3 ${
+                      conversation.id === activeHistoryConversationId
+                        ? "border-emerald-300 ring-1 ring-emerald-100"
+                        : "border-slate-100"
+                    }`}
                   >
-                    <span>對話 #{conversation.id}</span>
-                    {getChatwootWorkbenchConversationStatusLabel(conversation) ? (
-                      <span>{getChatwootWorkbenchConversationStatusLabel(conversation)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveHistoryConversationId(conversation.id)}
+                      className="flex w-full items-start justify-between gap-3 text-left text-xs text-slate-500"
+                    >
+                      <span className="min-w-0">
+                        <span className="block font-semibold text-slate-700">
+                          對話 #{conversation.id}
+                          {isCurrentChatwootConversation ? " · 目前對話" : ""}
+                        </span>
+                        <span className="mt-1 block">
+                          病人訊息 {conversation.latestIncomingMessageAt
+                            ? formatMessageTime(conversation.latestIncomingMessageAt)
+                            : "未有"}
+                        </span>
+                      </span>
+                      {getChatwootWorkbenchConversationStatusLabel(conversation) ? (
+                        <span className="shrink-0 font-semibold">
+                          {getChatwootWorkbenchConversationStatusLabel(conversation)}
+                        </span>
+                      ) : null}
+                    </button>
+                    {conversation.activityOnlySinceLastVisible ? (
+                      <p className="w-fit rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">
+                        冇新病人訊息 · 最近只係系統活動
+                      </p>
                     ) : null}
-                  </button>
                   {conversation.messages.length > 0 ? (
                     <div className="space-y-2">
                       {conversation.messages.map((message) => {
                         const incoming = message.direction === "incoming";
                         const failed = message.direction === "outgoing" && message.status === "failed";
+                        const hasReplyReference = Boolean(
+                          message.replyToMessageId || message.replyToExternalId,
+                        );
+                        const replyParent = hasReplyReference
+                          ? resolveChatwootWorkbenchReplyParent(conversation, message)
+                          : null;
 
                         return (
                           <div
@@ -616,6 +713,23 @@ export function NursePatientMessageClient({
                                   : "bg-emerald-700 text-white"
                               }`}
                             >
+                              {hasReplyReference ? (
+                                <div
+                                  aria-label="引用訊息"
+                                  className={`mb-2 border-l-2 px-2 py-1.5 text-xs leading-5 ${
+                                    failed
+                                      ? "border-rose-300 bg-rose-100 text-rose-800"
+                                      : incoming
+                                      ? "border-slate-300 bg-slate-100 text-slate-600"
+                                      : "border-emerald-300 bg-emerald-800 text-emerald-50"
+                                  }`}
+                                >
+                                  <p className="font-semibold">回覆緊</p>
+                                  <p className="line-clamp-3 whitespace-pre-wrap break-words">
+                                    {getQuotedMessagePreview(replyParent)}
+                                  </p>
+                                </div>
+                              ) : null}
                               {message.content ? (
                                 <p className="whitespace-pre-wrap break-words leading-6">{message.content}</p>
                               ) : null}
@@ -660,8 +774,9 @@ export function NursePatientMessageClient({
                   ) : (
                     <p className="text-sm text-slate-500">此對話未有可顯示 WhatsApp 訊息。</p>
                   )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           ) : null}
 

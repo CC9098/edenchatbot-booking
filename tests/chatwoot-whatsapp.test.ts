@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  findExistingConversation,
   sendBookingCancellationWhatsapp,
   sendBookingConfirmationWhatsapp,
   sendBookingRescheduleWhatsapp,
@@ -20,6 +21,87 @@ function jsonResponse(body: unknown, status = 200) {
     },
   });
 }
+
+test('findExistingConversation prefers the newest real message over newer reopen activity', () => {
+  const selected = findExistingConversation(
+    [
+      {
+        id: 10,
+        inbox_id: 7,
+        status: 'open',
+        last_activity_at: '2026-08-30T12:00:00Z',
+        last_non_activity_message: {
+          id: 100,
+          message_type: 0,
+          private: false,
+          created_at: '2026-08-30T10:00:00Z',
+        },
+      },
+      {
+        id: 20,
+        inbox_id: 7,
+        status: 'open',
+        last_activity_at: '2026-08-30T11:00:00Z',
+        last_non_activity_message: {
+          id: 200,
+          message_type: 0,
+          private: false,
+          created_at: '2026-08-30T11:30:00Z',
+        },
+      },
+      {
+        id: 30,
+        inbox_id: 99,
+        status: 'open',
+        last_activity_at: '2026-08-30T13:00:00Z',
+      },
+    ],
+    7,
+  );
+
+  assert.equal(selected?.id, 20);
+});
+
+test('findExistingConversation honours an explicit current conversation in the inbox', () => {
+  const selected = findExistingConversation(
+    [
+      { id: 10, inbox_id: 7, status: 'resolved' },
+      { id: 20, inbox_id: 7, status: 'open' },
+    ],
+    7,
+    10,
+  );
+
+  assert.equal(selected?.id, 10);
+});
+
+test('findExistingConversation falls back to activity time without real message summaries', () => {
+  const selected = findExistingConversation(
+    [
+      {
+        id: 10,
+        inbox_id: 7,
+        status: 'open',
+        last_activity_at: '2026-08-30T12:00:00Z',
+        last_non_activity_message: {
+          id: 100,
+          message_type: 2,
+          private: false,
+          created_at: '2026-08-30T12:00:01Z',
+        },
+      },
+      {
+        id: 20,
+        inbox_id: 7,
+        status: 'open',
+        last_activity_at: '2026-08-30T11:00:00Z',
+      },
+    ],
+    7,
+  );
+
+  assert.equal(selected?.id, 10);
+});
 
 test('buildStaffPatientTemplateBodyParams maps staff follow-up template to one staff note variable', () => {
   const params = buildStaffPatientTemplateBodyParams({

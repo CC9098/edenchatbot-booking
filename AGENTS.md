@@ -6,6 +6,14 @@ This repo contains multiple chat systems. Do not mix them.
 
 If the user says only "chatbot", "AI 自動回覆", "最近歷史對話", "widget", or "database", first confirm which system they mean before analysing behavior, logs, or data.
 
+## Delivery Completion Guardrail
+
+- For change or build work, treat the normal finish line as: isolated intended changes, relevant checks, commit, merge to the canonical branch, push, deployment, and live read-back when this repository has a production deployment.
+- Do not silently stop at local code, passing tests, an unmerged branch, or an undeployed commit and describe the work as complete.
+- If the user has not said whether merge, push, or deployment is wanted, ask before ending the task. Skip those steps only when the user explicitly requests local-only or no-deploy work.
+- Report each proof layer separately: local implementation, tests, commit, merged remote SHA, deployment status, authenticated production behavior, and any external-delivery proof.
+- Preserve unrelated dirty work by isolating the requested change in a clean branch or worktree instead of bundling unrelated files into the push.
+
 ## Brand Color Guardrail
 
 Keep the public app and booking UI on Eden green brand tokens in `app/globals.css`.

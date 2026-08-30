@@ -31,6 +31,8 @@ test("normalizes visible incoming and outgoing Chatwoot messages", () => {
         createdAt: "2026-06-25T10:44:32.000Z",
         status: null,
         sourceId: null,
+        replyToMessageId: null,
+        replyToExternalId: null,
         attachments: [],
       },
       {
@@ -40,6 +42,8 @@ test("normalizes visible incoming and outgoing Chatwoot messages", () => {
         createdAt: "2026-06-25T10:45:00.000Z",
         status: "read",
         sourceId: "wamid.123",
+        replyToMessageId: null,
+        replyToExternalId: null,
         attachments: [],
       },
     ],
@@ -95,6 +99,8 @@ test("keeps attachment-only WhatsApp messages", () => {
         createdAt: "2026-06-25T10:45:03.000Z",
         status: null,
         sourceId: null,
+        replyToMessageId: null,
+        replyToExternalId: null,
         attachments: [
           {
             id: 8,
@@ -129,8 +135,42 @@ test("keeps failed outgoing status visible for WhatsApp delivery evidence", () =
         createdAt: "2026-06-25T10:45:04.000Z",
         status: "failed",
         sourceId: null,
+        replyToMessageId: null,
+        replyToExternalId: null,
         attachments: [],
       },
     ],
   );
+});
+
+test("normalizes valid quoted-reply references and rejects malformed values", () => {
+  const [validReply, malformedReply] = normalizeChatwootHistoryMessages([
+    {
+      id: 7,
+      content: "覆你",
+      message_type: 0,
+      created_at: 1_782_384_305,
+      private: false,
+      content_attributes: {
+        in_reply_to: " 6 ",
+        in_reply_to_external_id: " wamid.parent ",
+      },
+    },
+    {
+      id: 8,
+      content: "另一句",
+      message_type: 0,
+      created_at: 1_782_384_306,
+      private: false,
+      content_attributes: {
+        in_reply_to: "not-a-message-id",
+        in_reply_to_external_id: "   ",
+      },
+    },
+  ]);
+
+  assert.equal(validReply?.replyToMessageId, 6);
+  assert.equal(validReply?.replyToExternalId, "wamid.parent");
+  assert.equal(malformedReply?.replyToMessageId, null);
+  assert.equal(malformedReply?.replyToExternalId, null);
 });

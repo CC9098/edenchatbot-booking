@@ -7,6 +7,7 @@ import {
   getChatwootWorkbenchComposerMode,
   getChatwootWorkbenchConversationStatusLabel,
   getChatwootWorkbenchScrollKey,
+  resolveChatwootWorkbenchReplyParent,
   type StaffChatwootWorkbenchConversation,
 } from "@/lib/staff-chatwoot-workbench";
 
@@ -78,4 +79,106 @@ test("translates Chatwoot internal conversation status for staff", () => {
 test("uses template composer mode when a WhatsApp conversation is closed", () => {
   assert.equal(getChatwootWorkbenchComposerMode({ status: "resolved", canReply: false }), "template");
   assert.equal(getChatwootWorkbenchComposerMode({ status: "open", canReply: true }), "direct");
+});
+
+test("resolves a quoted parent by internal id before source id fallback", () => {
+  const parentByInternalId = {
+    id: 20,
+    direction: "incoming" as const,
+    content: "第一句",
+    createdAt: null,
+    status: null,
+    sourceId: "wamid.first",
+    replyToMessageId: null,
+    replyToExternalId: null,
+    attachments: [],
+  };
+  const parentByExternalId = {
+    ...parentByInternalId,
+    id: 21,
+    content: "第二句",
+    sourceId: "wamid.second",
+  };
+  const reply = {
+    ...parentByInternalId,
+    id: 22,
+    content: "覆你",
+    sourceId: "wamid.reply",
+    replyToMessageId: 20,
+    replyToExternalId: "wamid.second",
+  };
+
+  assert.equal(
+    resolveChatwootWorkbenchReplyParent(
+      { messages: [parentByInternalId, parentByExternalId, reply] },
+      reply,
+    ),
+    parentByInternalId,
+  );
+
+  const fallbackReply = { ...reply, id: 23, replyToMessageId: 999 };
+  assert.equal(
+    resolveChatwootWorkbenchReplyParent(
+      { messages: [parentByInternalId, parentByExternalId, fallbackReply] },
+      fallbackReply,
+    ),
+    parentByExternalId,
+  );
+});
+
+test("does not resolve a missing parent outside the supplied conversation", () => {
+  const reply = {
+    id: 30,
+    direction: "incoming" as const,
+    content: "覆你",
+    createdAt: null,
+    status: null,
+    sourceId: null,
+    replyToMessageId: 999,
+    replyToExternalId: "wamid.missing",
+    attachments: [],
+  };
+
+  assert.equal(
+    resolveChatwootWorkbenchReplyParent({ messages: [reply] }, reply),
+    null,
+  );
+});
+
+test("resolves an attachment-only quoted parent", () => {
+  const attachmentParent = {
+    id: 40,
+    direction: "incoming" as const,
+    content: "",
+    createdAt: null,
+    status: null,
+    sourceId: "wamid.attachment",
+    replyToMessageId: null,
+    replyToExternalId: null,
+    attachments: [
+      {
+        id: 41,
+        fileType: "file",
+        url: "https://example.test/photo.jpg",
+        label: "jpg",
+      },
+    ],
+  };
+  const reply = {
+    ...attachmentParent,
+    id: 42,
+    content: "呢張相",
+    sourceId: null,
+    replyToExternalId: "wamid.attachment",
+    attachments: [],
+  };
+
+  const parent = resolveChatwootWorkbenchReplyParent(
+    { messages: [attachmentParent, reply] },
+    reply,
+  );
+
+  assert.equal(parent, attachmentParent);
+  assert.equal(parent?.content, "");
+  assert.equal(parent?.attachments[0]?.label, "jpg");
 });
