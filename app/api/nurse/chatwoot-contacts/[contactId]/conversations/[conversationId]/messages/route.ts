@@ -18,6 +18,11 @@ import {
   normalizeChatwootHistoryMessages,
   type RawChatwootHistoryMessage,
 } from "@/lib/staff-chatwoot-history";
+import {
+  getChatwootMessagePageState,
+  parseChatwootBeforeCursor,
+} from "@/lib/staff-chatwoot-history-pagination";
+import { getChatwootConversationFreshness } from "@/lib/staff-chatwoot-conversation-freshness";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +30,14 @@ type ChatwootConversation = {
   id?: number;
   status?: string | null;
   can_reply?: boolean | null;
+  created_at?: number | string | null;
+  updated_at?: number | string | null;
+  last_activity_at?: number | string | null;
+  meta?: {
+    sender?: {
+      id?: number | null;
+    } | null;
+  } | null;
 };
 
 async function findContactConversation(
@@ -34,13 +47,75 @@ async function findContactConversation(
   contactId: number,
   conversationId: number,
 ) {
-  const conversationsResponse = await staffChatwootRequest<{ payload?: ChatwootConversation[] }>(
+  const conversation = await staffChatwootRequest<ChatwootConversation>(
     baseUrl,
     apiAccessToken,
-    `/api/v1/accounts/${accountId}/contacts/${contactId}/conversations`,
+    `/api/v1/accounts/${accountId}/conversations/${conversationId}`,
   );
 
-  return (conversationsResponse.payload || []).find((conversation) => conversation.id === conversationId) || null;
+  return conversation.id === conversationId && conversation.meta?.sender?.id === contactId
+    ? conversation
+    : null;
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { contactId: string; conversationId: string } },
+) {
+  try {
+    await requireStaffRoleWithChatwootEdenToolsToken(request);
+
+    const contactId = Number(params.contactId);
+    const conversationId = Number(params.conversationId);
+    if (!Number.isInteger(contactId) || contactId <= 0 || !Number.isInteger(conversationId) || conversationId <= 0) {
+      return NextResponse.json({ error: "Invalid conversation" }, { status: 400 });
+    }
+
+    const beforeCursor = parseChatwootBeforeCursor(request.nextUrl.searchParams.get("before"));
+    if (!beforeCursor.valid) {
+      return NextResponse.json({ error: "Invalid before cursor" }, { status: 400 });
+    }
+
+    const { baseUrl, apiAccessToken, accountId: configuredAccountId } = getStaffChatwootConfig();
+    const accountId = await resolveStaffChatwootAccountId(baseUrl, apiAccessToken, configuredAccountId);
+    const conversation = await findContactConversation(
+      baseUrl,
+      apiAccessToken,
+      accountId,
+      contactId,
+      conversationId,
+    );
+    if (!conversation) {
+      return NextResponse.json({ error: "Conversation does not belong to this contact" }, { status: 404 });
+    }
+
+    const beforeQuery = beforeCursor.value ? `?before=${beforeCursor.value}` : "";
+    const messagesResponse = await staffChatwootRequest<{ payload?: RawChatwootHistoryMessage[] }>(
+      baseUrl,
+      apiAccessToken,
+      `/api/v1/accounts/${accountId}/conversations/${conversationId}/messages${beforeQuery}`,
+    );
+    const rawMessages = Array.isArray(messagesResponse.payload) ? messagesResponse.payload : [];
+    const pageState = getChatwootMessagePageState(rawMessages, beforeCursor.value);
+    const messages = normalizeChatwootHistoryMessages(rawMessages);
+
+    return NextResponse.json({
+      conversationId,
+      status: conversation.status || null,
+      canReply: conversation.can_reply ?? null,
+      messages,
+      nextBefore: pageState.nextBefore,
+      hasMore: pageState.hasMore,
+      ...getChatwootConversationFreshness(conversation, messages),
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    console.error("[nurse/chatwoot-contacts/messages] history error:", error);
+    return NextResponse.json({ error: "讀取 Chatwoot 訊息失敗" }, { status: 500 });
+  }
 }
 
 async function postChatwootMessage({

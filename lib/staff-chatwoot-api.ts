@@ -4,6 +4,11 @@ export type ChatwootConfig = {
   accountId: number | null;
 };
 
+type StaffChatwootRequestOptions = {
+  method?: "GET" | "POST";
+  body?: unknown;
+};
+
 export function getStaffChatwootConfig(): ChatwootConfig {
   const baseUrl = (process.env.CHATWOOT_BASE_URL || "").trim().replace(/\/$/, "");
   const apiAccessToken = (process.env.CHATWOOT_API_ACCESS_TOKEN || "").trim();
@@ -26,12 +31,15 @@ export async function staffChatwootRequest<T>(
   baseUrl: string,
   apiAccessToken: string,
   path: string,
+  options: StaffChatwootRequestOptions = {},
 ): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, {
+    method: options.method || "GET",
     headers: {
       api_access_token: apiAccessToken,
       "Content-Type": "application/json",
     },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
     cache: "no-store",
   });
 

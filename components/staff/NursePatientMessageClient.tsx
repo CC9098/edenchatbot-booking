@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import {
   ArrowLeft,
   CheckCircle2,
+  ChevronUp,
   LinkIcon,
   Loader2,
   MessageSquareText,
@@ -27,6 +28,7 @@ import {
   getChatwootWorkbenchComposerMode,
   getChatwootWorkbenchConversationStatusLabel,
   getChatwootWorkbenchScrollKey,
+  mergeOlderChatwootWorkbenchMessages,
   resolveChatwootWorkbenchReplyParent,
   type StaffChatwootWorkbenchConversation,
   type StaffChatwootWorkbenchMessage,
@@ -170,12 +172,19 @@ export function NursePatientMessageClient({
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [activeHistoryConversationId, setActiveHistoryConversationId] = useState<number | null>(null);
+  const [loadingHistoryConversationIds, setLoadingHistoryConversationIds] = useState<number[]>([]);
+  const [historyConversationErrors, setHistoryConversationErrors] = useState<Record<number, string>>({});
   const [composerText, setComposerText] = useState("");
   const [composerFile, setComposerFile] = useState<File | null>(null);
   const [isSendingComposerMessage, setIsSendingComposerMessage] = useState(false);
   const [composerError, setComposerError] = useState("");
   const activeHistoryBottomRef = useRef<HTMLDivElement | null>(null);
   const autoLoadedContactKeyRef = useRef("");
+  const activeHistoryContactIdRef = useRef<number | null>(null);
+  const historyLoadGenerationRef = useRef(0);
+  const historyLoadAbortControllerRef = useRef<AbortController | null>(null);
+  const historyConversationRequestsRef = useRef(new Set<string>());
+  const historyConversationAbortControllersRef = useRef(new Map<string, AbortController>());
 
   const selectedClinic = clinics.find((clinic) => clinic.id === form.clinicId) || clinics[0];
   const selectedPurpose = STAFF_PATIENT_MESSAGE_PURPOSE_BY_ID[form.purpose];
@@ -187,6 +196,20 @@ export function NursePatientMessageClient({
     prefill?.patientName || "",
     prefill?.phone || "",
   ].join("|");
+
+  useEffect(() => {
+    const conversationAbortControllers = historyConversationAbortControllersRef.current;
+    const conversationRequests = historyConversationRequestsRef.current;
+
+    return () => {
+      historyLoadAbortControllerRef.current?.abort();
+      for (const controller of conversationAbortControllers.values()) {
+        controller.abort();
+      }
+      conversationAbortControllers.clear();
+      conversationRequests.clear();
+    };
+  }, []);
 
   useEffect(() => {
     if (!prefillKey || prefillKey === appliedPrefillKey) return;
@@ -285,11 +308,24 @@ export function NursePatientMessageClient({
     contact: ContactSearchResult,
     preferredConversationId: number | null = null,
   ) => {
+    historyLoadAbortControllerRef.current?.abort();
+    for (const pendingController of historyConversationAbortControllersRef.current.values()) {
+      pendingController.abort();
+    }
+    historyConversationAbortControllersRef.current.clear();
+    historyConversationRequestsRef.current.clear();
+
     const controller = new AbortController();
+    const generation = historyLoadGenerationRef.current + 1;
+    historyLoadGenerationRef.current = generation;
+    historyLoadAbortControllerRef.current = controller;
+    activeHistoryContactIdRef.current = contact.id;
     try {
       setIsLoadingHistory(true);
       setHistoryError("");
       setHistoryConversations([]);
+      setHistoryConversationErrors({});
+      setLoadingHistoryConversationIds([]);
 
       const historyParams = new URLSearchParams();
       if (preferredConversationId) {
@@ -303,6 +339,11 @@ export function NursePatientMessageClient({
       });
       const payload = await response.json().catch(() => ({}));
 
+      if (
+        activeHistoryContactIdRef.current !== contact.id ||
+        historyLoadGenerationRef.current !== generation
+      ) return;
+
       if (!response.ok) {
         setHistoryError(payload.error || "讀取對話紀錄失敗");
         return;
@@ -314,15 +355,131 @@ export function NursePatientMessageClient({
         ? nextConversations.some((conversation: ContactHistoryConversation) => conversation.id === preferredConversationId)
         : false;
       setActiveHistoryConversationId(
-        preferredConversationExists ? preferredConversationId : nextConversations[0]?.id || null,
+        preferredConversationExists
+          ? preferredConversationId
+          : payload.activeConversationId || nextConversations[0]?.id || null,
       );
     } catch (error) {
       if (controller.signal.aborted) return;
+      if (historyLoadGenerationRef.current !== generation) return;
       setHistoryError(error instanceof Error ? error.message : "讀取對話紀錄失敗");
     } finally {
-      if (!controller.signal.aborted) setIsLoadingHistory(false);
+      if (historyLoadAbortControllerRef.current === controller) {
+        historyLoadAbortControllerRef.current = null;
+      }
+      if (!controller.signal.aborted && historyLoadGenerationRef.current === generation) {
+        setIsLoadingHistory(false);
+      }
     }
   }, [authToken]);
+
+  const loadConversationHistoryPage = useCallback(async ({
+    contactId,
+    conversationId,
+    before = null,
+  }: {
+    contactId: number;
+    conversationId: number;
+    before?: number | null;
+  }) => {
+    const generation = historyLoadGenerationRef.current;
+    const requestKey = `${generation}:${contactId}:${conversationId}:${before || "latest"}`;
+    if (historyConversationRequestsRef.current.has(requestKey)) return;
+    const controller = new AbortController();
+    historyConversationRequestsRef.current.add(requestKey);
+    historyConversationAbortControllersRef.current.set(requestKey, controller);
+    setLoadingHistoryConversationIds((current) =>
+      current.includes(conversationId) ? current : [...current, conversationId],
+    );
+    setHistoryConversationErrors((current) => ({ ...current, [conversationId]: "" }));
+
+    try {
+      const params = new URLSearchParams();
+      if (before) params.set("before", String(before));
+      const query = params.size ? `?${params.toString()}` : "";
+      const response = await fetch(
+        `/api/nurse/chatwoot-contacts/${contactId}/conversations/${conversationId}/messages${query}`,
+        {
+          cache: "no-store",
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+          signal: controller.signal,
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (
+        activeHistoryContactIdRef.current !== contactId ||
+        historyLoadGenerationRef.current !== generation
+      ) return;
+
+      if (!response.ok) {
+        setHistoryConversationErrors((current) => ({
+          ...current,
+          [conversationId]: payload.error || "讀取較早訊息失敗",
+        }));
+        return;
+      }
+
+      const messages = Array.isArray(payload.messages) ? payload.messages : [];
+      setHistoryConversations((current) => {
+        const merged = mergeOlderChatwootWorkbenchMessages(
+          current,
+          conversationId,
+          messages,
+          {
+            nextBefore: payload.nextBefore ?? null,
+            hasMore: Boolean(payload.hasMore),
+          },
+        );
+
+        if (before) return merged;
+        return merged.map((conversation) =>
+          conversation.id === conversationId
+            ? {
+                ...conversation,
+                status: payload.status ?? conversation.status,
+                canReply: payload.canReply ?? conversation.canReply,
+                lastActivityAt: payload.lastActivityAt ?? conversation.lastActivityAt,
+                latestVisibleMessageAt:
+                  payload.latestVisibleMessageAt ?? conversation.latestVisibleMessageAt,
+                latestIncomingMessageAt:
+                  payload.latestIncomingMessageAt ?? conversation.latestIncomingMessageAt,
+                activityOnlySinceLastVisible:
+                  payload.activityOnlySinceLastVisible ?? conversation.activityOnlySinceLastVisible,
+              }
+            : conversation,
+        );
+      });
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      if (
+        activeHistoryContactIdRef.current !== contactId ||
+        historyLoadGenerationRef.current !== generation
+      ) return;
+      setHistoryConversationErrors((current) => ({
+        ...current,
+        [conversationId]: error instanceof Error ? error.message : "讀取較早訊息失敗",
+      }));
+    } finally {
+      if (historyConversationAbortControllersRef.current.get(requestKey) === controller) {
+        historyConversationAbortControllersRef.current.delete(requestKey);
+        historyConversationRequestsRef.current.delete(requestKey);
+      }
+      if (historyLoadGenerationRef.current === generation) {
+        setLoadingHistoryConversationIds((current) => current.filter((id) => id !== conversationId));
+      }
+    }
+  }, [authToken]);
+
+  function selectHistoryConversation(conversation: ContactHistoryConversation) {
+    setActiveHistoryConversationId(conversation.id);
+    setComposerError("");
+    if (!selectedContact || conversation.messagesLoaded) return;
+
+    void loadConversationHistoryPage({
+      contactId: selectedContact.id,
+      conversationId: conversation.id,
+    });
+  }
 
   useEffect(() => {
     if (!embedded || !prefill?.contactId || !prefill.phone?.trim()) return;
@@ -647,23 +804,35 @@ export function NursePatientMessageClient({
           ) : null}
 
           {historyConversations.length > 0 ? (
-            <div className="max-h-[420px] space-y-4 overflow-y-auto pr-1">
+            <div
+              className="max-h-[420px] space-y-3 overflow-y-auto pr-1"
+              aria-busy={isLoadingHistory}
+              aria-live="polite"
+            >
               {historyConversations.map((conversation) => {
                 const isCurrentChatwootConversation = conversation.id === prefill?.conversationId;
+                const isActive = conversation.id === activeHistoryConversationId;
+                const isLoadingConversation = loadingHistoryConversationIds.includes(conversation.id);
+                const conversationError = historyConversationErrors[conversation.id] || "";
+                const summaryTime = conversation.messagesLoaded
+                  ? conversation.latestIncomingMessageAt
+                  : conversation.latestVisibleMessageAt;
 
                 return (
                   <div
                     key={conversation.id}
                     className={`space-y-2 rounded-lg border bg-slate-50 p-3 ${
-                      conversation.id === activeHistoryConversationId
+                      isActive
                         ? "border-emerald-300 ring-1 ring-emerald-100"
                         : "border-slate-100"
                     }`}
                   >
                     <button
                       type="button"
-                      onClick={() => setActiveHistoryConversationId(conversation.id)}
-                      className="flex w-full items-start justify-between gap-3 text-left text-xs text-slate-500"
+                      onClick={() => selectHistoryConversation(conversation)}
+                      aria-expanded={isActive}
+                      aria-controls={`conversation-history-${conversation.id}`}
+                      className="flex min-h-11 w-full cursor-pointer items-start justify-between gap-3 rounded-md text-left text-xs text-slate-600 outline-none transition-colors hover:text-slate-900 focus-visible:ring-4 focus-visible:ring-emerald-100"
                     >
                       <span className="min-w-0">
                         <span className="block font-semibold text-slate-700">
@@ -671,8 +840,8 @@ export function NursePatientMessageClient({
                           {isCurrentChatwootConversation ? " · 目前對話" : ""}
                         </span>
                         <span className="mt-1 block">
-                          病人訊息 {conversation.latestIncomingMessageAt
-                            ? formatMessageTime(conversation.latestIncomingMessageAt)
+                          {conversation.messagesLoaded ? "病人訊息" : "最近訊息"} {summaryTime
+                            ? formatMessageTime(summaryTime)
                             : "未有"}
                         </span>
                       </span>
@@ -687,93 +856,141 @@ export function NursePatientMessageClient({
                         冇新病人訊息 · 最近只係系統活動
                       </p>
                     ) : null}
-                  {conversation.messages.length > 0 ? (
-                    <div className="space-y-2">
-                      {conversation.messages.map((message) => {
-                        const incoming = message.direction === "incoming";
-                        const failed = message.direction === "outgoing" && message.status === "failed";
-                        const hasReplyReference = Boolean(
-                          message.replyToMessageId || message.replyToExternalId,
-                        );
-                        const replyParent = hasReplyReference
-                          ? resolveChatwootWorkbenchReplyParent(conversation, message)
-                          : null;
-
-                        return (
-                          <div
-                            key={message.id}
-                            className={`flex ${incoming ? "justify-start" : "justify-end"}`}
-                          >
-                            <div
-                              className={`max-w-[82%] rounded-lg px-3 py-2 text-sm shadow-sm ${
-                                failed
-                                  ? "border border-rose-200 bg-rose-50 text-rose-950"
-                                  : incoming
-                                  ? "bg-white text-slate-900"
-                                  : "bg-emerald-700 text-white"
-                              }`}
+                    {isActive ? (
+                      <div
+                        id={`conversation-history-${conversation.id}`}
+                        className="space-y-2 border-t border-slate-200 pt-2"
+                        aria-busy={isLoadingConversation}
+                      >
+                        {conversationError ? (
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                            <span>{conversationError}</span>
+                            <button
+                              type="button"
+                              onClick={() => selectedContact && void loadConversationHistoryPage({
+                                contactId: selectedContact.id,
+                                conversationId: conversation.id,
+                                before: conversation.messagesLoaded ? conversation.nextBefore : null,
+                              })}
+                              className="min-h-11 cursor-pointer rounded-lg px-3 font-semibold outline-none transition-colors hover:bg-rose-100 focus-visible:ring-4 focus-visible:ring-rose-100"
                             >
-                              {hasReplyReference ? (
-                                <div
-                                  aria-label="引用訊息"
-                                  className={`mb-2 border-l-2 px-2 py-1.5 text-xs leading-5 ${
-                                    failed
-                                      ? "border-rose-300 bg-rose-100 text-rose-800"
-                                      : incoming
-                                      ? "border-slate-300 bg-slate-100 text-slate-600"
-                                      : "border-emerald-300 bg-emerald-800 text-emerald-50"
-                                  }`}
-                                >
-                                  <p className="font-semibold">回覆緊</p>
-                                  <p className="line-clamp-3 whitespace-pre-wrap break-words">
-                                    {getQuotedMessagePreview(replyParent)}
-                                  </p>
-                                </div>
-                              ) : null}
-                              {message.content ? (
-                                <p className="whitespace-pre-wrap break-words leading-6">{message.content}</p>
-                              ) : null}
-                              {message.attachments.length > 0 ? (
-                                <div className="mt-2 space-y-1">
-                                  {message.attachments.map((attachment) => (
-                                    <a
-                                      key={attachment.id}
-                                      href={attachment.url}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold ${
-                                        incoming
-                                          ? "bg-slate-100 text-slate-700"
-                                          : failed
-                                          ? "bg-rose-100 text-rose-800"
-                                          : "bg-emerald-800 text-emerald-50"
-                                      }`}
-                                    >
-                                      <Paperclip className="h-3 w-3" />
-                                      {attachment.label}
-                                    </a>
-                                  ))}
-                                </div>
-                              ) : null}
-                              {message.createdAt ? (
-                                <p className={`mt-1 text-[11px] ${
-                                  failed ? "text-rose-600" : incoming ? "text-slate-400" : "text-emerald-100"
-                                }`}>
-                                  {formatMessageTime(message.createdAt)}
-                                  {failed ? " · 未送出" : ""}
-                                </p>
-                              ) : null}
-                            </div>
+                              再試一次
+                            </button>
                           </div>
-                        );
-                      })}
-                      {conversation.id === activeHistoryConversationId ? (
-                        <div ref={activeHistoryBottomRef} aria-hidden="true" />
-                      ) : null}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-500">此對話未有可顯示 WhatsApp 訊息。</p>
-                  )}
+                        ) : null}
+
+                        {isLoadingConversation ? (
+                          <p className="inline-flex min-h-11 items-center gap-2 text-sm text-slate-500">
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                            載入對話中
+                          </p>
+                        ) : null}
+
+                        {conversation.messagesLoaded && conversation.hasMoreMessages && conversation.nextBefore ? (
+                          <button
+                            type="button"
+                            onClick={() => selectedContact && void loadConversationHistoryPage({
+                              contactId: selectedContact.id,
+                              conversationId: conversation.id,
+                              before: conversation.nextBefore,
+                            })}
+                            disabled={isLoadingConversation}
+                            className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition-colors hover:border-emerald-200 hover:bg-emerald-50 focus-visible:ring-4 focus-visible:ring-emerald-100 disabled:cursor-not-allowed disabled:text-slate-400"
+                          >
+                            <ChevronUp className="h-4 w-4" aria-hidden="true" />
+                            載入較早訊息
+                          </button>
+                        ) : null}
+
+                        {conversation.messagesLoaded && conversation.messages.length > 0 ? (
+                          <div className="space-y-2">
+                            {conversation.messages.map((message) => {
+                              const incoming = message.direction === "incoming";
+                              const failed = message.direction === "outgoing" && message.status === "failed";
+                              const hasReplyReference = Boolean(
+                                message.replyToMessageId || message.replyToExternalId,
+                              );
+                              const replyParent = hasReplyReference
+                                ? resolveChatwootWorkbenchReplyParent(conversation, message)
+                                : null;
+
+                              return (
+                                <div
+                                  key={message.id}
+                                  className={`flex ${incoming ? "justify-start" : "justify-end"}`}
+                                >
+                                  <div
+                                    className={`max-w-[82%] rounded-lg px-3 py-2 text-sm shadow-sm ${
+                                      failed
+                                        ? "border border-rose-200 bg-rose-50 text-rose-950"
+                                        : incoming
+                                        ? "bg-white text-slate-900"
+                                        : "bg-emerald-700 text-white"
+                                    }`}
+                                  >
+                                    {hasReplyReference ? (
+                                      <div
+                                        aria-label="引用訊息"
+                                        className={`mb-2 border-l-2 px-2 py-1.5 text-xs leading-5 ${
+                                          failed
+                                            ? "border-rose-300 bg-rose-100 text-rose-800"
+                                            : incoming
+                                            ? "border-slate-300 bg-slate-100 text-slate-600"
+                                            : "border-emerald-300 bg-emerald-800 text-emerald-50"
+                                        }`}
+                                      >
+                                        <p className="font-semibold">回覆緊</p>
+                                        <p className="line-clamp-3 whitespace-pre-wrap break-words">
+                                          {getQuotedMessagePreview(replyParent)}
+                                        </p>
+                                      </div>
+                                    ) : null}
+                                    {message.content ? (
+                                      <p className="whitespace-pre-wrap break-words leading-6">{message.content}</p>
+                                    ) : null}
+                                    {message.attachments.length > 0 ? (
+                                      <div className="mt-2 space-y-1">
+                                        {message.attachments.map((attachment) => (
+                                          <a
+                                            key={attachment.id}
+                                            href={attachment.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold ${
+                                              incoming
+                                                ? "bg-slate-100 text-slate-700"
+                                                : failed
+                                                ? "bg-rose-100 text-rose-800"
+                                                : "bg-emerald-800 text-emerald-50"
+                                            }`}
+                                          >
+                                            <Paperclip className="h-3 w-3" />
+                                            {attachment.label}
+                                          </a>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                    {message.createdAt ? (
+                                      <p className={`mt-1 text-[11px] ${
+                                        failed ? "text-rose-600" : incoming ? "text-slate-400" : "text-emerald-100"
+                                      }`}>
+                                        {formatMessageTime(message.createdAt)}
+                                        {failed ? " · 未送出" : ""}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            <div ref={activeHistoryBottomRef} aria-hidden="true" />
+                          </div>
+                        ) : null}
+
+                        {conversation.messagesLoaded && conversation.messages.length === 0 && !isLoadingConversation ? (
+                          <p className="text-sm text-slate-500">此對話未有可顯示 WhatsApp 訊息。</p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}
