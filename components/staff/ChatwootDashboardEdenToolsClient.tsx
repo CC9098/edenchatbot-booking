@@ -69,13 +69,18 @@ async function restoreDeviceSession(): Promise<EdenToolsSession | null> {
 }
 
 function getPairingError(error: unknown): string {
-  if (error instanceof EdenToolsSessionError && error.status === 403) {
-    return "此帳戶未有姑娘權限。";
+  if (error instanceof EdenToolsSessionError) {
+    if (error.status === 403) return "此帳戶未有姑娘權限。";
+    if (error.status === 401) return "登入資料已失效，請再試一次。";
+    return "暫時未能連接 Eden 工具，請稍後再試。";
   }
   if (error instanceof Error && error.message === "DEVICE_STORAGE_UNAVAILABLE") {
     return "此裝置未能保存登入資料，請允許 Chatwoot 保存網站資料後再試。";
   }
-  return "帳戶或密碼不正確，請再試一次。";
+  if (error instanceof Error && /invalid login credentials/i.test(error.message)) {
+    return "帳戶或密碼不正確，請再試一次。";
+  }
+  return "暫時未能完成配對，請稍後再試。";
 }
 
 function ChatwootDashboardEdenToolsInner({
