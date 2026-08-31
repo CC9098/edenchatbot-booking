@@ -7,6 +7,7 @@ import {
   getChatwootWorkbenchComposerMode,
   getChatwootWorkbenchConversationStatusLabel,
   getChatwootWorkbenchScrollKey,
+  mergeOlderChatwootWorkbenchMessages,
   resolveChatwootWorkbenchReplyParent,
   type StaffChatwootWorkbenchConversation,
 } from "@/lib/staff-chatwoot-workbench";
@@ -66,7 +67,94 @@ test("changes scroll key when the active conversation receives a new message", (
   );
 
   assert.notEqual(after, before);
-  assert.equal(after, "841:2:12");
+  assert.equal(after, "841:12");
+});
+
+test("merges older messages in chronological order, deduplicates overlap, and updates pagination state", () => {
+  const otherConversation: StaffChatwootWorkbenchConversation = {
+    id: 842,
+    status: "open",
+    messages: [],
+  };
+  const current = appendChatwootWorkbenchMessage(conversations, 841, {
+    id: 11,
+    direction: "outgoing",
+    content: "已收到",
+    createdAt: "2026-06-25T10:45:00.000Z",
+    status: "sent",
+    sourceId: "wamid.123",
+    attachments: [],
+  });
+  const input = [...current, otherConversation];
+
+  const result = mergeOlderChatwootWorkbenchMessages(
+    input,
+    841,
+    [
+      {
+        id: 9,
+        direction: "incoming",
+        content: "早啲講過",
+        createdAt: "2026-06-25T10:43:00.000Z",
+        status: null,
+        sourceId: null,
+        attachments: [],
+      },
+      {
+        id: 10,
+        direction: "incoming",
+        content: "你好",
+        createdAt: "2026-06-25T10:44:32.000Z",
+        status: null,
+        sourceId: null,
+        attachments: [],
+      },
+    ],
+    { nextBefore: 8, hasMore: true },
+  );
+
+  assert.deepEqual(result[0]?.messages.map((message) => message.id), [9, 10, 11]);
+  assert.equal(result[0]?.messages.length, 3);
+  assert.equal(result[0]?.messagesLoaded, true);
+  assert.equal(result[0]?.nextBefore, 8);
+  assert.equal(result[0]?.hasMoreMessages, true);
+  assert.strictEqual(result[1], otherConversation);
+});
+
+test("keeps the bottom scroll key stable when older messages are prepended", () => {
+  const input = appendChatwootWorkbenchMessage(conversations, 841, {
+    id: 11,
+    direction: "outgoing",
+    content: "已收到",
+    createdAt: "2026-06-25T10:45:00.000Z",
+    status: "sent",
+    sourceId: "wamid.123",
+    attachments: [],
+  });
+  const before = getChatwootWorkbenchScrollKey(input, 841);
+
+  const after = getChatwootWorkbenchScrollKey(
+    mergeOlderChatwootWorkbenchMessages(
+      input,
+      841,
+      [
+        {
+          id: 9,
+          direction: "incoming",
+          content: "早啲講過",
+          createdAt: "2026-06-25T10:43:00.000Z",
+          status: null,
+          sourceId: null,
+          attachments: [],
+        },
+      ],
+      { nextBefore: 8, hasMore: true },
+    ),
+    841,
+  );
+
+  assert.equal(before, "841:11");
+  assert.equal(after, before);
 });
 
 test("translates Chatwoot internal conversation status for staff", () => {

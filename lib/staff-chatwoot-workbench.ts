@@ -23,6 +23,9 @@ export type StaffChatwootWorkbenchConversation = {
   latestVisibleMessageAt?: string | null;
   latestIncomingMessageAt?: string | null;
   activityOnlySinceLastVisible?: boolean;
+  messagesLoaded?: boolean;
+  nextBefore?: number | null;
+  hasMoreMessages?: boolean;
   messages: StaffChatwootWorkbenchMessage[];
 };
 
@@ -79,7 +82,38 @@ export function appendChatwootWorkbenchMessage(
 
     return {
       ...conversation,
-      messages: [...conversation.messages, message].slice(-80),
+      messages: [...conversation.messages, message],
+    };
+  });
+}
+
+export function mergeOlderChatwootWorkbenchMessages(
+  conversations: StaffChatwootWorkbenchConversation[],
+  conversationId: number,
+  olderMessages: StaffChatwootWorkbenchMessage[],
+  page: { nextBefore: number | null; hasMore: boolean },
+): StaffChatwootWorkbenchConversation[] {
+  return conversations.map((conversation) => {
+    if (conversation.id !== conversationId) return conversation;
+
+    const messageById = new Map<number, StaffChatwootWorkbenchMessage>();
+    for (const message of [...olderMessages, ...conversation.messages]) {
+      messageById.set(message.id, message);
+    }
+
+    const messages = Array.from(messageById.values()).sort((a, b) => {
+      const aTime = a.createdAt ? Date.parse(a.createdAt) : Number.NaN;
+      const bTime = b.createdAt ? Date.parse(b.createdAt) : Number.NaN;
+      if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) return aTime - bTime;
+      return a.id - b.id;
+    });
+
+    return {
+      ...conversation,
+      messages,
+      messagesLoaded: true,
+      nextBefore: page.nextBefore,
+      hasMoreMessages: page.hasMore,
     };
   });
 }
@@ -94,7 +128,7 @@ export function getChatwootWorkbenchScrollKey(
   if (!activeConversation) return "";
 
   const lastMessage = activeConversation.messages.at(-1);
-  return `${activeConversation.id}:${activeConversation.messages.length}:${lastMessage?.id || 0}`;
+  return `${activeConversation.id}:${lastMessage?.id || 0}`;
 }
 
 export function getChatwootWorkbenchConversationStatusLabel(
