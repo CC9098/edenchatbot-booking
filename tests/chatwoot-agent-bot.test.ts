@@ -15,6 +15,7 @@ import {
   getPreviousVisibleConversationMessage,
   mergeIncomingEventIntoConversationMessages,
   mapConversationMessagesToLegacyChat,
+  persistChatwootFlowState,
   resolveBookingMenuSelection,
   resolveClinicMenuSelection,
   resolveGeneralMenuSelection,
@@ -60,6 +61,141 @@ test('unmatched WhatsApp text is silenced instead of reopening bot prompts', () 
   assert.equal(shouldSilenceUnmatchedChatwootMessage('booking_menu'), true);
   assert.equal(shouldSilenceUnmatchedChatwootMessage('human'), true);
   assert.equal(shouldSilenceUnmatchedChatwootMessage('general_ai'), false);
+});
+
+test('human handoff persists the flow state and opens a pending AgentBot conversation', async () => {
+  const originalFetch = global.fetch;
+  const requests: Array<{ method: string; path: string; body: unknown }> = [];
+
+  global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(typeof input === 'string' ? input : input.toString());
+    requests.push({
+      method: init?.method || 'GET',
+      path: url.pathname,
+      body: init?.body ? JSON.parse(String(init.body)) : null,
+    });
+    return jsonResponse({ success: true });
+  }) as typeof global.fetch;
+
+  try {
+    await persistChatwootFlowState({
+      client: new ChatwootClient('https://chatwoot.example', 'test-token'),
+      accountId: 2,
+      conversationId: 1409,
+      currentStatus: 'pending',
+      currentAttributes: { existing: 'kept' },
+      nextState: 'human',
+      incomingMessageId: 16499,
+    });
+
+    assert.deepEqual(requests, [
+      {
+        method: 'POST',
+        path: '/api/v1/accounts/2/conversations/1409/toggle_status',
+        body: { status: 'open' },
+      },
+      {
+        method: 'POST',
+        path: '/api/v1/accounts/2/conversations/1409/custom_attributes',
+        body: {
+          custom_attributes: {
+            existing: 'kept',
+            eden_flow_state: 'human',
+            eden_last_incoming_message_id: '16499',
+          },
+        },
+      },
+    ]);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('failed human handoff does not persist the incoming-message dedupe marker', async () => {
+  const originalFetch = global.fetch;
+  const requestedPaths: string[] = [];
+
+  global.fetch = (async (input: RequestInfo | URL) => {
+    requestedPaths.push(new URL(typeof input === 'string' ? input : input.toString()).pathname);
+    return jsonResponse({ error: 'temporary failure' }, 503);
+  }) as typeof global.fetch;
+
+  try {
+    await assert.rejects(
+      persistChatwootFlowState({
+        client: new ChatwootClient('https://chatwoot.example', 'test-token'),
+        accountId: 2,
+        conversationId: 1409,
+        currentStatus: 'pending',
+        currentAttributes: {},
+        nextState: 'human',
+        incomingMessageId: 16500,
+      }),
+      /503/,
+    );
+
+    assert.deepEqual(requestedPaths, [
+      '/api/v1/accounts/2/conversations/1409/toggle_status',
+    ]);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('bot-owned pending flow stays pending while its state is persisted', async () => {
+  const originalFetch = global.fetch;
+  const requestedPaths: string[] = [];
+
+  global.fetch = (async (input: RequestInfo | URL) => {
+    requestedPaths.push(new URL(typeof input === 'string' ? input : input.toString()).pathname);
+    return jsonResponse({ success: true });
+  }) as typeof global.fetch;
+
+  try {
+    await persistChatwootFlowState({
+      client: new ChatwootClient('https://chatwoot.example', 'test-token'),
+      accountId: 2,
+      conversationId: 1500,
+      currentStatus: 'pending',
+      currentAttributes: {},
+      nextState: 'menu',
+      incomingMessageId: 17000,
+    });
+
+    assert.deepEqual(requestedPaths, [
+      '/api/v1/accounts/2/conversations/1500/custom_attributes',
+    ]);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('human flow already open does not toggle the conversation again', async () => {
+  const originalFetch = global.fetch;
+  const requestedPaths: string[] = [];
+
+  global.fetch = (async (input: RequestInfo | URL) => {
+    requestedPaths.push(new URL(typeof input === 'string' ? input : input.toString()).pathname);
+    return jsonResponse({ success: true });
+  }) as typeof global.fetch;
+
+  try {
+    await persistChatwootFlowState({
+      client: new ChatwootClient('https://chatwoot.example', 'test-token'),
+      accountId: 2,
+      conversationId: 1426,
+      currentStatus: 'open',
+      currentAttributes: {},
+      nextState: 'human',
+      incomingMessageId: 16474,
+    });
+
+    assert.deepEqual(requestedPaths, [
+      '/api/v1/accounts/2/conversations/1426/custom_attributes',
+    ]);
+  } finally {
+    global.fetch = originalFetch;
+  }
 });
 
 test('booking menu copy points users to booking page while legacy booking state still resolves', async () => {

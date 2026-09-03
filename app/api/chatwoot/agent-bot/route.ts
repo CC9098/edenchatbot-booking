@@ -15,7 +15,7 @@ import {
   isDuplicateIncomingMessage,
   mergeIncomingEventIntoConversationMessages,
   mapConversationMessagesToLegacyChat,
-  mergeFlowAttributes,
+  persistChatwootFlowState,
   replaceLatestUserMessage,
   resolveBookingMenuSelection,
   resolveClinicMenuSelection,
@@ -269,11 +269,15 @@ export async function POST(request: NextRequest) {
       await client.createMessage(event.accountId, event.conversationId, reply);
     }
 
-    await client.updateConversationCustomAttributes(
-      event.accountId,
-      event.conversationId,
-      mergeFlowAttributes(currentAttributes, nextState, event.messageId),
-    );
+    await persistChatwootFlowState({
+      client,
+      accountId: event.accountId,
+      conversationId: event.conversationId,
+      currentStatus: conversation.status,
+      currentAttributes,
+      nextState,
+      incomingMessageId: event.messageId,
+    });
 
     return NextResponse.json({ ok: true, state: nextState });
   } catch (error) {

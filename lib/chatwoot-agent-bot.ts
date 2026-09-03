@@ -72,6 +72,7 @@ interface ChatwootMessage {
 
 interface ChatwootConversationDetails {
   id: number;
+  status?: string | null;
   custom_attributes?: Record<string, unknown> | null;
   messages?: ChatwootMessage[];
 }
@@ -347,6 +348,20 @@ export class ChatwootClient {
       },
     );
   }
+
+  updateConversationStatus(
+    accountId: number,
+    conversationId: number,
+    status: 'open' | 'resolved' | 'pending' | 'snoozed',
+  ) {
+    return this.request(
+      `/api/v1/accounts/${accountId}/conversations/${conversationId}/toggle_status`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ status }),
+      },
+    );
+  }
 }
 
 export function createChatwootClientFromEnv(): ChatwootClient {
@@ -552,6 +567,34 @@ export function mergeFlowAttributes(
     [CHATWOOT_FLOW_STATE_ATTRIBUTE]: nextState,
     [CHATWOOT_LAST_INCOMING_MESSAGE_ID_ATTRIBUTE]: String(messageId),
   };
+}
+
+export async function persistChatwootFlowState({
+  client,
+  accountId,
+  conversationId,
+  currentStatus,
+  currentAttributes,
+  nextState,
+  incomingMessageId,
+}: {
+  client: ChatwootClient;
+  accountId: number;
+  conversationId: number;
+  currentStatus: string | null | undefined;
+  currentAttributes: Record<string, unknown> | null | undefined;
+  nextState: ChatwootFlowState;
+  incomingMessageId: number;
+}) {
+  if (nextState === 'human' && currentStatus?.toLowerCase() !== 'open') {
+    await client.updateConversationStatus(accountId, conversationId, 'open');
+  }
+
+  await client.updateConversationCustomAttributes(
+    accountId,
+    conversationId,
+    mergeFlowAttributes(currentAttributes, nextState, incomingMessageId),
+  );
 }
 
 function getManageActionCopy(action?: ChatwootManageBookingAction): {
