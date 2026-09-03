@@ -10,6 +10,7 @@ import {
   buildChatwootSystemMessageSet,
   buildDirectBookingReply,
   createChatwootClientFromEnv,
+  ensureChatwootHumanHandoffVisibility,
   extractIncomingChatwootEvent,
   getFlowState,
   isDuplicateIncomingMessage,
@@ -89,10 +90,36 @@ export async function POST(request: NextRequest) {
   try {
     const client = createChatwootClientFromEnv();
     const conversation = await client.getConversationDetails(event.accountId, event.conversationId);
+    const currentAttributes = conversation.custom_attributes || {};
+    const currentState = getFlowState(currentAttributes);
+    let handoffVerification: Awaited<
+      ReturnType<typeof ensureChatwootHumanHandoffVisibility>
+    > | null = null;
+
+    if (currentState === 'human') {
+      handoffVerification = await ensureChatwootHumanHandoffVisibility({
+        client,
+        accountId: event.accountId,
+        conversationId: event.conversationId,
+        currentStatus: conversation.status,
+      });
+
+      console.info('[chatwoot/agent-bot] existing human flow visible', {
+        accountId: event.accountId,
+        conversationId: event.conversationId,
+        incomingMessageId: event.messageId,
+        changed: handoffVerification.changed,
+        attempts: handoffVerification.attempts,
+      });
+    }
+
+    if (isDuplicateIncomingMessage(currentAttributes, event.messageId)) {
+      return NextResponse.json({ ok: true, ignored: 'duplicate_message' });
+    }
+
     const { settings: widgetSettings } = await loadWidgetChatbotSettings();
     const runtimeCopy = buildChatwootRuntimeCopy(widgetSettings);
     const runtimeSystemMessages = buildChatwootSystemMessageSet(runtimeCopy);
-    const currentAttributes = conversation.custom_attributes || {};
     const generalMenuReply: ChatwootOutgoingMessagePayload = {
       content: runtimeCopy.generalMenuPrompt,
       contentType: 'input_select',
@@ -104,15 +131,10 @@ export async function POST(request: NextRequest) {
       items: [...runtimeCopy.clinicMenuItems],
     };
 
-    if (isDuplicateIncomingMessage(currentAttributes, event.messageId)) {
-      return NextResponse.json({ ok: true, ignored: 'duplicate_message' });
-    }
-
     const conversationMessages = mergeIncomingEventIntoConversationMessages(
       conversation.messages,
       event,
     );
-    const currentState = getFlowState(currentAttributes);
     const rootSelection = resolveMenuSelection(event.content, {
       allowNumeric: currentState === 'menu',
     });
@@ -265,6 +287,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (nextState === 'human' && !handoffVerification) {
+      handoffVerification = await ensureChatwootHumanHandoffVisibility({
+        client,
+        accountId: event.accountId,
+        conversationId: event.conversationId,
+        currentStatus: conversation.status,
+      });
+
+      console.info('[chatwoot/agent-bot] human handoff visible', {
+        accountId: event.accountId,
+        conversationId: event.conversationId,
+        incomingMessageId: event.messageId,
+        changed: handoffVerification.changed,
+        attempts: handoffVerification.attempts,
+      });
+    }
+
     if (reply) {
       await client.createMessage(event.accountId, event.conversationId, reply);
     }
@@ -273,7 +312,7 @@ export async function POST(request: NextRequest) {
       client,
       accountId: event.accountId,
       conversationId: event.conversationId,
-      currentStatus: conversation.status,
+      currentStatus: handoffVerification?.status || conversation.status,
       currentAttributes,
       nextState,
       incomingMessageId: event.messageId,

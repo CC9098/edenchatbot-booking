@@ -74,6 +74,9 @@ test('human handoff persists the flow state and opens a pending AgentBot convers
       path: url.pathname,
       body: init?.body ? JSON.parse(String(init.body)) : null,
     });
+    if (init?.method === 'GET') {
+      return jsonResponse({ id: 1409, status: 'open' });
+    }
     return jsonResponse({ success: true });
   }) as typeof global.fetch;
 
@@ -93,6 +96,11 @@ test('human handoff persists the flow state and opens a pending AgentBot convers
         method: 'POST',
         path: '/api/v1/accounts/2/conversations/1409/toggle_status',
         body: { status: 'open' },
+      },
+      {
+        method: 'GET',
+        path: '/api/v1/accounts/2/conversations/1409',
+        body: null,
       },
       {
         method: 'POST',
@@ -136,6 +144,9 @@ test('failed human handoff does not persist the incoming-message dedupe marker',
 
     assert.deepEqual(requestedPaths, [
       '/api/v1/accounts/2/conversations/1409/toggle_status',
+      '/api/v1/accounts/2/conversations/1409',
+      '/api/v1/accounts/2/conversations/1409/toggle_status',
+      '/api/v1/accounts/2/conversations/1409',
     ]);
   } finally {
     global.fetch = originalFetch;

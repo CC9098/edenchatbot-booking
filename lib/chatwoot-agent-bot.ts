@@ -60,7 +60,7 @@ export interface ChatwootIncomingEvent {
   contactPhone: string | null;
 }
 
-interface ChatwootMessage {
+export interface ChatwootMessage {
   id?: number;
   content?: string | null;
   created_at?: number;
@@ -70,11 +70,22 @@ interface ChatwootMessage {
   status?: string | null;
 }
 
-interface ChatwootConversationDetails {
+export interface ChatwootConversationDetails {
   id: number;
+  inbox_id?: number | null;
   status?: string | null;
   custom_attributes?: Record<string, unknown> | null;
   messages?: ChatwootMessage[];
+  last_non_activity_message?: ChatwootMessage | null;
+}
+
+interface ChatwootConversationListResponse {
+  data?: {
+    meta?: {
+      all_count?: number;
+    };
+    payload?: ChatwootConversationDetails[];
+  };
 }
 
 interface ChatwootContactPayload {
@@ -273,6 +284,29 @@ export class ChatwootClient {
   getConversationDetails(accountId: number, conversationId: number) {
     return this.request<ChatwootConversationDetails>(
       `/api/v1/accounts/${accountId}/conversations/${conversationId}`,
+      { method: 'GET' },
+    );
+  }
+
+  listConversations(
+    accountId: number,
+    options: {
+      status: 'open' | 'resolved' | 'pending' | 'snoozed' | 'all';
+      inboxId?: number;
+      page?: number;
+    },
+  ) {
+    const searchParams = new URLSearchParams({
+      status: options.status,
+      page: String(options.page || 1),
+    });
+
+    if (options.inboxId) {
+      searchParams.set('inbox_id', String(options.inboxId));
+    }
+
+    return this.request<ChatwootConversationListResponse>(
+      `/api/v1/accounts/${accountId}/conversations?${searchParams.toString()}`,
       { method: 'GET' },
     );
   }
@@ -587,13 +621,71 @@ export async function persistChatwootFlowState({
   incomingMessageId: number;
 }) {
   if (nextState === 'human' && currentStatus?.toLowerCase() !== 'open') {
-    await client.updateConversationStatus(accountId, conversationId, 'open');
+    await ensureChatwootHumanHandoffVisibility({
+      client,
+      accountId,
+      conversationId,
+      currentStatus,
+    });
   }
 
   await client.updateConversationCustomAttributes(
     accountId,
     conversationId,
     mergeFlowAttributes(currentAttributes, nextState, incomingMessageId),
+  );
+}
+
+export async function ensureChatwootHumanHandoffVisibility({
+  client,
+  accountId,
+  conversationId,
+  currentStatus,
+  maxAttempts = 2,
+}: {
+  client: ChatwootClient;
+  accountId: number;
+  conversationId: number;
+  currentStatus: string | null | undefined;
+  maxAttempts?: number;
+}): Promise<{
+  status: 'open';
+  changed: boolean;
+  attempts: number;
+}> {
+  const initialStatus = currentStatus?.trim().toLowerCase() || null;
+  if (initialStatus === 'open') {
+    return { status: 'open', changed: false, attempts: 0 };
+  }
+
+  const normalizedMaxAttempts = Number.isFinite(maxAttempts) ? Math.floor(maxAttempts) : 2;
+  const attemptsLimit = Math.max(1, Math.min(3, normalizedMaxAttempts));
+  let lastStatus = initialStatus;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= attemptsLimit; attempt += 1) {
+    try {
+      await client.updateConversationStatus(accountId, conversationId, 'open');
+    } catch (error) {
+      lastError = error;
+    }
+
+    try {
+      const readBack = await client.getConversationDetails(accountId, conversationId);
+      lastStatus = readBack.status?.trim().toLowerCase() || null;
+      if (lastStatus === 'open') {
+        return { status: 'open', changed: true, attempts: attempt };
+      }
+      lastError = new Error(`authoritative read-back returned status ${lastStatus || 'unknown'}`);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  const detail = lastError instanceof Error ? lastError.message : String(lastError || 'unknown error');
+  throw new Error(
+    `[Chatwoot] human handoff visibility failed for conversation ${conversationId} ` +
+      `after ${attemptsLimit} attempt(s); last status=${lastStatus || 'unknown'}; ${detail}`,
   );
 }
 
