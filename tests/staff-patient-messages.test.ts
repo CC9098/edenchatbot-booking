@@ -35,7 +35,7 @@ test("staff follow-up message stays generic for arbitrary staff notes", () => {
   assert.doesNotMatch(message, /診所：佐敦/);
 });
 
-test("staff follow-up keeps two complete links and removes template-unsafe line breaks", () => {
+test("staff follow-up keeps links on separate lines for a free-text WhatsApp reply", () => {
   const prescriptionUrl =
     "https://os.ectcm.com/PrintPrescription/PrintPrescription?clientID=1234567&clientRegisterID=7654321&doctorID=2468&paperSize=A4&langcode=CN";
   const invoiceUrl =
@@ -57,9 +57,22 @@ test("staff follow-up keeps two complete links and removes template-unsafe line 
     note,
   });
 
-  assert.equal(params["1"], `${prescriptionUrl} ${invoiceUrl}`);
-  assert.match(message, new RegExp(`${prescriptionUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} ${invoiceUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  assert.equal(params["1"], `${prescriptionUrl} ｜ ${invoiceUrl}`);
+  assert.match(message, new RegExp(`${prescriptionUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n\\n${invoiceUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
   assert.doesNotMatch(params["1"], /[\r\n\t]/);
+});
+
+test("staff follow-up normalizes horizontal whitespace without removing paragraphs", () => {
+  const note = "  第一段\r\n\r\n\r\n第二段\t內容  ";
+  const message = buildStaffPatientMessageText({
+    patientName: "測試病人",
+    clinicNameZh: "佐敦",
+    purpose: "follow_up",
+    note,
+  });
+
+  assert.match(message, /第一段\n\n第二段 內容/);
+  assert.doesNotMatch(message, /\r|\t/);
 });
 
 test("staff follow-up has a larger explicit note limit than other staff messages", () => {

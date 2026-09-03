@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   ChevronUp,
+  Forward,
   LinkIcon,
   Loader2,
   MessageSquareText,
@@ -47,6 +48,12 @@ type ContactSearchResult = {
 
 type ContactHistoryMessage = StaffChatwootWorkbenchMessage;
 type ContactHistoryConversation = StaffChatwootWorkbenchConversation;
+
+type ChatwootDoctorOption = {
+  id: number;
+  name: string;
+  availabilityStatus: string | null;
+};
 
 type SendState =
   | { status: "idle" }
@@ -178,6 +185,14 @@ export function NursePatientMessageClient({
   const [composerFile, setComposerFile] = useState<File | null>(null);
   const [isSendingComposerMessage, setIsSendingComposerMessage] = useState(false);
   const [composerError, setComposerError] = useState("");
+  const [forwardConversationId, setForwardConversationId] = useState<number | null>(null);
+  const [forwardMessageId, setForwardMessageId] = useState<number | null>(null);
+  const [forwardDoctors, setForwardDoctors] = useState<ChatwootDoctorOption[]>([]);
+  const [forwardDoctorId, setForwardDoctorId] = useState<number | null>(null);
+  const [isLoadingForwardDoctors, setIsLoadingForwardDoctors] = useState(false);
+  const [isForwardingMessage, setIsForwardingMessage] = useState(false);
+  const [forwardError, setForwardError] = useState("");
+  const [forwardedMessages, setForwardedMessages] = useState<Record<number, string>>({});
   const activeHistoryBottomRef = useRef<HTMLDivElement | null>(null);
   const autoLoadedContactKeyRef = useRef("");
   const activeHistoryContactIdRef = useRef<number | null>(null);
@@ -185,6 +200,7 @@ export function NursePatientMessageClient({
   const historyLoadAbortControllerRef = useRef<AbortController | null>(null);
   const historyConversationRequestsRef = useRef(new Set<string>());
   const historyConversationAbortControllersRef = useRef(new Map<string, AbortController>());
+  const forwardRequestGenerationRef = useRef(0);
 
   const selectedClinic = clinics.find((clinic) => clinic.id === form.clinicId) || clinics[0];
   const selectedPurpose = STAFF_PATIENT_MESSAGE_PURPOSE_BY_ID[form.purpose];
@@ -293,6 +309,17 @@ export function NursePatientMessageClient({
   const openHistoryConversationCount = historyConversations.filter((conversation) =>
     ["open", "pending", "snoozed"].includes(conversation.status || ""),
   ).length;
+
+  const closeDoctorForward = useCallback(() => {
+    forwardRequestGenerationRef.current += 1;
+    setForwardConversationId(null);
+    setForwardMessageId(null);
+    setForwardDoctors([]);
+    setForwardDoctorId(null);
+    setIsLoadingForwardDoctors(false);
+    setIsForwardingMessage(false);
+    setForwardError("");
+  }, []);
 
   useEffect(() => {
     if (!activeHistoryScrollKey) return;
@@ -473,6 +500,7 @@ export function NursePatientMessageClient({
   function selectHistoryConversation(conversation: ContactHistoryConversation) {
     setActiveHistoryConversationId(conversation.id);
     setComposerError("");
+    closeDoctorForward();
     if (!selectedContact || conversation.messagesLoaded) return;
 
     void loadConversationHistoryPage({
@@ -497,6 +525,7 @@ export function NursePatientMessageClient({
     setComposerText("");
     setComposerFile(null);
     setComposerError("");
+    closeDoctorForward();
     void loadContactHistory(contact, prefill.conversationId || null);
   }, [
     embedded,
@@ -505,6 +534,7 @@ export function NursePatientMessageClient({
     prefill?.conversationId,
     prefill?.patientName,
     prefill?.phone,
+    closeDoctorForward,
   ]);
 
   function fillContact(contact: ContactSearchResult) {
@@ -517,6 +547,7 @@ export function NursePatientMessageClient({
     setComposerText("");
     setComposerFile(null);
     setComposerError("");
+    closeDoctorForward();
     setContactQuery("");
     setContactResults([]);
     void loadContactHistory(contact);
@@ -531,6 +562,87 @@ export function NursePatientMessageClient({
       purpose: "follow_up",
       note: message,
     }));
+  }
+
+  async function beginDoctorForward(conversationId: number, messageId: number) {
+    if (!selectedContact) return;
+    if (forwardConversationId === conversationId && forwardMessageId === messageId) {
+      closeDoctorForward();
+      return;
+    }
+
+    const generation = forwardRequestGenerationRef.current + 1;
+    forwardRequestGenerationRef.current = generation;
+    setForwardConversationId(conversationId);
+    setForwardMessageId(messageId);
+    setForwardDoctors([]);
+    setForwardDoctorId(null);
+    setForwardError("");
+    setIsLoadingForwardDoctors(true);
+
+    try {
+      const endpoint = `/api/nurse/chatwoot-contacts/${selectedContact.id}/conversations/${conversationId}/doctor-forward`;
+      const response = await fetch(endpoint, {
+        cache: "no-store",
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (forwardRequestGenerationRef.current !== generation) return;
+
+      if (!response.ok) {
+        setForwardError(payload.error || "讀取醫師名單失敗");
+        return;
+      }
+
+      const doctors = Array.isArray(payload.doctors) ? payload.doctors : [];
+      setForwardDoctors(doctors);
+      setForwardDoctorId(doctors[0]?.id || null);
+      if (doctors.length === 0) {
+        setForwardError(payload.configured ? "所選對話未有可接收嘅醫師。" : "未設定可接收嘅 Chatwoot 醫師帳戶。");
+      }
+    } catch (error) {
+      if (forwardRequestGenerationRef.current !== generation) return;
+      setForwardError(error instanceof Error ? error.message : "讀取醫師名單失敗");
+    } finally {
+      if (forwardRequestGenerationRef.current === generation) {
+        setIsLoadingForwardDoctors(false);
+      }
+    }
+  }
+
+  async function submitDoctorForward(conversationId: number, messageId: number) {
+    if (!selectedContact || !forwardDoctorId || isForwardingMessage) return;
+
+    try {
+      setIsForwardingMessage(true);
+      setForwardError("");
+      const endpoint = `/api/nurse/chatwoot-contacts/${selectedContact.id}/conversations/${conversationId}/doctor-forward`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({
+          messageId,
+          doctorAgentId: forwardDoctorId,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || !payload.success || !payload.verified) {
+        setForwardError(payload.error || "轉交醫師失敗");
+        return;
+      }
+
+      const doctorName = payload.doctor?.name || forwardDoctors.find((doctor) => doctor.id === forwardDoctorId)?.name || "醫師";
+      setForwardedMessages((current) => ({ ...current, [messageId]: doctorName }));
+      closeDoctorForward();
+    } catch (error) {
+      setForwardError(error instanceof Error ? error.message : "轉交醫師失敗");
+    } finally {
+      setIsForwardingMessage(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -913,6 +1025,10 @@ export function NursePatientMessageClient({
                               const replyParent = hasReplyReference
                                 ? resolveChatwootWorkbenchReplyParent(conversation, message)
                                 : null;
+                              const forwardedDoctorName = forwardedMessages[message.id] || "";
+                              const isForwardPanelOpen =
+                                forwardConversationId === conversation.id &&
+                                forwardMessageId === message.id;
 
                               return (
                                 <div
@@ -977,6 +1093,81 @@ export function NursePatientMessageClient({
                                         {formatMessageTime(message.createdAt)}
                                         {failed ? " · 未送出" : ""}
                                       </p>
+                                    ) : null}
+                                    {incoming ? (
+                                      <div className="mt-2 border-t border-slate-100 pt-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => void beginDoctorForward(conversation.id, message.id)}
+                                          disabled={Boolean(forwardedDoctorName)}
+                                          aria-expanded={isForwardPanelOpen}
+                                          className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-emerald-800 outline-none transition hover:bg-emerald-50 focus-visible:ring-4 focus-visible:ring-emerald-100 disabled:cursor-default disabled:text-emerald-700"
+                                        >
+                                          {forwardedDoctorName ? (
+                                            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                          ) : (
+                                            <Forward className="h-3.5 w-3.5" aria-hidden="true" />
+                                          )}
+                                          {forwardedDoctorName ? `已轉交 ${forwardedDoctorName}` : "交俾醫師"}
+                                        </button>
+
+                                        {isForwardPanelOpen ? (
+                                          <div className="mt-2 space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-slate-900">
+                                            {isLoadingForwardDoctors ? (
+                                              <p className="inline-flex items-center gap-2 text-xs text-slate-600">
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                                                載入醫師
+                                              </p>
+                                            ) : null}
+
+                                            {forwardDoctors.length > 0 ? (
+                                              <label className="block space-y-1 text-xs font-semibold text-slate-700">
+                                                <span>轉交俾</span>
+                                                <select
+                                                  value={forwardDoctorId || ""}
+                                                  onChange={(event) => setForwardDoctorId(Number(event.target.value) || null)}
+                                                  className="h-10 w-full rounded-md border border-emerald-200 bg-white px-2 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                                                >
+                                                  {forwardDoctors.map((doctor) => (
+                                                    <option key={doctor.id} value={doctor.id}>
+                                                      {doctor.name}
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                              </label>
+                                            ) : null}
+
+                                            {forwardError ? (
+                                              <p className="text-xs font-semibold text-rose-700">{forwardError}</p>
+                                            ) : null}
+
+                                            <div className="flex flex-wrap gap-2">
+                                              {forwardDoctors.length > 0 ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => void submitDoctorForward(conversation.id, message.id)}
+                                                  disabled={!forwardDoctorId || isForwardingMessage}
+                                                  className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-emerald-700 px-3 text-xs font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                                >
+                                                  {isForwardingMessage ? (
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                                                  ) : (
+                                                    <Forward className="h-3.5 w-3.5" aria-hidden="true" />
+                                                  )}
+                                                  確認轉交
+                                                </button>
+                                              ) : null}
+                                              <button
+                                                type="button"
+                                                onClick={closeDoctorForward}
+                                                className="min-h-9 rounded-md px-3 text-xs font-semibold text-slate-600 transition hover:bg-white"
+                                              >
+                                                取消
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ) : null}
+                                      </div>
                                     ) : null}
                                   </div>
                                 </div>
