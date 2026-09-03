@@ -860,7 +860,7 @@ test('sendStaffPatientWhatsappMessage creates a missing Chatwoot contact before 
   }
 });
 
-test('sendStaffPatientWhatsappMessage falls back to text when Chatwoot confirms the conversation can reply', async () => {
+test('sendStaffPatientWhatsappMessage prefers multiline text when Chatwoot confirms the conversation can reply', async () => {
   const originalFetch = global.fetch;
   const originalEnv = {
     CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
@@ -898,7 +898,12 @@ test('sendStaffPatientWhatsappMessage falls back to text when Chatwoot confirms 
           id: 7,
           channel_type: 'Channel::Whatsapp',
           phone_number: '+85267333801',
-          message_templates: [],
+          message_templates: [{
+            name: 'staff_patient_follow_up',
+            language: 'zh_HK',
+            status: 'approved',
+            category: 'UTILITY',
+          }],
         }],
       });
     }
@@ -969,7 +974,7 @@ test('sendStaffPatientWhatsappMessage falls back to text when Chatwoot confirms 
       phone: '91234567',
       clinicNameZh: '佐敦',
       purpose: 'follow_up',
-      note: '姑娘想確認你的預約資料。',
+      note: '處方連結：https://example.com/prescription\n\n收據連結：https://example.com/invoice',
     });
 
     assert.equal(result.success, true);
@@ -980,7 +985,7 @@ test('sendStaffPatientWhatsappMessage falls back to text when Chatwoot confirms 
     assert.equal(sentMessagePayloads.at(-1)?.template_params, undefined);
     const textContent = String(sentMessagePayloads.at(-1)?.content || '');
     assert.match(textContent, /以下是診所給你的跟進訊息：/);
-    assert.match(textContent, /姑娘想確認你的預約資料。/);
+    assert.match(textContent, /處方連結：https:\/\/example\.com\/prescription\n\n收據連結：https:\/\/example\.com\/invoice/);
     assert.doesNotMatch(textContent, /你好 陳小明/);
     assert.doesNotMatch(textContent, /診所：佐敦/);
   } finally {

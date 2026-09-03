@@ -2081,7 +2081,10 @@ export async function sendStaffPatientWhatsappMessage(
         buildContent: () => buildStaffPatientMessageText(input),
         buildBodyParams: () => buildStaffPatientTemplateBodyParams(input),
         getTemplateConfigs: (inbox) => getStaffPatientMessageTemplateConfigs(inbox, input.purpose),
-        preferTemplateIfAvailable: true,
+        // Use a normal reply first whenever Chatwoot confirms the WhatsApp
+        // customer-service window is open. This preserves line breaks. The
+        // approved template remains the safe fallback for closed/new chats.
+        preferTemplateIfAvailable: false,
         fallbackTextOnTemplateFailure: true,
       },
     );

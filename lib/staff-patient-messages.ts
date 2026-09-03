@@ -95,14 +95,27 @@ export function getStaffPatientNoteMaxLength(purpose: StaffPatientMessagePurpose
     : STAFF_PATIENT_DEFAULT_NOTE_MAX_LENGTH;
 }
 
-function normalizeFollowUpTemplateNote(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
+function normalizeFollowUpMessageNote(value: string): string {
+  return value
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/[\t\f\v ]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function normalizeFollowUpTemplateParameter(value: string): string {
+  return normalizeFollowUpMessageNote(value)
+    .split(/\n+/)
+    .filter(Boolean)
+    .join(" ｜ ");
 }
 
 function getStaffPatientMessageNote(input: BuildStaffPatientMessageTextInput): string {
   const note = input.note?.trim();
   if (note) {
-    return input.purpose === "follow_up" ? normalizeFollowUpTemplateNote(note) : note;
+    return input.purpose === "follow_up" ? normalizeFollowUpMessageNote(note) : note;
   }
 
   switch (input.purpose) {
@@ -207,7 +220,10 @@ export function buildStaffPatientTemplateBodyParams(
 
   if (input.purpose === "follow_up") {
     return {
-      "1": getStaffPatientMessageNote(input),
+      // Meta rejects newlines inside template variables. Keep the free-text
+      // message multiline, but retain readable separators for the template
+      // fallback used outside the WhatsApp customer-service window.
+      "1": normalizeFollowUpTemplateParameter(getStaffPatientMessageNote(input)),
     };
   }
 
