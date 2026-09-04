@@ -910,7 +910,8 @@
     padding-top: max(10px, env(safe-area-inset-top));
   }
   .claim span {
-    display: none;
+    font-size: 11px;
+    white-space: nowrap;
   }
   .claim {
     padding: 8px !important;
