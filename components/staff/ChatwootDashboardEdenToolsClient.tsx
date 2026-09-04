@@ -175,5 +175,6 @@ function ChatwootDashboardEdenToolsGate({ clinics }: { clinics: ClinicOption[] }
 }
 
 export function ChatwootDashboardEdenToolsClient({ clinics }: { clinics: ClinicOption[] }) {
+  useEffect(() => { if (window.parent === window) window.location.replace("/conversations"); }, []);
   return <ChatwootDashboardEdenToolsGate clinics={clinics} />;
 }

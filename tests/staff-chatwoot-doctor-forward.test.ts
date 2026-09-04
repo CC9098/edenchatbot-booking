@@ -72,8 +72,8 @@ test("doctor handoff note mentions the doctor and deep-links to the selected pat
   });
 
   assert.match(note, /\[@Dr Leung\]\(mention:\/\/user\/8\/Dr%20Leung\)/);
-  assert.match(note, /https:\/\/chat\.example\/app\/accounts\/2\/conversations\/42\?messageId=101/);
-  assert.match(note, /同一對話用 Reply 回覆病人/);
+  assert.match(note, /\/conversations\?id=42&messageId=101/);
+  assert.match(note, /Eden 對話回覆病人/);
 });
 
 test("doctor handoff metadata supports idempotent read-back", () => {

@@ -310,6 +310,28 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       throw new Error("Chatwoot doctor forward read-back failed");
     }
 
+    const conversationPath = `/api/v1/accounts/${accountId}/conversations/${routeIds.conversationId}`;
+    const current = await staffChatwootRequest<{ custom_attributes?: Record<string, unknown> }>(baseUrl, apiAccessToken, conversationPath);
+    // A repeated forward must not reopen a task the doctor has already completed.
+    if (!existingForward || !current.custom_attributes?.eden_workspace) {
+      const previous = (current.custom_attributes?.eden_workspace || {}) as Record<string, unknown>;
+      const revision = crypto.randomUUID();
+      await staffChatwootRequest(baseUrl, apiAccessToken, `${conversationPath}/assignments`, {
+        method: "POST", body: { assignee_id: doctor.id },
+      });
+      await staffChatwootRequest(baseUrl, apiAccessToken, `${conversationPath}/custom_attributes`, {
+        method: "POST", body: { custom_attributes: {
+          eden_flow_state: "human",
+          eden_workspace: { ...previous, stage: "doctor", doctorId: doctor.id, doctorName: doctor.name, ownerId: null, ownerName: doctor.name, revision, updatedAt: new Date().toISOString() },
+        } },
+      });
+      await staffChatwootRequest(baseUrl, apiAccessToken, `${conversationPath}/toggle_status`, { method: "POST", body: { status: "open" } });
+      const saved = await staffChatwootRequest<{ status?: string; meta?: { assignee?: { id?: number } }; custom_attributes?: { eden_flow_state?: string; eden_workspace?: { revision?: string } } }>(baseUrl, apiAccessToken, conversationPath);
+      if (saved.status !== "open" || saved.meta?.assignee?.id !== doctor.id || saved.custom_attributes?.eden_flow_state !== "human" || saved.custom_attributes?.eden_workspace?.revision !== revision) {
+        throw new Error("Eden doctor queue read-back failed");
+      }
+    }
+
     console.info(
       `[nurse/chatwoot doctor forward] staff=${userId} role=${staffRole.role} conversation=${routeIds.conversationId} message=${parsedBody.data.messageId} doctor=${doctor.id} duplicate=${Boolean(existingForward)}`,
     );

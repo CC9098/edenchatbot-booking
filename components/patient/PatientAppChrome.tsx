@@ -220,6 +220,11 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
     return isNativeAppUserAgent(userAgent) || mobileBrowser;
   });
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [conversationLogin, setConversationLogin] = useState(false);
+  useEffect(() => {
+    const next = new URLSearchParams(window.location.search).get("next") || "";
+    setConversationLogin(pathname === "/login" && (next === "/conversations" || next.startsWith("/conversations?")));
+  }, [pathname]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -255,7 +260,7 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Show patient mobile chrome in native app and mobile browsers.
-  const patientRoute = showMobileChrome && isPatientRoute(pathname);
+  const patientRoute = showMobileChrome && isPatientRoute(pathname) && !conversationLogin;
   const isChatRoute = patientRoute && pathname.startsWith("/chat");
 
   const activeTab = getActiveTab(pathname);

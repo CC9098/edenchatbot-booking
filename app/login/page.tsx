@@ -52,6 +52,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const authError = searchParams.get("error") === "auth";
   const nextPath = sanitizeAuthNextPath(searchParams.get("next"));
+  const isConversationsEntry = nextPath === "/conversations" || nextPath.startsWith("/conversations?");
   const isStaffConsoleEntry =
     nextPath === "/doctor" ||
     nextPath.startsWith("/doctor/") ||
@@ -59,7 +60,8 @@ function LoginForm() {
     nextPath === "/nurse" ||
     nextPath.startsWith("/nurse/") ||
     nextPath.startsWith("/nurse?") ||
-    nextPath.startsWith("/chatwoot/");
+    nextPath.startsWith("/chatwoot/") ||
+    nextPath === "/conversations" || nextPath.startsWith("/conversations?");
 
   const defaultMethod: LoginMethod = isStaffConsoleEntry ? "google" : "whatsapp";
   const [activeMethod, setActiveMethod] = useState<LoginMethod>(defaultMethod);
@@ -384,12 +386,12 @@ function LoginForm() {
         <div className="patient-card space-y-6 p-8">
           <div className={`text-center ${isStaffConsoleEntry ? "space-y-3" : ""}`}>
             <h2 className="text-lg font-semibold text-slate-900">
-              {isStaffConsoleEntry ? "登入 staff 控制台" : "登入帳號"}
+              {isConversationsEntry ? "Eden 對話" : isStaffConsoleEntry ? "登入 staff 控制台" : "登入帳號"}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              {isStaffConsoleEntry ? "登入後直接進入醫師 / 姑娘工作台" : "選擇登入方式以繼續"}
+              {isConversationsEntry ? "用員工帳號登入" : isStaffConsoleEntry ? "登入後直接進入醫師 / 姑娘工作台" : "選擇登入方式以繼續"}
             </p>
-            {isStaffConsoleEntry && (
+            {isStaffConsoleEntry && !isConversationsEntry && (
               <div className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-emerald-50 px-4 py-4 text-left shadow-[0_8px_24px_rgba(8,145,178,0.08)]">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />

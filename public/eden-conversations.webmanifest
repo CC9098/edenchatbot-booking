@@ -1,0 +1,17 @@
+{
+  "name": "Eden 對話",
+  "short_name": "Eden 對話",
+  "start_url": "/conversations",
+  "scope": "/conversations",
+  "display": "standalone",
+  "background_color": "#f4f7f4",
+  "theme_color": "#17664b",
+  "icons": [
+    {
+      "src": "/logo-eden.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
