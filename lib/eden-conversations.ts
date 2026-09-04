@@ -172,8 +172,10 @@ export function normalizeEdenConversation(
       Number(latest?.created_at) || raw.last_activity_at || raw.timestamp || 0,
     lastMessageId: latest?.id || 0,
     lastIncomingId,
+    // First use inherits the existing inbox baseline instead of flagging all history.
+    // After a staff member opens the conversation, their own cursor is authoritative.
     unread:
-      lastIncomingId > readId || (readId === 0 && (raw.unread_count || 0) > 0),
+      readId > 0 ? lastIncomingId > readId : (raw.unread_count || 0) > 0,
     bot:
       raw.custom_attributes?.eden_flow_state !== "human" &&
       raw.status === "pending",

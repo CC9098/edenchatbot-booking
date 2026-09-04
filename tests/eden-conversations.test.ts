@@ -48,6 +48,7 @@ function conversation(): RawEdenConversation {
     inbox_id: 2,
     status: "open",
     can_reply: true,
+    unread_count: 1,
     messages: [incoming],
     meta: { sender: { id: 4, name: "測試病人", phone_number: "+85200000000" } },
     custom_attributes: {
@@ -65,6 +66,17 @@ test("unread is per staff member and remains separate from workflow completion",
   const read = normalizeEdenConversation(raw, actor);
   assert.equal(read.unread, false);
   assert.equal(read.stage, "reply");
+});
+test("first Eden visit inherits existing read history and then keeps a personal cursor", () => {
+  const raw = conversation();
+  raw.status = "resolved";
+  raw.unread_count = 0;
+  assert.equal(normalizeEdenConversation(raw, actor).unread, false);
+  raw.unread_count = 1;
+  assert.equal(normalizeEdenConversation(raw, actor).unread, true);
+  raw.unread_count = 0;
+  raw.custom_attributes!.eden_read_staffa = 99;
+  assert.equal(normalizeEdenConversation(raw, actor).unread, true);
 });
 test("new patient message reopens waiting-for-patient state but keeps doctor handoff visible", () => {
   const raw = conversation();
