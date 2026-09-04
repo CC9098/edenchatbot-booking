@@ -86,6 +86,7 @@ type PatientMessagePrefill = {
 type NursePatientMessageClientProps = {
   clinics: ClinicOption[];
   embedded?: boolean;
+  formOnly?: boolean;
   authToken?: string;
   prefill?: PatientMessagePrefill;
   latestIncomingMessage?: string;
@@ -162,6 +163,7 @@ function getQuotedMessagePreview(message: StaffChatwootWorkbenchMessage | null):
 export function NursePatientMessageClient({
   clinics,
   embedded = false,
+  formOnly = false,
   authToken = "",
   prefill,
   latestIncomingMessage = "",
@@ -805,7 +807,7 @@ export function NursePatientMessageClient({
 
   return (
     <div className={embedded ? "space-y-4 p-3" : "space-y-6"}>
-      <section className={embedded ? "space-y-3" : "rounded-lg border border-emerald-100 bg-white p-5 shadow-sm sm:p-6"}>
+      <section hidden={formOnly} className={embedded ? "space-y-3" : "rounded-lg border border-emerald-100 bg-white p-5 shadow-sm sm:p-6"}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             {!embedded ? (

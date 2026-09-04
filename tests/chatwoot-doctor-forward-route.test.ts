@@ -42,6 +42,8 @@ test("doctor forward route validates, writes, and reads back the Chatwoot handof
     },
   };
 
+  const savedConversation: any = { id: 42, inbox_id: 7, meta: { sender: { id: 99 } }, custom_attributes: {} };
+  let noteCreated = false;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const requestUrl = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     const parsedUrl = new URL(requestUrl);
@@ -49,7 +51,7 @@ test("doctor forward route validates, writes, and reads back the Chatwoot handof
     const method = init?.method || "GET";
 
     if (method === "GET" && path === "/api/v1/accounts/2/conversations/42") {
-      return jsonResponse({ id: 42, inbox_id: 7, meta: { sender: { id: 99 } } });
+      return jsonResponse(savedConversation);
     }
     if (method === "GET" && path === "/api/v1/accounts/2/agents") {
       return jsonResponse([{
@@ -69,7 +71,7 @@ test("doctor forward route validates, writes, and reads back the Chatwoot handof
       });
     }
     if (method === "GET" && path === "/api/v1/accounts/2/conversations/42/messages") {
-      return jsonResponse({ payload: [] });
+      return jsonResponse({ payload: noteCreated ? [{ id: 202, private: true, content_attributes: forwardAttributes }] : [] });
     }
     if (method === "POST" && path === "/api/v1/accounts/2/conversations/42/participants") {
       const body = JSON.parse(String(init?.body || "{}"));
@@ -79,6 +81,7 @@ test("doctor forward route validates, writes, and reads back the Chatwoot handof
     if (method === "POST" && path === "/api/v1/accounts/2/conversations/42/messages") {
       const body = JSON.parse(String(init?.body || "{}"));
       postedBodies.push({ path, body });
+      noteCreated = true;
       return jsonResponse({ id: 202, private: true, content_attributes: body.content_attributes });
     }
     if (method === "GET" && path === "/api/v1/accounts/2/conversations/42/participants") {
@@ -90,6 +93,14 @@ test("doctor forward route validates, writes, and reads back the Chatwoot handof
       });
     }
 
+    if (method === "POST" && ["/assignments", "/custom_attributes", "/toggle_status"].some(suffix => path.endsWith(suffix))) {
+      const body = JSON.parse(String(init?.body || "{}"));
+      postedBodies.push({ path, body });
+      if (path.endsWith("/custom_attributes")) Object.assign(savedConversation.custom_attributes, body.custom_attributes);
+      if (path.endsWith("/assignments")) savedConversation.meta.assignee = { id: body.assignee_id };
+      if (path.endsWith("/toggle_status")) savedConversation.status = body.status;
+      return jsonResponse({});
+    }
     throw new Error(`Unexpected fetch: ${method} ${path}`);
   }) as typeof globalThis.fetch;
 
@@ -136,6 +147,22 @@ test("doctor forward route validates, writes, and reads back the Chatwoot handof
     assert.deepEqual(postedBodies[1]?.body.content_attributes, forwardAttributes);
     assert.match(String(postedBodies[1]?.body.content || ""), /mention:\/\/user\/8\/Dr%20Leung/);
     assert.match(String(postedBodies[1]?.body.content || ""), /messageId=101/);
+    assert.match(String(postedBodies[1]?.body.content || ""), /conversations\?id=42/);
+    assert.equal(postedBodies.find(item => item.path.endsWith("/assignments"))?.body.assignee_id, 8);
+    assert.equal((postedBodies.find(item => item.path.endsWith("/custom_attributes"))?.body.custom_attributes as any).eden_workspace.stage, "doctor");
+    assert.equal(postedBodies.find(item => item.path.endsWith("/toggle_status"))?.body.status, "open");
+    savedConversation.status = "resolved";
+    savedConversation.custom_attributes.eden_workspace.stage = "done";
+    const beforeRetry = postedBodies.length;
+    const retry = await postDoctorForward(new NextRequest("http://localhost/api/doctor-forward", {
+      method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ messageId: 101, doctorAgentId: 8 }),
+    }), context);
+    assert.equal(retry.status, 200);
+    assert.equal((await retry.json()).duplicate, true);
+    assert.equal(savedConversation.status, "resolved");
+    assert.equal(postedBodies.slice(beforeRetry).some(item => item.path.endsWith("/assignments") || item.path.endsWith("/custom_attributes") || item.path.endsWith("/toggle_status") || item.path.endsWith("/messages")), false);
+
   } finally {
     globalThis.fetch = originalFetch;
     for (const [key, value] of Object.entries(originalEnv)) {

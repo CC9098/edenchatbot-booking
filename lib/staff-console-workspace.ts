@@ -18,6 +18,7 @@ export type StaffWorkspaceConfig = {
 };
 
 const DOCTOR_NAV_ITEMS: StaffWorkspaceNavItem[] = [
+  { href: "/conversations?view=doctor", label: "Eden 對話" },
   {
     href: "/doctor",
     label: "首頁",
@@ -36,6 +37,7 @@ const DOCTOR_NAV_ITEMS: StaffWorkspaceNavItem[] = [
 ];
 
 const NURSE_NAV_ITEMS: StaffWorkspaceNavItem[] = [
+  { href: "/conversations", label: "Eden 對話" },
   {
     href: "/nurse",
     label: "首頁",

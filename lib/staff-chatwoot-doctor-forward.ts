@@ -1,3 +1,4 @@
+import { buildPublicUrl } from "@/lib/public-url";
 import type { RawChatwootHistoryMessage } from "@/lib/staff-chatwoot-history";
 
 export const CHATWOOT_DOCTOR_FORWARD_ACTION = "eden_tools_doctor_forward";
@@ -99,8 +100,7 @@ export function buildChatwootDoctorForwardNote({
   doctor: Pick<StaffChatwootDoctor, "id" | "name">;
 }): string {
   const conversationUrl = new URL(
-    `/app/accounts/${accountId}/conversations/${conversationId}`,
-    `${baseUrl.replace(/\/$/, "")}/`,
+    buildPublicUrl(`/conversations?id=${conversationId}`),
   );
   conversationUrl.searchParams.set("messageId", String(sourceMessageId));
 
@@ -109,7 +109,7 @@ export function buildChatwootDoctorForwardNote({
   return [
     `${mention} 姑娘已轉交一則病人訊息。`,
     `[開啟指定訊息](${conversationUrl.toString()})`,
-    "請喺同一對話用 Reply 回覆病人。",
+    "請喺 Eden 對話回覆病人。",
   ].join("\n\n");
 }
 

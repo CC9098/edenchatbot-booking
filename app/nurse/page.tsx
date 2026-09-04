@@ -24,6 +24,7 @@ type RoleHomeAction = {
 };
 
 const NURSE_ACTIONS: RoleHomeAction[] = [
+  { title: "Eden 對話", subtitle: "回覆病人、接手、交更。", href: "/conversations", icon: MessageCircle, className: "border-emerald-200 bg-emerald-50 hover:bg-emerald-100", iconClassName: "border-emerald-200 bg-white text-emerald-800" },
   {
     title: "今日預約",
     subtitle: "睇今日到診、待處理、改期和取消。",

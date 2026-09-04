@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  MessageCircle,
   Mic2,
   NotebookPen,
   Stethoscope,
@@ -18,6 +19,7 @@ type RoleHomeAction = {
 };
 
 const DOCTOR_ACTIONS: RoleHomeAction[] = [
+  { title: "Eden 對話", subtitle: "查看轉交、回覆病人。", href: "/conversations?view=doctor", icon: MessageCircle, className: "border-emerald-200 bg-emerald-50 hover:bg-emerald-100", iconClassName: "border-emerald-200 bg-white text-emerald-800" },
   {
     title: "今日病人",
     subtitle: "睇名單、開病人紀錄、跟進覆診。",
