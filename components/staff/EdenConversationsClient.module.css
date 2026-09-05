@@ -997,3 +997,52 @@
     transition: none;
   }
 }
+
+.messageActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.forwardButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 44px;
+  min-height: 44px;
+  background: transparent;
+  border: 0;
+  color: #426658;
+  cursor: pointer;
+  font-size: 11px;
+}
+.forwardButton:hover {
+  background: #e2ebe5;
+  border-radius: 8px;
+}
+.forwardRecipient {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.forwardRecipient select {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px;
+  border: 1px solid #b7c8bd;
+  border-radius: 10px;
+  background: white;
+  color: #18382a;
+  font-size: 16px;
+}
+.forwardResult {
+  color: #1d543d;
+  padding: 12px 0;
+}
+.forwardResult a {
+  text-decoration: underline;
+}

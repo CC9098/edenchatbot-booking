@@ -20,6 +20,7 @@ import {
   ChevronDown,
   ClipboardList,
   FileText,
+  Forward,
   Loader2,
   LogOut,
   MessageCircle,
@@ -49,6 +50,7 @@ import { buildStaffPatientMessageText } from "@/lib/staff-patient-messages";
 import { NursePatientMessageClient } from "@/components/staff/NursePatientMessageClient";
 import { CLINIC_BY_ID, PHYSICAL_CLINIC_IDS } from "@/shared/clinic-data";
 import styles from "./EdenConversationsClient.module.css";
+import { WhatsappForwardDialog } from "./WhatsappForwardDialog";
 
 type InboxData = {
   conversations: EdenConversation[];
@@ -176,6 +178,10 @@ export function EdenConversationsClient() {
     dueAt: "",
   });
   const [doctorId, setDoctorId] = useState("");
+  const [forwardMessage, setForwardMessage] = useState<EdenMessage | null>(
+    null,
+  );
+  const closeForward = useCallback(() => setForwardMessage(null), []);
   const anchorAttempted = useRef<number | null>(null);
   const activeRef = useRef<number | null>(null);
   const actorRef = useRef<ConversationActor | null>(null);
@@ -356,6 +362,7 @@ export function EdenConversationsClient() {
     setInternal(false);
     setMenu(false);
     setDrawer(null);
+    setForwardMessage(null);
     setNextBefore(null);
     draftKey.current = "";
     stayAtBottom.current = true;
@@ -942,7 +949,7 @@ export function EdenConversationsClient() {
                     }}
                   >
                     <Stethoscope size={18} />
-                    交俾醫師
+                    分派 Eden 跟進
                   </button>
                   <button
                     onClick={() => {
@@ -1210,17 +1217,27 @@ export function EdenConversationsClient() {
                         </footer>
                       </article>
                       {!m.private && (
-                        <button
-                          className={styles.replyButton}
-                          aria-label={`引用訊息 ${m.id}`}
-                          onClick={() => {
-                            if (internal) changeMode(false);
-                            setReply(m);
-                            textarea.current?.focus();
-                          }}
-                        >
-                          <Reply size={17} />
-                        </button>
+                        <div className={styles.messageActions}>
+                          <button
+                            className={styles.replyButton}
+                            aria-label={`引用訊息 ${m.id}`}
+                            onClick={() => {
+                              if (internal) changeMode(false);
+                              setReply(m);
+                              textarea.current?.focus();
+                            }}
+                          >
+                            <Reply size={17} />
+                          </button>
+                          <button
+                            className={styles.forwardButton}
+                            aria-label={`轉寄訊息 ${m.id}`}
+                            onClick={() => setForwardMessage(m)}
+                          >
+                            <Forward size={17} />
+                            <span>轉寄</span>
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1405,6 +1422,15 @@ export function EdenConversationsClient() {
           </>
         )}
       </section>
+      {forwardMessage && active && actor && (
+        <WhatsappForwardDialog
+          conversationId={active.id}
+          actorId={actor.id}
+          message={forwardMessage}
+          onClose={closeForward}
+          request={api}
+        />
+      )}
       {drawer && active && (
         <div
           className={styles.overlay}
@@ -1419,7 +1445,7 @@ export function EdenConversationsClient() {
               drawer === "handover"
                 ? "交更"
                 : drawer === "doctor"
-                  ? "交俾醫師"
+                  ? "分派 Eden 跟進"
                   : drawer === "followup"
                     ? "跟進訊息預覽"
                     : "預約及收費"
@@ -1431,7 +1457,7 @@ export function EdenConversationsClient() {
                 {drawer === "handover"
                   ? "交更"
                   : drawer === "doctor"
-                    ? "交俾醫師"
+                    ? "分派 Eden 跟進"
                     : drawer === "followup"
                       ? "跟進訊息預覽"
                       : "預約及收費"}
