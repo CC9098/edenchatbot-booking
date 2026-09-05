@@ -147,6 +147,20 @@
   border-radius: 8px;
   background: white;
 }
+.historySelect {
+  margin-left: auto;
+  min-width: 0;
+  max-width: 55%;
+  padding: 5px;
+  border: 1px solid #dce5de;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+}
+.contactPhone {
+  color: var(--muted);
+  font-size: 12px;
+}
 .list {
   overflow: auto;
   flex: 1;

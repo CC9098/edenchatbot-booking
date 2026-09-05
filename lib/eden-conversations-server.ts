@@ -12,6 +12,7 @@ import {
   normalizeEdenConversation,
   normalizeEdenMessages,
   matchesConversationView,
+  latestEdenConversationsPerContact,
   assertWorkspaceRevision,
   validateConversationAttachment,
   type ConversationActor,
@@ -19,6 +20,7 @@ import {
   type RawEdenMessage,
   type WorkspaceState,
   type ConversationStage,
+  type EdenConversation,
 } from "@/lib/eden-conversations";
 import { getChatwootMessagePageState } from "@/lib/staff-chatwoot-history-pagination";
 import { parseChatwootDoctorAgentIds } from "@/lib/staff-chatwoot-doctor-forward";
@@ -157,14 +159,71 @@ export async function listConversations(
   options: { view: string; page: number; query: string; inboxId?: number },
 ) {
   const query = options.query.trim().slice(0, 100);
-  let contactIds: number[] = [];
   if (query) {
-    const contacts = await conversationRequest<{ payload: { id: number }[] }>(
+    const contacts = await conversationRequest<{
+      payload: { id: number }[];
+      meta?: { count?: number };
+    }>(
       ctx,
-      `/contacts/search?q=${encodeURIComponent(query)}&page=1`,
+      `/contacts/search?q=${encodeURIComponent(query)}&page=${options.page}&sort=-last_activity_at`,
     );
-    contactIds = (contacts.payload || []).map((c) => c.id);
-    if (!contactIds.length) return { conversations: [], nextPage: null };
+    const contactIds = [
+      ...new Set((contacts.payload || []).map((c) => c.id)),
+    ].filter((id) => Number.isSafeInteger(id) && id > 0);
+    const conversations: EdenConversation[] = [];
+    // Contact search is paged by people, never by their historical tickets.
+    // Limit fan-out while fetching the full history for each contact on this page.
+    for (let offset = 0; offset < contactIds.length; offset += 5) {
+      const results = await Promise.all(
+        contactIds.slice(offset, offset + 5).map(async (contactId) => {
+          const result = await conversationRequest<{
+            payload: RawEdenConversation[];
+          }>(ctx, `/contacts/${contactId}/conversations`);
+          const history = (result.payload || [])
+            .filter(
+              (c) =>
+                (!c.account_id || c.account_id === ctx.accountId) &&
+                c.meta?.sender?.id === contactId &&
+                ctx.inboxes.some((i) => i.id === c.inbox_id) &&
+                (!options.inboxId || c.inbox_id === options.inboxId),
+            )
+            .map((c) => presentConversation(ctx, c))
+            .sort(
+              (a, b) =>
+                b.updatedAt - a.updatedAt ||
+                b.lastMessageId - a.lastMessageId ||
+                b.id - a.id,
+            );
+          const latest = history.find((c) =>
+            matchesConversationView(c, options.view, ctx.actor),
+          );
+          return latest
+            ? {
+                ...latest,
+                contactHistory: history.map(
+                  ({ id, stage, updatedAt, inboxName }) => ({
+                    id,
+                    stage,
+                    updatedAt,
+                    inboxName,
+                  }),
+                ),
+              }
+            : null;
+        }),
+      );
+      for (const result of results) if (result) conversations.push(result);
+    }
+    const count = contacts.meta?.count;
+    const hasMore =
+      (contacts.payload || []).length > 0 &&
+      (typeof count === "number"
+        ? options.page * 15 < count
+        : contacts.payload.length >= 15);
+    return {
+      conversations: latestEdenConversationsPerContact(conversations),
+      nextPage: hasMore ? options.page + 1 : null,
+    };
   }
   const status =
     options.view === "done"
@@ -178,24 +237,9 @@ export async function listConversations(
     sort_by: "last_activity_at_desc",
   });
   if (options.inboxId) qs.set("inbox_id", String(options.inboxId));
-  const result = query
-    ? await conversationRequest<{
-        payload?: RawEdenConversation[];
-        data?: { payload?: RawEdenConversation[] };
-      }>(ctx, `/conversations/filter?page=${options.page}`, {
-        payload: [
-          {
-            attribute_key: "contact_id",
-            filter_operator: "equal_to",
-            values: contactIds.map(String),
-            query_operator: null,
-          },
-        ],
-      })
-    : await conversationRequest<{ data?: { payload?: RawEdenConversation[] } }>(
-        ctx,
-        `/conversations?${qs}`,
-      );
+  const result = await conversationRequest<{
+    data?: { payload?: RawEdenConversation[] };
+  }>(ctx, `/conversations?${qs}`);
   const raw: RawEdenConversation[] =
     result.data?.payload ||
     (result as { payload?: RawEdenConversation[] }).payload ||

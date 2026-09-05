@@ -92,7 +92,44 @@ export type EdenConversation = {
   assigneeId: number | null;
   assigneeName: string;
   state: WorkspaceState;
+  contactHistory?: {
+    id: number;
+    stage: ConversationStage;
+    updatedAt: number;
+    inboxName: string;
+  }[];
 };
+
+export function latestEdenConversationsPerContact(
+  conversations: EdenConversation[],
+): EdenConversation[] {
+  const contacts = new Map<string, EdenConversation>();
+  for (const c of [...conversations].sort(
+    (a, b) =>
+      b.updatedAt - a.updatedAt ||
+      b.lastMessageId - a.lastMessageId ||
+      b.id - a.id,
+  )) {
+    const key =
+      c.contactId > 0 ? `contact:${c.contactId}` : `conversation:${c.id}`;
+    if (!contacts.has(key)) contacts.set(key, c);
+  }
+  return [...contacts.values()];
+}
+
+export function mergeEdenConversationPages(
+  pages: Map<number, EdenConversation[]>,
+  byContact: boolean,
+): EdenConversation[] {
+  const rows = [...pages.entries()]
+    .sort(([a], [b]) => a - b)
+    .flatMap(([, rows]) => rows);
+  if (byContact) return latestEdenConversationsPerContact(rows);
+  // Prefer the refreshed first page when conversations move between pages.
+  return rows.filter(
+    (c, index) => rows.findIndex((other) => other.id === c.id) === index,
+  );
+}
 
 export function normalizeEdenMessages(raw: RawEdenMessage[]): EdenMessage[] {
   return raw
@@ -128,11 +165,11 @@ export function normalizeEdenConversation(
   ].filter((m): m is RawEdenMessage =>
     Boolean(
       m &&
-        !m.private &&
-        (m.message_type === 0 ||
-          m.message_type === 1 ||
-          m.message_type === "incoming" ||
-          m.message_type === "outgoing"),
+      !m.private &&
+      (m.message_type === 0 ||
+        m.message_type === 1 ||
+        m.message_type === "incoming" ||
+        m.message_type === "outgoing"),
     ),
   );
   const latest = messages.sort((a, b) => (b.id || 0) - (a.id || 0))[0];
@@ -174,8 +211,7 @@ export function normalizeEdenConversation(
     lastIncomingId,
     // First use inherits the existing inbox baseline instead of flagging all history.
     // After a staff member opens the conversation, their own cursor is authoritative.
-    unread:
-      readId > 0 ? lastIncomingId > readId : (raw.unread_count || 0) > 0,
+    unread: readId > 0 ? lastIncomingId > readId : (raw.unread_count || 0) > 0,
     bot:
       raw.custom_attributes?.eden_flow_state !== "human" &&
       raw.status === "pending",
