@@ -38,6 +38,7 @@ import {
 import { createBrowserClient } from "@/lib/supabase-browser";
 import {
   mergeEdenMessages,
+  mergeEdenConversationPages,
   STAGE_LABELS,
   validateConversationAttachment,
   type ConversationActor,
@@ -148,6 +149,9 @@ export function EdenConversationsClient() {
   const [listError, setListError] = useState("");
   const [activeId, setActiveId] = useState<number | null>(null);
   const [active, setActive] = useState<EdenConversation | null>(null);
+  const [contactHistory, setContactHistory] = useState<
+    NonNullable<EdenConversation["contactHistory"]>
+  >([]);
   const [messages, setMessages] = useState<EdenMessage[]>([]);
   const [nextBefore, setNextBefore] = useState<number | null>(null);
   const [doctors, setDoctors] = useState<DetailData["doctors"]>([]);
@@ -182,6 +186,7 @@ export function EdenConversationsClient() {
   const activeRef = useRef<number | null>(null);
   const actorRef = useRef<ConversationActor | null>(null);
   const listSequence = useRef(0);
+  const listPages = useRef(new Map<number, EdenConversation[]>());
   const listBusy = useRef(false);
   const detailBusy = useRef(false);
   const sendLock = useRef(false);
@@ -263,23 +268,10 @@ export function EdenConversationsClient() {
         setActor(data.actor);
         setInboxes(data.inboxes);
         notify(data.conversations);
-        setConversations((previous) =>
-          page === 1
-            ? quiet && previous.length > 25
-              ? [
-                  ...new Map(
-                    [...data.conversations, ...previous.slice(25)].map((c) => [
-                      c.id,
-                      c,
-                    ]),
-                  ).values(),
-                ]
-              : data.conversations
-            : [
-                ...new Map(
-                  [...previous, ...data.conversations].map((c) => [c.id, c]),
-                ).values(),
-              ],
+        if (page === 1 && !quiet) listPages.current.clear();
+        listPages.current.set(page, data.conversations);
+        setConversations(
+          mergeEdenConversationPages(listPages.current, Boolean(query.trim())),
         );
         setNextPage((previous) => (quiet ? previous : data.nextPage));
         setListError("");
@@ -354,10 +346,14 @@ export function EdenConversationsClient() {
     [],
   );
 
-  function selectConversation(id: number | null) {
+  function selectConversation(
+    id: number | null,
+    history: EdenConversation["contactHistory"] = [],
+  ) {
     activeRef.current = id;
     setActiveId(id);
     setActive(null);
+    setContactHistory(history);
     setMessages([]);
     setText("");
     setReply(null);
@@ -418,6 +414,7 @@ export function EdenConversationsClient() {
   }, [search]);
   useEffect(() => {
     seenIncoming.current = null;
+    listPages.current.clear();
     void loadList();
     return () => {
       // Invalidate requests from the old filter; this ref is a sequence, not a DOM node.
@@ -830,8 +827,8 @@ export function EdenConversationsClient() {
             conversations.map((c) => (
               <button
                 key={c.id}
-                className={`${styles.conversation} ${c.id === activeId ? styles.activeConversation : ""}`}
-                onClick={() => selectConversation(c.id)}
+                className={`${styles.conversation} ${c.id === activeId || (query.trim() && c.contactId > 0 && c.contactId === active?.contactId) ? styles.activeConversation : ""}`}
+                onClick={() => selectConversation(c.id, c.contactHistory)}
                 aria-label={`${c.name}，${STAGE_LABELS[c.stage]}${c.unread ? "，未讀" : ""}`}
               >
                 <span className={styles.avatar}>{c.name.slice(0, 1)}</span>
@@ -840,6 +837,9 @@ export function EdenConversationsClient() {
                     <strong>{c.name}</strong>
                     <time>{time(c.updatedAt)}</time>
                   </span>
+                  {query.trim() && c.phone && (
+                    <span className={styles.contactPhone}>{c.phone}</span>
+                  )}
                   <span className={styles.row}>
                     <span className={styles.preview}>{c.preview}</span>
                     {c.unread && (
@@ -859,7 +859,7 @@ export function EdenConversationsClient() {
           {!loadingList && !conversations.length && (
             <div className={styles.empty}>
               <MessageCircle size={34} />
-              <p>{query ? "未找到相符對話" : "暫時冇呢類對話"}</p>
+              <p>{query ? "未找到相符聯絡人" : "暫時冇呢類對話"}</p>
             </div>
           )}
           {nextPage && (
@@ -868,7 +868,11 @@ export function EdenConversationsClient() {
               disabled={loadingList}
               onClick={() => void loadList(nextPage)}
             >
-              {loadingList ? "載入中…" : "載入更多對話"}
+              {loadingList
+                ? "載入中…"
+                : query.trim()
+                  ? "載入更多聯絡人"
+                  : "載入更多對話"}
             </button>
           )}
         </div>
@@ -1002,6 +1006,35 @@ export function EdenConversationsClient() {
                       ? `${active.state.doctorName} 待覆`
                       : active.inboxName}
                 </span>
+                {contactHistory.length > 1 && (
+                  <select
+                    className={styles.historySelect}
+                    aria-label="對話紀錄"
+                    value={activeId || ""}
+                    disabled={sending || busy}
+                    onChange={(event) =>
+                      selectConversation(
+                        Number(event.target.value),
+                        contactHistory,
+                      )
+                    }
+                  >
+                    {contactHistory.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {"對話紀錄 · "}
+                        {new Date(c.updatedAt * 1000).toLocaleString("zh-HK", {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: false,
+                        })}
+                        {` · ${STAGE_LABELS[c.stage]}${inboxes.length > 1 ? ` · ${c.inboxName}` : ""}`}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             )}
             {active?.state.handover && (
