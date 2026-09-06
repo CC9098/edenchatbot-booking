@@ -526,7 +526,9 @@ export async function sendConversationMessage(
   );
   const verified = readback.payload.find((m) => m.id === sent.id);
   if (!verified) throw new AuthError(502, "正在確認訊息，請重新載入查看。");
-  if (!input.private && verified.status !== "failed") {
+  const message = normalizeEdenMessages([verified])[0];
+  if (!message) throw new AuthError(502, "未能確認訊息內容，請重新載入查看。");
+  if (!input.private && !message.deliveryIssue && ["sent", "delivered", "read"].includes(message.status || "")) {
     const latest = await getConversation(ctx, raw.id);
     if (
       (latest.custom_attributes?.eden_workspace?.revision || "") ===
@@ -546,5 +548,5 @@ export async function sendConversationMessage(
       );
     }
   }
-  return { message: normalizeEdenMessages([verified])[0], duplicate: false };
+  return { message, duplicate: false };
 }

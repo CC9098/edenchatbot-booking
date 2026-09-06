@@ -15,7 +15,6 @@ import {
   ArrowLeft,
   Bell,
   BellOff,
-  Check,
   CheckCheck,
   ChevronDown,
   ClipboardList,
@@ -51,6 +50,7 @@ import { NursePatientMessageClient } from "@/components/staff/NursePatientMessag
 import { CLINIC_BY_ID, PHYSICAL_CLINIC_IDS } from "@/shared/clinic-data";
 import styles from "./EdenConversationsClient.module.css";
 import { WhatsappForwardDialog } from "./WhatsappForwardDialog";
+import { EdenMessageDelivery } from "./EdenMessageDelivery";
 
 type InboxData = {
   conversations: EdenConversation[];
@@ -646,12 +646,17 @@ export function EdenConversationsClient() {
         setMessages((previous) =>
           mergeEdenMessages(previous, [result.message]),
         );
-        if (draftKey.current === currentDraft) {
+        if (!result.message.deliveryIssue && draftKey.current === currentDraft) {
           setText((previous) => (previous === text ? "" : previous));
           setReply(null);
           setFile(null);
         }
         textarea.current?.focus();
+      }
+      if (result.message.deliveryIssue) {
+        if (activeRef.current === id) setError(result.message.deliveryIssue.description);
+        void loadList(1, true);
+        return;
       }
       if (getDraft(currentDraft) === text) storeDraft(currentDraft, "");
       sendRequest.current = null;
@@ -829,7 +834,7 @@ export function EdenConversationsClient() {
                 key={c.id}
                 className={`${styles.conversation} ${c.id === activeId || (query.trim() && c.contactId > 0 && c.contactId === active?.contactId) ? styles.activeConversation : ""}`}
                 onClick={() => selectConversation(c.id, c.contactHistory)}
-                aria-label={`${c.name}，${STAGE_LABELS[c.stage]}${c.unread ? "，未讀" : ""}`}
+                aria-label={`${c.name}，${STAGE_LABELS[c.stage]}${c.deliveryIssue ? "，送達異常" : ""}${c.unread ? "，未讀" : ""}`}
               >
                 <span className={styles.avatar}>{c.name.slice(0, 1)}</span>
                 <span className={styles.conversationText}>
@@ -842,6 +847,7 @@ export function EdenConversationsClient() {
                   )}
                   <span className={styles.row}>
                     <span className={styles.preview}>{c.preview}</span>
+                    {c.deliveryIssue && <span className={styles.failed}>{c.deliveryIssue.label}</span>}
                     {c.unread && (
                       <span className={styles.unread} aria-label="未讀" />
                     )}
@@ -1197,23 +1203,16 @@ export function EdenConversationsClient() {
                             </a>
                           ),
                         )}
+                        {m.deliveryIssue && (
+                          <p className={styles.deliveryWarning} role="status">
+                            {m.deliveryIssue.description}
+                          </p>
+                        )}
                         <footer className={styles.messageMeta}>
                           <time>{time(m.createdAt)}</time>
-                          {m.direction === "outgoing" &&
-                            !m.private &&
-                            (m.status === "failed" ? (
-                              <span className={styles.failed}>未送出</span>
-                            ) : m.status === "read" ? (
-                              <CheckCheck
-                                size={16}
-                                color="#168fc1"
-                                aria-label="病人已讀"
-                              />
-                            ) : m.status === "delivered" ? (
-                              <CheckCheck size={16} aria-label="已送達" />
-                            ) : (
-                              <Check size={16} aria-label="已提交" />
-                            ))}
+                          {m.direction === "outgoing" && (
+                            <EdenMessageDelivery message={m} issueClassName={styles.failed} />
+                          )}
                         </footer>
                       </article>
                       {!m.private && (
