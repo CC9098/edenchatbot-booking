@@ -322,6 +322,37 @@ test("quoted send preserves lines and is read back; same request does not send t
       1,
     );
   }));
+
+test("sent plus provider error does not move work to waiting or cause a duplicate retry", async () =>
+  withChatwoot(async (raw, messages, calls) => {
+    const mockFetch = global.fetch;
+    global.fetch = async (url, options) => {
+      const response = await mockFetch(url, options);
+      if (String(url).endsWith("/messages") && options?.method === "POST") {
+        const message = messages.at(-1)!;
+        message.content_attributes = {
+          ...message.content_attributes,
+          external_error: "131026: Message undeliverable",
+        };
+        return Response.json(message);
+      }
+      return response;
+    };
+    try {
+      const input = { content: "測試發送異常", private: false, requestId: "error-readback-test" };
+      const sent = await sendConversationMessage(ctx, structuredClone(raw), input);
+      assert.equal(sent.message.status, "sent");
+      assert.equal(sent.message.deliveryIssue?.code, "131026");
+      assert.equal(raw.custom_attributes?.eden_workspace?.stage, undefined);
+      assert.equal(calls.some(c => c.path.endsWith("/toggle_status") || c.path.endsWith("/custom_attributes")), false);
+      const again = await sendConversationMessage(ctx, raw, input);
+      assert.equal(again.duplicate, true);
+      assert.equal(again.message.deliveryIssue?.code, "131026");
+      assert.equal(calls.filter(c => c.path.endsWith("/messages") && c.method === "POST").length, 1);
+    } finally {
+      global.fetch = mockFetch;
+    }
+  }));
 test("closed window blocks public text while still allowing internal notes", async () =>
   withChatwoot(async (raw, _messages, calls) => {
     raw.can_reply = false;

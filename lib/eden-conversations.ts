@@ -3,6 +3,7 @@ import {
   type RawChatwootHistoryMessage,
 } from "@/lib/staff-chatwoot-history";
 import type { StaffChatwootWorkbenchMessage } from "@/lib/staff-chatwoot-workbench";
+import { getEdenDeliveryIssue, type EdenDeliveryIssue } from "@/lib/eden-message-delivery";
 
 export type ConversationStage = "reply" | "patient" | "doctor" | "done";
 export const STAGE_LABELS: Record<ConversationStage, string> = {
@@ -39,12 +40,16 @@ export type EdenMessage = StaffChatwootWorkbenchMessage & {
   private: boolean;
   senderName: string;
   requestId?: string;
+  deliveryIssue?: EdenDeliveryIssue | null;
+  deleted?: boolean;
 };
 export type RawEdenMessage = RawChatwootHistoryMessage & {
   sender?: { name?: string };
   content_attributes?: NonNullable<
     RawChatwootHistoryMessage["content_attributes"]
   > & {
+    external_error?: string | null;
+    deleted?: boolean;
     eden_workspace?: { actor?: string; actorId?: string; requestId?: string };
   };
 };
@@ -92,6 +97,7 @@ export type EdenConversation = {
   assigneeId: number | null;
   assigneeName: string;
   state: WorkspaceState;
+  deliveryIssue?: EdenDeliveryIssue | null;
   contactHistory?: {
     id: number;
     stage: ConversationStage;
@@ -142,6 +148,8 @@ export function normalizeEdenMessages(raw: RawEdenMessage[]): EdenMessage[] {
         {
           ...normalized,
           private: message.private === true,
+          deliveryIssue: getEdenDeliveryIssue(message),
+          deleted: message.content_attributes?.deleted === true,
           senderName:
             message.content_attributes?.eden_workspace?.actor ||
             message.sender?.name ||
@@ -209,6 +217,7 @@ export function normalizeEdenConversation(
       Number(latest?.created_at) || raw.last_activity_at || raw.timestamp || 0,
     lastMessageId: latest?.id || 0,
     lastIncomingId,
+    deliveryIssue: latest ? getEdenDeliveryIssue(latest) : null,
     // First use inherits the existing inbox baseline instead of flagging all history.
     // After a staff member opens the conversation, their own cursor is authoritative.
     unread: readId > 0 ? lastIncomingId > readId : (raw.unread_count || 0) > 0,
