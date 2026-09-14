@@ -1,0 +1,134 @@
+.picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.trigger {
+  display: grid;
+  width: 32px;
+  height: 46px;
+  place-items: center;
+  border-radius: 10px;
+  background: transparent;
+  color: #6d8974;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.trigger:hover:not(:disabled),
+.trigger[aria-expanded="true"] {
+  background: #e2f0e3;
+  color: #17664b;
+}
+
+.trigger:disabled {
+  cursor: default;
+}
+
+.panel {
+  position: absolute;
+  right: -8px;
+  bottom: calc(100% + 8px);
+  z-index: 12;
+  width: min(312px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid #cfe1d0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(31, 72, 47, 0.18);
+  color: #25432d;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 11px 7px;
+  border-bottom: 1px solid #edf3eb;
+  color: #17664b;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.close {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 7px;
+  background: transparent;
+  color: #71917a;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.close:hover {
+  background: #edf6ed;
+  color: #17664b;
+}
+
+.groups {
+  max-height: min(300px, 48vh);
+  overflow-y: auto;
+  padding: 2px 9px 9px;
+  scrollbar-color: #bed7c1 transparent;
+}
+
+.group {
+  padding: 7px 0 3px;
+}
+
+.group + .group {
+  border-top: 1px solid #edf3eb;
+}
+
+.group h3 {
+  margin: 0 3px 4px;
+  color: #71917a;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.emoji {
+  display: grid;
+  min-width: 0;
+  min-height: 34px;
+  place-items: center;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+
+.emoji:hover,
+.emoji:focus-visible {
+  background: #e4f2e5;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 420px) {
+  .panel {
+    right: -5px;
+    width: min(300px, calc(100vw - 20px));
+  }
+
+  .emoji {
+    min-height: 36px;
+    font-size: 19px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger,
+  .emoji {
+    transition: none;
+  }
+}

@@ -709,6 +709,8 @@
   border-radius: 12px;
   box-shadow: 0 -8px 35px #223c211a;
   display: grid;
+  max-height: min(65vh, 440px);
+  overflow-y: auto;
   z-index: 4;
 }
 .quickReplies button {
@@ -720,6 +722,71 @@
 }
 .quickReplies button:hover {
   background: #eff5e9;
+}
+.cannedReplySuggestions {
+  position: absolute;
+  bottom: 100%;
+  left: 30px;
+  right: 30px;
+  max-height: min(65vh, 440px);
+  overflow-y: auto;
+  background: white;
+  padding: 8px;
+  border: 1px solid #dce6d8;
+  border-radius: 12px;
+  box-shadow: 0 -8px 35px #223c211a;
+  display: grid;
+  z-index: 5;
+}
+.cannedReplySuggestions button {
+  display: grid;
+  gap: 3px;
+  text-align: left;
+  padding: 10px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  background: white;
+}
+.cannedReplySuggestions button:hover,
+.cannedReplySuggestions button[aria-selected="true"] {
+  background: #eff5e9;
+}
+.cannedReplyCode {
+  color: #357356;
+  font-size: 11px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.cannedReplyPreview {
+  color: #617468;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+.cannedReplySuggestions button[aria-selected="true"] .cannedReplyPreview {
+  display: block;
+  max-height: min(35vh, 260px);
+  overflow-y: auto;
+  -webkit-line-clamp: unset;
+}
+.cannedReplyStatus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  color: #788979;
+  font-size: 11px;
+}
+.cannedReplyStatus button {
+  flex-shrink: 0;
+  padding: 3px 7px;
+  background: #eaf3e8;
+  color: #377354;
+  font-size: 11px;
 }
 .connection {
   display: flex;

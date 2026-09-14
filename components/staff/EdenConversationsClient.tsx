@@ -7,6 +7,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -44,9 +45,16 @@ import {
   type EdenConversation,
   type EdenMessage,
 } from "@/lib/eden-conversations";
+import {
+  filterStaffCannedReplies,
+  getCannedReplySlashToken,
+  replaceCannedReplySlashToken,
+  type StaffCannedReply,
+} from "@/lib/staff-canned-replies";
 import { resolveChatwootWorkbenchReplyParent } from "@/lib/staff-chatwoot-workbench";
 import { buildStaffPatientMessageText } from "@/lib/staff-patient-messages";
 import { NursePatientMessageClient } from "@/components/staff/NursePatientMessageClient";
+import { StaffEmojiPicker } from "@/components/staff/StaffEmojiPicker";
 import { CLINIC_BY_ID, PHYSICAL_CLINIC_IDS } from "@/shared/clinic-data";
 import styles from "./EdenConversationsClient.module.css";
 import { WhatsappForwardDialog } from "./WhatsappForwardDialog";
@@ -169,6 +177,12 @@ export function EdenConversationsClient() {
   const [notifications, setNotifications] = useState(false);
   const [menu, setMenu] = useState(false);
   const [quickReplies, setQuickReplies] = useState(false);
+  const [cannedReplies, setCannedReplies] = useState<StaffCannedReply[]>([]);
+  const [cannedRepliesLoading, setCannedRepliesLoading] = useState(false);
+  const [cannedRepliesFetched, setCannedRepliesFetched] = useState(false);
+  const [cannedRepliesError, setCannedRepliesError] = useState("");
+  const [cannedReplyActiveIndex, setCannedReplyActiveIndex] = useState(0);
+  const [cannedReplyDismissed, setCannedReplyDismissed] = useState(false);
   const [drawer, setDrawer] = useState<
     "handover" | "doctor" | "tools" | "followup" | null
   >(null);
@@ -203,6 +217,57 @@ export function EdenConversationsClient() {
   const seenIncoming = useRef<Map<number, number> | null>(null);
   const focusMessage = useRef<number | null>(null);
   const sw = useRef<ServiceWorkerRegistration | null>(null);
+  const cannedReplyRequest = useRef<Promise<void> | null>(null);
+  const cannedReplyOptionRefs = useRef<Map<number, HTMLButtonElement>>(
+    new Map(),
+  );
+
+  const loadCannedReplies = useCallback(async () => {
+    if (cannedRepliesFetched) return;
+    if (cannedReplyRequest.current) return cannedReplyRequest.current;
+
+    const request = (async () => {
+      setCannedRepliesLoading(true);
+      setCannedRepliesError("");
+      try {
+        const data = await api<{ replies?: StaffCannedReply[] }>(
+          "/api/staff/canned-replies",
+        );
+        setCannedReplies(Array.isArray(data.replies) ? data.replies : []);
+        setCannedRepliesFetched(true);
+      } catch (cause) {
+        setCannedRepliesError(
+          cause instanceof Error ? cause.message : "未能載入常用回覆。",
+        );
+      } finally {
+        setCannedRepliesLoading(false);
+      }
+    })();
+    cannedReplyRequest.current = request;
+    try {
+      await request;
+    } finally {
+      if (cannedReplyRequest.current === request)
+        cannedReplyRequest.current = null;
+    }
+  }, [cannedRepliesFetched]);
+
+  const slashToken =
+    !internal
+      ? getCannedReplySlashToken(
+          text,
+          textarea.current?.selectionStart ?? text.length,
+        )
+      : null;
+  const slashQuery = slashToken?.query ?? null;
+  const slashSuggestions = useMemo(
+    () => slashQuery === null
+      ? []
+      : filterStaffCannedReplies(cannedReplies, slashQuery),
+    [cannedReplies, slashQuery],
+  );
+  const hasSlashToken = Boolean(slashToken);
+  const showSlashSuggestions = Boolean(slashToken) && !cannedReplyDismissed;
 
   const notify = useCallback((incoming: EdenConversation[]) => {
     if (seenIncoming.current && notificationEnabled.current) {
@@ -361,6 +426,8 @@ export function EdenConversationsClient() {
     setError("");
     setInternal(false);
     setMenu(false);
+    setQuickReplies(false);
+    setCannedReplyDismissed(false);
     setDrawer(null);
     setForwardMessage(null);
     setNextBefore(null);
@@ -412,6 +479,22 @@ export function EdenConversationsClient() {
     const timer = window.setTimeout(() => setQuery(search), 300);
     return () => clearTimeout(timer);
   }, [search]);
+  useEffect(() => {
+    if (!quickReplies && !hasSlashToken) return;
+    void loadCannedReplies();
+  }, [quickReplies, hasSlashToken, loadCannedReplies]);
+  useEffect(() => {
+    setCannedReplyActiveIndex(0);
+    setCannedReplyDismissed(false);
+  }, [slashQuery]);
+  useEffect(() => {
+    if (!showSlashSuggestions || !slashSuggestions.length) return;
+    const item = slashSuggestions[cannedReplyActiveIndex];
+    if (!item) return;
+    cannedReplyOptionRefs.current.get(item.id)?.scrollIntoView({
+      block: "nearest",
+    });
+  }, [cannedReplyActiveIndex, showSlashSuggestions, slashQuery, slashSuggestions]);
   useEffect(() => {
     seenIncoming.current = null;
     listPages.current.clear();
@@ -551,6 +634,33 @@ export function EdenConversationsClient() {
     const key = `eden.conversation.draft:${actor?.id}:${activeId}:${value ? "note" : "reply"}`;
     draftKey.current = key;
     setText(getDraft(key));
+    setQuickReplies(false);
+    setCannedReplyDismissed(false);
+  }
+  function insertCannedReply(content: string) {
+    const currentText = text;
+    const cursor = textarea.current?.selectionStart ?? currentText.length;
+    const replacement = replaceCannedReplySlashToken(
+      currentText,
+      cursor,
+      content,
+    );
+    const nextValue =
+      replacement?.value ??
+      `${currentText.slice(0, cursor)}${content}${currentText.slice(cursor)}`;
+    const nextCursor = replacement?.cursor ?? cursor + content.length;
+    changeText(nextValue);
+    setQuickReplies(false);
+    setCannedReplyDismissed(true);
+    setCannedReplyActiveIndex(0);
+    requestAnimationFrame(() => {
+      const input = textarea.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(nextCursor, nextCursor);
+      input.style.height = "auto";
+      input.style.height = `${Math.min(input.scrollHeight, 150)}px`;
+    });
   }
   function chooseFile(value?: File) {
     if (!value) return;
@@ -1274,36 +1384,142 @@ export function EdenConversationsClient() {
                 <button
                   className={styles.quickToggle}
                   aria-expanded={quickReplies}
-                  onClick={() => setQuickReplies(!quickReplies)}
+                  onClick={() => {
+                    setQuickReplies(!quickReplies);
+                    setCannedReplyDismissed(true);
+                  }}
                 >
                   常用回覆
                   <ChevronDown size={13} />
                 </button>
               </div>
               {quickReplies && (
-                <div className={styles.quickReplies}>
-                  {QUICK_REPLIES.map((value) => (
+                <div
+                  className={styles.quickReplies}
+                  role="listbox"
+                  aria-label="Chatwoot 常用回覆"
+                >
+                  {cannedRepliesLoading && (
+                    <div className={styles.cannedReplyStatus} role="status">
+                      載入 Chatwoot 常用回覆…
+                    </div>
+                  )}
+                  {cannedReplies.map((item) => (
                     <button
-                      key={value}
-                      onClick={() => {
-                        changeText(value);
-                        setQuickReplies(false);
-                        textarea.current?.focus();
-                      }}
+                      key={`chatwoot-${item.id}`}
+                      type="button"
+                      role="option"
+                      aria-selected={false}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => insertCannedReply(item.content)}
                     >
-                      {value}
+                      <span className={styles.cannedReplyCode}>
+                        /{item.shortCode}
+                      </span>
+                      <span className={styles.cannedReplyPreview}>
+                        {item.content}
+                      </span>
                     </button>
                   ))}
+                  {!cannedReplies.length &&
+                    QUICK_REPLIES.map((value) => (
+                      <button
+                        key={`fallback-${value}`}
+                        type="button"
+                        role="option"
+                        aria-selected={false}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => insertCannedReply(value)}
+                      >
+                        {value}
+                      </button>
+                    ))}
                   <button
-                    onClick={() => {
-                      changeText(
+                    type="button"
+                    role="option"
+                    aria-selected={false}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() =>
+                      insertCannedReply(
                         `你好，可以喺以下連結選擇預約時間：\n${window.location.origin}/booking-whatsapp`,
-                      );
-                      setQuickReplies(false);
-                    }}
+                      )
+                    }
                   >
-                    預約連結
+                    <span className={styles.cannedReplyCode}>預約連結</span>
+                    <span className={styles.cannedReplyPreview}>
+                      開啟網上預約頁面
+                    </span>
                   </button>
+                  {!cannedRepliesLoading && cannedRepliesError && (
+                    <div className={styles.cannedReplyStatus} role="status">
+                      <span>Chatwoot 回覆暫時未能載入。</span>
+                      <button
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setCannedRepliesError("");
+                          void loadCannedReplies();
+                        }}
+                      >
+                        重試
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              {showSlashSuggestions && (
+                <div
+                  className={styles.cannedReplySuggestions}
+                  role="listbox"
+                  aria-label="搜尋常用回覆"
+                >
+                  {cannedRepliesLoading ? (
+                    <div className={styles.cannedReplyStatus} role="status">
+                      載入 Chatwoot 常用回覆…
+                    </div>
+                  ) : slashSuggestions.length ? (
+                    slashSuggestions.map((item, index) => (
+                      <button
+                        key={`slash-${item.id}`}
+                        type="button"
+                        role="option"
+                        aria-selected={index === cannedReplyActiveIndex}
+                        ref={(node) => {
+                          if (node)
+                            cannedReplyOptionRefs.current.set(item.id, node);
+                          else cannedReplyOptionRefs.current.delete(item.id);
+                        }}
+                        onMouseEnter={() => setCannedReplyActiveIndex(index)}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => insertCannedReply(item.content)}
+                      >
+                        <span className={styles.cannedReplyCode}>
+                          /{item.shortCode}
+                        </span>
+                        <span className={styles.cannedReplyPreview}>
+                          {item.content}
+                        </span>
+                      </button>
+                    ))
+                  ) : cannedRepliesError ? (
+                    <div className={styles.cannedReplyStatus} role="status">
+                      <span>Chatwoot 回覆暫時未能載入。</span>
+                      <button
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setCannedRepliesError("");
+                          void loadCannedReplies();
+                        }}
+                      >
+                        重試
+                      </button>
+                    </div>
+                  ) : (
+                    <div className={styles.cannedReplyStatus} role="status">
+                      未有相符回覆
+                    </div>
+                  )}
                 </div>
               )}
               {reply && (
@@ -1385,6 +1601,40 @@ export function EdenConversationsClient() {
                     }
                   }}
                   onKeyDown={(e) => {
+                    if (!internal && showSlashSuggestions) {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setCannedReplyDismissed(true);
+                        return;
+                      }
+                      if (e.key === "ArrowDown" && slashSuggestions.length) {
+                        e.preventDefault();
+                        setCannedReplyActiveIndex(
+                          (current) => (current + 1) % slashSuggestions.length,
+                        );
+                        return;
+                      }
+                      if (e.key === "ArrowUp" && slashSuggestions.length) {
+                        e.preventDefault();
+                        setCannedReplyActiveIndex(
+                          (current) =>
+                            (current - 1 + slashSuggestions.length) %
+                            slashSuggestions.length,
+                        );
+                        return;
+                      }
+                      if (
+                        e.key === "Enter" &&
+                        !e.shiftKey &&
+                        !e.nativeEvent.isComposing
+                      ) {
+                        e.preventDefault();
+                        const selected =
+                          slashSuggestions[cannedReplyActiveIndex];
+                        if (selected) insertCannedReply(selected.content);
+                        return;
+                      }
+                    }
                     if (
                       e.key === "Enter" &&
                       !e.shiftKey &&
@@ -1395,6 +1645,12 @@ export function EdenConversationsClient() {
                       void send();
                     }
                   }}
+                />
+                <StaffEmojiPicker
+                  textareaRef={textarea}
+                  value={text}
+                  onChange={changeText}
+                  disabled={sending || (!internal && !active?.canReply)}
                 />
                 <button
                   className={styles.send}

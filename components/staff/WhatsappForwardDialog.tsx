@@ -5,7 +5,7 @@ import { FileText, Forward, X } from "lucide-react";
 import type { EdenMessage } from "@/lib/eden-conversations";
 import {
   forwardDeliveryLabel,
-  type WhatsappForwardDoctor,
+  type WhatsappForwardRecipient,
   type WhatsappForwardPreview,
   type WhatsappForwardResult,
 } from "@/lib/eden-whatsapp-forward";
@@ -19,6 +19,16 @@ type Props = {
   request: <T>(url: string, init?: RequestInit) => Promise<T>;
 };
 
+function recipientKindLabel(kind: WhatsappForwardRecipient["kind"]): string {
+  if (kind === "doctor") return "醫師";
+  if (kind === "branch") return "分店";
+  return "同事";
+}
+
+function recipientOptionLabel(recipient: WhatsappForwardRecipient): string {
+  return `${recipient.name} · ${recipientKindLabel(recipient.kind)} · ${recipient.phone}`;
+}
+
 export function WhatsappForwardDialog({
   conversationId,
   actorId,
@@ -26,8 +36,8 @@ export function WhatsappForwardDialog({
   onClose,
   request,
 }: Props) {
-  const [doctors, setDoctors] = useState<WhatsappForwardDoctor[]>([]);
-  const [doctorId, setDoctorId] = useState("");
+  const [recipients, setRecipients] = useState<WhatsappForwardRecipient[]>([]);
+  const [recipientId, setRecipientId] = useState("");
   const [preview, setPreview] = useState<WhatsappForwardPreview | null>(null);
   const [result, setResult] = useState<WhatsappForwardResult | null>(null);
   const [error, setError] = useState("");
@@ -40,9 +50,12 @@ export function WhatsappForwardDialog({
 
   useEffect(() => {
     let current = true;
-    void request<{ doctors: WhatsappForwardDoctor[] }>(base)
+    void request<{
+      recipients?: WhatsappForwardRecipient[];
+      doctors?: WhatsappForwardRecipient[];
+    }>(base)
       .then((data) => {
-        if (current) setDoctors(data.doctors);
+        if (current) setRecipients(data.recipients || data.doctors || []);
       })
       .catch((e) => {
         if (current) setError(e.message);
@@ -60,10 +73,10 @@ export function WhatsappForwardDialog({
     setPreview(null);
     setResult(null);
     setError("");
-    if (!doctorId) return;
+    if (!recipientId) return;
     setLoading(true);
     void request<{ preview: WhatsappForwardPreview }>(
-      `${base}?messageId=${message.id}&doctorId=${encodeURIComponent(doctorId)}`,
+      `${base}?messageId=${message.id}&doctorId=${encodeURIComponent(recipientId)}`,
     )
       .then((data) => {
         if (current) setPreview(data.preview);
@@ -77,7 +90,7 @@ export function WhatsappForwardDialog({
     return () => {
       current = false;
     };
-  }, [base, doctorId, message.id, request]);
+  }, [base, message.id, recipientId, request]);
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -150,7 +163,9 @@ export function WhatsappForwardDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messageId: message.id,
-          doctorId,
+          // Keep the API/database field name for compatibility with existing
+          // idempotency records; the chooser itself is recipient-oriented.
+          doctorId: recipientId,
           token: preview.token,
           requestId,
         }),
@@ -182,22 +197,22 @@ export function WhatsappForwardDialog({
           </button>
         </header>
         <label className={styles.forwardRecipient}>
-          收件醫師
+          收件人
           <select
-            value={doctorId}
+            value={recipientId}
             disabled={sending}
-            onChange={(e) => setDoctorId(e.target.value)}
+            onChange={(e) => setRecipientId(e.target.value)}
           >
-            <option value="">揀醫師</option>
-            {doctors.map((doctor) => (
-              <option key={doctor.id} value={doctor.id}>
-                {doctor.name} · {doctor.phone}
+            <option value="">揀收件人</option>
+            {recipients.map((recipient) => (
+              <option key={recipient.id} value={recipient.id}>
+                {recipientOptionLabel(recipient)}
               </option>
             ))}
           </select>
         </label>
-        {!loading && !doctors.length && !error && (
-          <p>未設定醫師 WhatsApp 號碼。</p>
+        {!loading && !recipients.length && !error && (
+          <p>未設定 WhatsApp 轉寄收件人。</p>
         )}
         {loading && <p role="status">載入中…</p>}
         <div className={styles.followupPreview}>
@@ -229,7 +244,7 @@ export function WhatsappForwardDialog({
           <div role="status" className={styles.forwardResult}>
             <p>{forwardDeliveryLabel(result.status)}</p>
             <a href={`/conversations?id=${result.conversationId}`}>
-              查看醫師 WhatsApp 對話
+              查看收件人 WhatsApp 對話
             </a>
           </div>
         ) : (
@@ -241,7 +256,7 @@ export function WhatsappForwardDialog({
             onClick={() => void send()}
           >
             <Forward size={18} />
-            {sending ? "發送中…" : "發送到醫師 WhatsApp"}
+            {sending ? "發送中…" : "發送到收件人 WhatsApp"}
           </button>
         )}
       </section>

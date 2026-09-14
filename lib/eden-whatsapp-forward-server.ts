@@ -13,12 +13,12 @@ import {
   type RawEdenConversation,
 } from "@/lib/eden-conversations";
 import {
-  getWhatsappForwardDoctors,
   forwardMessageText,
   templateForwardText,
   type WhatsappForwardPreview,
   type WhatsappForwardResult,
 } from "@/lib/eden-whatsapp-forward";
+import { getWhatsappForwardRecipients } from "@/lib/eden-whatsapp-forward-config";
 
 type ForwardInput = { messageId: number; doctorId: string };
 type ForwardRecord = {
@@ -62,7 +62,7 @@ export function createForwardLedger(): ForwardLedger {
         .update({ message_id: messageIds.at(-1), message_ids: messageIds })
         .eq("request_id", id);
       if (error)
-        throw new AuthError(502, "訊息已提交，請查看醫師對話確認狀態。");
+        throw new AuthError(502, "訊息已提交，請查看收件人對話確認狀態。");
     },
   };
 }
@@ -73,10 +73,10 @@ async function prepare(
   sourceId: number,
   input: ForwardInput,
 ) {
-  const doctor = getWhatsappForwardDoctors().find(
+  const recipient = getWhatsappForwardRecipients().find(
     (d) => d.id === input.doctorId,
   );
-  if (!doctor) throw new AuthError(400, "請選擇已設定 WhatsApp 嘅醫師。");
+  if (!recipient) throw new AuthError(400, "請選擇已設定 WhatsApp 嘅收件人。");
   if (!Number.isSafeInteger(input.messageId) || input.messageId <= 0)
     throw new AuthError(400, "訊息編號無效。");
   const source = await getConversation(ctx, sourceId);
@@ -97,9 +97,9 @@ async function prepare(
     throw new AuthError(400, "搵唔到可轉寄嘅訊息。內部備註不會轉寄。");
   const contacts = await conversationRequest<{
     payload: { id: number; phone_number?: string }[];
-  }>(ctx, `/contacts/search?q=${encodeURIComponent(digits(doctor.phone))}`);
+  }>(ctx, `/contacts/search?q=${encodeURIComponent(digits(recipient.phone))}`);
   const matches = contacts.payload.filter(
-    (c) => digits(c.phone_number) === digits(doctor.phone),
+    (c) => digits(c.phone_number) === digits(recipient.phone),
   );
   const lists = await Promise.all(
     matches.map((c) =>
@@ -120,19 +120,19 @@ async function prepare(
   if (!candidate)
     throw new AuthError(
       409,
-      "未有此醫師與診所嘅 WhatsApp 對話，請醫師先 WhatsApp 診所。",
+      "未有此收件人與診所嘅 WhatsApp 對話，請收件人先 WhatsApp 診所。",
     );
   const target = await getConversation(ctx, candidate.id);
   if (
     target.inbox_id !== source.inbox_id ||
-    digits(target.meta?.sender?.phone_number) !== digits(doctor.phone)
+    digits(target.meta?.sender?.phone_number) !== digits(recipient.phone)
   )
-    throw new AuthError(409, "醫師收件號碼有更新，請重新選擇。");
+    throw new AuthError(409, "收件號碼有更新，請重新選擇。");
   if (
     target.id === source.id ||
-    digits(source.meta?.sender?.phone_number) === digits(doctor.phone)
+    digits(source.meta?.sender?.phone_number) === digits(recipient.phone)
   )
-    throw new AuthError(400, "呢段已經係該醫師嘅 WhatsApp 對話。");
+    throw new AuthError(400, "呢段已經係該收件人嘅 WhatsApp 對話。");
   const content = forwardMessageText(
     source.meta?.sender?.name || "病人",
     source.meta?.sender?.phone_number || "",
@@ -144,9 +144,9 @@ async function prepare(
   const parameter = templateForwardText(content);
   if (mode === "template") {
     if (normalized.attachments.length)
-      reason = "醫師需要先回覆診所 WhatsApp，先可以轉寄圖片、語音或檔案。";
+      reason = "收件人需要先回覆診所 WhatsApp，先可以轉寄圖片、語音或檔案。";
     else if (parameter.length > 900)
-      reason = "訊息較長，需要醫師先回覆診所 WhatsApp，先可以完整轉寄。";
+      reason = "訊息較長，需要收件人先回覆診所 WhatsApp，先可以完整轉寄。";
     else {
       const inbox = await conversationRequest<{
         message_templates?: {
@@ -167,7 +167,7 @@ async function prepare(
         template.components?.find((c) => c.type === "BODY")?.text !==
           "你好，以下是診所給你的跟進訊息：\n\n{{1}}\n\n如有問題，請直接回覆此 WhatsApp。"
       )
-        reason = "暫時未能使用診所 WhatsApp 通知，請醫師先回覆診所。";
+        reason = "暫時未能使用診所 WhatsApp 通知，請收件人先回覆診所。";
     }
   }
   if (content.length > 4096)
@@ -183,7 +183,7 @@ async function prepare(
         account: ctx.accountId,
         source: source.id,
         message: input.messageId,
-        doctor,
+        doctor: recipient,
         target: target.id,
         content: visibleContent,
         mode,
@@ -192,7 +192,7 @@ async function prepare(
     )
     .digest("hex");
   const preview: WhatsappForwardPreview = {
-    doctor,
+    doctor: recipient,
     sourceMessageId: input.messageId,
     destinationId: target.id,
     content: visibleContent,
@@ -307,7 +307,7 @@ async function readResult(
   if (!messages.length)
     throw new AuthError(
       409,
-      "呢次轉寄已提交，正在確認結果；請查看醫師對話，唔好重複發送。",
+      "呢次轉寄已提交，正在確認結果；請查看收件人對話，唔好重複發送。",
     );
   const partial = messages.length < (record.part_count || 1);
   const status = partial
@@ -424,7 +424,7 @@ export async function sendWhatsappForward(
     form.append("attachments[]", file, file.name);
     bodies.push(form);
   }
-  // Keep doctor replies in the staff inbox instead of triggering the patient bot.
+  // Keep recipient replies in the staff inbox instead of triggering the patient bot.
   await conversationRequest(
     ctx,
     `/conversations/${target.id}/custom_attributes`,
