@@ -5,7 +5,7 @@ import {
   getConversation,
   requireConversationContext,
 } from "@/lib/eden-conversations-server";
-import { getWhatsappForwardDoctors } from "@/lib/eden-whatsapp-forward";
+import { getWhatsappForwardRecipients } from "@/lib/eden-whatsapp-forward-config";
 import {
   previewWhatsappForward,
   sendWhatsappForward,
@@ -29,7 +29,7 @@ function failure(error: unknown) {
       error:
         error instanceof AuthError
           ? error.message
-          : "未能確認轉寄狀態，請查看醫師對話。",
+          : "未能確認轉寄狀態，請查看收件人對話。",
     },
     error instanceof AuthError ? error.status : 502,
   );
@@ -42,12 +42,16 @@ export async function GET(
   try {
     const ctx = await requireConversationContext();
     await getConversation(ctx, Number(params.id));
-    if (!request.nextUrl.searchParams.has("doctorId"))
-      return json({ doctors: getWhatsappForwardDoctors() });
+    if (!request.nextUrl.searchParams.has("doctorId")) {
+      const recipients = getWhatsappForwardRecipients();
+      // Keep `doctors` temporarily for older Eden Tools bundles; both keys
+      // contain the same server-allowlisted recipients.
+      return json({ recipients, doctors: recipients });
+    }
     const input = inputSchema.safeParse(
       Object.fromEntries(request.nextUrl.searchParams),
     );
-    if (!input.success) throw new AuthError(400, "請選擇訊息及醫師。");
+    if (!input.success) throw new AuthError(400, "請選擇訊息及收件人。");
     return json({
       preview: await previewWhatsappForward(ctx, Number(params.id), input.data),
     });

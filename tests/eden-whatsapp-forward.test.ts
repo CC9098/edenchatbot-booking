@@ -4,6 +4,7 @@ import {
   getWhatsappForwardDoctors,
   forwardDeliveryLabel,
 } from "@/lib/eden-whatsapp-forward";
+import { getWhatsappForwardRecipients } from "@/lib/eden-whatsapp-forward-config";
 import {
   previewWhatsappForward,
   sendWhatsappForward,
@@ -193,6 +194,21 @@ test("only explicitly configured doctor recipients appear; legacy clinic notific
     ["chan", "lee", "hon"],
   );
   assert.equal(list[0].name, "陳家富醫師");
+});
+test("server recipient allowlist exposes the six doctor, branch, and staff WhatsApp destinations", () => {
+  assert.deepEqual(getWhatsappForwardRecipients({}), [
+    {
+      id: "cheungmy",
+      name: "張敏言醫師",
+      kind: "doctor",
+      phone: "+85295850430",
+    },
+    { id: "jordan", name: "佐敦", kind: "branch", phone: "+85259293042" },
+    { id: "central", name: "中環", kind: "branch", phone: "+85259269537" },
+    { id: "yanzi", name: "燕子", kind: "staff", phone: "+85296563420" },
+    { id: "mingwai", name: "明惠", kind: "staff", phone: "+85296094966" },
+    { id: "ling", name: "ling", kind: "staff", phone: "+85261567366" },
+  ]);
 });
 test("preview resolves the exact doctor phone without writes or a doctor staff account", async () =>
   fixture(async (f) => {

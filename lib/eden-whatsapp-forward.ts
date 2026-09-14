@@ -1,8 +1,18 @@
 import { DOCTORS } from "@/shared/clinic-data";
 
-export type WhatsappForwardDoctor = { id: string; name: string; phone: string };
+export type WhatsappForwardRecipientKind = "doctor" | "branch" | "staff";
+export type WhatsappForwardRecipient = {
+  id: string;
+  name: string;
+  kind: WhatsappForwardRecipientKind;
+  phone: string;
+};
+
+// Kept as an alias while the server request/ledger still uses the original
+// doctorId/doctor_id names. New UI copy should call these recipients.
+export type WhatsappForwardDoctor = WhatsappForwardRecipient;
 export type WhatsappForwardPreview = {
-  doctor: WhatsappForwardDoctor;
+  doctor: WhatsappForwardRecipient;
   sourceMessageId: number;
   destinationId: number;
   content: string;
@@ -17,7 +27,9 @@ export type WhatsappForwardResult = {
   status: string;
 };
 
-// Phone numbers are private deployment configuration, never part of the public bundle.
+// Legacy environment-only doctor configuration. The operational recipient
+// allowlist, including the six staff/branch entries, lives in the server-only
+// config module so these phone numbers can never enter the browser bundle.
 export function getWhatsappForwardDoctors(
   env: Record<string, string | undefined> = process.env,
 ): WhatsappForwardDoctor[] {
@@ -25,7 +37,7 @@ export function getWhatsappForwardDoctors(
     const phone =
       env[`DOCTOR_FORWARD_WHATSAPP_${doctor.id.toUpperCase()}`]?.trim();
     return phone && /^\+[1-9]\d{7,14}$/.test(phone)
-      ? [{ id: doctor.id, name: doctor.nameZh, phone }]
+      ? [{ id: doctor.id, name: doctor.nameZh, kind: "doctor", phone }]
       : [];
   });
 }
@@ -54,10 +66,10 @@ export function templateForwardText(content: string) {
 }
 
 export function forwardDeliveryLabel(status: string) {
-  if (status === "read") return "醫師已讀";
-  if (status === "delivered") return "已送達醫師 WhatsApp";
+  if (status === "read") return "收件人已讀";
+  if (status === "delivered") return "已送達收件人 WhatsApp";
   if (status === "partial")
-    return "只確認到部分訊息，請查看醫師對話及附件，唔好重複轉寄。";
-  if (status === "failed") return "WhatsApp 未能送出，請查看醫師對話。";
+    return "只確認到部分訊息，請查看收件人對話及附件，唔好重複轉寄。";
+  if (status === "failed") return "WhatsApp 未能送出，請查看收件人對話。";
   return "已提交，等候 WhatsApp 送達。";
 }
