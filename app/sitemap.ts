@@ -12,6 +12,7 @@ const staticRoutes = [
   "/chat",
   "/courses",
   "/dr-wong",
+  "/dr-lee-chin-lam",
   "/generalized-anxiety-disorder-gad7",
   "/manage-booking",
 ] as const;
