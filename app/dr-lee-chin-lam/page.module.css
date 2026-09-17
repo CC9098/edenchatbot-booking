@@ -64,14 +64,15 @@
 .section > h2 { margin-top: 30px; }
 .seriesSection { border-bottom: 1px solid var(--line); }
 .seriesIntro { max-width: 660px; margin: 0 0 32px; font-size: 15px; line-height: 1.95; color: var(--muted); }
-.seriesGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; list-style: none; padding: 0; margin: 0; }
+.seriesGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 48px; list-style: none; padding: 0; margin: 0; }
 .seriesGrid > li { min-width: 0; }
-.seriesCard { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: #fffef9; border: 1px solid var(--line); border-radius: 8px; transition: border-color .2s; }
-.seriesCard:hover { border-color: #698467; }
-.seriesImage { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-bottom: 1px solid var(--line); background: #f4f0e6; }
-.seriesCardBody { display: flex; flex: 1; flex-direction: column; padding: 30px; }
-.seriesCard h3 { font-size: 22px; font-weight: 500; line-height: 1.65; margin: 16px 0 14px; }
-.seriesCardBody > p { color: var(--muted); font-size: 14px; line-height: 1.95; margin: 0 0 28px; }
+.seriesCard { display: grid; grid-template-columns: minmax(0, 1fr) 136px; gap: 24px; align-items: start; height: 100%; padding: 28px 0; border-top: 1px solid var(--line); }
+.seriesCard:hover h3 { text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
+.seriesImage { display: block; width: 136px; height: 112px; object-fit: cover; border-radius: 4px; margin-top: 28px; background: #f4f0e6; }
+.seriesCardBody { display: flex; flex-direction: column; min-width: 0; }
+.seriesCard h3 { font-size: 25px; font-weight: 700; line-height: 1.45; letter-spacing: -.025em; margin: 12px 0 10px; text-wrap: pretty; }
+.seriesCardBody > p { color: var(--muted); font-size: 14px; line-height: 1.75; margin: 0 0 20px; }
+.seriesCard .articleLink { align-self: flex-start; }
 .seriesCredit { margin: 22px 0 0; color: var(--muted); font-size: 11px; line-height: 1.8; }
 .topicButtons { display: flex; flex-wrap: wrap; gap: 10px; margin: 32px 0; }
 .topicButtons button { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 48px; background: transparent; border: 1px solid #c5cdbf; border-radius: 4px; padding: 12px 20px; font: inherit; font-size: 14px; color: var(--ink); cursor: pointer; }
@@ -117,6 +118,9 @@
   .featureGrid { gap: 40px; }
   .doctorSection { gap: 45px; }
   .desktopBreak { display: none; }
+  .seriesGrid { column-gap: 28px; }
+  .seriesCard { grid-template-columns: minmax(0, 1fr) 104px; gap: 18px; }
+  .seriesImage { width: 104px; height: 96px; }
 }
 @media (max-width: 700px) {
   .page { padding: 0 20px; }
@@ -126,31 +130,38 @@
   .brandEnglish { font-size: 8px; }
   .navigation > a:not(.navBooking) { display: none; }
   .navigation .navBooking { font-size: 11px; gap: 4px; }
-  .hero { grid-template-columns: 1fr; padding: 42px 0; gap: 35px; }
+  .hero { grid-template-columns: 1fr; padding: 24px 0 36px; gap: 24px; }
   .hero h1 { font-size: clamp(39px, 10vw, 55px); }
   .hero h1 span { text-decoration-thickness: 5px; }
-  .hero .eyebrow { font-size: 12px; margin-bottom: 22px; }
-  .heroSubtitle { font-size: 22px; margin: 25px 0 16px; }
-  .heroDescription { font-size: 14px; }
-  .actions { gap: 8px 20px; margin-top: 24px; }
+  .hero .eyebrow { display: none; }
+  .heroSubtitle { font-size: 21px; margin: 20px 0 12px; }
+  .heroDescription { font-size: 14px; margin: 0; }
+  .actions { gap: 8px 20px; margin-top: 20px; }
   .primaryButton { padding: 12px 17px; font-size: 13px; gap: 12px; }
   .textButton { font-size: 12px; }
-  .heroFootnote { margin-top: 24px; }
-  .portraitCard { max-width: 390px; justify-self: center; padding: 12px 12px 0; }
-  .portraitFrame { aspect-ratio: 1 / .92; }
+  .heroFootnote { display: none; }
+  .portraitCard { grid-row: 1; display: flex; align-items: center; gap: 18px; max-width: none; padding: 0; border-radius: 0; background: transparent; }
+  .portraitFrame { width: 96px; height: 104px; flex-shrink: 0; aspect-ratio: auto; border-radius: 48px 48px 4px 4px; }
   .portraitFrame img { object-position: center 38%; }
-  .portraitCaption { padding: 18px 12px 22px; }
-  .portraitCaption h2 { font-size: 23px; }
+  .portraitCaption { flex: 1; gap: 8px; padding: 0; }
+  .portraitCaption p { font-size: 9px; }
+  .portraitCaption h2 { font-size: 24px; font-weight: 600; letter-spacing: .06em; }
+  .portraitCaption h2 span { display: block; margin: 7px 0 0; font-size: 12px; font-weight: 400; }
+  .portraitCaption > a { width: 36px; height: 44px; border: 0; }
   .feature { padding: 26px 24px 20px; }
   .featureGrid { grid-template-columns: 1fr; gap: 30px; padding: 28px 0 20px; }
   .feature h2, .section > h2, .faqGrid h2 { font-size: 29px; }
   .featureLink { font-size: 13px; gap: 8px; margin-top: 15px; }
   .section { padding: 48px 0; }
   .sectionLabel { font-size: 10px; padding-bottom: 18px; }
-  .seriesIntro { font-size: 14px; margin-bottom: 24px; }
-  .seriesGrid { grid-template-columns: 1fr; gap: 14px; }
-  .seriesCardBody { padding: 24px; }
-  .seriesCard h3 { font-size: 20px; }
+  .seriesSection > h2 { font-size: 27px; line-height: 1.4; margin: 24px 0 12px; text-wrap: balance; }
+  .seriesIntro { font-size: 14px; margin-bottom: 22px; }
+  .seriesGrid { grid-template-columns: 1fr; gap: 0; }
+  .seriesCard { grid-template-columns: minmax(0, 1fr) 88px; gap: 18px; padding: 22px 0; }
+  .seriesImage { width: 88px; height: 80px; margin-top: 28px; }
+  .seriesCard h3 { font-size: 22px; margin: 10px 0 8px; }
+  .seriesCardBody > p { font-size: 13px; margin-bottom: 14px; }
+  .seriesCard .articleCategory { font-size: 10px; letter-spacing: .04em; }
   .topicButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 25px 0; }
   .topicButtons button { padding: 11px 8px; font-size: 13px; gap: 8px; }
   .readingPanel h3 { font-size: 21px; }

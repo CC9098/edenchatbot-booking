@@ -92,10 +92,10 @@ export default function DrLeePage() {
         </div>
         <div className={styles.portraitCard}>
           <div className={styles.portraitFrame}>
-            <Image src={portrait} alt="李芊霖中醫師肖像" width={512} height={512} priority sizes="(max-width: 700px) 88vw, 410px" />
+            <Image src={portrait} alt="李芊霖中醫師肖像" width={512} height={512} priority sizes="(max-width: 700px) 96px, 410px" />
           </div>
           <div className={styles.portraitCaption}>
-            <div><p>DR. LEE</p><h2>李芊霖<span>中醫師</span></h2></div>
+            <div><p>DR. LEE</p><h2>李芊霖<span>註冊中醫師</span></h2></div>
             <a href="#doctor" aria-label="認識李芊霖中醫師"><ArrowDown size={22} aria-hidden="true" /></a>
           </div>
         </div>
@@ -120,19 +120,19 @@ export default function DrLeePage() {
 
       <section id="series" className={`${styles.section} ${styles.seriesSection}`} aria-labelledby="series-title">
         <div className={styles.sectionLabel}><span>02 / 系列閱讀</span><span>四篇，逐步了解</span></div>
-        <h2 id="series-title">理解壓力<br />與感官負荷。</h2>
-        <p className={styles.seriesIntro}>從社交後的疲倦，到睡眠、日常環境與親友相處，逐步認識自己的需要。</p>
+        <h2 id="series-title">理解壓力與感官負荷</h2>
+        <p className={styles.seriesIntro}>從身體感受、日常調整，到與親友相處。</p>
         <ol className={styles.seriesGrid}>
           {seriesArticles.map((article) => (
             <li key={article.order}>
               <a className={styles.seriesCard} href={article.href}>
-                <Image className={styles.seriesImage} src={article.image} alt="" width={960} height={640} sizes="(max-width: 700px) calc(100vw - 40px), (max-width: 1224px) calc((100vw - 84px) / 2), 570px" />
                 <div className={styles.seriesCardBody}>
                   <span className={styles.articleCategory}>{article.order} / {article.label}</span>
                   <h3>{article.title}</h3>
                   <p>{article.description}</p>
                   <span className={styles.articleLink}>閱讀全文 <ArrowUpRight size={16} aria-hidden="true" /></span>
                 </div>
+                <Image className={styles.seriesImage} src={article.image} alt="" width={960} height={640} sizes="(max-width: 700px) 88px, (max-width: 1000px) 104px, 136px" />
               </a>
             </li>
           ))}
