@@ -102,7 +102,7 @@ export default function DrLeePage() {
       </section>
 
       <section id="autonomic" className={styles.feature} aria-labelledby="autonomic-title">
-        <div className={styles.sectionLabel}><span>01 / 專題閱讀</span><span>自律神經</span></div>
+        <div className={styles.sectionLabel}><span>專題閱讀</span><span>自律神經</span></div>
         <div className={styles.featureGrid}>
           <div>
             <h2 id="autonomic-title">身體的訊號，<br />可以從哪裏看起？</h2>
@@ -119,7 +119,7 @@ export default function DrLeePage() {
       </section>
 
       <section id="series" className={`${styles.section} ${styles.seriesSection}`} aria-labelledby="series-title">
-        <div className={styles.sectionLabel}><span>02 / 系列閱讀</span><span>四篇，逐步了解</span></div>
+        <div className={styles.sectionLabel}><span>系列閱讀</span><span>四篇，逐步了解</span></div>
         <h2 id="series-title">理解壓力與感官負荷</h2>
         <p className={styles.seriesIntro}>從身體感受、日常調整，到與親友相處。</p>
         <ol className={styles.seriesGrid}>
@@ -141,14 +141,14 @@ export default function DrLeePage() {
       </section>
 
       <section id="reading" className={styles.section} aria-labelledby="reading-title">
-        <div className={styles.sectionLabel}><span>03 / 李醫師文章選讀</span><a href={blogHref}>所有文章 <ArrowUpRight size={15} aria-hidden="true" /></a></div>
+        <div className={styles.sectionLabel}><span>李醫師文章選讀</span><a href={blogHref}>所有文章 <ArrowUpRight size={15} aria-hidden="true" /></a></div>
         <h2 id="reading-title">由你關心的問題，<br />繼續讀下去。</h2>
         <ReadingGuide />
       </section>
 
       <section id="doctor" className={`${styles.section} ${styles.doctorSection}`} aria-labelledby="doctor-title">
         <div className={styles.doctorIntro}>
-          <p className={styles.eyebrow}>04 / 醫師簡介</p>
+          <p className={styles.eyebrow}>醫師簡介</p>
           <h2 id="doctor-title">李芊霖<span>註冊中醫師</span></h2>
           <p>李醫師的文章涵蓋自律神經、睡眠、飲食及婦科等健康題目，從中醫角度介紹疾病知識與日常生活的關係。</p>
           <a href={teamHref} className={styles.textButton}>查看診所醫師資料 <ArrowUpRight size={17} aria-hidden="true" /></a>
