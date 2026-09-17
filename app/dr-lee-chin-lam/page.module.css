@@ -66,10 +66,12 @@
 .seriesIntro { max-width: 660px; margin: 0 0 32px; font-size: 15px; line-height: 1.95; color: var(--muted); }
 .seriesGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; list-style: none; padding: 0; margin: 0; }
 .seriesGrid > li { min-width: 0; }
-.seriesCard { display: flex; flex-direction: column; height: 100%; padding: 30px; background: #fffef9; border: 1px solid var(--line); border-radius: 8px; transition: border-color .2s; }
+.seriesCard { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: #fffef9; border: 1px solid var(--line); border-radius: 8px; transition: border-color .2s; }
 .seriesCard:hover { border-color: #698467; }
+.seriesImage { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-bottom: 1px solid var(--line); background: #f4f0e6; }
+.seriesCardBody { display: flex; flex: 1; flex-direction: column; padding: 30px; }
 .seriesCard h3 { font-size: 22px; font-weight: 500; line-height: 1.65; margin: 16px 0 14px; }
-.seriesCard > p { color: var(--muted); font-size: 14px; line-height: 1.95; margin: 0 0 28px; }
+.seriesCardBody > p { color: var(--muted); font-size: 14px; line-height: 1.95; margin: 0 0 28px; }
 .seriesCredit { margin: 22px 0 0; color: var(--muted); font-size: 11px; line-height: 1.8; }
 .topicButtons { display: flex; flex-wrap: wrap; gap: 10px; margin: 32px 0; }
 .topicButtons button { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 48px; background: transparent; border: 1px solid #c5cdbf; border-radius: 4px; padding: 12px 20px; font: inherit; font-size: 14px; color: var(--ink); cursor: pointer; }
@@ -147,7 +149,7 @@
   .sectionLabel { font-size: 10px; padding-bottom: 18px; }
   .seriesIntro { font-size: 14px; margin-bottom: 24px; }
   .seriesGrid { grid-template-columns: 1fr; gap: 14px; }
-  .seriesCard { padding: 24px; }
+  .seriesCardBody { padding: 24px; }
   .seriesCard h3 { font-size: 20px; }
   .topicButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 25px 0; }
   .topicButtons button { padding: 11px 8px; font-size: 13px; gap: 8px; }
