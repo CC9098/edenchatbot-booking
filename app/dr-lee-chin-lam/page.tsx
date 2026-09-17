@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowDown, ArrowRight, ArrowUpRight, CalendarDays, Plus } from "lucide-react";
 import { jsonLd, publicUrl, SITE_NAME } from "@/lib/structured-data";
 import { ReadingGuide } from "./ReadingGuide";
+import { seriesArticles } from "./series-articles";
 import styles from "./page.module.css";
 
 const pagePath = "/dr-lee-chin-lam";
@@ -70,6 +71,7 @@ export default function DrLeePage() {
           <span>醫天圓<span className={styles.brandEnglish}>EDEN TCM CLINIC</span></span>
         </a>
         <nav aria-label="頁面導覽" className={styles.navigation}>
+          <a href="#series">系列閱讀</a>
           <a href="#reading">閱讀專題</a>
           <a href="#doctor">醫師簡介</a>
           <Link href={bookingHref} className={styles.navBooking} prefetch={false}>查看應診時段 <ArrowUpRight size={15} aria-hidden="true" /></Link>
@@ -116,15 +118,34 @@ export default function DrLeePage() {
         <p className={styles.medicalNote}>如有突發或持續嚴重胸痛、呼吸困難或暈厥，應立即求醫。</p>
       </section>
 
+      <section id="series" className={`${styles.section} ${styles.seriesSection}`} aria-labelledby="series-title">
+        <div className={styles.sectionLabel}><span>02 / 系列閱讀</span><span>四篇，逐步了解</span></div>
+        <h2 id="series-title">理解壓力<br />與感官負荷。</h2>
+        <p className={styles.seriesIntro}>從社交後的疲倦，到睡眠、日常環境與親友相處，逐步認識自己的需要。</p>
+        <ol className={styles.seriesGrid}>
+          {seriesArticles.map((article) => (
+            <li key={article.order}>
+              <a className={styles.seriesCard} href={article.href}>
+                <span className={styles.articleCategory}>{article.order} / {article.label}</span>
+                <h3>{article.title}</h3>
+                <p>{article.description}</p>
+                <span className={styles.articleLink}>閱讀全文 <ArrowUpRight size={16} aria-hidden="true" /></span>
+              </a>
+            </li>
+          ))}
+        </ol>
+        <p className={styles.seriesCredit}>由李芊霖醫師〈Asper Girls〉原文延伸整理 · 醫天圓</p>
+      </section>
+
       <section id="reading" className={styles.section} aria-labelledby="reading-title">
-        <div className={styles.sectionLabel}><span>02 / 李醫師文章選讀</span><a href={blogHref}>所有文章 <ArrowUpRight size={15} aria-hidden="true" /></a></div>
+        <div className={styles.sectionLabel}><span>03 / 李醫師文章選讀</span><a href={blogHref}>所有文章 <ArrowUpRight size={15} aria-hidden="true" /></a></div>
         <h2 id="reading-title">由你關心的問題，<br />繼續讀下去。</h2>
         <ReadingGuide />
       </section>
 
       <section id="doctor" className={`${styles.section} ${styles.doctorSection}`} aria-labelledby="doctor-title">
         <div className={styles.doctorIntro}>
-          <p className={styles.eyebrow}>03 / 醫師簡介</p>
+          <p className={styles.eyebrow}>04 / 醫師簡介</p>
           <h2 id="doctor-title">李芊霖<span>註冊中醫師</span></h2>
           <p>李醫師的文章涵蓋自律神經、睡眠、飲食及婦科等健康題目，從中醫角度介紹疾病知識與日常生活的關係。</p>
           <a href={teamHref} className={styles.textButton}>查看診所醫師資料 <ArrowUpRight size={17} aria-hidden="true" /></a>
