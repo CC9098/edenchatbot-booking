@@ -126,10 +126,13 @@ export default function DrLeePage() {
           {seriesArticles.map((article) => (
             <li key={article.order}>
               <a className={styles.seriesCard} href={article.href}>
-                <span className={styles.articleCategory}>{article.order} / {article.label}</span>
-                <h3>{article.title}</h3>
-                <p>{article.description}</p>
-                <span className={styles.articleLink}>閱讀全文 <ArrowUpRight size={16} aria-hidden="true" /></span>
+                <Image className={styles.seriesImage} src={article.image} alt="" width={960} height={640} sizes="(max-width: 700px) calc(100vw - 40px), (max-width: 1224px) calc((100vw - 84px) / 2), 570px" />
+                <div className={styles.seriesCardBody}>
+                  <span className={styles.articleCategory}>{article.order} / {article.label}</span>
+                  <h3>{article.title}</h3>
+                  <p>{article.description}</p>
+                  <span className={styles.articleLink}>閱讀全文 <ArrowUpRight size={16} aria-hidden="true" /></span>
+                </div>
               </a>
             </li>
           ))}
