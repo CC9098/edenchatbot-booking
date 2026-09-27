@@ -369,6 +369,32 @@
   color: var(--muted);
   margin: 4px 0 0;
 }
+.contactNameRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.contactNameRow h2 {
+  min-width: 0;
+}
+.editName {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--green);
+}
+.editName:hover {
+  background: #e9f3ec;
+}
+.nameError {
+  margin: 0;
+  color: #b42318;
+  font-size: 13px;
+}
 .claim {
   color: var(--green) !important;
   background: #e9f3ec !important;

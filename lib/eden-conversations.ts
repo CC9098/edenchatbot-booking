@@ -3,9 +3,23 @@ import {
   type RawChatwootHistoryMessage,
 } from "@/lib/staff-chatwoot-history";
 import type { StaffChatwootWorkbenchMessage } from "@/lib/staff-chatwoot-workbench";
-import { getEdenDeliveryIssue, type EdenDeliveryIssue } from "@/lib/eden-message-delivery";
+import {
+  getEdenDeliveryIssue,
+  type EdenDeliveryIssue,
+} from "@/lib/eden-message-delivery";
 
 export type ConversationStage = "reply" | "patient" | "doctor" | "done";
+export const CONTACT_NAME_MAX_LENGTH = 128;
+
+export function normalizeEdenContactName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = value.trim();
+  return name &&
+    name.length <= CONTACT_NAME_MAX_LENGTH &&
+    !/[\u0000-\u001f\u007f]/.test(name)
+    ? name
+    : null;
+}
 export const STAGE_LABELS: Record<ConversationStage, string> = {
   reply: "待回覆",
   patient: "等病人",

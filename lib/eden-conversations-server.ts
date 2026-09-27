@@ -10,6 +10,7 @@ import {
 } from "@/lib/staff-chatwoot-api";
 import {
   normalizeEdenConversation,
+  normalizeEdenContactName,
   normalizeEdenMessages,
   matchesConversationView,
   latestEdenConversationsPerContact,
@@ -282,6 +283,38 @@ export async function conversationDetail(
       .map((a) => ({ id: a.id, name: a.name })),
     actor: ctx.actor,
   };
+}
+
+export async function updateConversationContactName(
+  ctx: ConversationContext,
+  raw: RawEdenConversation,
+  input: { name: string; expectedName: string },
+) {
+  const name = normalizeEdenContactName(input.name);
+  if (!name) throw new AuthError(400, "請輸入有效姓名（最多 128 字）。");
+  const contactId = raw.meta?.sender?.id;
+  if (!Number.isSafeInteger(contactId) || !contactId || contactId <= 0)
+    throw new AuthError(409, "未能確認聯絡人，請重新載入。");
+  const current = presentConversation(ctx, raw);
+  // A retry of an already saved name is a no-op, even after a lost response.
+  if (raw.meta?.sender?.name === name) return current;
+  if (current.name !== input.expectedName)
+    throw new AuthError(409, "同事已更改姓名，請重新載入核對後再試。");
+
+  let updateError: unknown;
+  try {
+    await conversationRequest(ctx, `/contacts/${contactId}`, { name }, "PUT");
+  } catch (error) {
+    updateError = error;
+  }
+  // Read the authoritative contact through its conversation, including after
+  // an uncertain update response. Never report a local-only name as saved.
+  const saved = await getConversation(ctx, raw.id);
+  if (saved.meta?.sender?.id !== contactId || saved.meta.sender.name !== name) {
+    if (updateError) throw updateError;
+    throw new AuthError(502, "未能確認姓名已儲存，請重新載入核對。");
+  }
+  return presentConversation(ctx, saved);
 }
 
 export async function saveConversationState(
