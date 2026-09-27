@@ -6,6 +6,7 @@ import {
   conversationDetail,
   getConversation,
   updateConversation,
+  updateConversationContactName,
   sendConversationMessage,
 } from "@/lib/eden-conversations-server";
 
@@ -71,6 +72,33 @@ export async function POST(request: NextRequest, { params }: Context) {
     if (!parsed.success) throw new AuthError(400, "請填妥操作內容。");
     return NextResponse.json(
       { conversation: await updateConversation(ctx, raw, parsed.data) },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    return failure(error);
+  }
+}
+const contactNameSchema = z
+  .object({
+    name: z.string(),
+    expectedName: z.string(),
+  })
+  .strict();
+
+export async function PATCH(request: NextRequest, { params }: Context) {
+  try {
+    const ctx = await requireConversationContext(request);
+    const parsed = contactNameSchema.safeParse(await request.json());
+    if (!parsed.success) throw new AuthError(400, "請填妥姓名。");
+    const raw = await getConversation(ctx, Number(params.id));
+    return NextResponse.json(
+      {
+        conversation: await updateConversationContactName(
+          ctx,
+          raw,
+          parsed.data,
+        ),
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

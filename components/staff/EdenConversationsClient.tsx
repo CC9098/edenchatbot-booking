@@ -26,6 +26,7 @@ import {
   MessageCircle,
   MoreHorizontal,
   Paperclip,
+  Pencil,
   Plus,
   Reply,
   Search,
@@ -39,6 +40,8 @@ import { createBrowserClient } from "@/lib/supabase-browser";
 import {
   mergeEdenMessages,
   mergeEdenConversationPages,
+  CONTACT_NAME_MAX_LENGTH,
+  normalizeEdenContactName,
   STAGE_LABELS,
   validateConversationAttachment,
   type ConversationActor,
@@ -184,8 +187,15 @@ export function EdenConversationsClient() {
   const [cannedReplyActiveIndex, setCannedReplyActiveIndex] = useState(0);
   const [cannedReplyDismissed, setCannedReplyDismissed] = useState(false);
   const [drawer, setDrawer] = useState<
-    "handover" | "doctor" | "tools" | "followup" | null
+    "handover" | "doctor" | "tools" | "followup" | "name" | null
   >(null);
+  const [contactName, setContactName] = useState("");
+  const [nameError, setNameError] = useState("");
+  const contactNameEdit = useRef<{ id: number; expectedName: string } | null>(
+    null,
+  );
+  const contactNameLock = useRef(false);
+  const contactNameVersion = useRef(0);
   const [handover, setHandover] = useState({
     summary: "",
     nextStep: "",
@@ -319,6 +329,7 @@ export function EdenConversationsClient() {
   const loadList = useCallback(
     async (page = 1, quiet = false) => {
       const sequence = ++listSequence.current;
+      const nameVersion = contactNameVersion.current;
       if (!quiet) setLoadingList(true);
       try {
         const params = new URLSearchParams({
@@ -328,7 +339,11 @@ export function EdenConversationsClient() {
           inbox,
         });
         const data = await api<InboxData>(`/api/staff/conversations?${params}`);
-        if (sequence !== listSequence.current) return;
+        if (
+          sequence !== listSequence.current ||
+          nameVersion !== contactNameVersion.current
+        )
+          return;
         actorRef.current = data.actor;
         setActor(data.actor);
         setInboxes(data.inboxes);
@@ -355,11 +370,16 @@ export function EdenConversationsClient() {
 
   const loadDetail = useCallback(
     async (id: number, before?: number, initial = false) => {
+      const nameVersion = contactNameVersion.current;
       try {
         const data = await api<DetailData>(
           `/api/staff/conversations/${id}${before ? `?before=${before}` : ""}`,
         );
-        if (activeRef.current !== id) return;
+        if (
+          activeRef.current !== id ||
+          nameVersion !== contactNameVersion.current
+        )
+          return;
         setActor(data.actor);
         actorRef.current = data.actor;
         setActive(data.conversation);
@@ -429,6 +449,8 @@ export function EdenConversationsClient() {
     setQuickReplies(false);
     setCannedReplyDismissed(false);
     setDrawer(null);
+    setNameError("");
+    contactNameEdit.current = null;
     setForwardMessage(null);
     setNextBefore(null);
     draftKey.current = "";
@@ -494,7 +516,12 @@ export function EdenConversationsClient() {
     cannedReplyOptionRefs.current.get(item.id)?.scrollIntoView({
       block: "nearest",
     });
-  }, [cannedReplyActiveIndex, showSlashSuggestions, slashQuery, slashSuggestions]);
+  }, [
+    cannedReplyActiveIndex,
+    showSlashSuggestions,
+    slashQuery,
+    slashSuggestions,
+  ]);
   useEffect(() => {
     seenIncoming.current = null;
     listPages.current.clear();
@@ -701,6 +728,64 @@ export function EdenConversationsClient() {
       setError(cause instanceof Error ? cause.message : "未能更新。");
       void loadDetail(id);
     } finally {
+      setBusy(false);
+    }
+  }
+  async function saveContactName() {
+    const editing = contactNameEdit.current;
+    if (
+      !active ||
+      !editing ||
+      editing.id !== active.id ||
+      contactNameLock.current ||
+      busy ||
+      offline
+    )
+      return;
+    const name = normalizeEdenContactName(contactName);
+    if (!name) {
+      setNameError("請輸入有效姓名（最多 128 字）。");
+      return;
+    }
+    contactNameLock.current = true;
+    contactNameVersion.current += 1;
+    setBusy(true);
+    setNameError("");
+    try {
+      const result = await api<{ conversation: EdenConversation }>(
+        `/api/staff/conversations/${editing.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, expectedName: editing.expectedName }),
+        },
+      );
+      contactNameVersion.current += 1;
+      const saved = result.conversation;
+      const rename = (c: EdenConversation) =>
+        c.contactId === saved.contactId ? { ...c, name: saved.name } : c;
+      for (const [page, rows] of listPages.current) {
+        listPages.current.set(page, rows.map(rename));
+      }
+      setConversations((rows) => rows.map(rename));
+      setActive((current) =>
+        current && current.contactId === saved.contactId
+          ? rename(current)
+          : current,
+      );
+      if (activeRef.current === editing.id) {
+        setDrawer(null);
+        contactNameEdit.current = null;
+        setError("");
+      }
+      void loadList(1, true);
+      void loadDetail(editing.id);
+    } catch (cause) {
+      if (activeRef.current === editing.id)
+        setNameError(cause instanceof Error ? cause.message : "未能更改姓名。");
+      void loadDetail(editing.id);
+    } finally {
+      contactNameLock.current = false;
       setBusy(false);
     }
   }
@@ -957,7 +1042,11 @@ export function EdenConversationsClient() {
                   )}
                   <span className={styles.row}>
                     <span className={styles.preview}>{c.preview}</span>
-                    {c.deliveryIssue && <span className={styles.failed}>{c.deliveryIssue.label}</span>}
+                    {c.deliveryIssue && (
+                      <span className={styles.failed}>
+                        {c.deliveryIssue.label}
+                      </span>
+                    )}
                     {c.unread && (
                       <span className={styles.unread} aria-label="未讀" />
                     )}
@@ -1027,7 +1116,28 @@ export function EdenConversationsClient() {
                 {active?.name.slice(0, 1) || "…"}
               </span>
               <div className={styles.contactHeading}>
-                <h2>{active?.name || "載入中…"}</h2>
+                <div className={styles.contactNameRow}>
+                  <h2>{active?.name || "載入中…"}</h2>
+                  {active && active.contactId > 0 && (
+                    <button
+                      className={styles.editName}
+                      aria-label="更改病人姓名"
+                      title="更改病人姓名"
+                      disabled={busy || offline}
+                      onClick={() => {
+                        contactNameEdit.current = {
+                          id: active.id,
+                          expectedName: active.name,
+                        };
+                        setContactName(active.name);
+                        setNameError("");
+                        setDrawer("name");
+                      }}
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  )}
+                </div>
                 <p>
                   {active?.phone}{" "}
                   {active && <span>· {active.assigneeName}</span>}
@@ -1689,7 +1799,7 @@ export function EdenConversationsClient() {
       {drawer && active && (
         <div
           className={styles.overlay}
-          onClick={() => !sending && setDrawer(null)}
+          onClick={() => !sending && !busy && setDrawer(null)}
         >
           <section
             ref={drawerRef}
@@ -1697,29 +1807,33 @@ export function EdenConversationsClient() {
             role="dialog"
             aria-modal="true"
             aria-label={
-              drawer === "handover"
-                ? "交更"
-                : drawer === "doctor"
-                  ? "分派 Eden 跟進"
-                  : drawer === "followup"
-                    ? "跟進訊息預覽"
-                    : "預約及收費"
-            }
-            onClick={(e) => e.stopPropagation()}
-          >
-            <header>
-              <h2>
-                {drawer === "handover"
+              drawer === "name"
+                ? "更改病人姓名"
+                : drawer === "handover"
                   ? "交更"
                   : drawer === "doctor"
                     ? "分派 Eden 跟進"
                     : drawer === "followup"
                       ? "跟進訊息預覽"
-                      : "預約及收費"}
+                      : "預約及收費"
+            }
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header>
+              <h2>
+                {drawer === "name"
+                  ? "更改病人姓名"
+                  : drawer === "handover"
+                    ? "交更"
+                    : drawer === "doctor"
+                      ? "分派 Eden 跟進"
+                      : drawer === "followup"
+                        ? "跟進訊息預覽"
+                        : "預約及收費"}
               </h2>
               <button
                 aria-label="關閉"
-                disabled={sending}
+                disabled={sending || busy}
                 onClick={() => setDrawer(null)}
               >
                 <X />
@@ -1728,6 +1842,48 @@ export function EdenConversationsClient() {
             <p className={styles.drawerContact}>
               {active.name} · {active.phone}
             </p>
+            {drawer === "name" && (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void saveContactName();
+                }}
+              >
+                <label>
+                  病人姓名
+                  <input
+                    autoFocus
+                    required
+                    maxLength={CONTACT_NAME_MAX_LENGTH}
+                    value={contactName}
+                    disabled={busy}
+                    aria-invalid={Boolean(nameError)}
+                    aria-describedby={
+                      nameError ? "contact-name-error" : undefined
+                    }
+                    onChange={(event) => {
+                      setContactName(event.target.value);
+                      setNameError("");
+                    }}
+                  />
+                </label>
+                {nameError && (
+                  <p
+                    id="contact-name-error"
+                    className={styles.nameError}
+                    role="alert"
+                  >
+                    {nameError}
+                  </p>
+                )}
+                <button
+                  className={styles.primary}
+                  disabled={busy || offline || !contactName.trim()}
+                >
+                  {busy ? "儲存中…" : "儲存"}
+                </button>
+              </form>
+            )}
             {drawer === "handover" && (
               <form
                 onSubmit={(e) => {
