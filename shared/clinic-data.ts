@@ -122,7 +122,7 @@ export const CLINICS: ClinicProfile[] = [
     contactPhone: '2698 5422 / 5189 9065',
     whatsappUrl: 'https://wa.me/85251899065',
     whatsappLabel: '按此聯絡姑娘',
-    hoursText: '週一、二、四至日 10:30-14:00，15:30-19:00；週三及公眾假期休息',
+    hoursText: '週一、二、四至六 10:30-14:00，15:30-19:00；週日 10:30-14:00，15:30-17:00；週三及公眾假期休息',
     googleMapUrl: CLINIC_GOOGLE_MAP_URLS.tsuenwan,
     routeMapUrl: 'https://www.edenclinic.hk/荃灣街景路線圖/',
   },
