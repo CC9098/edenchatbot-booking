@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
  */
 const BLOCKED_PATHNAME_PREFIXES = [
   "/login",
+  "/my-bookings",
   "/booking",
   "/booking-whatsapp",
   "/manage-booking",

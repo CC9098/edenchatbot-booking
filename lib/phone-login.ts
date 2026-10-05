@@ -33,10 +33,13 @@ function getPositiveIntegerEnv(name: string, fallback: number) {
 
 export function getLoginOtpSecret() {
   const secret = process.env.WIDGET_BOOKING_OTP_SECRET?.trim();
-  if (!secret) {
-    throw new Error("WhatsApp 登入設定未完成，請聯絡診所職員。");
-  }
-  return secret;
+  if (secret) return secret;
+
+  const serverSecret = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!serverSecret) throw new Error("登入服務暫時未能連線，請稍後再試。");
+  return createHmac("sha256", serverSecret)
+    .update("eden:member-login:otp-secret:v1")
+    .digest("base64url");
 }
 
 function getResendCooldownSeconds() {
@@ -203,10 +206,13 @@ export type VerifyLoginOtpResult =
 
 export async function requestLoginOtp(phone: string): Promise<RequestLoginOtpResult> {
   try {
-    const phoneDigits = normalizePhoneForSearch(phone);
-    if (!phoneDigits || phoneDigits.length < 6) {
+    const e164 = toHKE164(phone);
+    const phoneDigits = normalizePhoneForSearch(e164);
+    if (!/^\+[1-9]\d{7,14}$/.test(e164)) {
       return { success: false, error: "請輸入有效的 WhatsApp 電話號碼。" };
     }
+
+    getLoginOtpSecret();
 
     const throttle = await enforceLoginOtpRequestThrottle(phoneDigits);
     if (!throttle.allowed) {
@@ -236,8 +242,6 @@ export async function requestLoginOtp(phone: string): Promise<RequestLoginOtpRes
 
     if (insertError) throw new Error(insertError.message);
 
-    const e164 = toHKE164(phone);
-
     const whatsappResult = await sendBookingManageOtpWhatsapp({
       patientName: "用戶",
       phone: e164,
@@ -245,6 +249,7 @@ export async function requestLoginOtp(phone: string): Promise<RequestLoginOtpRes
       code,
       expiryMinutes: OTP_TTL_MINUTES,
       clinicWhatsappPhone: getChatwootWhatsappSenderPhone(),
+      purpose: "member_login",
     });
 
     if (!whatsappResult.success) {
@@ -271,7 +276,7 @@ export async function verifyLoginOtp(params: {
   setCookie?: CookieSetter;
 }): Promise<VerifyLoginOtpResult> {
   try {
-    const phoneDigits = normalizePhoneForSearch(params.phone);
+    const phoneDigits = normalizePhoneForSearch(toHKE164(params.phone));
     const code = params.code.replace(/\D/g, "").trim();
 
     if (!phoneDigits || phoneDigits.length < 6) {
@@ -284,6 +289,9 @@ export async function verifyLoginOtp(params: {
     const verification = await getLatestActiveLoginVerification(phoneDigits);
     if (!verification) {
       return { success: false, error: "驗證碼已失效，請重新索取。" };
+    }
+    if (verification.attempt_count >= verification.max_attempts) {
+      return { success: false, error: "已超過最多嘗試次數，請重新索取。" };
     }
 
     const expiresAtMs = new Date(verification.expires_at).getTime();
@@ -320,7 +328,19 @@ export async function verifyLoginOtp(params: {
       };
     }
 
-    await markConsumed(verification.id);
+    const now = new Date().toISOString();
+    const { data: consumed, error: consumeError } = await createServiceClient()
+      .from("widget_booking_verifications")
+      .update({ consumed_at: now, updated_at: now })
+      .eq("id", verification.id)
+      .is("consumed_at", null)
+      .lt("attempt_count", verification.max_attempts)
+      .gt("expires_at", now)
+      .select("id");
+    if (consumeError) throw new Error(consumeError.message);
+    if (!consumed?.length) {
+      return { success: false, error: "驗證碼已失效，請重新索取。" };
+    }
 
     const digitsRaw = verification.phone_digits;
     const phoneE164 = toHKE164(digitsRaw);

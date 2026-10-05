@@ -1,4 +1,5 @@
 import { normalizePhoneForSearch } from '@/lib/contact-utils';
+import { buildWhatsappAuthenticationOtpParams } from '@/lib/whatsapp-login-template';
 import {
   buildCampaignContextNote,
   mergeCampaignLabels,
@@ -163,6 +164,7 @@ interface BookingWhatsappReminderNotificationInput extends BookingWhatsappRemind
 }
 
 interface BookingManageWhatsappOtpInput {
+  purpose?: "manage_booking" | "member_login";
   patientName: string;
   phone: string;
   email: string;
@@ -846,7 +848,16 @@ function getRescheduleTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
   });
 }
 
-function getOtpTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
+function getOtpTemplateConfigs(inbox: ChatwootInbox, purpose?: BookingManageWhatsappOtpInput["purpose"]): TemplateConfig[] {
+  if (purpose === "member_login") {
+    return getNamedTemplateConfigs(inbox, {
+      configuredName: process.env.CHATWOOT_WHATSAPP_LOGIN_OTP_TEMPLATE_NAME,
+      configuredLanguage: process.env.CHATWOOT_WHATSAPP_LOGIN_OTP_TEMPLATE_LANGUAGE || 'zh_HK',
+      configuredCategory: 'AUTHENTICATION',
+      fallbackNames: ['eden_member_login_otp'],
+      defaultCategory: 'AUTHENTICATION',
+    });
+  }
   const configuredName = (process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_NAME || '').trim();
   const configuredLanguage = (process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_LANGUAGE || 'zh_HK').trim();
   const category = (process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_CATEGORY || 'UTILITY').trim();
@@ -1139,7 +1150,9 @@ async function sendMessageWithTemplateFallback(
     const bodyParams = typeof buildBodyParams === 'function'
       ? buildBodyParams(templateConfig)
       : buildBodyParams;
-    const processedParamCandidates = buildTemplateProcessedParamCandidates(bodyParams);
+    const processedParamCandidates = templateConfig.category.toUpperCase() === 'AUTHENTICATION' && bodyParams.verification_code
+      ? [buildWhatsappAuthenticationOtpParams(bodyParams.verification_code)]
+      : buildTemplateProcessedParamCandidates(bodyParams);
 
     for (const processedParams of processedParamCandidates) {
       try {
@@ -1921,11 +1934,12 @@ export async function sendBookingManageOtpWhatsapp(
     }
 
     const content = buildWhatsappManageVerificationText({
+      purpose: input.purpose,
       patientName: input.patientName,
       code: input.code,
       expiryMinutes: input.expiryMinutes,
     });
-    const templateConfigs = getOtpTemplateConfigs(inbox);
+    const templateConfigs = getOtpTemplateConfigs(inbox, input.purpose);
     const bodyParams = buildWhatsappManageVerificationTemplateBodyParams({
       patientName: input.patientName,
       code: input.code,

@@ -1,27 +1,12 @@
 /**
- * whatsapp-auth-bridge.ts
- *
- * Bridges a successful WhatsApp OTP verification into a real Supabase auth session.
- *
- * Strategy:
- *  - ensureSupabaseUserForPhone: find-or-create an auth.users row keyed by phone.
- *    A synthetic email (wa_<digits>@whatsapp.internal) is stored so that
- *    generateLink can be used in establishSessionForUser.
- *  - establishSessionForUser: uses SUPABASE_JWT_SECRET (approach B) to mint a
- *    short-lived JWT directly, then writes it into the standard @supabase/ssr
- *    cookie via the provided setCookie callback.
- *
- * ENV REQUIREMENTS (add to .env.example and Vercel project settings):
- *   SUPABASE_JWT_SECRET  — the "JWT Secret" shown in Supabase > Settings > API.
- *                          Required for establishSessionForUser. If absent the
- *                          call resolves with { success: false } and logs a warning
- *                          so callers can degrade gracefully.
- *
- * This module is server-only (no "server-only" sentinel needed — callers are already
- * server-side and the module uses the service-role key directly).
+ * Resolve phone accounts after WhatsApp verification and exchange a server-only
+ * Supabase magic-link token for a real, refreshable Auth session. generateLink
+ * does not send an email; the token hash never leaves this server module.
  */
 
-import { createHmac } from "crypto";
+import { createServerClient } from "@supabase/ssr";
+
+import { normalizePhoneForSearch, toHKE164 } from "@/lib/contact-utils";
 
 import { createServiceClient } from "@/lib/supabase";
 
@@ -57,37 +42,6 @@ function syntheticEmailForPhone(phoneDigits: string): string {
   return `wa_${phoneDigits}@whatsapp.internal`;
 }
 
-/**
- * Extracts the Supabase project ref from NEXT_PUBLIC_SUPABASE_URL.
- * URL format: https://<projectRef>.supabase.co
- */
-function getProjectRef(): string {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "";
-  const match = url.match(/https:\/\/([^.]+)\.supabase\.co/);
-  if (!match?.[1]) {
-    throw new Error(
-      "[whatsapp-auth-bridge] Cannot parse project ref from NEXT_PUBLIC_SUPABASE_URL.",
-    );
-  }
-  return match[1];
-}
-
-/**
- * Signs a minimal Supabase-compatible JWT using SUPABASE_JWT_SECRET.
- * Uses HS256, matching what Supabase's GoTrue expects.
- */
-function mintSupabaseJwt(payload: Record<string, unknown>, secret: string): string {
-  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString(
-    "base64url",
-  );
-  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const signingInput = `${header}.${body}`;
-  const signature = createHmac("sha256", secret)
-    .update(signingInput)
-    .digest("base64url");
-  return `${signingInput}.${signature}`;
-}
-
 // ---------------------------------------------------------------------------
 // Public: ensureSupabaseUserForPhone
 // ---------------------------------------------------------------------------
@@ -108,7 +62,9 @@ export async function ensureSupabaseUserForPhone(params: {
   /** Optional patient name from booking. */
   displayNameHint?: string;
 }): Promise<EnsureUserResult> {
-  const { phoneDigits, phoneE164, displayNameHint } = params;
+  const { displayNameHint } = params;
+  const phoneE164 = toHKE164(params.phoneE164);
+  const phoneDigits = normalizePhoneForSearch(phoneE164);
 
   if (!phoneDigits || !phoneE164) {
     return { error: "[whatsapp-auth-bridge] phoneDigits and phoneE164 are required." };
@@ -123,15 +79,25 @@ export async function ensureSupabaseUserForPhone(params: {
     const { data: profileRows, error: profileErr } = await supabase
       .from("profiles")
       .select("id")
-      .eq("phone", phoneDigits)
-      .limit(1);
+      .in("phone_digits", phoneDigits.startsWith("852") && phoneDigits.length === 11
+        ? [phoneDigits, phoneDigits.slice(3)]
+        : [phoneDigits])
+      .limit(10);
 
     if (profileErr) {
       console.error("[whatsapp-auth-bridge] profiles lookup error:", profileErr.message);
       // Non-fatal — fall through to auth.users search.
     } else if (profileRows && profileRows.length > 0) {
-      const userId = profileRows[0].id as string;
-      return { userId, created: false };
+      // A profile phone is editable contact information, not proof of ownership.
+      // Reuse only an Auth account whose confirmed phone matches the OTP phone.
+      for (const profile of profileRows) {
+        const userId = profile.id as string;
+        const { data, error } = await supabase.auth.admin.getUserById(userId);
+        if (!error && data.user?.phone_confirmed_at &&
+            normalizePhoneForSearch(toHKE164(data.user.phone || "")) === phoneDigits) {
+          return { userId, created: false };
+        }
+      }
     }
 
     // ------------------------------------------------------------------
@@ -141,7 +107,7 @@ export async function ensureSupabaseUserForPhone(params: {
     // with the service_role key, which is what supabase-js does internally.
     // ------------------------------------------------------------------
     const syntheticEmail = syntheticEmailForPhone(phoneDigits);
-    const existingUserId = await findAuthUserIdByEmail(syntheticEmail);
+    const existingUserId = await findAuthUserIdByEmail(syntheticEmail, phoneDigits);
 
     if (existingUserId) {
       await upsertProfilesRow({ supabase, userId: existingUserId, phoneDigits, displayNameHint });
@@ -168,7 +134,7 @@ export async function ensureSupabaseUserForPhone(params: {
     if (createErr || !newUserData?.user?.id) {
       // Could be a duplicate if two requests raced — retry the REST lookup once.
       if (createErr?.message?.toLowerCase().includes("already")) {
-        const retryId = await findAuthUserIdByEmail(syntheticEmail);
+        const retryId = await findAuthUserIdByEmail(syntheticEmail, phoneDigits);
         if (retryId) {
           await upsertProfilesRow({ supabase, userId: retryId, phoneDigits, displayNameHint });
           return { userId: retryId, created: false };
@@ -202,7 +168,7 @@ export async function ensureSupabaseUserForPhone(params: {
  *
  * Returns the user UUID string if found, or null.
  */
-async function findAuthUserIdByEmail(email: string): Promise<string | null> {
+async function findAuthUserIdByEmail(email: string, phoneDigits: string): Promise<string | null> {
   const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
@@ -228,9 +194,10 @@ async function findAuthUserIdByEmail(email: string): Promise<string | null> {
   }
 
   // Response shape: { users: [...], aud: string, ... }
-  type AdminUsersResponse = { users?: Array<{ id: string; email?: string }> };
+  type AdminUsersResponse = { users?: Array<{ id: string; email?: string; phone?: string; phone_confirmed_at?: string }> };
   const json = (await res.json()) as AdminUsersResponse;
-  const match = json.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+  const match = json.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase() &&
+    u.phone_confirmed_at && normalizePhoneForSearch(toHKE164(u.phone || "")) === phoneDigits);
   return match?.id ?? null;
 }
 
@@ -262,131 +229,57 @@ async function upsertProfilesRow(params: {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Public: establishSessionForUser
-// ---------------------------------------------------------------------------
-
-/**
- * Called after OTP success. Creates a Supabase session (access + refresh token)
- * for the given user and writes the standard @supabase/ssr cookies via setCookie.
- *
- * Implementation: Approach B — mints a JWT using SUPABASE_JWT_SECRET, then
- * writes it as the `sb-<projectRef>-auth-token` cookie that @supabase/ssr reads.
- *
- * Required env var: SUPABASE_JWT_SECRET (Supabase > Settings > API > JWT Secret).
- * If absent, this function resolves with { success: false } and logs a warning.
- *
- * @param userId    - The Supabase auth.users UUID.
- * @param setCookie - A callback that writes a cookie (name, value, options).
- *                    In a Next.js Route Handler, pass:
- *                    (name, value, options) => response.cookies.set(name, value, options)
- *                    or use the @supabase/ssr `setAll` pattern.
- */
+/** Called only after the caller has verified ownership of the phone. */
 export async function establishSessionForUser(
   userId: string,
   setCookie: CookieSetter,
 ): Promise<EstablishSessionResult> {
-  const jwtSecret = process.env.SUPABASE_JWT_SECRET?.trim();
-
-  if (!jwtSecret) {
-    console.warn(
-      "[whatsapp-auth-bridge] SUPABASE_JWT_SECRET is not set. " +
-        "Session establishment skipped. Add this env var to enable WhatsApp login.",
-    );
-    return { success: false, error: "SUPABASE_JWT_SECRET not configured." };
-  }
-
   try {
-    const projectRef = getProjectRef();
-
-    // Fetch user metadata so we can include email/phone in claims.
-    const supabase = createServiceClient();
-    const { data: userData, error: userErr } = await supabase.auth.admin.getUserById(userId);
-    if (userErr || !userData?.user) {
-      return {
-        success: false,
-        error: `[whatsapp-auth-bridge] getUserById failed: ${userErr?.message ?? "unknown"}`,
-      };
+    const admin = createServiceClient();
+    const { data: userData, error: userError } = await admin.auth.admin.getUserById(userId);
+    const email = userData?.user?.email;
+    if (userError || !email) {
+      return { success: false, error: "Unable to resolve the verified account." };
     }
-    const user = userData.user;
 
-    // Access token: 1 hour TTL (standard Supabase default).
-    const nowSec = Math.floor(Date.now() / 1000);
-    const accessTokenTtlSec = 3600;
+    const { data: link, error: linkError } = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+    });
+    if (linkError || !link?.properties?.hashed_token || link.user?.id !== userId) {
+      return { success: false, error: "Unable to create the verified account session." };
+    }
 
-    const accessTokenPayload: Record<string, unknown> = {
-      aud: "authenticated",
-      exp: nowSec + accessTokenTtlSec,
-      iat: nowSec,
-      iss: process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL,
-      sub: userId,
-      role: "authenticated",
-      // Optional claims mirroring GoTrue's output:
-      ...(user.email ? { email: user.email } : {}),
-      ...(user.phone ? { phone: user.phone } : {}),
-      session_id: crypto.randomUUID(),
-      app_metadata: user.app_metadata ?? {},
-      user_metadata: user.user_metadata ?? {},
-    };
-
-    const accessToken = mintSupabaseJwt(accessTokenPayload, jwtSecret);
-
-    // Refresh token: opaque random string (not a JWT). Supabase's client will
-    // use this to call the token refresh endpoint. We generate a random one here.
-    // NOTE: A JWT-signed refresh token is not directly usable with Supabase's
-    // /token?grant_type=refresh_token endpoint unless it was issued by GoTrue.
-    // We persist a real refresh token by calling supabase.auth.admin.generateLink
-    // to get one, OR we set a short access token TTL and acknowledge the user
-    // will need to re-authenticate when it expires.
-    //
-    // For Phase 0A, we use a signed dummy refresh token. The session will last
-    // accessTokenTtlSec (1 hour). Persistent refresh is a Phase 0B concern.
-    const refreshToken = Buffer.from(crypto.randomUUID()).toString("base64url");
-
-    // The @supabase/ssr cookie stores a JSON object matching the Session type.
-    const sessionPayload = {
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      expires_in: accessTokenTtlSec,
-      expires_at: nowSec + accessTokenTtlSec,
-      token_type: "bearer",
-      user: {
-        id: userId,
-        aud: "authenticated",
-        role: "authenticated",
-        email: user.email ?? null,
-        phone: user.phone ?? null,
-        created_at: user.created_at,
-        updated_at: user.updated_at ?? user.created_at,
-        user_metadata: user.user_metadata ?? {},
-        app_metadata: user.app_metadata ?? {},
+    const pendingCookies: Array<Parameters<CookieSetter>> = [];
+    const client = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll: () => [],
+          setAll: (cookies) => {
+            for (const { name, value, options } of cookies) {
+              pendingCookies.push([name, value, options]);
+            }
+          },
+        },
       },
-    };
+    );
+    const { data, error } = await client.auth.verifyOtp({
+      token_hash: link.properties.hashed_token,
+      type: "email",
+    });
+    if (error || !data.session || data.user?.id !== userId) {
+      return { success: false, error: "Unable to establish the verified account session." };
+    }
 
-    // Cookie name follows @supabase/ssr convention.
-    const cookieName = `sb-${projectRef}-auth-token`;
-    const cookieValue = JSON.stringify(sessionPayload);
-
-    // Secure cookie options (match what @supabase/ssr sets in production).
-    const cookieOptions: Record<string, unknown> = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      // Access token is 1 hour; let the browser keep the cookie a bit longer
-      // so the client-side can detect expiry and redirect to login.
-      maxAge: accessTokenTtlSec + 60,
-    };
-
-    setCookie(cookieName, cookieValue, cookieOptions);
-
-    // @supabase/ssr also sets a code verifier cookie in some flows; not needed here.
-
+    // Keep the SDK's cookie encoding/chunking and refresh-token persistence.
+    for (const cookie of pendingCookies) setCookie(...cookie);
     return { success: true };
-  } catch (err) {
+  } catch (error) {
     return {
       success: false,
-      error: `[whatsapp-auth-bridge] Unexpected error: ${err instanceof Error ? err.message : String(err)}`,
+      error: error instanceof Error ? error.message : "Unable to establish the verified account session.",
     };
   }
 }

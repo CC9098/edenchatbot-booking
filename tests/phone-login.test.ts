@@ -11,21 +11,27 @@ function rowAt(ms: number): LoginOtpThrottleRow {
   return { created_at: new Date(ms).toISOString() };
 }
 
-test("getLoginOtpSecret requires explicit OTP secret", () => {
-  const original = process.env.WIDGET_BOOKING_OTP_SECRET;
-  delete process.env.WIDGET_BOOKING_OTP_SECRET;
-
+test("login OTP secret works without a separate configured secret and never uses a public constant", () => {
+  const originalOtp = process.env.WIDGET_BOOKING_OTP_SECRET;
+  const originalService = process.env.SUPABASE_SERVICE_ROLE_KEY;
   try {
-    assert.throws(
-      () => getLoginOtpSecret(),
-      /WhatsApp 登入設定未完成/,
-    );
+    delete process.env.WIDGET_BOOKING_OTP_SECRET;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-server-secret-a";
+    const first = getLoginOtpSecret();
+    assert.notEqual(first, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    assert.equal(first, getLoginOtpSecret());
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-server-secret-b";
+    assert.notEqual(first, getLoginOtpSecret());
+    process.env.WIDGET_BOOKING_OTP_SECRET = " explicit-test-otp-secret ";
+    assert.equal(getLoginOtpSecret(), "explicit-test-otp-secret");
+    delete process.env.WIDGET_BOOKING_OTP_SECRET;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    assert.throws(() => getLoginOtpSecret(), /登入服務暫時未能連線/);
   } finally {
-    if (original === undefined) {
-      delete process.env.WIDGET_BOOKING_OTP_SECRET;
-    } else {
-      process.env.WIDGET_BOOKING_OTP_SECRET = original;
-    }
+    if (originalOtp === undefined) delete process.env.WIDGET_BOOKING_OTP_SECRET;
+    else process.env.WIDGET_BOOKING_OTP_SECRET = originalOtp;
+    if (originalService === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = originalService;
   }
 });
 
