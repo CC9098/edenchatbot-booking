@@ -259,7 +259,9 @@ export async function requestLoginOtp(phone: string): Promise<RequestLoginOtpRes
 
     return {
       success: true,
-      message: `驗證碼已發送到 ${maskPhone(phoneDigits)} 的 WhatsApp。`,
+      message: whatsappResult.verificationLabel
+        ? `${whatsappResult.verificationLabel}已發送到 ${maskPhone(phoneDigits)} 的 WhatsApp，請在此輸入驗證碼登入。`
+        : `驗證碼已發送到 ${maskPhone(phoneDigits)} 的 WhatsApp。`,
       maskedPhone: maskPhone(phoneDigits),
     };
   } catch (err) {

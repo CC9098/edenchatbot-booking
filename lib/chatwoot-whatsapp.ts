@@ -248,6 +248,7 @@ interface StaffPatientWhatsappMessageInput {
 }
 
 interface SendWhatsappBookingConfirmationResult {
+  verificationLabel?: string;
   success: boolean;
   conversationId?: number;
   whatsappSent: boolean;
@@ -310,6 +311,10 @@ class ChatwootWhatsappClient {
       `/api/v1/accounts/${accountId}/inboxes`,
       { method: 'GET' },
     );
+  }
+
+  getInbox(accountId: number, inboxId: number) {
+    return this.request<ChatwootInbox>(`/api/v1/accounts/${accountId}/inboxes/${inboxId}`, { method: 'GET' });
   }
 
   syncInboxTemplates(accountId: number, inboxId: number) {
@@ -854,7 +859,7 @@ function getOtpTemplateConfigs(inbox: ChatwootInbox, purpose?: BookingManageWhat
       configuredName: process.env.CHATWOOT_WHATSAPP_LOGIN_OTP_TEMPLATE_NAME,
       configuredLanguage: process.env.CHATWOOT_WHATSAPP_LOGIN_OTP_TEMPLATE_LANGUAGE || 'zh_HK',
       configuredCategory: 'AUTHENTICATION',
-      fallbackNames: ['eden_member_login_otp'],
+      fallbackNames: ['eden_member_login_otp', 'booking_manage_otp'],
       defaultCategory: 'AUTHENTICATION',
     });
   }
@@ -1183,7 +1188,7 @@ async function sendMessageWithTemplateFallback(
           continue;
         }
 
-        return;
+        return templateConfig.name;
       } catch (error) {
         lastError = error;
       }
@@ -1895,7 +1900,10 @@ export async function sendBookingManageOtpWhatsapp(
       parseOptionalInteger(process.env.CHATWOOT_WHATSAPP_INBOX_ID),
       input.clinicWhatsappPhone,
     );
-    const inbox = await refreshInboxTemplates(client, accountId, initialInbox);
+    const refreshedInbox = await refreshInboxTemplates(client, accountId, initialInbox);
+    const inbox = input.purpose === 'member_login' && refreshedInbox.id
+      ? await client.getInbox(accountId, refreshedInbox.id).catch(() => refreshedInbox)
+      : refreshedInbox;
     const inboxId = inbox.id;
     if (!inboxId) {
       throw new Error('Resolved Chatwoot WhatsApp inbox is missing an id');
@@ -1947,7 +1955,7 @@ export async function sendBookingManageOtpWhatsapp(
     });
 
     if (templateConfigs.length > 0) {
-      await sendMessageWithTemplateFallback(
+      const templateName = await sendMessageWithTemplateFallback(
         client,
         accountId,
         conversationId,
@@ -1955,6 +1963,12 @@ export async function sendBookingManageOtpWhatsapp(
         templateConfigs,
         bodyParams,
       );
+      return {
+        success: true,
+        whatsappSent: true,
+        conversationId,
+        ...(templateName === 'booking_manage_otp' ? { verificationLabel: '預約管理驗證碼' } : {}),
+      };
     } else {
       await client.createMessage(accountId, conversationId, {
         content,
