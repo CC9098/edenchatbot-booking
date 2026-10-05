@@ -39,6 +39,9 @@
   "exclude": [
     "node_modules",
     "drizzle.config.ts",
-    "training-videos"
+    "training-videos",
+    "output",
+    ".codex-worktrees",
+    "graphify-out"
   ]
 }

@@ -4,6 +4,7 @@ export interface BookingManageWhatsappOtpInput {
   patientName: string;
   code: string;
   expiryMinutes?: number;
+  purpose?: "manage_booking" | "member_login";
 }
 
 export interface BookingManageWhatsappAccessInput {
@@ -15,13 +16,13 @@ export function buildWhatsappManageVerificationText(
   input: BookingManageWhatsappOtpInput,
 ): string {
   return [
-    "醫天圓中醫診所預約管理驗證",
+    input.purpose === "member_login" ? "醫天圓中醫診所會員登入驗證" : "醫天圓中醫診所預約管理驗證",
     "",
     "你好，",
-    `你的預約管理驗證碼是：${input.code}`,
-    "此驗證碼會在 10 分鐘後失效。",
+    `你的${input.purpose === "member_login" ? "會員登入" : "預約管理"}驗證碼是：${input.code}`,
+    `此驗證碼會在 ${input.expiryMinutes || 10} 分鐘後失效。`,
     "",
-    `管理預約：${buildManageBookingUrl()}`,
+    ...(input.purpose === "member_login" ? [] : [`管理預約：${buildManageBookingUrl()}`]),
     "如非你本人操作，請忽略此訊息。",
   ].join("\n");
 }

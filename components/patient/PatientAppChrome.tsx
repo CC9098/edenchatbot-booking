@@ -36,6 +36,7 @@ function isPatientRoute(pathname: string): boolean {
   return (
     pathname.startsWith("/chat") ||
     pathname.startsWith("/booking") ||
+    pathname.startsWith("/my-bookings") ||
     pathname.startsWith("/cancel") ||
     pathname.startsWith("/reschedule") ||
     pathname.startsWith("/articles") ||
@@ -50,6 +51,7 @@ function getActiveTab(pathname: string): TabItem["id"] {
   if (pathname.startsWith("/chat")) return "chat";
   if (
     pathname.startsWith("/booking") ||
+    pathname.startsWith("/my-bookings") ||
     pathname.startsWith("/cancel") ||
     pathname.startsWith("/reschedule")
   ) {
@@ -66,6 +68,7 @@ function getActiveTab(pathname: string): TabItem["id"] {
 }
 
 function getTopbarTitle(pathname: string): string {
+  if (pathname.startsWith("/my-bookings")) return "我的預約";
   if (
     pathname.startsWith("/booking") ||
     pathname.startsWith("/cancel") ||
@@ -267,7 +270,8 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   const topbarTitle = getTopbarTitle(pathname);
   const shouldShowRouteTopbar = patientRoute && !isChatRoute;
   const shouldShowTabbar = !isChatRoute || !keyboardOpen;
-  const shouldPromptProfileCompletion = isPatientRoute(pathname) && !pathname.startsWith("/login");
+  const shouldPromptProfileCompletion = isPatientRoute(pathname) &&
+    !pathname.startsWith("/login") && !pathname.startsWith("/my-bookings");
   const routeTopbarInnerClassName =
     "chat-fixed-topbar__inner !flex !min-h-[52px] !items-center !justify-between !gap-2.5 !rounded-[18px] !border !border-[rgba(92,118,95,0.14)] !bg-[#F5F7F2] !px-3 !shadow-[0_6px_16px_rgba(36,61,41,0.06)] max-[440px]:!min-h-[50px] max-[440px]:!gap-1.5 max-[440px]:!px-2.5";
   const routeTopbarStartClassName = "chat-fixed-topbar__start flex min-w-0 flex-1 items-center gap-2";
