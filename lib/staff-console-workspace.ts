@@ -37,6 +37,7 @@ const DOCTOR_NAV_ITEMS: StaffWorkspaceNavItem[] = [
 ];
 
 const NURSE_NAV_ITEMS: StaffWorkspaceNavItem[] = [
+  { href: "/nurse/ig-news", label: "IG 消息" },
   { href: "/conversations", label: "Eden 對話" },
   {
     href: "/nurse",

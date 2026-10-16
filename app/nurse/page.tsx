@@ -24,6 +24,7 @@ type RoleHomeAction = {
 };
 
 const NURSE_ACTIONS: RoleHomeAction[] = [
+  { title: "IG 消息", subtitle: "同步首頁消息，查看更新時間。", href: "/nurse/ig-news", icon: Image, className: "border-primary/20 bg-white hover:bg-primary/5", iconClassName: "border-primary/20 bg-white text-primary" },
   { title: "Eden 對話", subtitle: "回覆病人、接手、交更。", href: "/conversations", icon: MessageCircle, className: "border-emerald-200 bg-emerald-50 hover:bg-emerald-100", iconClassName: "border-emerald-200 bg-white text-emerald-800" },
   {
     title: "今日預約",

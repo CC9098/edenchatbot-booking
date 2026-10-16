@@ -26,10 +26,10 @@ export type LatestNewsItem = {
 };
 
 const TITLE_MAX = 40;
-const LEAD_DECOR = /^[\s*＊!！•·\-–—~～\[\]【】「」()（）\p{Extended_Pictographic}️‍]+/u;   // 開頭符號同 emoji
+const LEAD_DECOR = /^[\s*＊!！•·\-–—~～\[\]【】「」()（）\p{Extended_Pictographic}\uFE0F\u200D]+/u;   // 開頭符號同 emoji
 
 const hasTag = (caption: string, tag: string) =>
-  caption.split(/\s+/).some((w) => w.replace(/[，,。.!！]+$/u, '') === tag);
+  caption.match(/#[\p{L}\p{N}_]+/gu)?.some(value => value === tag) ?? false;
 
 function cleanLine(line: string): string {
   return line
@@ -53,7 +53,7 @@ export function mediaImage(m: IgMedia): string {
   if (m.media_type === 'CAROUSEL_ALBUM') {
     const kids = m.children?.data || [];
     const first = kids.find((k) => k.media_type === 'IMAGE' && k.media_url) || kids[0];
-    return m.media_url || first?.media_url || first?.thumbnail_url || '';
+    return first?.media_type === 'VIDEO' ? first.thumbnail_url || '' : first?.media_url || m.media_url || '';
   }
   return m.media_url || '';
 }
@@ -72,9 +72,9 @@ export function selectLatestNews(
       img: mediaImage(m),
       link: m.permalink || '',
       date: m.timestamp || '',
-      t: Date.parse(m.timestamp || '') || 0,
+      t: Date.parse(m.timestamp || ''),
     }))
-    .filter((x) => x.title && x.img && (x.pin || x.t >= cutoff))
+    .filter((x) => x.title && x.img && /^https:\/\/(www\.)?instagram\.com\//i.test(x.link) && Number.isFinite(x.t) && x.t <= now.getTime() && (x.pin || x.t >= cutoff))
     .sort((a, b) => Number(b.pin) - Number(a.pin) || b.t - a.t)
     .slice(0, limit)
     .map(({ t: _t, ...item }) => item);
