@@ -3,7 +3,7 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarClock, RefreshCcw, Save, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarClock, RefreshCcw, Save, Trash2 } from "lucide-react";
 
 import {
   DAY_FIELD_ORDER,
@@ -14,6 +14,15 @@ import {
   normalizeDbTime,
   type DayInputMap,
 } from "@/lib/timetable-admin-utils";
+import {
+  HOLIDAY_SCOPE_ALL,
+  findDoctorsNamedInReason,
+  isNetworkWideHoliday,
+  reviewHolidayScope,
+  toHolidayScopeValue,
+  type HolidayClinicScope,
+  type HolidayDoctorScope,
+} from "@/lib/holiday-scope";
 import { getWorkspaceFromPath } from "@/lib/staff-console-workspace";
 import { CLINICS, DOCTORS, type ClinicId, type DoctorId } from "@/shared/clinic-data";
 
@@ -37,6 +46,8 @@ type HolidayItem = {
   endTime: string | null;
   reason: string;
   createdAt: string;
+  createdBy?: string | null;
+  createdByEmail?: string | null;
 };
 
 type StaffRole = "doctor" | "assistant" | "admin";
@@ -57,8 +68,8 @@ type TimetablePayload = {
 
 type HolidayFormState = {
   id: string | null;
-  doctorId: DoctorId | "";
-  clinicId: ClinicId | "";
+  doctorId: HolidayDoctorScope;
+  clinicId: HolidayClinicScope;
   holidayDate: string;
   startTime: string;
   endTime: string;
@@ -162,6 +173,7 @@ function hasConfiguredSchedule(row: ScheduleItem): boolean {
 }
 
 function isHolidayFormValid(form: HolidayFormState): boolean {
+  if (!form.doctorId || !form.clinicId) return false;
   if (!form.holidayDate) return false;
   if ((form.startTime && !form.endTime) || (!form.startTime && form.endTime)) return false;
   if (form.startTime && form.endTime && form.startTime >= form.endTime) return false;
@@ -188,7 +200,11 @@ function formatHolidayDateLabel(dateIso: string): string {
   }).format(date);
 }
 
-function formatHolidayTimeLabel(item: HolidayItem): string {
+function formatDoctorList(doctorIds: DoctorId[]): string {
+  return doctorIds.map((id) => DOCTOR_LABELS[id]).join("、");
+}
+
+function formatHolidayTimeLabel(item: Pick<HolidayItem, "startTime" | "endTime">): string {
   if (!item.startTime || !item.endTime) return "全日";
   return `${normalizeDbTime(item.startTime)}-${normalizeDbTime(item.endTime)}`;
 }
@@ -206,6 +222,7 @@ export default function DoctorTimetablePage() {
   const [holidays, setHolidays] = useState<HolidayItem[]>([]);
   const [holidayForm, setHolidayForm] = useState<HolidayFormState>(EMPTY_HOLIDAY_FORM);
   const [holidaySaving, setHolidaySaving] = useState(false);
+  const [holidayConfirming, setHolidayConfirming] = useState(false);
   const [holidayDeletingId, setHolidayDeletingId] = useState<string | null>(null);
 
   async function loadTimetable() {
@@ -261,6 +278,15 @@ export default function DoctorTimetablePage() {
   const allDayHolidayCount = useMemo(
     () => holidays.filter((item) => !item.startTime || !item.endTime).length,
     [holidays]
+  );
+  const holidayScopeReview = useMemo(
+    () =>
+      reviewHolidayScope({
+        doctorScope: holidayForm.doctorId,
+        clinicScope: holidayForm.clinicId,
+        reason: holidayForm.reason,
+      }),
+    [holidayForm.doctorId, holidayForm.clinicId, holidayForm.reason]
   );
   const scopedHolidayCount = useMemo(
     () => holidays.filter((item) => Boolean(item.doctorId || item.clinicId)).length,
@@ -411,8 +437,25 @@ export default function DoctorTimetablePage() {
     }
   }
 
-  async function handleHolidaySubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function updateHolidayForm(patch: Partial<HolidayFormState>) {
+    setHolidayConfirming(false);
+    setHolidayForm((prev) => ({ ...prev, ...patch }));
+  }
+
+  function resetHolidayForm() {
+    setHolidayConfirming(false);
+    setHolidayForm(EMPTY_HOLIDAY_FORM);
+  }
+
+  async function handleHolidaySubmit(event?: React.FormEvent<HTMLFormElement>, confirmed = false) {
+    event?.preventDefault();
+    if (holidaySaving || !isHolidayFormValid(holidayForm)) return;
+    // Only the explicit 「確定儲存」 button counts as confirmation, never a plain form submit.
+    if (holidayScopeReview.needsConfirmation && !confirmed) {
+      setHolidayConfirming(true);
+      return;
+    }
+
     setHolidaySaving(true);
     setNotice(null);
     setError(null);
@@ -427,8 +470,9 @@ export default function DoctorTimetablePage() {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          doctorId: holidayForm.doctorId || null,
-          clinicId: holidayForm.clinicId || null,
+          // "all" is sent explicitly; the API rejects a missing scope.
+          doctorId: holidayForm.doctorId,
+          clinicId: holidayForm.clinicId,
           holidayDate: holidayForm.holidayDate,
           startTime: holidayForm.startTime || null,
           endTime: holidayForm.endTime || null,
@@ -441,7 +485,13 @@ export default function DoctorTimetablePage() {
         throw new Error(data.error || `HTTP ${response.status}`);
       }
 
-      setHolidayForm(EMPTY_HOLIDAY_FORM);
+      // Keep doctor/clinic so consecutive days for the same doctor need no re-selecting.
+      setHolidayConfirming(false);
+      setHolidayForm({
+        ...EMPTY_HOLIDAY_FORM,
+        doctorId: holidayForm.doctorId,
+        clinicId: holidayForm.clinicId,
+      });
       setNotice(holidayForm.id ? "休診資料已更新" : "休診資料已新增");
       startTransition(() => {
         void loadTimetable();
@@ -468,7 +518,7 @@ export default function DoctorTimetablePage() {
       setNotice("休診資料已刪除");
       setHolidays((prev) => prev.filter((item) => item.id !== id));
       if (holidayForm.id === id) {
-        setHolidayForm(EMPTY_HOLIDAY_FORM);
+        resetHolidayForm();
       }
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "刪除休診資料失敗");
@@ -774,7 +824,7 @@ export default function DoctorTimetablePage() {
                     {holidayForm.id ? "編輯休診資料" : "新增休診資料"}
                   </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    不填開始／結束時間即代表全日休診。`doctor` 或 `clinic` 留空可作用於全體。原因會同步顯示喺 booking 頁黃色提示。
+                    不填開始／結束時間即代表全日休診。原因會同步顯示喺 booking 頁黃色提示。
                   </p>
 
                   <form className="mt-5 space-y-4" onSubmit={handleHolidaySubmit}>
@@ -784,13 +834,19 @@ export default function DoctorTimetablePage() {
                         <select
                           value={holidayForm.doctorId}
                           onChange={(event) =>
-                            setHolidayForm((prev) => ({ ...prev, doctorId: event.target.value as DoctorId | "" }))
+                            updateHolidayForm({ doctorId: event.target.value as HolidayDoctorScope })
                           }
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          aria-invalid={!holidayForm.doctorId}
+                          className={`w-full rounded-xl border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${
+                            holidayForm.doctorId ? "border-slate-200 text-slate-800" : "border-amber-300 text-slate-400"
+                          }`}
                         >
-                          <option value="">全部醫師</option>
+                          <option value="" disabled>
+                            請選擇醫師
+                          </option>
+                          <option value={HOLIDAY_SCOPE_ALL} className="text-slate-800">全部醫師</option>
                           {DOCTORS.map((doctor) => (
-                            <option key={doctor.id} value={doctor.id}>
+                            <option key={doctor.id} value={doctor.id} className="text-slate-800">
                               {doctor.nameZh}
                             </option>
                           ))}
@@ -802,13 +858,19 @@ export default function DoctorTimetablePage() {
                         <select
                           value={holidayForm.clinicId}
                           onChange={(event) =>
-                            setHolidayForm((prev) => ({ ...prev, clinicId: event.target.value as ClinicId | "" }))
+                            updateHolidayForm({ clinicId: event.target.value as HolidayClinicScope })
                           }
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          aria-invalid={!holidayForm.clinicId}
+                          className={`w-full rounded-xl border px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${
+                            holidayForm.clinicId ? "border-slate-200 text-slate-800" : "border-amber-300 text-slate-400"
+                          }`}
                         >
-                          <option value="">全部診所</option>
+                          <option value="" disabled>
+                            請選擇診所
+                          </option>
+                          <option value={HOLIDAY_SCOPE_ALL} className="text-slate-800">全部診所</option>
                           {CLINICS.map((clinic) => (
-                            <option key={clinic.id} value={clinic.id}>
+                            <option key={clinic.id} value={clinic.id} className="text-slate-800">
                               {clinic.nameZh}
                             </option>
                           ))}
@@ -823,7 +885,7 @@ export default function DoctorTimetablePage() {
                           type="date"
                           value={holidayForm.holidayDate}
                           onChange={(event) =>
-                            setHolidayForm((prev) => ({ ...prev, holidayDate: event.target.value }))
+                            updateHolidayForm({ holidayDate: event.target.value })
                           }
                           className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
@@ -835,7 +897,7 @@ export default function DoctorTimetablePage() {
                           type="time"
                           value={holidayForm.startTime}
                           onChange={(event) =>
-                            setHolidayForm((prev) => ({ ...prev, startTime: event.target.value }))
+                            updateHolidayForm({ startTime: event.target.value })
                           }
                           className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
@@ -847,7 +909,7 @@ export default function DoctorTimetablePage() {
                           type="time"
                           value={holidayForm.endTime}
                           onChange={(event) =>
-                            setHolidayForm((prev) => ({ ...prev, endTime: event.target.value }))
+                            updateHolidayForm({ endTime: event.target.value })
                           }
                           className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
@@ -859,7 +921,7 @@ export default function DoctorTimetablePage() {
                       <textarea
                         value={holidayForm.reason}
                         onChange={(event) =>
-                          setHolidayForm((prev) => ({ ...prev, reason: event.target.value }))
+                          updateHolidayForm({ reason: event.target.value })
                         }
                         rows={3}
                         placeholder="例如：23/4(四)員工活動日，全線休息一日"
@@ -867,10 +929,64 @@ export default function DoctorTimetablePage() {
                       />
                     </div>
 
+                    {holidayConfirming && holidayScopeReview.needsConfirmation ? (
+                      <div
+                        role="alertdialog"
+                        aria-labelledby="holiday-confirm-title"
+                        className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4"
+                      >
+                        <p
+                          id="holiday-confirm-title"
+                          className="flex items-center gap-2 text-sm font-semibold text-rose-800"
+                        >
+                          <AlertTriangle className="h-4 w-4 shrink-0" />
+                          儲存前請確認
+                        </p>
+                        {holidayScopeReview.doctorsNamedWithAllScope.length > 0 ? (
+                          <p className="text-sm leading-6 text-rose-800">
+                            原因提到{formatDoctorList(holidayScopeReview.doctorsNamedWithAllScope)}，但醫師揀咗「全部醫師」。係咪漏揀醫師？
+                          </p>
+                        ) : null}
+                        {holidayScopeReview.isNetworkWide ? (
+                          <p className="text-sm leading-6 text-rose-800">
+                            呢條會令所有醫師、所有分店喺 {formatHolidayDateLabel(holidayForm.holidayDate)}
+                            {holidayForm.startTime && holidayForm.endTime
+                              ? ` ${formatHolidayTimeLabel(holidayForm)}`
+                              : ""}{" "}
+                            全部約唔到，確定？
+                          </p>
+                        ) : null}
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            type="button"
+                            onClick={() => void handleHolidaySubmit(undefined, true)}
+                            disabled={holidaySaving}
+                            className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {holidaySaving ? "儲存中..." : "確定儲存"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHolidayConfirming(false)}
+                            disabled={holidaySaving}
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                          >
+                            返回修改
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {holidayScopeReview.missing.length > 0 ? (
+                      <p className="text-xs font-medium text-amber-700">
+                        請先選擇{holidayScopeReview.missing.map((kind) => (kind === "doctor" ? "醫師" : "診所")).join("及")}
+                      </p>
+                    ) : null}
+
                     <div className="flex flex-wrap gap-3">
                       <button
                         type="submit"
-                        disabled={holidaySaving || !isHolidayFormValid(holidayForm)}
+                        disabled={holidaySaving || holidayConfirming || !isHolidayFormValid(holidayForm)}
                         className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <Save className="h-4 w-4" />
@@ -878,7 +994,7 @@ export default function DoctorTimetablePage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setHolidayForm(EMPTY_HOLIDAY_FORM)}
+                        onClick={resetHolidayForm}
                         className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
                       >
                         重設
@@ -896,14 +1012,34 @@ export default function DoctorTimetablePage() {
                   </div>
 
                   <div className="space-y-3 p-4">
-                    {holidays.map((item) => (
+                    {holidays.map((item) => {
+                      const networkWide = isNetworkWideHoliday(item);
+                      const namedDoctors = item.doctorId ? [] : findDoctorsNamedInReason(item.reason);
+
+                      return (
                       <article
                         key={item.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4"
+                        className={`rounded-2xl border px-4 py-4 ${
+                          networkWide ? "border-rose-200 bg-rose-50/60" : "border-slate-200 bg-slate-50/70"
+                        }`}
                       >
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                           <div className="min-w-0 space-y-3">
                             <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                              {networkWide ? (
+                                <span className="rounded-full border border-rose-300 bg-rose-600 px-3 py-1 text-white">
+                                  全線休息
+                                </span>
+                              ) : null}
+                              {namedDoctors.length > 0 ? (
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-amber-800"
+                                  title={`原因提到${formatDoctorList(namedDoctors)}，但範圍係全部醫師`}
+                                >
+                                  <AlertTriangle className="h-3 w-3" />
+                                  範圍可能有誤
+                                </span>
+                              ) : null}
                               <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700">
                                 {formatHolidayScope(item)}
                               </span>
@@ -922,23 +1058,27 @@ export default function DoctorTimetablePage() {
                               <p className="mt-1 text-sm leading-6 text-slate-800">
                                 {item.reason || "—"}
                               </p>
+                              {item.createdByEmail ? (
+                                <p className="mt-1 text-xs text-slate-500">由 {item.createdByEmail} 新增</p>
+                              ) : null}
                             </div>
                           </div>
 
                           <div className="flex flex-wrap gap-2 lg:justify-end">
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
+                                setHolidayConfirming(false);
                                 setHolidayForm({
                                   id: item.id,
-                                  doctorId: item.doctorId ?? "",
-                                  clinicId: item.clinicId ?? "",
+                                  doctorId: toHolidayScopeValue(item.doctorId),
+                                  clinicId: toHolidayScopeValue(item.clinicId),
                                   holidayDate: item.holidayDate,
                                   startTime: normalizeDbTime(item.startTime) ?? "",
                                   endTime: normalizeDbTime(item.endTime) ?? "",
                                   reason: item.reason,
-                                })
-                              }
+                                });
+                              }}
                               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
                             >
                               編輯
@@ -955,7 +1095,8 @@ export default function DoctorTimetablePage() {
                           </div>
                         </div>
                       </article>
-                    ))}
+                      );
+                    })}
 
                     {holidays.length === 0 ? (
                       <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
