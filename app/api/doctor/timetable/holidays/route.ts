@@ -3,26 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AuthError, getCurrentUser, requireStaffRole } from '@/lib/auth-helpers';
 import { createServiceClient } from '@/lib/supabase';
 import { invalidateTimetableConsumers } from '@/lib/timetable-cache-invalidation';
-import { isClinicId, isDoctorId } from '@/shared/clinic-data';
+import { HolidayScopeError, isMissingHolidayAuditColumnError, parseHolidayScopeInput } from '@/lib/holiday-scope';
 
 export const dynamic = 'force-dynamic';
-
-function normalizeOptionalEntityId(raw: unknown, type: 'doctor' | 'clinic') {
-  if (raw === null || raw === undefined || raw === '') return null;
-  if (typeof raw !== 'string') {
-    throw new Error(`${type}Id must be a string or empty`);
-  }
-
-  const value = raw.trim();
-  if (!value) return null;
-  if (type === 'doctor' && !isDoctorId(value)) {
-    throw new Error('Invalid doctorId');
-  }
-  if (type === 'clinic' && !isClinicId(value)) {
-    throw new Error('Invalid clinicId');
-  }
-  return value;
-}
 
 function normalizeDate(value: unknown): string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
@@ -49,8 +32,9 @@ export async function POST(request: NextRequest) {
     await requireStaffRole(user.id);
     const body = await request.json();
 
-    const doctorId = normalizeOptionalEntityId(body.doctorId, 'doctor');
-    const clinicId = normalizeOptionalEntityId(body.clinicId, 'clinic');
+    // Scope must be chosen explicitly: a doctor/clinic id, or "all" (stored as NULL).
+    const doctorId = parseHolidayScopeInput(body.doctorId, 'doctor');
+    const clinicId = parseHolidayScopeInput(body.clinicId, 'clinic');
     const holidayDate = normalizeDate(body.holidayDate);
     const startTime = normalizeTime(body.startTime, 'startTime');
     const endTime = normalizeTime(body.endTime, 'endTime');
@@ -64,18 +48,26 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createServiceClient();
-    const { data, error } = await supabase
-      .from('holidays')
-      .insert({
-        doctor_id: doctorId,
-        clinic_id: clinicId,
-        holiday_date: holidayDate,
-        start_time: startTime,
-        end_time: endTime,
-        reason: reason || null,
-      })
-      .select('id')
-      .single();
+    const baseRow = {
+      doctor_id: doctorId,
+      clinic_id: clinicId,
+      holiday_date: holidayDate,
+      start_time: startTime,
+      end_time: endTime,
+      reason: reason || null,
+    };
+    const insertHoliday = (row: Record<string, unknown>) =>
+      supabase.from('holidays').insert(row).select('id').single();
+
+    let { data, error } = await insertHoliday({
+      ...baseRow,
+      created_by: user.id,
+      created_by_email: user.email ?? null,
+    });
+    if (error && isMissingHolidayAuditColumnError(error)) {
+      // Audit columns not migrated yet: keep creating closures without them.
+      ({ data, error } = await insertHoliday(baseRow));
+    }
 
     if (error || !data) {
       console.error('[POST /api/doctor/timetable/holidays] insert error:', error?.message);
@@ -87,6 +79,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof HolidayScopeError) {
+      return NextResponse.json({ error: error.message, field: `${error.kind}Id` }, { status: 400 });
     }
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 400 });

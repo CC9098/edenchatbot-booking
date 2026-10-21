@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { AuthError, getCurrentUser, requireStaffRole } from '@/lib/auth-helpers';
+import { isMissingHolidayAuditColumnError } from '@/lib/holiday-scope';
 import { createServiceClient } from '@/lib/supabase';
 import {
   createEmptyDayInputs,
@@ -32,7 +33,11 @@ interface HolidayRow {
   end_time: string | null;
   reason: string | null;
   created_at: string;
+  created_by?: string | null;
+  created_by_email?: string | null;
 }
+
+const HOLIDAY_BASE_COLUMNS = 'id, doctor_id, clinic_id, holiday_date, start_time, end_time, reason, created_at';
 
 function isMissingEffectiveFromColumnError(error: unknown): boolean {
   const message =
@@ -114,7 +119,14 @@ export async function GET() {
 
     let scheduleRows: DoctorScheduleRow[] | null = null;
     let scheduleError: { message: string } | null = null;
-    const [{ data: initialScheduleRows, error: initialScheduleError }, { data: holidayRows, error: holidayError }] =
+    const selectHolidays = (columns: string) =>
+      supabase
+        .from('holidays')
+        .select(columns)
+        .order('holiday_date', { ascending: true })
+        .order('created_at', { ascending: false });
+
+    const [{ data: initialScheduleRows, error: initialScheduleError }, initialHolidayResult] =
       await Promise.all([
         supabase
           .from('doctor_schedules')
@@ -122,12 +134,16 @@ export async function GET() {
           .order('doctor_id', { ascending: true })
           .order('clinic_id', { ascending: true })
           .order('effective_from', { ascending: true }),
-        supabase
-          .from('holidays')
-          .select('id, doctor_id, clinic_id, holiday_date, start_time, end_time, reason, created_at')
-          .order('holiday_date', { ascending: true })
-          .order('created_at', { ascending: false }),
+        selectHolidays(`${HOLIDAY_BASE_COLUMNS}, created_by, created_by_email`),
       ]);
+
+    // Audit columns may not be migrated yet; fall back to the original column set.
+    const holidayResult =
+      initialHolidayResult.error && isMissingHolidayAuditColumnError(initialHolidayResult.error)
+        ? await selectHolidays(HOLIDAY_BASE_COLUMNS)
+        : initialHolidayResult;
+    const holidayRows = holidayResult.data as unknown as HolidayRow[] | null;
+    const holidayError = holidayResult.error;
 
     if (initialScheduleError && isMissingEffectiveFromColumnError(initialScheduleError)) {
       const fallbackResult = await supabase
@@ -168,7 +184,7 @@ export async function GET() {
       dayInputs: mapDayInputs(row.schedule),
     }));
 
-    const holidays = ((holidayRows ?? []) as HolidayRow[]).map((row) => ({
+    const holidays = (holidayRows ?? []).map((row) => ({
       id: row.id,
       doctorId: row.doctor_id,
       clinicId: row.clinic_id,
@@ -177,6 +193,8 @@ export async function GET() {
       endTime: normalizeDbTime(row.end_time),
       reason: row.reason ?? '',
       createdAt: row.created_at,
+      createdBy: row.created_by ?? null,
+      createdByEmail: row.created_by_email ?? null,
     }));
 
     return NextResponse.json({
