@@ -18,7 +18,12 @@ import {
   normalizePhoneForSearch,
   normalizePhoneForStorage,
 } from '@/lib/contact-utils';
-import { getMonthlyUnavailableSummaryLabel } from '@/lib/booking-availability-labels';
+import {
+  bookingDatesBetween,
+  earliestAvailabilitySummary,
+  scanBookingOverview,
+  type EarliestAvailabilitySummary,
+} from '@/lib/booking-availability-overview';
 import {
   BOOKING_PICKUP_LABELS,
   getBookingPickupOptions,
@@ -707,7 +712,13 @@ export function BookingTabFlow({
     {}
   );
   const [bookableDatesLoading, setBookableDatesLoading] = useState(false);
+  const [earliestDatesLoading, setEarliestDatesLoading] = useState(false);
   const [bookableDatesError, setBookableDatesError] = useState('');
+  // Availability already read for the current doctor/visit type, reused when switching months.
+  const availabilityCacheRef = useRef<{ key: string; data: MonthClinicAvailability }>({
+    key: '',
+    data: {},
+  });
 
   const [formValues, setFormValues] = useState<BookingFormValues>(() =>
     buildInitialFormValues(initialContact, initialSelection)
@@ -725,7 +736,7 @@ export function BookingTabFlow({
 
   const minDate = getTodayIsoInHongKong();
   const maxDate = getMaxDateIsoInHongKong(MAX_BOOKING_WINDOW_DAYS);
-  const currentMonthKey = toMonthKeyFromIsoDate(minDate);
+  const bookingDates = useMemo(() => bookingDatesBetween(minDate, maxDate), [minDate, maxDate]);
 
   const doctorOptions = useMemo(
     () => doctors,
@@ -1002,80 +1013,20 @@ export function BookingTabFlow({
     });
   }, [calendarMonthKey, clinicId, maxDate, minDate, monthClinicAvailability, visibleClinics]);
 
-  const clinicMonthlySummaries = useMemo<
-    Partial<Record<ClinicId, { label: string; tone: 'available' | 'unavailable' | 'loading' | 'unknown' }>>
-  >(() => {
-    const summaries: Partial<
-      Record<ClinicId, { label: string; tone: 'available' | 'unavailable' | 'loading' | 'unknown' }>
-    > = {};
-    const daysInMonth = getDaysInMonth(calendarMonthKey);
-
-    for (const clinic of scannableClinics) {
-      let firstAvailableDate = '';
-      let hasUnavailableDate = false;
-      let hasUnknownDate = false;
-
-      for (let day = 1; day <= daysInMonth; day += 1) {
-        const dateIso = isoDateFromMonthDay(calendarMonthKey, day);
-        if (dateIso < minDate || dateIso > maxDate) continue;
-
-        const state = monthClinicAvailability[dateIso]?.[clinic.clinicId];
-        if (state === 'available') {
-          firstAvailableDate = dateIso;
-          break;
-        }
-
-        if (state === 'unavailable') {
-          hasUnavailableDate = true;
-          continue;
-        }
-
-        hasUnknownDate = true;
-      }
-
-      if (firstAvailableDate) {
-        summaries[clinic.clinicId] = {
-          label: `本月最早 ${formatShortDate(firstAvailableDate)} 可約`,
-          tone: 'available',
-        };
-        continue;
-      }
-
-      if (bookableDatesLoading) {
-        summaries[clinic.clinicId] = {
-          label: '正在掃描本月時段',
-          tone: 'loading',
-        };
-        continue;
-      }
-
-      if (!hasUnknownDate && hasUnavailableDate) {
-        summaries[clinic.clinicId] = {
-          label: getMonthlyUnavailableSummaryLabel({
-            calendarMonthKey,
-            currentMonthKey,
-          }),
-          tone: 'unavailable',
-        };
-        continue;
-      }
-
-      summaries[clinic.clinicId] = {
-        label: '稍後更新',
-        tone: 'unknown',
-      };
-    }
-
-    return summaries;
-  }, [
-    bookableDatesLoading,
-    calendarMonthKey,
-    currentMonthKey,
-    maxDate,
-    minDate,
-    monthClinicAvailability,
-    scannableClinics,
-  ]);
+  const clinicEarliestSummaries = useMemo<Partial<Record<ClinicId, EarliestAvailabilitySummary>>>(
+    () =>
+      Object.fromEntries(
+        scannableClinics.map((clinic) => [
+          clinic.clinicId,
+          earliestAvailabilitySummary(
+            bookingDates,
+            (dateIso) => monthClinicAvailability[dateIso]?.[clinic.clinicId],
+            earliestDatesLoading
+          ),
+        ])
+      ),
+    [bookingDates, earliestDatesLoading, monthClinicAvailability, scannableClinics]
+  );
 
   const selectedDateAllAvailableClinics = useMemo(() => {
     if (!selectedDate) return [];
@@ -1095,77 +1046,87 @@ export function BookingTabFlow({
     if (!doctorId || scannableClinics.length === 0) {
       setMonthClinicAvailability({});
       setBookableDatesLoading(false);
+      setEarliestDatesLoading(false);
       setBookableDatesError('');
       return;
     }
 
-    const daysInMonth = getDaysInMonth(calendarMonthKey);
-    const datesToScan: string[] = [];
-
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      const dateIso = isoDateFromMonthDay(calendarMonthKey, day);
-      if (dateIso >= minDate && dateIso <= maxDate) {
-        datesToScan.push(dateIso);
-      }
+    const clinicIds = scannableClinics.map((clinic) => clinic.clinicId);
+    const cacheKey = [
+      doctorId,
+      visitType,
+      selectedDoctorSlotMinutes,
+      clinicIds.join(','),
+      bookingDates[0] ?? '',
+      bookingDates[bookingDates.length - 1] ?? '',
+    ].join('|');
+    if (availabilityCacheRef.current.key !== cacheKey) {
+      availabilityCacheRef.current = { key: cacheKey, data: {} };
     }
 
-    setMonthClinicAvailability({});
+    const known = availabilityCacheRef.current.data;
+    setMonthClinicAvailability(known);
     setBookableDatesError('');
 
-    if (datesToScan.length === 0) {
+    if (bookingDates.length === 0) {
       setBookableDatesLoading(false);
+      setEarliestDatesLoading(false);
       return;
     }
 
     let isCancelled = false;
     setBookableDatesLoading(true);
+    setEarliestDatesLoading(true);
+
+    const visibleMonthPrefix = `${calendarMonthKey}-`;
+    const hasPartialRead = (dates: string[]) =>
+      dates.some((dateIso) =>
+        Object.values(availabilityCacheRef.current.data[dateIso] ?? {}).includes('unknown')
+      );
+    const partialReadMessage = '暫時未能完整讀取預約日曆，彩色燈號可能未完全顯示。';
 
     const scanBookableDates = async () => {
-      const queue = datesToScan.flatMap((dateIso) =>
-        scannableClinics.map((clinic) => ({
-          dateIso,
-          clinicId: clinic.clinicId,
-        }))
-      );
-      const nextAvailability: MonthClinicAvailability = {};
-      let hasPartialRead = false;
-      const workerCount = Math.min(6, queue.length);
-
-      await Promise.all(
-        Array.from({ length: workerCount }, async () => {
-          while (queue.length > 0 && !isCancelled) {
-            const nextJob = queue.shift();
-            if (!nextJob) break;
-
-            const result = await requestAvailabilityForDoctor(
-              doctorId,
-              nextJob.clinicId,
-              nextJob.dateIso,
-              selectedDoctorSlotMinutes,
-              visitType
-            );
-
-            nextAvailability[nextJob.dateIso] = {
-              ...(nextAvailability[nextJob.dateIso] ?? {}),
-              [nextJob.clinicId]: result.status,
-            };
-
-            if (result.status === 'unknown' || result.calendarUnavailable) {
-              hasPartialRead = true;
-            }
-          }
-        })
-      );
+      await scanBookingOverview({
+        dates: bookingDates,
+        clinics: clinicIds,
+        known,
+        isPriorityDate: (dateIso) => dateIso.startsWith(visibleMonthPrefix),
+        isCancelled: () => isCancelled,
+        request: async (dateIso, targetClinicId) => {
+          const result = await requestAvailabilityForDoctor(
+            doctorId,
+            targetClinicId,
+            dateIso,
+            selectedDoctorSlotMinutes,
+            visitType
+          );
+          return result.status;
+        },
+        onResult: (dateIso, targetClinicId, state) => {
+          if (availabilityCacheRef.current.key !== cacheKey) return;
+          const cache = availabilityCacheRef.current.data;
+          availabilityCacheRef.current.data = {
+            ...cache,
+            [dateIso]: { ...(cache[dateIso] ?? {}), [targetClinicId]: state },
+          };
+          if (!isCancelled) setMonthClinicAvailability(availabilityCacheRef.current.data);
+        },
+        onPriorityComplete: () => {
+          if (isCancelled) return;
+          setBookableDatesLoading(false);
+          setBookableDatesError(
+            hasPartialRead(bookingDates.filter((dateIso) => dateIso.startsWith(visibleMonthPrefix)))
+              ? partialReadMessage
+              : ''
+          );
+        },
+      });
 
       if (isCancelled) return;
 
-      setMonthClinicAvailability(nextAvailability);
       setBookableDatesLoading(false);
-      setBookableDatesError(
-        hasPartialRead
-          ? '暫時未能完整讀取預約日曆，彩色燈號可能未完全顯示。'
-          : ''
-      );
+      setEarliestDatesLoading(false);
+      setBookableDatesError(hasPartialRead(bookingDates) ? partialReadMessage : '');
     };
 
     void scanBookableDates();
@@ -1173,7 +1134,7 @@ export function BookingTabFlow({
     return () => {
       isCancelled = true;
     };
-  }, [calendarMonthKey, doctorId, maxDate, minDate, scannableClinics, selectedDoctorSlotMinutes, visitType]);
+  }, [bookingDates, calendarMonthKey, doctorId, scannableClinics, selectedDoctorSlotMinutes, visitType]);
 
   useEffect(() => {
     const isCurrentPickupAvailable = pickupOptions.some(
@@ -1822,7 +1783,7 @@ export function BookingTabFlow({
                   const scheduleLines = formatScheduleLines(clinic.schedule);
                   const isChosenClinic = clinic.clinicId === clinicId;
                   const clinicStyle = CLINIC_AVAILABILITY_STYLES[clinic.clinicId];
-                  const clinicSummary = clinicMonthlySummaries[clinic.clinicId];
+                  const clinicSummary = clinicEarliestSummaries[clinic.clinicId];
                   const summaryClassName =
                     clinicSummary?.tone === 'available'
                       ? clinicStyle.badgeClassName
@@ -1876,7 +1837,7 @@ export function BookingTabFlow({
                             className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${summaryClassName}`}
                           >
                             <span className={`h-2 w-2 rounded-full ${summaryDotClassName}`} />
-                            {clinicSummary?.label || '稍後更新'}
+                            {clinicSummary?.label || '正在查詢最早時段'}
                           </span>
                           {isChosenClinic && (
                             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
@@ -1898,9 +1859,7 @@ export function BookingTabFlow({
                 })}
               </div>
               <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                {isMinimalPreview
-                  ? '點按診所即可篩選。'
-                  : '點按診所卡即可套用篩選；如顯示「本月餘下日子暫滿」，可到下一步按右箭嘴查看下月。'}
+                點按診所即可篩選。
               </p>
               {onlineConsultationMethodNotice ? (
                 <div className="mt-4 flex gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-relaxed text-sky-900">
