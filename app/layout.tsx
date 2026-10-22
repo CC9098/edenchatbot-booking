@@ -4,6 +4,7 @@ import { NativeOAuthListener } from "@/components/auth/NativeOAuthListener";
 import { StaffAuthResume } from "@/components/auth/StaffAuthResume";
 import { PatientAppChrome } from "@/components/patient/PatientAppChrome";
 import { CrossMethodBanner } from "@/components/member/CrossMethodBanner";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { clinicStructuredData, jsonLd, SITE_DESCRIPTION, SITE_NAME } from "@/lib/structured-data";
 import { buildPublicUrl, getPublicBaseUrl } from "@/lib/public-url";
 import "./globals.css";
@@ -88,6 +89,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLd(clinicStructuredData()) }}
         />
+        <GoogleAnalytics />
         <NativeOAuthListener />
         <StaffAuthResume />
         <CrossMethodBanner />

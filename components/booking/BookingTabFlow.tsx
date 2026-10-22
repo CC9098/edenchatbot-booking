@@ -48,6 +48,7 @@ import {
   splitHkDisplayName,
 } from '@/components/booking/PatientProfileSelector';
 import type { PatientProfile } from '@/app/api/patient-profiles/route';
+import { trackEvent } from '@/lib/analytics';
 
 type BookingStep = 'setup' | 'timeslot' | 'details' | 'success';
 type FlowVariant = 'whatsapp' | 'staff';
@@ -1587,6 +1588,13 @@ export function BookingTabFlow({
 
       if (isWhatsappFlow || isStaffFlow) {
         setWhatsappSent(data.whatsappSent === true);
+      }
+      if (!isStaffFlow) {
+        trackEvent('booking_completed', {
+          doctor_id: doctorId,
+          clinic_id: clinicId,
+          booking_flow: flowVariant,
+        });
       }
       setStep('success');
     } catch {
