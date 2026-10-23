@@ -18,6 +18,11 @@ export function isTrackedPath(pathname: string): boolean {
   );
 }
 
+// Embed routes run inside iframes on www.edenclinic.hk, which already records the page view.
+export function isEmbedPath(pathname: string): boolean {
+  return pathname === '/embed' || pathname.startsWith('/embed/');
+}
+
 type GtagWindow = Window & { gtag?: (...args: unknown[]) => void };
 
 // Never pass patient-identifying data (name, phone, email, notes) in params.
