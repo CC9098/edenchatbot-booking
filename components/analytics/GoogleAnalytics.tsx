@@ -2,7 +2,7 @@
 
 import Script from "next/script";
 import { usePathname } from "next/navigation";
-import { GA_MEASUREMENT_ID, isTrackedPath } from "@/lib/analytics";
+import { GA_MEASUREMENT_ID, isEmbedPath, isTrackedPath } from "@/lib/analytics";
 
 export function GoogleAnalytics() {
   const pathname = usePathname() || "/";
@@ -12,6 +12,11 @@ export function GoogleAnalytics() {
   if (typeof window !== "undefined") {
     (window as unknown as Record<string, boolean>)[`ga-disable-${GA_MEASUREMENT_ID}`] = !isTrackedPath(pathname);
   }
+
+  // Inside the website's iframes, keep events such as booking_completed but skip the duplicate page view.
+  const config = isEmbedPath(pathname)
+    ? { send_page_view: false, cookie_flags: "SameSite=None;Secure" }
+    : {};
 
   return (
     <>
@@ -26,7 +31,7 @@ function gtag(){dataLayer.push(arguments);}
 window.gtag = gtag;
 window['ga-disable-${GA_MEASUREMENT_ID}'] = ${JSON.stringify(!isTrackedPath(pathname))};
 gtag('js', new Date());
-gtag('config', '${GA_MEASUREMENT_ID}');`}
+gtag('config', '${GA_MEASUREMENT_ID}', ${JSON.stringify(config)});`}
       </Script>
     </>
   );
