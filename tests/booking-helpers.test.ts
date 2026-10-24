@@ -52,6 +52,23 @@ test("tsuen wan and central use different evening last booking cutoffs", () => {
   );
 });
 
+test("afternoon sessions starting before 15:00 use the evening cutoff, not the lunch one", () => {
+  // Chiropractor Saturday session 14:30-16:30 at Jordan.
+  assert.equal(
+    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-10-31", "14:30"), "jordan"),
+    false
+  );
+  assert.equal(
+    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-10-31", "16:00"), "jordan"),
+    false
+  );
+  // Late morning slots are still blocked by the lunch cutoff.
+  assert.equal(
+    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-10-31", "13:45"), "jordan"),
+    true
+  );
+});
+
 test("online bookings are not constrained by physical clinic last booking cutoffs", () => {
   assert.equal(
     isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-03-30", "19:15"), "online"),

@@ -5,7 +5,10 @@ import { PHYSICAL_CLINIC_IDS, type PhysicalClinicId } from '../shared/clinic-dat
 import { getHolidaysForDate } from './holiday-store';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
-const AFTERNOON_SESSION_START_MINUTES = 15 * 60;
+// Morning sessions end at 14:00; only slots starting before then use the lunch
+// cutoff. Afternoon sessions that start earlier than 15:00 (e.g. 14:30) use the
+// evening cutoff instead of being blocked by the lunch one.
+const MORNING_SESSION_END_MINUTES = 14 * 60;
 const SAME_DAY_EVENING_BOOKING_CUTOFF_MINUTES = 19 * 60;
 const CLINIC_LAST_BOOKING_CUTOFFS: Record<
   PhysicalClinicId,
@@ -62,7 +65,7 @@ function getClinicLastBookingCutoffTime(
   }
 
   const cutoffs = CLINIC_LAST_BOOKING_CUTOFFS[clinicId];
-  return slotStartMinutes < AFTERNOON_SESSION_START_MINUTES
+  return slotStartMinutes < MORNING_SESSION_END_MINUTES
     ? cutoffs.lunch
     : cutoffs.evening;
 }

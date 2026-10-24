@@ -54,6 +54,8 @@ export type DoctorProfile = {
   bookingSlotMinutes?: number;
   bookingVisitOptions?: readonly BookingVisitOption[];
   onlineBookingEnabled?: boolean;
+  /** Patient-facing smart look-busy (see lib/look-busy.ts). Missing = enabled. */
+  lookBusy?: { enabled: boolean };
 };
 
 export type ClinicProfile = {
@@ -144,6 +146,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: `/doctor-avatars/clean/chan.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'chan' }),
+    lookBusy: { enabled: true },
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
   },
   {
@@ -153,6 +156,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: `/doctor-avatars/clean/lee.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'lee' }),
+    lookBusy: { enabled: true },
     bookingTreatmentOptions: ['acupuncture'],
   },
   {
@@ -162,6 +166,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: `/doctor-avatars/clean/hon.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'hon' }),
+    lookBusy: { enabled: true },
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
     bookingSlotMinutes: 15,
     scheduleNote:
@@ -174,6 +179,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: `/doctor-avatars/clean/chau.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'chau' }),
+    lookBusy: { enabled: true },
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
     bookingSlotMinutes: 15,
   },
@@ -184,6 +190,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: `/doctor-avatars/clean/cheung.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'cheung', clinicId: 'online' }),
+    lookBusy: { enabled: true },
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
     bookingSlotMinutes: 20,
   },
@@ -194,6 +201,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: `/doctor-avatars/clean/cheungmy.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'cheungmy' }),
+    lookBusy: { enabled: true },
     bookingTreatmentOptions: ['acupuncture'],
     scheduleNote:
       '2026年5月13日起應診：佐敦逢星期四 11:00-14:00；荃灣逢星期三 10:30-14:00、15:30-17:00。',
@@ -205,6 +213,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: `/doctor-avatars/clean/leung.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'leung' }),
+    lookBusy: { enabled: true },
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
   },
   {
@@ -214,6 +223,7 @@ export const DOCTORS: DoctorProfile[] = [
     avatarSrc: `/doctor-avatars/clean/wong.webp?v=${DOCTOR_AVATAR_CACHE_VERSION}`,
     avatarObjectPosition: 'center',
     bookingUrl: buildBookingUrl({ doctorId: 'wong', clinicId: 'jordan' }),
+    lookBusy: { enabled: true },
     bookingPractitionerGroup: 'support',
     bookingGroupLabel: '協作脊醫服務',
     bookingRoleLabel: '協作脊醫',
@@ -336,6 +346,11 @@ export function getDoctorBookingSlotMinutes(
   }
 
   return DOCTOR_BY_ID[doctorId].bookingSlotMinutes || DEFAULT_DOCTOR_BOOKING_SLOT_MINUTES;
+}
+
+export function isDoctorLookBusyEnabled(doctorId: string): boolean {
+  if (!isDoctorId(doctorId)) return true;
+  return DOCTOR_BY_ID[doctorId].lookBusy?.enabled ?? true;
 }
 
 export function getDoctorBookingPractitionerGroup(doctorId: string): BookingPractitionerGroup {

@@ -1029,6 +1029,18 @@ export function ChatWidget({
         return;
       }
 
+      // A failed lookup (e.g. Google Calendar unavailable) is not a fully booked day.
+      if (!response.ok || data.error) {
+        addBotMessage('系統暫時未能查詢時段，請稍後再試，或 WhatsApp／致電診所預約。');
+        if (booking.mode === 'reschedule') {
+          const dateOptions = buildDateOptionsForClinic(booking.doctorNameZh, booking.clinicId, 0);
+          setOptions([...(dateOptions || []), { label: widgetSettings.flows.common.bookingBackButtonLabel, value: 'booking_back' }, returnMainOption]);
+        } else {
+          handleBookingVisitTypeSelect(booking.isFirstVisit!);
+        }
+        return;
+      }
+
       if (!data.slots || data.slots.length === 0) {
         addBotMessage('呢日已經滿晒 😅 請揀另一日。');
         if (booking.mode === 'reschedule') {
