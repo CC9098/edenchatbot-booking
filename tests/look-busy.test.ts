@@ -120,12 +120,21 @@ test("floor can cap the total hidden below the target ratio", () => {
   assert.equal(result.visibleSlots.length, 5); // target round(7*0.3)=2, floor allows 2
 });
 
-test("near-date release: today and the next two days (HK) show everything", () => {
-  const day = buildDay();
-  assert.equal(applyLookBusy(input({ ...day, date: "2026-10-24" })).skipped, "near_date");
-  assert.equal(applyLookBusy(input({ ...day, date: "2026-10-25" })).skipped, "near_date");
-  assert.equal(applyLookBusy(input({ ...day, date: "2026-10-26" })).skipped, "near_date");
-  assert.notEqual(applyLookBusy(input({ ...day, date: "2026-10-27" })).skipped, "near_date");
+test("near dates (today and the next two days, HK) use lighter tiers", () => {
+  const quiet = buildDay(["10:00", "15:00"]); // 2/32 busy
+  for (const date of ["2026-10-25", "2026-10-26"]) {
+    const result = applyLookBusy(input({ ...quiet, date }));
+    assert.equal(result.hideRatio, 0.15, date);
+    assert.equal(result.hiddenSlots.length, Math.round(30 * 0.15), date);
+  }
+  // Saturday near date: lighter tier and Saturday cap agree at 15%.
+  assert.equal(applyLookBusy(input({ ...quiet, date: "2026-10-24" })).hideRatio, 0.15);
+  // Medium occupancy on a near date hides nothing.
+  const medium = buildDay(timesBetween("10:00", "12:00", 15).concat(timesBetween("15:00", "16:15", 15)));
+  assert.equal(applyLookBusy(input({ ...medium, date: "2026-10-26" })).skipped, "near_date");
+  // Beyond the window the normal tiers apply.
+  assert.equal(applyLookBusy(input({ ...quiet, date: "2026-10-27" })).hideRatio, 0.3);
+  assert.deepEqual(LOOK_BUSY_CONFIG.nearDateTiers, [{ belowOccupancy: 0.3, hideRatio: 0.15 }]);
   // 23:30 HK on 10-24 is still 10-24 in HK; 00:30 HK on 10-25 releases 10-27.
   assert.equal(isWithinNearDateRelease("2026-10-27", new Date("2026-10-24T16:30:00Z")), true);
   assert.equal(isWithinNearDateRelease("2026-10-27", new Date("2026-10-24T15:30:00Z")), false);

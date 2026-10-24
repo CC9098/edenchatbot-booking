@@ -28,16 +28,20 @@ export const LOOK_BUSY_CONFIG = {
   /** Each session (schedule range) keeps at least min(this, offered slots in that session). */
   minVisiblePerSession: 5,
   /**
-   * Near-date release: dates within this many calendar days of today (HK)
-   * show every slot. 2 = today, tomorrow and the day after.
+   * Near dates: dates within this many calendar days of today (HK) use the
+   * lighter `nearDateTiers` instead of `tiers`. 2 = today, tomorrow and the
+   * day after.
    */
   releaseWithinDays: 2,
+  /** Lighter tiers for near dates; occupancy at or above the last bound hides nothing. */
+  nearDateTiers: [{ belowOccupancy: 0.3, hideRatio: 0.15 }],
   timeZone: 'Asia/Hong_Kong',
 } as const;
 
 export type LookBusyConfig = {
   tiers: ReadonlyArray<{ belowOccupancy: number; hideRatio: number }>;
   maxHideRatioByWeekday: Readonly<Partial<Record<number, number>>>;
+  nearDateTiers: ReadonlyArray<{ belowOccupancy: number; hideRatio: number }>;
   minVisiblePerSession: number;
   releaseWithinDays: number;
   timeZone: string;
@@ -145,7 +149,14 @@ export function getHideRatioForOccupancy(
   occupancy: number,
   config: Pick<LookBusyConfig, 'tiers'> = LOOK_BUSY_CONFIG
 ): number {
-  for (const tier of config.tiers) {
+  return ratioFromTiers(occupancy, config.tiers);
+}
+
+function ratioFromTiers(
+  occupancy: number,
+  tiers: ReadonlyArray<{ belowOccupancy: number; hideRatio: number }>
+): number {
+  for (const tier of tiers) {
     if (occupancy < tier.belowOccupancy) return tier.hideRatio;
   }
   return 0;
@@ -160,9 +171,10 @@ export function weekdayOfIsoDate(date: string): number {
 export function getHideRatio(
   occupancy: number,
   date: string,
-  config: Pick<LookBusyConfig, 'tiers' | 'maxHideRatioByWeekday'> = LOOK_BUSY_CONFIG
+  config: Pick<LookBusyConfig, 'tiers' | 'nearDateTiers' | 'maxHideRatioByWeekday'> = LOOK_BUSY_CONFIG,
+  nearDate = false
 ): number {
-  const tierRatio = getHideRatioForOccupancy(occupancy, config);
+  const tierRatio = ratioFromTiers(occupancy, nearDate ? config.nearDateTiers : config.tiers);
   const cap = config.maxHideRatioByWeekday[weekdayOfIsoDate(date)];
   return cap === undefined ? tierRatio : Math.min(tierRatio, cap);
 }
@@ -179,13 +191,13 @@ export function applyLookBusy(
   ): LookBusyResult => ({ visibleSlots: [...offered], hiddenSlots: [], occupancy, hideRatio, skipped });
 
   if (!input.enabled) return keepAll('disabled');
-  if (isWithinNearDateRelease(input.date, input.now, config)) return keepAll('near_date');
+  const nearDate = isWithinNearDateRelease(input.date, input.now, config);
 
   const occupancy = computeOccupancy(input.grid);
   if (occupancy === null) return keepAll('no_grid');
 
-  const hideRatio = getHideRatio(occupancy, input.date, config);
-  if (hideRatio <= 0) return keepAll('busy_day', occupancy, hideRatio);
+  const hideRatio = getHideRatio(occupancy, input.date, config, nearDate);
+  if (hideRatio <= 0) return keepAll(nearDate ? 'near_date' : 'busy_day', occupancy, hideRatio);
 
   const targetHide = Math.round(offered.length * hideRatio);
   if (targetHide <= 0) return keepAll('nothing_to_hide', occupancy, hideRatio);
