@@ -16,6 +16,8 @@ import {
 import { getDoctorBookingSlotMinutes } from '@/shared/clinic-data';
 import { type Holiday } from '@/shared/schema';
 import { getVirtualOnlineAvailability } from '@/lib/virtual-online-booking';
+import { applyLookBusy, type LookBusyGridSlot } from '@/lib/look-busy';
+import { shouldApplyLookBusy } from '@/lib/look-busy-viewer';
 
 
 
@@ -46,6 +48,7 @@ export async function POST(request: NextRequest) {
                                                                                 doctorId,
                                                                                 requestedDate,
                                                                                 durationMinutes,
+                                                                                applyLookBusy: await shouldApplyLookBusy(request, doctorId),
                                                                 });
 
                                                                 if (!availability.mappingFound) {
@@ -110,10 +113,14 @@ export async function POST(request: NextRequest) {
                                 // Get busy slots from Google Calendar
                                 try {
                                                 console.time('fetch-google-calendar');
-                                                const busySlots = await getFreeBusy(mapping.calendarId, requestedDayUtc);
+                                                const [busySlots, lookBusyEnabled] = await Promise.all([
+                                                                getFreeBusy(mapping.calendarId, requestedDayUtc),
+                                                                shouldApplyLookBusy(request, doctorId),
+                                                ]);
                                                 console.timeEnd('fetch-google-calendar');
 
                                                 const availableSlots: string[] = [];
+                                                const lookBusyGrid: LookBusyGridSlot[] = [];
                                                 const nowUtc = new Date(); // Current time to prevent booking in the past
 
                                                 // Is today?
@@ -122,46 +129,50 @@ export async function POST(request: NextRequest) {
                                                 const bufferMinutes = 60; // 1 hour buffer for same-day bookings
                                                 const bookingCutoffUtc = new Date(nowUtc.getTime() + bufferMinutes * 60 * 1000);
 
-                                                for (const range of daySchedule) {
+                                                daySchedule.forEach((range, sessionIndex) => {
                                                                 let currentSlot = fromZonedTime(`${requestedDate}T${range.start}:00`, HONG_KONG_TIMEZONE);
                                                                 const endData = fromZonedTime(`${requestedDate}T${range.end}:00`, HONG_KONG_TIMEZONE);
 
                                                                 while (currentSlot < endData) {
-                                                                                // If booking for today, skip past times
-                                                                                if (isToday && currentSlot < bookingCutoffUtc) {
-                                                                                                currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
-                                                                                                continue;
-                                                                                }
-
-                                                                                if (isSlotBlockedBySameDayEveningCutoffUtc(currentSlot, nowUtc)) {
-                                                                                                currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
-                                                                                                continue;
-                                                                                }
-
-                                                                                if (isSlotAfterClinicLastBookingCutoffUtc(currentSlot, clinicId)) {
-                                                                                                currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
-                                                                                                continue;
-                                                                                }
-
                                                                                 // Check if slot + duration fits within range end
                                                                                 const slotEnd = new Date(currentSlot.getTime() + durationMinutes * 60000);
                                                                                 if (slotEnd > endData) break;
 
-                                                                                // Check against Google Calendar busy slots + partial-day holiday blocks
-                                                                                if (
-                                                                                                isSlotAvailableUtc(currentSlot, slotEnd, busySlots)
-                                                                                                && !isSlotBlockedByHolidaysUtc(currentSlot, slotEnd, applicableHolidays)
-                                                                                ) {
-                                                                                                // Format as HH:mm
-                                                                                                const slotStr = formatInTimeZone(currentSlot, HONG_KONG_TIMEZONE, 'HH:mm');
+                                                                                const slotStr = formatInTimeZone(currentSlot, HONG_KONG_TIMEZONE, 'HH:mm');
+                                                                                const calendarFree = isSlotAvailableUtc(currentSlot, slotEnd, busySlots);
+                                                                                const holidayBlocked = isSlotBlockedByHolidaysUtc(currentSlot, slotEnd, applicableHolidays);
+                                                                                // Occupancy grid ignores time-of-day rules (same-day buffer, cutoffs).
+                                                                                lookBusyGrid.push({
+                                                                                                time: slotStr,
+                                                                                                session: sessionIndex,
+                                                                                                status: holidayBlocked ? 'excluded' : calendarFree ? 'free' : 'busy',
+                                                                                });
+
+                                                                                const blockedByTimeRule =
+                                                                                                (isToday && currentSlot < bookingCutoffUtc)
+                                                                                                || isSlotBlockedBySameDayEveningCutoffUtc(currentSlot, nowUtc)
+                                                                                                || isSlotAfterClinicLastBookingCutoffUtc(currentSlot, clinicId);
+
+                                                                                if (!blockedByTimeRule && calendarFree && !holidayBlocked) {
                                                                                                 availableSlots.push(slotStr);
                                                                                 }
 
                                                                                 currentSlot = new Date(currentSlot.getTime() + slotIntervalMinutes * 60 * 1000);
                                                                 }
-                                                }
+                                                });
 
-                                                return NextResponse.json({ success: true, slots: availableSlots });
+                                                const lookBusy = applyLookBusy({
+                                                                doctorId,
+                                                                clinicId,
+                                                                date: requestedDate,
+                                                                slotMinutes: slotIntervalMinutes,
+                                                                grid: lookBusyGrid,
+                                                                offeredSlots: availableSlots,
+                                                                now: nowUtc,
+                                                                enabled: lookBusyEnabled,
+                                                });
+
+                                                return NextResponse.json({ success: true, slots: lookBusy.visibleSlots });
                                 } catch (calError: any) {
                                                 console.error(`Calendar error: ${getSafeErrorMessage(calError)}`);
                                                 return NextResponse.json(

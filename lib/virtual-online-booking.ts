@@ -9,6 +9,7 @@ import {
 } from '@/lib/booking-helpers';
 import { getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
 import { getFreeBusy } from '@/lib/google-calendar';
+import { applyLookBusy, type LookBusyGridSlot } from '@/lib/look-busy';
 import type { Holiday } from '@/shared/schema';
 import {
   PHYSICAL_CLINIC_IDS,
@@ -169,8 +170,9 @@ async function getAvailableSlotsForMapping(params: {
   requestedDate: string;
   durationMinutes: number;
   nowUtc: Date;
+  lookBusyEnabled: boolean;
 }): Promise<VirtualOnlineAvailability> {
-  const { mapping, requestedDate, durationMinutes, nowUtc } = params;
+  const { mapping, requestedDate, durationMinutes, nowUtc, lookBusyEnabled } = params;
   const { requestedDayUtc, dayOfWeek } = getRequestedDayContext(requestedDate);
   const daySchedule = getScheduleForDayFromWeekly(mapping.schedule, dayOfWeek);
 
@@ -205,42 +207,55 @@ async function getAvailableSlotsForMapping(params: {
 
   const busySlots = await getFreeBusy(mapping.calendarId, requestedDayUtc);
   const availableSlots: string[] = [];
+  const lookBusyGrid: LookBusyGridSlot[] = [];
   const slotIncrementMinutes = durationMinutes > 0 ? durationMinutes : 15;
 
-  for (const range of daySchedule) {
+  daySchedule.forEach((range, sessionIndex) => {
     let currentSlot = fromZonedTime(`${requestedDate}T${range.start}:00`, HONG_KONG_TIMEZONE);
     const rangeEnd = fromZonedTime(`${requestedDate}T${range.end}:00`, HONG_KONG_TIMEZONE);
 
     while (currentSlot < rangeEnd) {
-      if (isPastSameDayCutoff(requestedDate, currentSlot, nowUtc)) {
-        currentSlot = new Date(currentSlot.getTime() + slotIncrementMinutes * 60 * 1000);
-        continue;
-      }
-
-      if (isSlotBlockedBySameDayEveningCutoffUtc(currentSlot, nowUtc)) {
-        currentSlot = new Date(currentSlot.getTime() + slotIncrementMinutes * 60 * 1000);
-        continue;
-      }
-
       const slotEnd = new Date(currentSlot.getTime() + durationMinutes * 60000);
       if (slotEnd > rangeEnd) {
         break;
       }
 
-      if (
-        isSlotAvailableUtc(currentSlot, slotEnd, busySlots) &&
-        !isSlotBlockedByHolidaysUtc(currentSlot, slotEnd, applicableHolidays)
-      ) {
-        availableSlots.push(formatInTimeZone(currentSlot, HONG_KONG_TIMEZONE, 'HH:mm'));
+      const slotLabel = formatInTimeZone(currentSlot, HONG_KONG_TIMEZONE, 'HH:mm');
+      const calendarFree = isSlotAvailableUtc(currentSlot, slotEnd, busySlots);
+      const holidayBlocked = isSlotBlockedByHolidaysUtc(currentSlot, slotEnd, applicableHolidays);
+      // Occupancy of the underlying calendar; ignores time-of-day rules.
+      lookBusyGrid.push({
+        time: slotLabel,
+        session: sessionIndex,
+        status: holidayBlocked ? 'excluded' : calendarFree ? 'free' : 'busy',
+      });
+
+      const blockedByTimeRule =
+        isPastSameDayCutoff(requestedDate, currentSlot, nowUtc) ||
+        isSlotBlockedBySameDayEveningCutoffUtc(currentSlot, nowUtc);
+
+      if (!blockedByTimeRule && calendarFree && !holidayBlocked) {
+        availableSlots.push(slotLabel);
       }
 
       currentSlot = new Date(currentSlot.getTime() + slotIncrementMinutes * 60 * 1000);
     }
-  }
+  });
+
+  const lookBusy = applyLookBusy({
+    doctorId: mapping.doctorId,
+    clinicId: mapping.clinicId,
+    date: requestedDate,
+    slotMinutes: slotIncrementMinutes,
+    grid: lookBusyGrid,
+    offeredSlots: availableSlots,
+    now: nowUtc,
+    enabled: lookBusyEnabled,
+  });
 
   return {
     mappingFound: true,
-    slots: availableSlots,
+    slots: lookBusy.visibleSlots,
     isClosed: false,
     isHoliday: false,
   };
@@ -362,8 +377,11 @@ export async function getVirtualOnlineAvailability(params: {
   doctorId: string;
   requestedDate: string;
   durationMinutes: number;
+  /** Patient view only; the caller resolves global/doctor switches and staff bypass. */
+  applyLookBusy?: boolean;
 }): Promise<VirtualOnlineAvailability> {
   const { doctorId, requestedDate, durationMinutes } = params;
+  const lookBusyEnabled = params.applyLookBusy ?? false;
   if (!isDoctorId(doctorId)) {
     return {
       mappingFound: false,
@@ -396,6 +414,7 @@ export async function getVirtualOnlineAvailability(params: {
         requestedDate,
         durationMinutes,
         nowUtc,
+        lookBusyEnabled,
       })
     )
   );
