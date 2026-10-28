@@ -1,3 +1,5 @@
+import type { BookingLocale } from '@/shared/booking-locale';
+import { notificationDoctorName, notificationClinicName } from '@/lib/booking-notification-locale';
 import { type BookingVisitType } from '@/lib/booking-intake-storage';
 import { buildManageBookingUrl } from '@/lib/public-url';
 
@@ -10,6 +12,7 @@ const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const DEFAULT_CHATWOOT_WHATSAPP_SENDER_PHONE = '+85251899065';
 
 export interface BookingWhatsappConfirmationInput {
+  locale?: BookingLocale;
   bookingId: string;
   patientName: string;
   doctorNameZh: string;
@@ -24,13 +27,13 @@ export interface BookingWhatsappConfirmationInput {
 
 export interface BookingWhatsappReminderInput extends BookingWhatsappConfirmationInput {}
 
-function formatDateForWhatsapp(dateIso: string): string {
+function formatDateForWhatsapp(dateIso: string, locale?: BookingLocale): string {
   if (!dateIso) return '';
 
   const date = new Date(`${dateIso}T00:00:00+08:00`);
   if (Number.isNaN(date.getTime())) return dateIso;
 
-  return new Intl.DateTimeFormat('zh-HK', {
+  return new Intl.DateTimeFormat(locale === 'en' ? 'en-HK' : 'zh-HK', {
     timeZone: HONG_KONG_TIMEZONE,
     year: 'numeric',
     month: 'long',
@@ -78,16 +81,24 @@ export function getClinicWhatsappPhone(_clinicId: string): string {
   return getChatwootWhatsappSenderPhone();
 }
 
-function buildPatientManageBookingUrl(manageAccessToken?: string): string {
+function buildPatientManageBookingUrl(manageAccessToken?: string, locale?: BookingLocale): string {
   return manageAccessToken
-    ? buildManageBookingUrl({ token: manageAccessToken })
-    : buildManageBookingUrl();
+    ? buildManageBookingUrl({ token: manageAccessToken, locale })
+    : buildManageBookingUrl({ locale });
 }
 
 function buildOnlineConsultFlowLines(input: BookingWhatsappConfirmationInput): string[] {
   if (!input.onlineConsultUrl && !input.meetLink) {
     return [];
   }
+
+  if (input.locale === 'en') return [
+    'Online consultation:',
+    input.onlineConsultUrl ? '1. Open the consultation link five minutes before your appointment.' : '1. Open Google Meet five minutes before your appointment.',
+    input.onlineConsultUrl ? `Consultation link: ${input.onlineConsultUrl}` : '',
+    '2. Keep Google Meet open while you wait for your practitioner.',
+    input.meetLink ? `Google Meet: ${input.meetLink}` : '',
+  ].filter(Boolean);
 
   const lines = [
     '網上診症流程：',
@@ -107,8 +118,19 @@ function buildOnlineConsultFlowLines(input: BookingWhatsappConfirmationInput): s
 export function buildWhatsappConfirmationText(
   input: BookingWhatsappConfirmationInput & { manageAccessToken?: string },
 ): string {
-  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
+  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken, input.locale);
   const onlineConsultFlowLines = buildOnlineConsultFlowLines(input);
+  if (input.locale === 'en') return [
+    'Eden Clinic — appointment confirmed', '', `Hello ${input.patientName},`,
+    `Practitioner: ${notificationDoctorName(input.doctorNameZh, input.locale)}`,
+    `Clinic: ${notificationClinicName(input.clinicNameZh, input.locale)}`,
+    `Date: ${formatDateForWhatsapp(input.appointmentDate, input.locale)}`,
+    `Time: ${input.appointmentTime} (Hong Kong time)`,
+    `Visit: ${input.visitType === 'first' ? 'First visit' : 'Follow-up'}`,
+    ...onlineConsultFlowLines,
+    `Booking reference: ${input.bookingId}`,
+    input.groupBookingNotice || '', '', 'Change or cancel your appointment:', manageUrl,
+  ].filter((line, index, lines) => line || lines[index - 1] !== '').join('\n');
 
   return [
     '醫天圓中醫診所預約確認',
@@ -116,7 +138,7 @@ export function buildWhatsappConfirmationText(
     `你好 ${input.patientName}，`,
     `你已成功預約 ${input.doctorNameZh} 醫師。`,
     `診所：${input.clinicNameZh}`,
-    `日期：${formatDateForWhatsapp(input.appointmentDate)}`,
+    `日期：${formatDateForWhatsapp(input.appointmentDate, input.locale)}`,
     `時間：${input.appointmentTime}`,
     `診症類型：${VISIT_TYPE_LABELS[input.visitType]}`,
     ...onlineConsultFlowLines,
@@ -132,14 +154,14 @@ export function buildWhatsappConfirmationText(
 export function buildWhatsappTemplateBodyParams(
   input: BookingWhatsappConfirmationInput & { manageAccessToken?: string },
 ): Record<string, string> {
-  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
+  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken, input.locale);
 
   return {
     patient_name: input.patientName,
-    doctor_name: input.doctorNameZh,
-    clinic_name: input.clinicNameZh,
-    appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
-    visit_type: VISIT_TYPE_LABELS[input.visitType],
+    doctor_name: notificationDoctorName(input.doctorNameZh, input.locale),
+    clinic_name: notificationClinicName(input.clinicNameZh, input.locale),
+    appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate, input.locale)} ${input.appointmentTime}`,
+    visit_type: input.locale === 'en' ? (input.visitType === 'first' ? 'First visit' : 'Follow-up') : VISIT_TYPE_LABELS[input.visitType],
     booking_id: input.bookingId,
     manage_url: manageUrl,
     ...(input.meetLink && process.env.CHATWOOT_WHATSAPP_CONFIRMATION_TEMPLATE_INCLUDE_MEET_LINK === 'true'
@@ -151,16 +173,16 @@ export function buildWhatsappTemplateBodyParams(
 export function buildWhatsappOnlineTemplateBodyParams(
   input: BookingWhatsappConfirmationInput & { manageAccessToken?: string },
 ): Record<string, string> {
-  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
-  const appointmentDateTime = `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`;
+  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken, input.locale);
+  const appointmentDateTime = `${formatDateForWhatsapp(input.appointmentDate, input.locale)} ${input.appointmentTime}`;
 
   return {
     patient_name: input.patientName,
-    doctor_name: `${input.doctorNameZh}（預約時間：${appointmentDateTime}）`,
-    clinic_name: input.clinicNameZh,
+    doctor_name: input.locale === 'en' ? `${notificationDoctorName(input.doctorNameZh, input.locale)} (${appointmentDateTime})` : `${input.doctorNameZh}（預約時間：${appointmentDateTime}）`,
+    clinic_name: notificationClinicName(input.clinicNameZh, input.locale),
     appointment_datetime: appointmentDateTime,
     ...(input.onlineConsultUrl ? { online_consult_url: input.onlineConsultUrl } : {}),
-    visit_type: VISIT_TYPE_LABELS[input.visitType],
+    visit_type: input.locale === 'en' ? (input.visitType === 'first' ? 'First visit' : 'Follow-up') : VISIT_TYPE_LABELS[input.visitType],
     booking_id: input.bookingId,
     manage_url: manageUrl,
   };
@@ -169,7 +191,17 @@ export function buildWhatsappOnlineTemplateBodyParams(
 export function buildWhatsappReminderText(
   input: BookingWhatsappReminderInput & { manageAccessToken?: string },
 ): string {
-  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
+  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken, input.locale);
+  if (input.locale === 'en') return [
+    'Eden Clinic — appointment reminder', '', `Hello ${input.patientName},`,
+    'Your appointment is in approximately 24 hours.',
+    `Practitioner: ${notificationDoctorName(input.doctorNameZh, input.locale)}`,
+    `Clinic: ${notificationClinicName(input.clinicNameZh, input.locale)}`,
+    `Date: ${formatDateForWhatsapp(input.appointmentDate, input.locale)}`,
+    `Time: ${input.appointmentTime} (Hong Kong time)`,
+    `Visit: ${input.visitType === 'first' ? 'First visit' : 'Follow-up'}`,
+    `Booking reference: ${input.bookingId}`, '', 'Change or cancel your appointment:', manageUrl,
+  ].join('\n');
 
   return [
     '醫天圓中醫診所預約提醒',
@@ -178,7 +210,7 @@ export function buildWhatsappReminderText(
     '溫馨提示：你的預約大約將於24小時後進行。',
     `醫師：${input.doctorNameZh}`,
     `診所：${input.clinicNameZh}`,
-    `日期：${formatDateForWhatsapp(input.appointmentDate)}`,
+    `日期：${formatDateForWhatsapp(input.appointmentDate, input.locale)}`,
     `時間：${input.appointmentTime}`,
     `診症類型：${VISIT_TYPE_LABELS[input.visitType]}`,
     `預約編號：${input.bookingId}`,
@@ -191,14 +223,14 @@ export function buildWhatsappReminderText(
 export function buildWhatsappReminderTemplateBodyParams(
   input: BookingWhatsappReminderInput & { manageAccessToken?: string },
 ): Record<string, string> {
-  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken);
+  const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken, input.locale);
 
   return {
     patient_name: input.patientName,
-    doctor_name: input.doctorNameZh,
-    clinic_name: input.clinicNameZh,
-    appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
-    visit_type: VISIT_TYPE_LABELS[input.visitType],
+    doctor_name: notificationDoctorName(input.doctorNameZh, input.locale),
+    clinic_name: notificationClinicName(input.clinicNameZh, input.locale),
+    appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate, input.locale)} ${input.appointmentTime}`,
+    visit_type: input.locale === 'en' ? (input.visitType === 'first' ? 'First visit' : 'Follow-up') : VISIT_TYPE_LABELS[input.visitType],
     booking_id: input.bookingId,
     manage_url: manageUrl,
   };
@@ -209,6 +241,7 @@ export function buildWhatsappReminderTemplateBodyParams(
 // ---------------------------------------------------------------------------
 
 export interface BookingWhatsappCancellationInput {
+  locale?: BookingLocale;
   bookingId: string;
   patientName: string;
   doctorNameZh: string;
@@ -222,6 +255,16 @@ export interface BookingWhatsappCancellationInput {
 export function buildWhatsappCancellationText(
   input: BookingWhatsappCancellationInput,
 ): string {
+  if (input.locale === 'en') return [
+    'Eden Clinic — appointment cancelled', '', `Hello ${input.patientName},`,
+    'Your appointment has been cancelled.',
+    `Practitioner: ${notificationDoctorName(input.doctorNameZh, input.locale)}`,
+    `Clinic: ${notificationClinicName(input.clinicNameZh, input.locale)}`,
+    `Date: ${formatDateForWhatsapp(input.appointmentDate, input.locale)}`,
+    `Time: ${input.appointmentTime} (Hong Kong time)`,
+    `Booking reference: ${input.bookingId}`, input.cancellationReason || '', '',
+    'Manage appointments:', buildPatientManageBookingUrl(input.manageAccessToken, input.locale),
+  ].filter((line, index, lines) => line || lines[index - 1] !== '').join('\n');
   return [
     '醫天圓中醫診所預約取消確認',
     '',
@@ -229,14 +272,14 @@ export function buildWhatsappCancellationText(
     '你的以下預約已成功取消：',
     `醫師：${input.doctorNameZh}`,
     `診所：${input.clinicNameZh}`,
-    `原定日期：${formatDateForWhatsapp(input.appointmentDate)}`,
+    `原定日期：${formatDateForWhatsapp(input.appointmentDate, input.locale)}`,
     `原定時間：${input.appointmentTime}`,
     `預約編號：${input.bookingId}`,
     input.cancellationReason ? '' : '',
     input.cancellationReason || '',
     '',
     '如需重新預約，歡迎隨時使用以下連結：',
-    buildPatientManageBookingUrl(input.manageAccessToken),
+    buildPatientManageBookingUrl(input.manageAccessToken, input.locale),
   ].filter((line, index, lines) => line || lines[index - 1] !== '').join('\n');
 }
 
@@ -245,15 +288,16 @@ export function buildWhatsappCancellationTemplateBodyParams(
 ): Record<string, string> {
   return {
     patient_name: input.patientName,
-    doctor_name: input.doctorNameZh,
-    clinic_name: input.clinicNameZh,
-    appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate)} ${input.appointmentTime}`,
+    doctor_name: notificationDoctorName(input.doctorNameZh, input.locale),
+    clinic_name: notificationClinicName(input.clinicNameZh, input.locale),
+    appointment_datetime: `${formatDateForWhatsapp(input.appointmentDate, input.locale)} ${input.appointmentTime}`,
     booking_id: input.bookingId,
-    manage_url: buildPatientManageBookingUrl(input.manageAccessToken),
+    manage_url: buildPatientManageBookingUrl(input.manageAccessToken, input.locale),
   };
 }
 
 export interface BookingWhatsappRescheduleInput {
+  locale?: BookingLocale;
   bookingId: string;
   patientName: string;
   doctorNameZh: string;
@@ -268,6 +312,16 @@ export interface BookingWhatsappRescheduleInput {
 export function buildWhatsappRescheduleText(
   input: BookingWhatsappRescheduleInput,
 ): string {
+  if (input.locale === 'en') return [
+    'Eden Clinic — appointment changed', '', `Hello ${input.patientName},`,
+    'Your appointment has been rescheduled.',
+    `Practitioner: ${notificationDoctorName(input.doctorNameZh, input.locale)}`,
+    `Clinic: ${notificationClinicName(input.clinicNameZh, input.locale)}`,
+    `Previous time: ${formatDateForWhatsapp(input.oldDate, input.locale)} ${input.oldTime}`,
+    `New time: ${formatDateForWhatsapp(input.newDate, input.locale)} ${input.newTime} (Hong Kong time)`,
+    `Booking reference: ${input.bookingId}`, '',
+    'Manage appointments:', buildPatientManageBookingUrl(input.manageAccessToken, input.locale),
+  ].join('\n');
   return [
     '醫天圓中醫診所預約更改確認',
     '',
@@ -275,11 +329,11 @@ export function buildWhatsappRescheduleText(
     '你的預約已成功更改：',
     `醫師：${input.doctorNameZh}`,
     `診所：${input.clinicNameZh}`,
-    `原定時間：${formatDateForWhatsapp(input.oldDate)} ${input.oldTime}`,
-    `新時間：${formatDateForWhatsapp(input.newDate)} ${input.newTime}`,
+    `原定時間：${formatDateForWhatsapp(input.oldDate, input.locale)} ${input.oldTime}`,
+    `新時間：${formatDateForWhatsapp(input.newDate, input.locale)} ${input.newTime}`,
     `預約編號：${input.bookingId}`,
     '',
-    `管理預約：${buildPatientManageBookingUrl(input.manageAccessToken)}`,
+    `管理預約：${buildPatientManageBookingUrl(input.manageAccessToken, input.locale)}`,
   ].join('\n');
 }
 
@@ -288,11 +342,11 @@ export function buildWhatsappRescheduleTemplateBodyParams(
 ): Record<string, string> {
   return {
     patient_name: input.patientName,
-    doctor_name: input.doctorNameZh,
-    clinic_name: input.clinicNameZh,
-    old_datetime: `${formatDateForWhatsapp(input.oldDate)} ${input.oldTime}`,
-    new_datetime: `${formatDateForWhatsapp(input.newDate)} ${input.newTime}`,
+    doctor_name: notificationDoctorName(input.doctorNameZh, input.locale),
+    clinic_name: notificationClinicName(input.clinicNameZh, input.locale),
+    old_datetime: `${formatDateForWhatsapp(input.oldDate, input.locale)} ${input.oldTime}`,
+    new_datetime: `${formatDateForWhatsapp(input.newDate, input.locale)} ${input.newTime}`,
     booking_id: input.bookingId,
-    manage_url: buildPatientManageBookingUrl(input.manageAccessToken),
+    manage_url: buildPatientManageBookingUrl(input.manageAccessToken, input.locale),
   };
 }

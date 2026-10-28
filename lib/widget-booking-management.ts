@@ -1,3 +1,4 @@
+import { parseBookingLocale, type BookingLocale } from '@/shared/booking-locale';
 import "server-only";
 
 import { createHmac, randomInt, randomUUID, timingSafeEqual } from "crypto";
@@ -72,6 +73,7 @@ type WidgetBookingRow = {
   phone_digits: string | null;
   email: string;
   visit_type: "first" | "followup";
+  booking_payload?: Record<string, unknown> | null;
 };
 
 type WidgetManageAction = "reschedule" | "cancel";
@@ -193,6 +195,7 @@ const BOOKING_SELECT_FIELDS = [
   "phone_digits",
   "email",
   "visit_type",
+  "booking_payload",
 ].join(", ");
 
 function getWidgetOtpSecret() {
@@ -785,6 +788,7 @@ export async function requestWidgetBookingVerificationCode(
 export async function requestWidgetBookingManageLink(params: {
   phone: string;
   action?: WidgetManageAction | null;
+  locale?: BookingLocale;
 }): Promise<WidgetBookingRequestCodeResult> {
   try {
     const phoneDigits = normalizePhoneForSearch(params.phone);
@@ -806,11 +810,13 @@ export async function requestWidgetBookingManageLink(params: {
       ttlMs: getWidgetOtpTtlMs(),
     });
     const manageUrl = buildManageBookingUrl({
+      locale: params.locale,
       action: params.action || undefined,
       token: manageAccessToken,
     });
 
     const whatsappResult = await sendBookingManageAccessWhatsapp({
+      locale: params.locale,
       patientName: primaryRow.patient_name,
       phone: primaryRow.phone,
       email: getWhatsappContactEmail(primaryRow),
@@ -994,6 +1000,7 @@ export async function lookupWidgetBooking(
 
 export async function cancelWidgetBooking(
   manageToken: string,
+  locale?: BookingLocale,
 ): Promise<WidgetBookingActionResult> {
   const rowResult = await getBookingRowByManageToken(manageToken);
   if (!rowResult.success) {
@@ -1041,6 +1048,7 @@ export async function cancelWidgetBooking(
     const manageAccessToken = phoneDigits ? createManageAccessToken(phoneDigits) : undefined;
 
     const whatsappResult = await sendBookingCancellationWhatsapp({
+      locale: locale ?? parseBookingLocale(row.booking_payload?.locale),
       bookingId: row.google_event_id || row.id,
       patientName: row.patient_name,
       doctorNameZh: row.doctor_name_zh,
@@ -1077,6 +1085,7 @@ export async function cancelWidgetBooking(
 
 export async function rescheduleWidgetBooking(params: {
   manageToken: string;
+  locale?: BookingLocale;
   date: string;
   time: string;
   clinicId?: string;
@@ -1277,6 +1286,7 @@ export async function rescheduleWidgetBooking(params: {
     const manageAccessToken = phoneDigits ? createManageAccessToken(phoneDigits) : undefined;
 
     const whatsappResult = await sendBookingRescheduleWhatsapp({
+      locale: params.locale ?? parseBookingLocale(row.booking_payload?.locale),
       bookingId: nextEventId || row.id,
       patientName: row.patient_name,
       doctorNameZh: row.doctor_name_zh,

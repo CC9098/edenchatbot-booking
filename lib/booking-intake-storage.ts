@@ -1,3 +1,4 @@
+import { parseBookingLocale, type BookingLocale } from '@/shared/booking-locale';
 import { createServiceClient } from "@/lib/supabase";
 import { normalizePhoneForSearch } from "@/lib/contact-utils";
 import type { BookingPickupType } from "@/shared/booking-pickup";
@@ -38,6 +39,7 @@ export interface BookingIntakeCreateInput {
 }
 
 export interface BookingReminderIntakeCandidate {
+  locale?: BookingLocale;
   intakeId: string;
   googleEventId: string;
   calendarId: string;
@@ -397,6 +399,7 @@ export async function listConfirmedBookingReminderCandidatesByDate(
         appointmentTime:
           typeof row.appointment_time === "string" ? row.appointment_time.trim() : "",
         notificationClinicId: parseNotificationClinicId(row.booking_payload),
+        locale: parseBookingLocale(row.booking_payload?.locale),
       });
     }
 

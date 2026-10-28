@@ -1,3 +1,4 @@
+import { bookingText, type BookingLocale } from '@/shared/booking-locale';
 export type AvailabilityState = 'available' | 'unavailable' | 'unknown';
 
 export type AvailabilityByDate<Clinic extends string> = Record<
@@ -44,6 +45,7 @@ export function earliestAvailabilitySummary(
   dates: string[],
   stateForDate: (date: string) => AvailabilityState | undefined,
   loading: boolean,
+  locale: BookingLocale = 'zh',
 ): EarliestAvailabilitySummary {
   let hasUnresolvedEarlierDate = false;
 
@@ -53,7 +55,7 @@ export function earliestAvailabilitySummary(
 
     if (state === 'available') {
       if (hasUnresolvedEarlierDate) break;
-      return { label: `最早 ${formatDayMonth(date)} 可約`, tone: 'available' };
+      return { label: bookingText('最早 {0}/{1} 可約', locale, [Number(date.slice(8,10)), Number(date.slice(5,7))]), tone: 'available' };
     }
 
     hasUnresolvedEarlierDate = true;
@@ -61,11 +63,11 @@ export function earliestAvailabilitySummary(
     if (loading) break;
   }
 
-  if (loading) return { label: '正在查詢最早時段', tone: 'loading' };
+  if (loading) return { label: bookingText('正在查詢最早時段', locale), tone: 'loading' };
   if (dates.length === 0 || hasUnresolvedEarlierDate) {
-    return { label: '暫時未能確認最早時段', tone: 'unknown' };
+    return { label: bookingText('暫時未能確認最早時段', locale), tone: 'unknown' };
   }
-  return { label: '可預約日期內暫無時段', tone: 'unavailable' };
+  return { label: bookingText('可預約日期內暫無時段', locale), tone: 'unavailable' };
 }
 
 type ScanJob<Clinic extends string> = { date: string; clinic: Clinic; priority: boolean };

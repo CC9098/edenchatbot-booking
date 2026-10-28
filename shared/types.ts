@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ALL_BOOKING_TREATMENT_OPTION_IDS } from '@/shared/booking-treatment-options';
+import { isDoctorAcceptingBookings } from '@/shared/clinic-data';
 
 const optionalEmailSchema = z
   .string()
@@ -20,7 +21,7 @@ export const availabilitySchema = z.object({
 });
 
 export const bookingSchema = z.object({
-                doctorId: z.string(),
+                doctorId: z.string().refine(isDoctorAcceptingBookings, { message: 'Doctor is not accepting bookings' }),
                 doctorName: z.string(),
                 doctorNameZh: z.string(),
                 clinicId: z.string(),

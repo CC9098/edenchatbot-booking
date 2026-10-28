@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { isEnglishPublicRoute } from "@/lib/public-language";
 import { useEffect, useState, type FormEvent } from "react";
 import { ClinicBrandLink } from "@/components/brand/ClinicBrandLink";
 import {
@@ -216,6 +217,8 @@ function ProfileCompletionPrompt({ enabled }: { enabled: boolean }) {
 
 export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const englishPublicRoute = isEnglishPublicRoute(pathname, searchParams.get("lang"));
   const [showMobileChrome, setShowMobileChrome] = useState(() => {
     if (typeof window === "undefined") return false;
     const userAgent = window.navigator.userAgent;
@@ -263,14 +266,14 @@ export function PatientAppChrome({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Show patient mobile chrome in native app and mobile browsers.
-  const patientRoute = showMobileChrome && isPatientRoute(pathname) && !conversationLogin;
+  const patientRoute = showMobileChrome && isPatientRoute(pathname) && !conversationLogin && !englishPublicRoute;
   const isChatRoute = patientRoute && pathname.startsWith("/chat");
 
   const activeTab = getActiveTab(pathname);
   const topbarTitle = getTopbarTitle(pathname);
   const shouldShowRouteTopbar = patientRoute && !isChatRoute;
   const shouldShowTabbar = !isChatRoute || !keyboardOpen;
-  const shouldPromptProfileCompletion = isPatientRoute(pathname) &&
+  const shouldPromptProfileCompletion = !englishPublicRoute && isPatientRoute(pathname) &&
     !pathname.startsWith("/login") && !pathname.startsWith("/my-bookings");
   const routeTopbarInnerClassName =
     "chat-fixed-topbar__inner !flex !min-h-[52px] !items-center !justify-between !gap-2.5 !rounded-[18px] !border !border-[rgba(92,118,95,0.14)] !bg-[#F5F7F2] !px-3 !shadow-[0_6px_16px_rgba(36,61,41,0.06)] max-[440px]:!min-h-[50px] max-[440px]:!gap-1.5 max-[440px]:!px-2.5";

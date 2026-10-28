@@ -6,6 +6,7 @@ import { getTodayIsoInHongKong } from '@/lib/timetable-admin-utils';
 import {
   CLINIC_BY_ID,
   DOCTORS,
+  isDoctorAcceptingBookings,
   PHYSICAL_CLINIC_IDS,
   getDoctorBookingGroupLabel,
   getDoctorBookingPractitionerGroup,
@@ -169,7 +170,7 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
 
     const doctor = DOCTORS.find((candidate) => candidate.id === mapping.doctorId);
     const clinic = CLINIC_BY_ID[mapping.clinicId];
-    if (!doctor || !clinic) continue;
+    if (!doctor || !clinic || !isDoctorAcceptingBookings(doctor.id)) continue;
 
     const clinicSchedule: BookableClinicSchedule = {
       clinicId: mapping.clinicId,
@@ -196,6 +197,7 @@ export async function getPublicBookableScheduleData(): Promise<BookableDoctorSch
 
   return DOCTORS
     .map((doctorProfile): BookableDoctorSchedule | null => {
+      if (!isDoctorAcceptingBookings(doctorProfile.id)) return null;
       const onlineSchedule =
         doctorProfile.onlineBookingEnabled === false
           ? null

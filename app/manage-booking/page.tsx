@@ -1,3 +1,4 @@
+import { parseBookingLocale } from '@/shared/booking-locale';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -13,10 +14,15 @@ import {
 import { ManageBookingFlow } from '@/components/booking/ManageBookingFlow';
 import { PublicBookingTabs } from '@/components/booking/PublicBookingTabs';
 
-export const metadata: Metadata = {
+const chineseMetadata: Metadata = {
   title: '預約管理 | 醫天圓',
   description: '透過 WhatsApp 登入連結，以清晰卡片方式更改或取消現有預約。',
 };
+
+export function generateMetadata({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }): Metadata {
+  return parseBookingLocale(searchParams?.lang) === 'en' ? { title: { absolute: 'Manage appointments | Eden Clinic' }, description: 'Reschedule or cancel your Eden Clinic appointment using a WhatsApp sign-in link.' } : chineseMetadata;
+}
+
 
 function parseManageAction(value: string | string[] | undefined) {
   const normalized = Array.isArray(value) ? value[0] : value;
@@ -114,17 +120,18 @@ export default function ManageBookingPage({
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
+  const locale = parseBookingLocale(searchParams?.lang);
   const action = parseManageAction(searchParams?.action);
   const token = parseToken(searchParams?.token);
   const hero = getHeroCopy(action);
 
   return (
-    <main className="patient-pane overflow-x-hidden text-slate-800">
+    <main lang={locale === 'en' ? 'en-HK' : 'zh-Hant-HK'} className="patient-pane overflow-x-hidden text-slate-800">
       <div className="mx-auto max-w-5xl space-y-4">
-        <PublicBookingTabs current={action ?? 'manage'} manageToken={token} />
+        <PublicBookingTabs current={action ?? 'manage'} manageToken={token} locale={locale} />
 
-        {action || token ? (
-          <ManageBookingFlow action={action} manageAccessToken={token} />
+        {action || token || locale === 'en' ? (
+          <ManageBookingFlow action={action} manageAccessToken={token} locale={locale} />
         ) : (
           <section className="patient-card space-y-8 p-5 sm:p-7 lg:p-8">
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_340px]">

@@ -53,6 +53,8 @@ export type DoctorProfile = {
   bookingTreatmentOptions?: readonly BookingTreatmentOptionId[];
   bookingSlotMinutes?: number;
   bookingVisitOptions?: readonly BookingVisitOption[];
+  // Stops new physical and video bookings while retaining the historical doctor ID.
+  bookingEnabled?: boolean;
   onlineBookingEnabled?: boolean;
   /** Patient-facing smart look-busy (see lib/look-busy.ts). Missing = enabled. */
   lookBusy?: { enabled: boolean };
@@ -111,7 +113,7 @@ export const CLINICS: ClinicProfile[] = [
     contactPhone: '5929 3042',
     whatsappUrl: 'https://wa.me/85259293042',
     whatsappLabel: '按此聯絡姑娘',
-    hoursText: '週一至五 11:00-14:00, 15:30-19:30；週六 11:00-14:00, 15:30-18:30；週日及公眾假期休息',
+    hoursText: '週一至五 11:00-14:00, 15:30-19:30；週六 11:00-18:30；週日及公眾假期休息',
     googleMapUrl: CLINIC_GOOGLE_MAP_URLS.jordan,
     routeMapUrl: 'https://www.edenclinic.hk/佐敦街景路線圖/',
   },
@@ -124,7 +126,7 @@ export const CLINICS: ClinicProfile[] = [
     contactPhone: '2698 5422 / 5189 9065',
     whatsappUrl: 'https://wa.me/85251899065',
     whatsappLabel: '按此聯絡姑娘',
-    hoursText: '週一、二、四至六 10:30-14:00，15:30-19:00；週三及週日 10:30-14:00，15:30-17:00；公眾假期休息',
+    hoursText: '週一、二、四至日 10:30-14:00，15:30-19:00；週三及公眾假期休息',
     googleMapUrl: CLINIC_GOOGLE_MAP_URLS.tsuenwan,
     routeMapUrl: 'https://www.edenclinic.hk/荃灣街景路線圖/',
   },
@@ -169,8 +171,6 @@ export const DOCTORS: DoctorProfile[] = [
     lookBusy: { enabled: true },
     bookingTreatmentOptions: DEFAULT_DOCTOR_BOOKING_TREATMENT_OPTION_IDS,
     bookingSlotMinutes: 15,
-    scheduleNote:
-      '2026年3月1日至2026年3月9日如欲預約，請致電或 WhatsApp 聯絡診所；2026年3月10日至2026年4月30日韓醫師進修休診，會由張天慧醫師及梁仲威醫師駐診。',
   },
   {
     id: 'chau',
@@ -203,8 +203,8 @@ export const DOCTORS: DoctorProfile[] = [
     bookingUrl: buildBookingUrl({ doctorId: 'cheungmy' }),
     lookBusy: { enabled: true },
     bookingTreatmentOptions: ['acupuncture'],
-    scheduleNote:
-      '2026年5月13日起應診：佐敦逢星期四 11:00-14:00；荃灣逢星期三 10:30-14:00、15:30-17:00。',
+    bookingEnabled: false,
+    onlineBookingEnabled: false,
   },
   {
     id: 'leung',
@@ -257,6 +257,10 @@ export const DOCTORS: DoctorProfile[] = [
 export const DOCTOR_BY_ID: Record<DoctorId, DoctorProfile> = Object.fromEntries(
   DOCTORS.map((doctor) => [doctor.id, doctor])
 ) as Record<DoctorId, DoctorProfile>;
+
+export function isDoctorAcceptingBookings(doctorId: string): doctorId is DoctorId {
+  return isDoctorId(doctorId) && DOCTOR_BY_ID[doctorId].bookingEnabled !== false;
+}
 
 export const DOCTOR_BY_NAME_ZH: Record<string, DoctorProfile> = Object.fromEntries(
   DOCTORS.map((doctor) => [doctor.nameZh, doctor])

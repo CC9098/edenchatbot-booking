@@ -1,3 +1,5 @@
+import { approvedEnglishBookingTemplates } from '@/lib/booking-notification-locale';
+import type { BookingLocale } from '@/shared/booking-locale';
 import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import { buildWhatsappAuthenticationOtpParams } from '@/lib/whatsapp-login-template';
 import {
@@ -165,6 +167,7 @@ interface BookingWhatsappReminderNotificationInput extends BookingWhatsappRemind
 
 interface BookingManageWhatsappOtpInput {
   purpose?: "manage_booking" | "member_login";
+  locale?: BookingLocale;
   patientName: string;
   phone: string;
   email: string;
@@ -797,6 +800,11 @@ async function ensureWhatsappContact(
     contactId: contact.id,
     sourceId,
   };
+}
+
+function localizedBookingTemplates(inbox: ChatwootInbox, locale: BookingLocale | undefined, configs: TemplateConfig[], englishName?: string): TemplateConfig[] {
+  if (locale !== 'en') return configs;
+  return approvedEnglishBookingTemplates(inbox.message_templates || [], configs.map(config => config.name), englishName);
 }
 
 function getTemplateConfigs(inbox: ChatwootInbox): TemplateConfig[] {
@@ -1838,12 +1846,15 @@ export async function sendBookingConfirmationWhatsapp(
     const shouldUseOnlineTemplate = Boolean(input.meetLink);
 
     return await sendBookingWhatsappNotification(input, {
+      fallbackTextOnTemplateFailure: input.locale === 'en',
       buildContent: () => buildWhatsappConfirmationText(input),
       buildBodyParams: () =>
         shouldUseOnlineTemplate
           ? buildWhatsappOnlineTemplateBodyParams(input)
           : buildWhatsappTemplateBodyParams(input),
-      getTemplateConfigs: shouldUseOnlineTemplate ? getOnlineTemplateConfigs : getTemplateConfigs,
+      getTemplateConfigs: inbox => localizedBookingTemplates(inbox, input.locale,
+        shouldUseOnlineTemplate ? getOnlineTemplateConfigs(inbox) : getTemplateConfigs(inbox),
+        shouldUseOnlineTemplate ? process.env.CHATWOOT_WHATSAPP_ONLINE_TEMPLATE_NAME_EN : process.env.CHATWOOT_WHATSAPP_TEMPLATE_NAME_EN),
       preferTemplateIfAvailable: !input.groupBookingNotice,
     });
   } catch (error) {
@@ -1860,9 +1871,10 @@ export async function sendBookingReminderWhatsapp(
 ): Promise<SendWhatsappBookingConfirmationResult> {
   try {
     return await sendBookingWhatsappNotification(input, {
+      fallbackTextOnTemplateFailure: input.locale === 'en',
       buildContent: () => buildWhatsappReminderText(input),
       buildBodyParams: () => buildWhatsappReminderTemplateBodyParams(input),
-      getTemplateConfigs: getReminderTemplateConfigs,
+      getTemplateConfigs: inbox => localizedBookingTemplates(inbox, input.locale, getReminderTemplateConfigs(inbox), process.env.CHATWOOT_WHATSAPP_REMINDER_TEMPLATE_NAME_EN),
       preferTemplateIfAvailable: true,
     });
   } catch (error) {
@@ -1943,11 +1955,12 @@ export async function sendBookingManageOtpWhatsapp(
 
     const content = buildWhatsappManageVerificationText({
       purpose: input.purpose,
+      locale: input.locale,
       patientName: input.patientName,
       code: input.code,
       expiryMinutes: input.expiryMinutes,
     });
-    const templateConfigs = getOtpTemplateConfigs(inbox, input.purpose);
+    const templateConfigs = localizedBookingTemplates(inbox, input.locale, getOtpTemplateConfigs(inbox, input.purpose), process.env.CHATWOOT_WHATSAPP_OTP_TEMPLATE_NAME_EN);
     const bodyParams = buildWhatsappManageVerificationTemplateBodyParams({
       patientName: input.patientName,
       code: input.code,
@@ -1967,12 +1980,13 @@ export async function sendBookingManageOtpWhatsapp(
         success: true,
         whatsappSent: true,
         conversationId,
-        ...(templateName === 'booking_manage_otp' ? { verificationLabel: '預約管理驗證碼' } : {}),
+        ...(templateName === 'booking_manage_otp' ? { verificationLabel: input.locale === 'en' ? 'Appointment verification code' : '預約管理驗證碼' } : {}),
       };
+    } else if (input.locale === 'en') {
+      if (!isActiveConversation(existingConversation)) throw buildNoTemplateForOutboundTextError();
+      await sendTextMessageWithFailureCheck(client, accountId, conversationId, content);
     } else {
-      await client.createMessage(accountId, conversationId, {
-        content,
-      });
+      await client.createMessage(accountId, conversationId, { content });
     }
 
     return {
@@ -1994,9 +2008,10 @@ export async function sendBookingManageAccessWhatsapp(
 ): Promise<SendWhatsappBookingConfirmationResult> {
   try {
     return await sendBookingWhatsappNotification(input, {
+      fallbackTextOnTemplateFailure: input.locale === 'en',
       buildContent: () => buildWhatsappManageAccessText(input),
       buildBodyParams: () => buildWhatsappManageAccessTemplateBodyParams(input),
-      getTemplateConfigs: getManageLinkTemplateConfigs,
+      getTemplateConfigs: inbox => localizedBookingTemplates(inbox, input.locale, getManageLinkTemplateConfigs(inbox), process.env.CHATWOOT_WHATSAPP_MANAGE_LINK_TEMPLATE_NAME_EN),
       preferTemplateIfAvailable: true,
     });
   } catch (error) {
@@ -2135,9 +2150,10 @@ export async function sendBookingCancellationWhatsapp(
 ): Promise<SendWhatsappBookingConfirmationResult> {
   try {
     return await sendBookingWhatsappNotification(input, {
+      fallbackTextOnTemplateFailure: input.locale === 'en',
       buildContent: () => buildWhatsappCancellationText(input),
       buildBodyParams: () => buildWhatsappCancellationTemplateBodyParams(input),
-      getTemplateConfigs: getCancellationTemplateConfigs,
+      getTemplateConfigs: inbox => localizedBookingTemplates(inbox, input.locale, getCancellationTemplateConfigs(inbox), process.env.CHATWOOT_WHATSAPP_CANCEL_TEMPLATE_NAME_EN),
       preferTemplateIfAvailable: !input.cancellationReason,
     });
   } catch (error) {
@@ -2159,9 +2175,10 @@ export async function sendBookingRescheduleWhatsapp(
 ): Promise<SendWhatsappBookingConfirmationResult> {
   try {
     return await sendBookingWhatsappNotification(input, {
+      fallbackTextOnTemplateFailure: input.locale === 'en',
       buildContent: () => buildWhatsappRescheduleText(input),
       buildBodyParams: () => buildWhatsappRescheduleTemplateBodyParams(input),
-      getTemplateConfigs: getRescheduleTemplateConfigs,
+      getTemplateConfigs: inbox => localizedBookingTemplates(inbox, input.locale, getRescheduleTemplateConfigs(inbox), process.env.CHATWOOT_WHATSAPP_RESCHEDULE_TEMPLATE_NAME_EN),
       preferTemplateIfAvailable: true,
     });
   } catch (error) {

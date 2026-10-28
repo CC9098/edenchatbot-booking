@@ -23,6 +23,7 @@ const BLOCKED_PATHNAME_PREFIXES = [
 ];
 
 function isBlockedPathname(pathname: string): boolean {
+  if (pathname === "/en" || pathname.startsWith("/en/")) return true;
   return BLOCKED_PATHNAME_PREFIXES.some((prefix) =>
     pathname.startsWith(prefix),
   );

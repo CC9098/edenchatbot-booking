@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
+import { PublicDocumentLanguage } from "@/components/brand/PublicDocumentLanguage";
 import { Figtree, Noto_Sans_TC, Noto_Serif_TC, Roboto_Mono } from "next/font/google";
 import { NativeOAuthListener } from "@/components/auth/NativeOAuthListener";
 import { StaffAuthResume } from "@/components/auth/StaffAuthResume";
@@ -91,9 +93,12 @@ export default function RootLayout({
         />
         <GoogleAnalytics />
         <NativeOAuthListener />
+        <Suspense fallback={null}><PublicDocumentLanguage /></Suspense>
         <StaffAuthResume />
         <CrossMethodBanner />
-        <PatientAppChrome>{children}</PatientAppChrome>
+        <Suspense fallback={children}>
+          <PatientAppChrome>{children}</PatientAppChrome>
+        </Suspense>
       </body>
     </html>
   );
