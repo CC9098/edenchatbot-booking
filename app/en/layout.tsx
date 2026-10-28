@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './fonts.css';
 import './site.css';
 import './overrides.css';
+import './homepage.css';
 import { EnglishMain, EnglishSiteHeader } from '@/components/english/EnglishSiteChrome';
 import { EnglishFooter } from '@/components/english/EnglishCommon';
 import { ENGLISH_PUBLIC_ORIGIN, englishPublicationMetadata, isEnglishPublished } from '@/lib/english-publication';
