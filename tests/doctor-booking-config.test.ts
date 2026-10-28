@@ -13,6 +13,7 @@ import {
   getDoctorBookingVisitOption,
   getDoctorBookingVisitOptions,
   isSupportBookingPractitioner,
+  isDoctorAcceptingBookings,
 } from '@/shared/clinic-data';
 import { GROUP_BOOKING_POLICIES } from '@/lib/group-booking-policy';
 import { CALENDAR_MAPPINGS } from '@/shared/schedule-config';
@@ -88,6 +89,16 @@ test('Dr. Cheung Min Yin uses dedicated Jordan and Tsuen Wan calendars', () => {
   );
   assert.notEqual(jordanMapping?.calendarId, cheungTinWaiJordan?.calendarId);
   assert.notEqual(tsuenWanMapping?.calendarId, leungTsuenWan?.calendarId);
+});
+
+test('departed practitioners keep historical identity without current booking eligibility or hours', () => {
+  assert.equal(DOCTOR_BY_ID.hon.scheduleNote, undefined);
+  assert.equal(DOCTOR_BY_ID.cheungmy.scheduleNote, undefined);
+  assert.equal(DOCTOR_BY_ID.cheungmy.onlineBookingEnabled, false);
+  assert.equal(isDoctorAcceptingBookings('cheungmy'), false);
+  assert.equal(isDoctorAcceptingBookings('chan'), true);
+  assert.equal(isDoctorAcceptingBookings('wong'), true);
+  assert.equal(isDoctorAcceptingBookings('unknown'), false);
 });
 
 test('Dr. Chan has a configured avatar for booking profile cards', () => {

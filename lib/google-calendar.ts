@@ -1,3 +1,4 @@
+import type { BookingLocale } from '@/shared/booking-locale';
 import { google } from 'googleapis';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { randomUUID } from 'crypto';
@@ -81,6 +82,7 @@ function getMeetLinkFromEvent(event: any): string | undefined {
 }
 
 function buildBookingEventPrivateMetadata(details: {
+  locale?: BookingLocale;
   doctorId?: string;
   doctorName?: string;
   doctorNameZh: string;
@@ -91,6 +93,7 @@ function buildBookingEventPrivateMetadata(details: {
   const entries: Array<[string, string]> = [];
 
   for (const [key, value] of Object.entries({
+    locale: details.locale,
     doctorId: details.doctorId,
     doctorName: details.doctorName,
     doctorNameZh: details.doctorNameZh,
@@ -273,6 +276,7 @@ export async function getFreeBusy(calendarId: string, date: Date): Promise<{ sta
 export async function createBooking(
   calendarId: string,
   details: {
+    locale?: BookingLocale;
     doctorId?: string;
     doctorName: string;
     doctorNameZh: string;

@@ -16,5 +16,5 @@ export default function LegacyReschedulePage({
     params.set("token", token);
   }
 
-  redirect(`/manage-booking?${params.toString()}`);
+  redirect(`${searchParams?.lang === 'en' ? '/en/manage-booking' : '/manage-booking'}?${params.toString()}`);
 }

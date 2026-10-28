@@ -222,6 +222,7 @@ export async function GET(request: NextRequest) {
         appointmentDate: payload.date,
         appointmentTime: payload.time,
         visitType: payload.visitType,
+        locale: payload.locale,
         clinicWhatsappPhone: reminderClinicId ? getClinicWhatsappPhone(reminderClinicId) : null,
         manageAccessToken,
       });

@@ -1,0 +1,11 @@
+@layer components {
+/* Integration fixes only: the imported sample remains the visual reference. */
+:where(.eden-english) { min-height:100vh; width:100%; overflow-x:clip; --display:'Eden English Sans',sans-serif; --sans:'Eden English Sans',sans-serif; }
+:where(.eden-english) .header .brand img { width:158px; height:auto; }
+:where(.eden-english) .filters a, :where(.eden-english) .footer-links a, :where(.eden-english) .hero-addresses a { min-height:44px; }
+:where(.eden-english) .footer-links a { display:inline-flex; align-items:center; }
+:where(.eden-english) .article-booking-actions, :where(.eden-english) .article-header-actions { display:flex; gap:20px; flex-wrap:wrap; align-items:center; }
+:where(.eden-english) .not-found { padding-top:80px; padding-bottom:100px; }
+@media (max-width:580px) { :where(.eden-english) .header .brand img { width:140px; } }
+
+}

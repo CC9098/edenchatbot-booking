@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { buildPublicUrl, getPublicBaseUrl } from "@/lib/public-url";
+import { ENGLISH_SITEMAP_URL, isEnglishPublished } from "@/lib/english-publication-config";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -28,7 +29,7 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: buildPublicUrl("/sitemap.xml"),
+    sitemap: isEnglishPublished() ? [buildPublicUrl("/sitemap.xml"), ENGLISH_SITEMAP_URL] : buildPublicUrl("/sitemap.xml"),
     host: getPublicBaseUrl(),
   };
 }

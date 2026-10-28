@@ -1,5 +1,7 @@
 'use client';
 
+import { bookingFeedback, bookingText, type BookingLocale } from '@/shared/booking-locale';
+
 import Image from 'next/image';
 import { parseBookingDate } from '@/lib/booking-search-params';
 import Link from 'next/link';
@@ -92,6 +94,7 @@ type AvailabilityRequestResult = {
 };
 
 type BookingTabFlowProps = {
+  locale?: BookingLocale;
   doctors: BookableDoctorSchedule[];
   initialContact?: {
     displayName?: string | null;
@@ -200,11 +203,11 @@ const INITIAL_FORM_VALUES: BookingFormValues = {
 
 function buildInitialFormValues(
   initialContact?: BookingTabFlowProps['initialContact'],
-  initialSelection?: BookingTabFlowProps['initialSelection']
+  initialSelection?: BookingTabFlowProps['initialSelection'], locale: BookingLocale = 'zh'
 ): BookingFormValues {
   const gad7Symptoms =
     typeof initialSelection?.gad7Score === 'number'
-      ? `GAD-7 焦慮量表：${initialSelection.gad7Score}/21。主要困擾：長期擔心、緊張、失眠或身體繃緊，想由張敏言醫師評估。`
+      ? bookingText("GAD-7 焦慮量表：{0}/21。主要困擾：長期擔心、緊張、失眠或身體繃緊，想由張敏言醫師評估。", locale, [initialSelection.gad7Score])
       : '';
 
   if (!initialContact) {
@@ -223,7 +226,7 @@ function buildInitialFormValues(
   };
 }
 
-function toIsoDateInHongKong(date: Date): string {
+function toIsoDateInHongKong(date: Date, locale: BookingLocale = 'zh'): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: HONG_KONG_TIMEZONE,
     year: 'numeric',
@@ -232,23 +235,23 @@ function toIsoDateInHongKong(date: Date): string {
   }).format(date);
 }
 
-function getTodayIsoInHongKong(): string {
-  return toIsoDateInHongKong(new Date());
+function getTodayIsoInHongKong(locale: BookingLocale = 'zh'): string {
+  return toIsoDateInHongKong(new Date(), locale);
 }
 
-function getMaxDateIsoInHongKong(daysAhead: number): string {
+function getMaxDateIsoInHongKong(daysAhead: number, locale: BookingLocale = 'zh'): string {
   const date = new Date();
   date.setDate(date.getDate() + daysAhead);
-  return toIsoDateInHongKong(date);
+  return toIsoDateInHongKong(date, locale);
 }
 
-function formatDateForDisplay(dateIso: string): string {
+function formatDateForDisplay(dateIso: string, locale: BookingLocale = 'zh'): string {
   if (!dateIso) return '';
 
   const date = new Date(`${dateIso}T00:00:00+08:00`);
   if (Number.isNaN(date.getTime())) return dateIso;
 
-  return new Intl.DateTimeFormat('zh-HK', {
+  return new Intl.DateTimeFormat((locale === 'en' ? 'en-HK' : 'zh-HK'), {
     timeZone: HONG_KONG_TIMEZONE,
     month: 'long',
     day: 'numeric',
@@ -256,13 +259,13 @@ function formatDateForDisplay(dateIso: string): string {
   }).format(date);
 }
 
-function formatShortDate(dateIso: string): string {
+function formatShortDate(dateIso: string, locale: BookingLocale = 'zh'): string {
   if (!dateIso) return '';
 
   const date = new Date(`${dateIso}T00:00:00+08:00`);
   if (Number.isNaN(date.getTime())) return dateIso;
 
-  return new Intl.DateTimeFormat('zh-HK', {
+  return new Intl.DateTimeFormat((locale === 'en' ? 'en-HK' : 'zh-HK'), {
     timeZone: HONG_KONG_TIMEZONE,
     month: 'numeric',
     day: 'numeric',
@@ -271,19 +274,19 @@ function formatShortDate(dateIso: string): string {
 
 function formatSelectedTreatments(
   treatmentOptions: BookingTreatmentOption[],
-  treatmentOtherDetails?: string
+  treatmentOtherDetails?: string, locale: BookingLocale = 'zh'
 ): string {
   const normalizedOtherDetails = treatmentOtherDetails?.trim();
 
   return treatmentOptions
     .map((option) => {
-      const label = formatBookingTreatmentOptionLabel(option);
+      const label = (locale === 'en' ? option.labelEn : formatBookingTreatmentOptionLabel(option));
       if (option.id === OTHER_TREATMENT_OPTION_ID && normalizedOtherDetails) {
         return `${label}: ${normalizedOtherDetails}`;
       }
       return label;
     })
-    .join('、');
+    .join(locale === 'en' ? ', ' : '、');
 }
 
 async function requestAvailabilityForDoctor(
@@ -291,7 +294,8 @@ async function requestAvailabilityForDoctor(
   targetClinicId: ClinicId,
   dateIso: string,
   durationMinutes: number,
-  targetVisitType: VisitType
+  targetVisitType: VisitType,
+  locale: BookingLocale = 'zh'
 ): Promise<AvailabilityRequestResult> {
   try {
     const response = await fetch('/api/availability', {
@@ -317,7 +321,7 @@ async function requestAvailabilityForDoctor(
           isClosedDay: false,
           status: 'unknown',
           calendarUnavailable: true,
-          errorMessage: '暫時未能連接預約日曆，請稍後再試或在聊天頁由姑娘協助安排。',
+          errorMessage: bookingText("暫時未能連接預約日曆，請稍後再試或在聊天頁由姑娘協助安排。", locale),
         };
       }
 
@@ -325,7 +329,7 @@ async function requestAvailabilityForDoctor(
         slots: [],
         isClosedDay: false,
         status: 'unknown',
-        errorMessage: data?.error || '暫時未能讀取可預約時段，請稍後再試。',
+        errorMessage: data?.error || bookingText("暫時未能讀取可預約時段，請稍後再試。", locale),
       };
     }
 
@@ -342,94 +346,94 @@ async function requestAvailabilityForDoctor(
       slots: [],
       isClosedDay: false,
       status: 'unknown',
-      errorMessage: '載入時段失敗，請稍後再試。',
+      errorMessage: bookingText("載入時段失敗，請稍後再試。", locale),
     };
   }
 }
 
-function getSlotDurationLabel(durationMinutes: number): string {
-  return `每個時段 ${durationMinutes} 分鐘`;
+function getSlotDurationLabel(durationMinutes: number, locale: BookingLocale = 'zh'): string {
+  return bookingText("每個時段 {0} 分鐘", locale, [durationMinutes]);
 }
 
-function getVisitOptionDurationLabel(option?: BookingVisitOption): string | null {
+function getVisitOptionDurationLabel(option?: BookingVisitOption, locale: BookingLocale = 'zh'): string | null {
   if (!option || option.hideDurationLabel) return null;
-  return getSlotDurationLabel(option.durationMinutes);
+  return getSlotDurationLabel(option.durationMinutes, locale);
 }
 
-function formatHkdPrice(price?: number): string {
+function formatHkdPrice(price?: number, locale: BookingLocale = 'zh'): string {
   if (typeof price !== 'number') return '';
   return `HK$${price.toLocaleString('en-HK')}`;
 }
 
 function hasVisitSpecificServices(
-  doctor?: Pick<BookableDoctorSchedule, 'bookingVisitOptions'>
+  doctor?: Pick<BookableDoctorSchedule, 'bookingVisitOptions'>, locale: BookingLocale = 'zh'
 ): boolean {
   return Boolean(doctor?.bookingVisitOptions.length);
 }
 
-function getVisitOptionPriceLabel(option?: BookingVisitOption): string | null {
+function getVisitOptionPriceLabel(option?: BookingVisitOption, locale: BookingLocale = 'zh'): string | null {
   if (!option?.priceHkd) return null;
 
-  const priceLabel = formatHkdPrice(option.priceHkd);
+  const priceLabel = formatHkdPrice(option.priceHkd, locale);
   if (option.originalPriceHkd && option.originalPriceHkd > option.priceHkd) {
-    return `${priceLabel}（原價 ${formatHkdPrice(option.originalPriceHkd)}）`;
+    return bookingText("{0}（原價 {1}）", locale, [priceLabel, formatHkdPrice(option.originalPriceHkd, locale)]);
   }
 
   return priceLabel;
 }
 
-function formatVisitOptionSummary(option?: BookingVisitOption): string | null {
+function formatVisitOptionSummary(option?: BookingVisitOption, locale: BookingLocale = 'zh'): string | null {
   if (!option) return null;
 
-  const serviceLabel = `${option.serviceNameZh} ${option.serviceNameEn}`;
-  const priceLabel = getVisitOptionPriceLabel(option);
-  return [serviceLabel, priceLabel, getVisitOptionDurationLabel(option)]
+  const serviceLabel = locale === 'en' ? option.serviceNameEn : `${option.serviceNameZh} ${option.serviceNameEn}`;
+  const priceLabel = getVisitOptionPriceLabel(option, locale);
+  return [serviceLabel, priceLabel, getVisitOptionDurationLabel(option, locale)]
     .filter(Boolean)
     .join('．');
 }
 
-function compactDetails(details: Array<string | null | undefined | false>): string[] {
+function compactDetails(details: Array<string | null | undefined | false>, locale: BookingLocale = 'zh'): string[] {
   return details.filter((detail): detail is string => Boolean(detail));
 }
 
 function isSupportBookingDoctor(
-  doctor?: Pick<BookableDoctorSchedule, 'bookingPractitionerGroup'>
+  doctor?: Pick<BookableDoctorSchedule, 'bookingPractitionerGroup'>, locale: BookingLocale = 'zh'
 ): boolean {
   return doctor?.bookingPractitionerGroup === 'support';
 }
 
 function formatDoctorOptionLabel(
-  doctor: Pick<BookableDoctorSchedule, 'doctorNameZh' | 'doctorNameEn' | 'bookingPractitionerGroup' | 'bookingRoleLabel'>
+  doctor: Pick<BookableDoctorSchedule, 'doctorNameZh' | 'doctorNameEn' | 'bookingPractitionerGroup' | 'bookingRoleLabel'>, locale: BookingLocale = 'zh'
 ): string {
-  const suffix = isSupportBookingDoctor(doctor) ? ` - ${doctor.bookingRoleLabel}` : '';
-  return `${doctor.doctorNameZh} (${doctor.doctorNameEn})${suffix}`;
+  const suffix = isSupportBookingDoctor(doctor, locale) ? ` - ${bookingText(doctor.bookingRoleLabel, locale)}` : '';
+  return locale === 'en' ? `${bookingText(doctor.doctorNameZh, locale)}${bookingText(suffix, locale)}` : `${doctor.doctorNameZh} (${doctor.doctorNameEn})${suffix}`;
 }
 
 function getSelectedScheduleEyebrow(
-  doctor?: Pick<BookableDoctorSchedule, 'bookingPractitionerGroup'>
+  doctor?: Pick<BookableDoctorSchedule, 'bookingPractitionerGroup'>, locale: BookingLocale = 'zh'
 ): string {
-  return isSupportBookingDoctor(doctor) ? '協作脊醫時段' : '醫師應診時間';
+  return isSupportBookingDoctor(doctor, locale) ? bookingText("協作脊醫時段", locale) : bookingText("醫師應診時間", locale);
 }
 
 function getSelectedSummaryEyebrow(
-  doctor?: Pick<BookableDoctorSchedule, 'bookingPractitionerGroup'>
+  doctor?: Pick<BookableDoctorSchedule, 'bookingPractitionerGroup'>, locale: BookingLocale = 'zh'
 ): string {
-  return isSupportBookingDoctor(doctor) ? '已選協作服務' : '已選醫師';
+  return isSupportBookingDoctor(doctor, locale) ? bookingText("已選協作服務", locale) : bookingText("已選醫師", locale);
 }
 
-function padTwo(value: number): string {
+function padTwo(value: number, locale: BookingLocale = 'zh'): string {
   return String(value).padStart(2, '0');
 }
 
-function toMonthKeyInHongKong(date: Date): string {
-  return toIsoDateInHongKong(date).slice(0, 7);
+function toMonthKeyInHongKong(date: Date, locale: BookingLocale = 'zh'): string {
+  return toIsoDateInHongKong(date, locale).slice(0, 7);
 }
 
-function toMonthKeyFromIsoDate(dateIso: string): string {
+function toMonthKeyFromIsoDate(dateIso: string, locale: BookingLocale = 'zh'): string {
   return dateIso.slice(0, 7);
 }
 
-function parseMonthKey(monthKey: string): { year: number; month: number } | null {
+function parseMonthKey(monthKey: string, locale: BookingLocale = 'zh'): { year: number; month: number } | null {
   const match = monthKey.match(/^(\d{4})-(\d{2})$/);
   if (!match) return null;
 
@@ -442,26 +446,26 @@ function parseMonthKey(monthKey: string): { year: number; month: number } | null
   return { year, month };
 }
 
-function shiftMonthKey(monthKey: string, deltaMonths: number): string {
-  const parsed = parseMonthKey(monthKey);
+function shiftMonthKey(monthKey: string, deltaMonths: number, locale: BookingLocale = 'zh'): string {
+  const parsed = parseMonthKey(monthKey, locale);
   if (!parsed) return monthKey;
 
   const shifted = new Date(Date.UTC(parsed.year, parsed.month - 1 + deltaMonths, 1));
-  return `${shifted.getUTCFullYear()}-${padTwo(shifted.getUTCMonth() + 1)}`;
+  return `${shifted.getUTCFullYear()}-${padTwo(shifted.getUTCMonth() + 1, locale)}`;
 }
 
-function getDaysInMonth(monthKey: string): number {
-  const parsed = parseMonthKey(monthKey);
+function getDaysInMonth(monthKey: string, locale: BookingLocale = 'zh'): number {
+  const parsed = parseMonthKey(monthKey, locale);
   if (!parsed) return 30;
 
   return new Date(Date.UTC(parsed.year, parsed.month, 0)).getUTCDate();
 }
 
-function isoDateFromMonthDay(monthKey: string, day: number): string {
-  return `${monthKey}-${padTwo(day)}`;
+function isoDateFromMonthDay(monthKey: string, day: number, locale: BookingLocale = 'zh'): string {
+  return `${monthKey}-${padTwo(day, locale)}`;
 }
 
-function getWeekdayIndexMondayFirst(dateIso: string): number {
+function getWeekdayIndexMondayFirst(dateIso: string, locale: BookingLocale = 'zh'): number {
   const [yearStr, monthStr, dayStr] = dateIso.split('-');
   const year = Number(yearStr);
   const month = Number(monthStr);
@@ -473,46 +477,46 @@ function getWeekdayIndexMondayFirst(dateIso: string): number {
   return (sundayFirst + 6) % 7;
 }
 
-function formatMonthLabel(monthKey: string): string {
-  const parsed = parseMonthKey(monthKey);
+function formatMonthLabel(monthKey: string, locale: BookingLocale = 'zh'): string {
+  const parsed = parseMonthKey(monthKey, locale);
   if (!parsed) return monthKey;
 
   const date = new Date(Date.UTC(parsed.year, parsed.month - 1, 1));
-  return new Intl.DateTimeFormat('zh-HK', {
+  return new Intl.DateTimeFormat((locale === 'en' ? 'en-HK' : 'zh-HK'), {
     timeZone: HONG_KONG_TIMEZONE,
     year: 'numeric',
     month: 'long',
   }).format(date);
 }
 
-function monthHasSelectableDate(monthKey: string, minDate: string, maxDate: string): boolean {
-  const daysInMonth = getDaysInMonth(monthKey);
-  const firstDate = isoDateFromMonthDay(monthKey, 1);
-  const lastDate = isoDateFromMonthDay(monthKey, daysInMonth);
+function monthHasSelectableDate(monthKey: string, minDate: string, maxDate: string, locale: BookingLocale = 'zh'): boolean {
+  const daysInMonth = getDaysInMonth(monthKey, locale);
+  const firstDate = isoDateFromMonthDay(monthKey, 1, locale);
+  const lastDate = isoDateFromMonthDay(monthKey, daysInMonth, locale);
   return !(lastDate < minDate || firstDate > maxDate);
 }
 
-function formatTimeRanges(ranges: TimeRange[]): string {
-  return ranges.map((range) => `${range.start}-${range.end}`).join('，');
+function formatTimeRanges(ranges: TimeRange[], locale: BookingLocale = 'zh'): string {
+  return ranges.map((range) => `${range.start}-${range.end}`).join(locale === 'en' ? ', ' : '，');
 }
 
-function formatScheduleLines(schedule: WeeklySchedule): string[] {
+function formatScheduleLines(schedule: WeeklySchedule, locale: BookingLocale = 'zh'): string[] {
   const lines: string[] = [];
 
   for (let day = 0; day <= 6; day += 1) {
     const ranges = schedule[day];
     if (!ranges || ranges.length === 0) continue;
-    lines.push(`${WEEKDAY_LABELS_ZH[day]}：${formatTimeRanges(ranges)}`);
+    lines.push(`${bookingText(WEEKDAY_LABELS_ZH[day], locale)}：${formatTimeRanges(ranges, locale)}`);
   }
 
   return lines;
 }
 
-function formatCompactTimeRanges(ranges: TimeRange[]): string {
+function formatCompactTimeRanges(ranges: TimeRange[], locale: BookingLocale = 'zh'): string {
   return ranges.map((range) => `${range.start}-${range.end}`).join(' / ');
 }
 
-function formatCompactWeekdays(days: number[]): string {
+function formatCompactWeekdays(days: number[], locale: BookingLocale = 'zh'): string {
   if (days.length === 0) return '';
 
   const sortedDays = [...days].sort((left, right) => left - right);
@@ -536,17 +540,17 @@ function formatCompactWeekdays(days: number[]): string {
 
   const labels = chunks.map((chunk) => {
     if (chunk.length >= 3) {
-      return `${WEEKDAY_SHORT_LABELS_ZH[chunk[0]]}至${WEEKDAY_SHORT_LABELS_ZH[chunk[chunk.length - 1]]}`;
+      return bookingText("{0}至{1}", locale, [bookingText(WEEKDAY_SHORT_LABELS_ZH[chunk[0]], locale), bookingText(WEEKDAY_SHORT_LABELS_ZH[chunk[chunk.length - 1]], locale)]);
     }
 
-    return chunk.map((day) => WEEKDAY_SHORT_LABELS_ZH[day]).join('、');
+    return chunk.map((day) => bookingText(WEEKDAY_SHORT_LABELS_ZH[day], locale)).join(locale === 'en' ? ', ' : '、');
   });
 
-  return `週${labels.join('、')}`;
+  return bookingText("週{0}", locale, [labels.join(locale === 'en' ? ', ' : '、')]);
 }
 
 function formatCompactClinicSchedule(
-  clinic: BookableDoctorSchedule['clinics'][number]
+  clinic: BookableDoctorSchedule['clinics'][number], locale: BookingLocale = 'zh'
 ): string {
   const groupedByTime = new Map<string, number[]>();
 
@@ -554,65 +558,65 @@ function formatCompactClinicSchedule(
     const ranges = clinic.schedule[day];
     if (!ranges || ranges.length === 0) continue;
 
-    const timeLabel = formatCompactTimeRanges(ranges);
+    const timeLabel = formatCompactTimeRanges(ranges, locale);
     groupedByTime.set(timeLabel, [...(groupedByTime.get(timeLabel) ?? []), day]);
   }
 
   return Array.from(groupedByTime.entries())
-    .map(([timeLabel, days]) => `${formatCompactWeekdays(days)} ${timeLabel}`)
+    .map(([timeLabel, days]) => `${formatCompactWeekdays(days, locale)} ${timeLabel}`)
     .join('；');
 }
 
-function getCompactSchedulePreviewClinics(doctor: BookableDoctorSchedule) {
+function getCompactSchedulePreviewClinics(doctor: BookableDoctorSchedule, locale: BookingLocale = 'zh') {
   const physicalClinics = doctor.clinics.filter((clinic) => clinic.clinicId !== 'online');
   return physicalClinics.length > 0 ? physicalClinics : doctor.clinics;
 }
 
-function formatNoticeClinicList(notices: Array<{ clinicNameZh?: string }>): string {
+function formatNoticeClinicList(notices: Array<{ clinicNameZh?: string }>, locale: BookingLocale = 'zh'): string {
   const clinicNames = Array.from(
     new Set(
       notices
-        .map((notice) => notice.clinicNameZh?.trim())
+        .map((notice) => bookingText(notice.clinicNameZh?.trim(), locale))
         .filter((clinicName): clinicName is string => Boolean(clinicName))
     )
   );
 
   if (clinicNames.length === 0) return '';
-  if (clinicNames.length <= 3) return clinicNames.join('、');
-  return `${clinicNames.slice(0, 3).join('、')}等診所`;
+  if (clinicNames.length <= 3) return clinicNames.join(locale === 'en' ? ', ' : '、');
+  return bookingText("{0}等診所", locale, [clinicNames.slice(0, 3).join(locale === 'en' ? ', ' : '、')]);
 }
 
 function getDoctorHolidaySummaryLines(
   doctor: Pick<BookableDoctorSchedule, 'doctorNameZh'>,
-  notices: Array<{ clinicNameZh?: string }>
+  notices: Array<{ clinicNameZh?: string }>, locale: BookingLocale = 'zh'
 ): string[] {
-  const clinicList = formatNoticeClinicList(notices);
-  const clinicScope = clinicList ? `於${clinicList}` : '';
+  const clinicList = formatNoticeClinicList(notices, locale);
+  const clinicScope = clinicList ? bookingText("於{0}", locale, [clinicList]) : '';
 
   return [
-    `${doctor.doctorNameZh}${clinicScope}近日有休診或特別安排，已反映在下方日曆。`,
-    '你只需選可約日子；休診日不會開放預約。',
+    bookingText("{0}{1}近日有休診或特別安排，已反映在下方日曆。", locale, [bookingText(doctor.doctorNameZh, locale), clinicScope]),
+    bookingText("你只需選可約日子；休診日不會開放預約。", locale),
   ];
 }
 
-function CompactScheduleSummaryCard({
+function CompactScheduleSummaryCard({ locale = 'zh', 
   doctor,
   className = '',
-}: {
+}: { locale?: BookingLocale; 
   doctor: BookableDoctorSchedule;
   className?: string;
 }) {
   return (
     <div className={`w-full rounded-xl border border-[#e2efe4] bg-[#f7fbf8] px-3 py-3 text-xs leading-relaxed text-slate-600 sm:max-w-[20rem] sm:shrink-0 ${className}`}>
-      <p className="font-semibold text-[#254430]">應診時間</p>
+      <p className="font-semibold text-[#254430]">{bookingText("應診時間", locale)}</p>
       <div className="mt-2 space-y-1.5">
-        {getCompactSchedulePreviewClinics(doctor).map((clinic) => (
+        {getCompactSchedulePreviewClinics(doctor, locale).map((clinic) => (
           <p
             key={`compact-schedule-${doctor.doctorId}-${clinic.clinicId}`}
             className="grid grid-cols-[2.75rem_1fr] gap-2"
           >
-            <span className="font-semibold text-[#5d8c67]">{clinic.clinicNameZh}</span>
-            <span>{formatCompactClinicSchedule(clinic)}</span>
+            <span className="font-semibold text-[#5d8c67]">{bookingText(clinic.clinicNameZh, locale)}</span>
+            <span>{formatCompactClinicSchedule(clinic, locale)}</span>
           </p>
         ))}
       </div>
@@ -620,14 +624,14 @@ function CompactScheduleSummaryCard({
   );
 }
 
-function getDoctorAvatarFallback(nameZh?: string): string {
-  return nameZh?.trim().slice(0, 1) || '醫';
+function getDoctorAvatarFallback(nameZh?: string, locale: BookingLocale = 'zh'): string {
+  return nameZh?.trim().slice(0, 1) || bookingText("醫", locale);
 }
 
-function DoctorAvatar({
+function DoctorAvatar({ locale = 'zh', 
   doctor,
   size = 'sm',
-}: {
+}: { locale?: BookingLocale; 
   doctor?: Pick<BookableDoctorSchedule, 'doctorNameZh' | 'avatarSrc' | 'avatarObjectPosition'>;
   size?: 'sm' | 'lg';
 }) {
@@ -641,7 +645,7 @@ function DoctorAvatar({
       {doctor?.avatarSrc ? (
         <Image
           src={doctor.avatarSrc}
-          alt={`${doctor.doctorNameZh}頭像`}
+          alt={bookingText("{0}頭像", locale, [bookingText(doctor.doctorNameZh, locale)])}
           fill
           sizes={isLarge ? '112px' : '56px'}
           className="object-cover"
@@ -649,19 +653,19 @@ function DoctorAvatar({
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,#eaf8ed_0%,#cfe8d6_100%)] text-lg font-semibold text-[#2b5d38]">
-          {getDoctorAvatarFallback(doctor?.doctorNameZh)}
+          {getDoctorAvatarFallback(bookingText(doctor?.doctorNameZh, locale), locale)}
         </div>
       )}
     </div>
   );
 }
 
-function DoctorBookingSummary({
+function DoctorBookingSummary({ locale = 'zh', 
   doctor,
   clinicNameZh,
   eyebrow,
   details,
-}: {
+}: { locale?: BookingLocale; 
   doctor?: Pick<BookableDoctorSchedule, 'doctorNameZh' | 'avatarSrc' | 'avatarObjectPosition'>;
   clinicNameZh?: string;
   eyebrow: string;
@@ -670,11 +674,11 @@ function DoctorBookingSummary({
   return (
     <div className="rounded-[24px] border border-[#d5e4d8] bg-[linear-gradient(135deg,#f8fcf8_0%,#eef8f0_55%,#ffffff_100%)] p-4 text-left shadow-[0_16px_36px_-30px_rgba(31,74,44,0.45)]">
       <div className="flex items-center gap-3">
-        <DoctorAvatar doctor={doctor} size="sm" />
+        <DoctorAvatar doctor={doctor} size="sm" locale={locale} />
         <div className="min-w-0">
           <p className="text-[11px] font-semibold tracking-[0.24em] text-[#5d8c67]">{eyebrow}</p>
-          <p className="mt-1 truncate text-base font-semibold text-[#254430]">{doctor?.doctorNameZh || '已選醫師'}</p>
-          <p className="truncate text-xs text-slate-500">{clinicNameZh || '請選擇診所'}</p>
+          <p className="mt-1 truncate text-base font-semibold text-[#254430]">{bookingText(doctor?.doctorNameZh, locale) || bookingText("已選醫師", locale)}</p>
+          <p className="truncate text-xs text-slate-500">{clinicNameZh || bookingText("請選擇診所", locale)}</p>
         </div>
       </div>
       <div className="mt-3 space-y-1 text-sm text-slate-600">
@@ -686,7 +690,7 @@ function DoctorBookingSummary({
   );
 }
 
-export function BookingTabFlow({
+export function BookingTabFlow({ locale = 'zh', 
   doctors,
   initialContact,
   initialSelection,
@@ -711,7 +715,7 @@ export function BookingTabFlow({
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotError, setSlotError] = useState('');
-  const [calendarMonthKey, setCalendarMonthKey] = useState(() => toMonthKeyInHongKong(new Date()));
+  const [calendarMonthKey, setCalendarMonthKey] = useState(() => toMonthKeyInHongKong(new Date(), locale));
   const [monthClinicAvailability, setMonthClinicAvailability] = useState<MonthClinicAvailability>(
     {}
   );
@@ -725,7 +729,7 @@ export function BookingTabFlow({
   });
 
   const [formValues, setFormValues] = useState<BookingFormValues>(() =>
-    buildInitialFormValues(initialContact, initialSelection)
+    buildInitialFormValues(initialContact, initialSelection, locale)
   );
   const [formErrors, setFormErrors] = useState<BookingFormErrors>({});
   const previousClinicIdRef = useRef<ClinicId | ''>(initialSelection?.clinicId ?? '');
@@ -738,8 +742,8 @@ export function BookingTabFlow({
     initialPatientProfileId ?? null,
   );
 
-  const minDate = getTodayIsoInHongKong();
-  const maxDate = getMaxDateIsoInHongKong(MAX_BOOKING_WINDOW_DAYS);
+  const minDate = getTodayIsoInHongKong(locale);
+  const maxDate = getMaxDateIsoInHongKong(MAX_BOOKING_WINDOW_DAYS, locale);
   const bookingDates = useMemo(() => bookingDatesBetween(minDate, maxDate), [minDate, maxDate]);
 
   const doctorOptions = useMemo(
@@ -747,12 +751,12 @@ export function BookingTabFlow({
     [doctors]
   );
   const primaryDoctorOptions = useMemo(
-    () => doctorOptions.filter((doctor) => !isSupportBookingDoctor(doctor)),
-    [doctorOptions]
+    () => doctorOptions.filter((doctor) => !isSupportBookingDoctor(doctor, locale)),
+    [doctorOptions, locale]
   );
   const supportDoctorOptions = useMemo(
-    () => doctorOptions.filter((doctor) => isSupportBookingDoctor(doctor)),
-    [doctorOptions]
+    () => doctorOptions.filter((doctor) => isSupportBookingDoctor(doctor, locale)),
+    [doctorOptions, locale]
   );
 
   const clinicOptions = useMemo(() => {
@@ -764,7 +768,7 @@ export function BookingTabFlow({
     () => doctorOptions.find((doctor) => doctor.doctorId === doctorId),
     [doctorId, doctorOptions]
   );
-  const usesVisitBasedServices = hasVisitSpecificServices(selectedDoctor);
+  const usesVisitBasedServices = hasVisitSpecificServices(selectedDoctor, locale);
   const selectedVisitOption = useMemo(
     () =>
       selectedDoctor?.bookingVisitOptions.find(
@@ -786,7 +790,7 @@ export function BookingTabFlow({
       ),
     [selectedDoctor]
   );
-  const selectedDoctorSummaryEyebrow = getSelectedSummaryEyebrow(selectedDoctor);
+  const selectedDoctorSummaryEyebrow = getSelectedSummaryEyebrow(selectedDoctor, locale);
   const selectedDoctorNotices = useMemo(() => {
     if (!selectedDoctor) return [];
 
@@ -828,22 +832,22 @@ export function BookingTabFlow({
       .filter((option): option is BookingTreatmentOption => Boolean(option));
   }, [isOnlineConsultation, selectedDoctor, selectedTreatmentOptions, usesVisitBasedServices]);
   const selectedTreatmentSummary = selectedTreatmentDetails.length > 0
-    ? formatSelectedTreatments(selectedTreatmentDetails, formValues.treatmentOtherDetails)
+    ? formatSelectedTreatments(selectedTreatmentDetails, formValues.treatmentOtherDetails, locale)
     : '';
   const treatmentSummaryDetail = isOnlineConsultation
     ? null
     : selectedTreatmentSummary
-      ? `已選治療項目：${selectedTreatmentSummary}`
+      ? bookingText("已選治療項目：{0}", locale, [selectedTreatmentSummary])
       : selectedDoctor
         ? isMinimalPreview
           ? null
-          : '治療項目：未指定（可留待到診時再確認）'
+          : bookingText("治療項目：未指定（可留待到診時再確認）", locale)
         : null;
   const availableTreatmentSummaryDetail =
     !isMinimalPreview && selectedDoctor && !usesVisitBasedServices
       ? null
       : null;
-  const selectedVisitOptionSummary = formatVisitOptionSummary(selectedVisitOption);
+  const selectedVisitOptionSummary = formatVisitOptionSummary(selectedVisitOption, locale);
   const pickupOptions = useMemo(
     () => getBookingPickupOptions(clinicId),
     [clinicId]
@@ -867,13 +871,13 @@ export function BookingTabFlow({
     usesVisitBasedServices
     && (selectedVisitOption?.hideDurationLabel ?? selectedDoctorVisitOptionsHideDurations)
       ? null
-      : getSlotDurationLabel(selectedDoctorSlotMinutes);
+      : getSlotDurationLabel(selectedDoctorSlotMinutes, locale);
   const onlineConsultationMethodNotice =
     isOnlineConsultation && selectedDoctor?.doctorId === 'cheung'
-      ? `${selectedDoctor.doctorNameZh}網上診症會使用 Google Meet 視像。預約成功後，系統會透過 WhatsApp 發送網上診症入口；到時按連結進入即可。`
+      ? bookingText("{0}網上診症會使用 Google Meet 視像。預約成功後，系統會透過 WhatsApp 發送網上診症入口；到時按連結進入即可。", locale, [bookingText(selectedDoctor.doctorNameZh, locale)])
       : '';
   const onlineConsultationMethodDetail = onlineConsultationMethodNotice
-    ? '視像方式：Google Meet；預約成功後 WhatsApp 會收到網上診症入口。'
+    ? bookingText("視像方式：Google Meet；預約成功後 WhatsApp 會收到網上診症入口。", locale)
     : null;
   const groupBookingNotice = '';
   const scannableClinics = useMemo(
@@ -887,47 +891,47 @@ export function BookingTabFlow({
         : scannableClinics,
     [clinicId, scannableClinics]
   );
-  const pageTitle = isStaffFlow ? '姑娘代約' : '預約服務';
+  const pageTitle = isStaffFlow ? bookingText("姑娘代約", locale) : bookingText("預約服務", locale);
   const pageSubtitle = isStaffFlow
-    ? '供姑娘或前台代病人安排時段。成功後系統會優先透過 WhatsApp 發送確認訊息，若有電郵則會一併寄出確認電郵。'
+    ? bookingText("供姑娘或前台代病人安排時段。成功後系統會優先透過 WhatsApp 發送確認訊息，若有電郵則會一併寄出確認電郵。", locale)
     : isMinimalPreview
     ? ''
     : isWhatsappFlow
-    ? '成功預約後，診所會透過 WhatsApp 發送確認訊息到你提供的電話。'
-    : '「每一次預約，都是照顧自己的開始。」';
-  const submitButtonLabel = '確認預約';
-  const submitLoadingLabel = isStaffFlow ? '代約處理中...' : '預約處理中...';
+    ? bookingText("成功預約後，診所會透過 WhatsApp 發送確認訊息到你提供的電話。", locale)
+    : bookingText("「每一次預約，都是照顧自己的開始。」", locale);
+  const submitButtonLabel = bookingText("確認預約", locale);
+  const submitLoadingLabel = isStaffFlow ? bookingText("代約處理中...", locale) : bookingText("預約處理中...", locale);
   const confirmationNotice = isStaffFlow
-    ? '此頁會以病人資料建立正式預約，並嘗試即時發送 WhatsApp 確認。若病人已有電郵，系統亦會補發確認電郵。'
+    ? bookingText("此頁會以病人資料建立正式預約，並嘗試即時發送 WhatsApp 確認。若病人已有電郵，系統亦會補發確認電郵。", locale)
     : groupBookingNotice
     ? groupBookingNotice
     : isWhatsappFlow
-    ? '成功預約後會透過 WhatsApp 發送確認訊息到你提供的電話。'
-    : '如有提供電郵，系統會發送確認電郵；更改或取消可使用電郵內連結。';
+    ? bookingText("成功預約後會透過 WhatsApp 發送確認訊息到你提供的電話。", locale)
+    : bookingText("如有提供電郵，系統會發送確認電郵；更改或取消可使用電郵內連結。", locale);
   const detailNotice = onlineConsultationMethodNotice
     ? `${onlineConsultationMethodNotice} ${confirmationNotice}`
     : confirmationNotice;
-  const successTitle = isStaffFlow ? '代約完成' : '預約成功';
+  const successTitle = isStaffFlow ? bookingText("代約完成", locale) : bookingText("預約成功", locale);
   const successDescription = isStaffFlow
-    ? '預約已建立，系統已嘗試發送確認訊息到病人提供的聯絡方式。'
+    ? bookingText("預約已建立，系統已嘗試發送確認訊息到病人提供的聯絡方式。", locale)
     : groupBookingNotice
     ? groupBookingNotice
     : onlineConsultationMethodNotice
-    ? '預約已建立，Google Meet 網上診症入口會隨 WhatsApp 確認訊息發送到你提供的電話。'
+    ? bookingText("預約已建立，Google Meet 網上診症入口會隨 WhatsApp 確認訊息發送到你提供的電話。", locale)
     : isWhatsappFlow
-    ? '預約已建立，診所會透過 WhatsApp 跟進並發送確認訊息到你提供的電話。'
+    ? bookingText("預約已建立，診所會透過 WhatsApp 跟進並發送確認訊息到你提供的電話。", locale)
     : formValues.email.trim()
-      ? '確認電郵將發送到你提供的信箱。'
-      : '預約已建立；如需更改或取消，請聯絡診所跟進。';
-  const successQuote = isStaffFlow ? '「資料確認得愈完整，跟進就愈穩陣。」' : '「每一次回來，身體都記得。」';
-  const referenceLabel = '預約編號';
+      ? bookingText("確認電郵將發送到你提供的信箱。", locale)
+      : bookingText("預約已建立；如需更改或取消，請聯絡診所跟進。", locale);
+  const successQuote = isStaffFlow ? bookingText("「資料確認得愈完整，跟進就愈穩陣。」", locale) : bookingText("「每一次回來，身體都記得。」", locale);
+  const referenceLabel = bookingText("預約編號", locale);
 
   const canContinueSetup = Boolean(doctorId && visitType);
   const canContinueTimeslot = Boolean(selectedDate && selectedTime && clinicId);
-  const previousMonthKey = shiftMonthKey(calendarMonthKey, -1);
-  const nextMonthKey = shiftMonthKey(calendarMonthKey, 1);
-  const canGoToPreviousMonth = monthHasSelectableDate(previousMonthKey, minDate, maxDate);
-  const canGoToNextMonth = monthHasSelectableDate(nextMonthKey, minDate, maxDate);
+  const previousMonthKey = shiftMonthKey(calendarMonthKey, -1, locale);
+  const nextMonthKey = shiftMonthKey(calendarMonthKey, 1, locale);
+  const canGoToPreviousMonth = monthHasSelectableDate(previousMonthKey, minDate, maxDate, locale);
+  const canGoToNextMonth = monthHasSelectableDate(nextMonthKey, minDate, maxDate, locale);
   const hasAutofilledContact = Boolean(
     initialContact?.displayName || initialContact?.email || initialContact?.phone
   );
@@ -969,14 +973,14 @@ export function BookingTabFlow({
   }, [clinicId, clinicOptions, doctorId, doctorOptions]);
 
   const calendarMonthLabel = useMemo(
-    () => formatMonthLabel(calendarMonthKey),
-    [calendarMonthKey]
+    () => formatMonthLabel(calendarMonthKey, locale),
+    [calendarMonthKey, locale]
   );
 
   const calendarCells = useMemo(() => {
-    const daysInMonth = getDaysInMonth(calendarMonthKey);
+    const daysInMonth = getDaysInMonth(calendarMonthKey, locale);
     const leadingEmptyCellCount = getWeekdayIndexMondayFirst(
-      isoDateFromMonthDay(calendarMonthKey, 1)
+      isoDateFromMonthDay(calendarMonthKey, 1, locale), locale
     );
     const totalCellCount = Math.ceil((leadingEmptyCellCount + daysInMonth) / 7) * 7;
 
@@ -984,7 +988,7 @@ export function BookingTabFlow({
       const day = index - leadingEmptyCellCount + 1;
       if (day < 1 || day > daysInMonth) return null;
 
-      const dateIso = isoDateFromMonthDay(calendarMonthKey, day);
+      const dateIso = isoDateFromMonthDay(calendarMonthKey, day, locale);
       const dateAvailability = monthClinicAvailability[dateIso] ?? {};
       const availableClinicIds = visibleClinics
         .filter((clinic) => dateAvailability[clinic.clinicId] === 'available')
@@ -997,7 +1001,7 @@ export function BookingTabFlow({
         visibleClinics.length > 0 && availableClinicIds.length === 0 && !hasUnknownAvailability;
       const availableClinicNames = visibleClinics
         .filter((clinic) => availableClinicIds.includes(clinic.clinicId))
-        .map((clinic) => clinic.clinicNameZh);
+        .map((clinic) => bookingText(clinic.clinicNameZh, locale));
 
       return {
         dateIso,
@@ -1007,15 +1011,15 @@ export function BookingTabFlow({
         isUnavailable,
         availabilityLabel:
           availableClinicNames.length > 0
-            ? `${availableClinicNames.join('、')}有位`
+            ? bookingText("{0}有位", locale, [availableClinicNames.join(locale === 'en' ? ', ' : '、')])
             : isUnavailable
               ? clinicId
-                ? `${visibleClinics[0]?.clinicNameZh || '所選診所'}暫滿`
-                : '所有診所暫滿'
-              : '正在掃描時段',
+                ? bookingText("{0}暫滿", locale, [bookingText(visibleClinics[0]?.clinicNameZh || '所選診所', locale)])
+                : bookingText("所有診所暫滿", locale)
+              : bookingText("正在掃描時段", locale),
       };
     });
-  }, [calendarMonthKey, clinicId, maxDate, minDate, monthClinicAvailability, visibleClinics]);
+  }, [calendarMonthKey, clinicId, maxDate, minDate, monthClinicAvailability, visibleClinics, locale]);
 
   const clinicEarliestSummaries = useMemo<Partial<Record<ClinicId, EarliestAvailabilitySummary>>>(
     () =>
@@ -1025,11 +1029,12 @@ export function BookingTabFlow({
           earliestAvailabilitySummary(
             bookingDates,
             (dateIso) => monthClinicAvailability[dateIso]?.[clinic.clinicId],
-            earliestDatesLoading
+            earliestDatesLoading,
+            locale
           ),
         ])
       ),
-    [bookingDates, earliestDatesLoading, monthClinicAvailability, scannableClinics]
+    [bookingDates, earliestDatesLoading, monthClinicAvailability, scannableClinics, locale]
   );
 
   const selectedDateAllAvailableClinics = useMemo(() => {
@@ -1087,7 +1092,7 @@ export function BookingTabFlow({
       dates.some((dateIso) =>
         Object.values(availabilityCacheRef.current.data[dateIso] ?? {}).includes('unknown')
       );
-    const partialReadMessage = '暫時未能完整讀取預約日曆，彩色燈號可能未完全顯示。';
+    const partialReadMessage = bookingText('暫時未能完整讀取預約日曆，彩色燈號可能未完全顯示。', locale);
 
     const scanBookableDates = async () => {
       await scanBookingOverview({
@@ -1098,11 +1103,7 @@ export function BookingTabFlow({
         isCancelled: () => isCancelled,
         request: async (dateIso, targetClinicId) => {
           const result = await requestAvailabilityForDoctor(
-            doctorId,
-            targetClinicId,
-            dateIso,
-            selectedDoctorSlotMinutes,
-            visitType
+            doctorId, targetClinicId, dateIso, selectedDoctorSlotMinutes, visitType, locale
           );
           return result.status;
         },
@@ -1138,7 +1139,7 @@ export function BookingTabFlow({
     return () => {
       isCancelled = true;
     };
-  }, [bookingDates, calendarMonthKey, doctorId, scannableClinics, selectedDoctorSlotMinutes, visitType]);
+  }, [bookingDates, calendarMonthKey, doctorId, scannableClinics, selectedDoctorSlotMinutes, visitType, locale]);
 
   useEffect(() => {
     const isCurrentPickupAvailable = pickupOptions.some(
@@ -1234,7 +1235,7 @@ export function BookingTabFlow({
   }
 
   function resetAvailabilityOverview() {
-    setCalendarMonthKey(toMonthKeyInHongKong(new Date()));
+    setCalendarMonthKey(toMonthKeyInHongKong(new Date(), locale));
     setMonthClinicAvailability({});
     setBookableDatesLoading(false);
     setBookableDatesError('');
@@ -1276,7 +1277,7 @@ export function BookingTabFlow({
       }
 
       if (isDateFullyUnavailable(selectedDate, '')) {
-        setSlotError('所選日期所有診所暫無可預約時段。');
+        setSlotError(bookingText("所選日期所有診所暫無可預約時段。", locale));
       }
       return;
     }
@@ -1306,7 +1307,7 @@ export function BookingTabFlow({
       targetClinicId,
       dateIso,
       selectedDoctorSlotMinutes,
-      visitType
+      visitType, locale
     );
 
     setMonthClinicAvailability((prev) => ({
@@ -1319,7 +1320,7 @@ export function BookingTabFlow({
 
     if (result.status === 'unknown') {
       setSlotError(
-        result.errorMessage || '暫時未能讀取可預約時段，請稍後再試。'
+        result.errorMessage || bookingText("暫時未能讀取可預約時段，請稍後再試。", locale)
       );
       setSlotsLoading(false);
       return;
@@ -1328,13 +1329,13 @@ export function BookingTabFlow({
     setAvailableSlots(result.slots);
 
     if (result.isClosedDay) {
-      setSlotError('當日休診或公眾假期，請選擇其他日期。');
+      setSlotError(bookingText("當日休診或公眾假期，請選擇其他日期。", locale));
       setSlotsLoading(false);
       return;
     }
 
     if (result.slots.length === 0) {
-      setSlotError('當日暫無可預約時段。');
+      setSlotError(bookingText("當日暫無可預約時段。", locale));
     }
 
     setSlotsLoading(false);
@@ -1352,7 +1353,7 @@ export function BookingTabFlow({
 
   function handleDateChange(dateIso: string) {
     setSelectedDate(dateIso);
-    setCalendarMonthKey(toMonthKeyFromIsoDate(dateIso));
+    setCalendarMonthKey(toMonthKeyFromIsoDate(dateIso, locale));
     clearSelectedTimeslot(true);
 
     if (clinicId) {
@@ -1361,7 +1362,7 @@ export function BookingTabFlow({
     }
 
     if (isDateFullyUnavailable(dateIso, '')) {
-      setSlotError('所選日期所有診所暫無可預約時段。');
+      setSlotError(bookingText("所選日期所有診所暫無可預約時段。", locale));
     }
   }
 
@@ -1394,62 +1395,62 @@ export function BookingTabFlow({
     const nextErrors: BookingFormErrors = {};
 
     if (!values.firstName.trim()) {
-      nextErrors.firstName = '請輸入名字';
+      nextErrors.firstName = bookingText("請輸入名字", locale);
     }
 
     if (!values.lastName.trim()) {
-      nextErrors.lastName = '請輸入姓氏';
+      nextErrors.lastName = bookingText("請輸入姓氏", locale);
     }
 
     const normalizedPhone = normalizePhoneForSearch(values.phone);
     if (normalizedPhone.length < 8) {
-      nextErrors.phone = '請輸入有效電話（至少 8 位數字）';
+      nextErrors.phone = bookingText("請輸入有效電話（至少 8 位數字）", locale);
     }
 
     const normalizedEmail = values.email.trim().toLowerCase();
     if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      nextErrors.email = '請輸入有效電郵地址';
+      nextErrors.email = bookingText("請輸入有效電郵地址", locale);
     }
 
     if (needsTreatmentOtherDetails && !values.treatmentOtherDetails.trim()) {
-      nextErrors.treatmentOtherDetails = '如選擇其他，請註明服務內容';
+      nextErrors.treatmentOtherDetails = bookingText("如選擇其他，請註明服務內容", locale);
     }
 
     if (isOnlineConsultation && !values.medicationPickup) {
-      nextErrors.medicationPickup = '請選擇取藥方法';
+      nextErrors.medicationPickup = bookingText("請選擇取藥方法", locale);
     }
 
     if (isOnlineConsultation && isShippingBookingPickup(values.medicationPickup) && !values.shippingAddressDetails.trim()) {
-      nextErrors.shippingAddressDetails = '請填寫寄送地址或順豐站／智能櫃資料';
+      nextErrors.shippingAddressDetails = bookingText("請填寫寄送地址或順豐站／智能櫃資料", locale);
     }
 
     if (isOnlineConsultation && isClinicPickupBookingPickup(values.medicationPickup) && !values.clinicPickupRemarks.trim()) {
-      nextErrors.clinicPickupRemarks = '請填寫取藥時間或其他備註';
+      nextErrors.clinicPickupRemarks = bookingText("請填寫取藥時間或其他備註", locale);
     }
 
     if (visitType === 'first') {
       if (!values.dateOfBirth.trim()) {
-        nextErrors.dateOfBirth = '首診需要出生日期';
+        nextErrors.dateOfBirth = bookingText("首診需要出生日期", locale);
       }
 
       if (!values.gender) {
-        nextErrors.gender = '首診需要性別資料';
+        nextErrors.gender = bookingText("首診需要性別資料", locale);
       }
 
       if (!values.allergies.trim()) {
-        nextErrors.allergies = '首診需要過敏史資料';
+        nextErrors.allergies = bookingText("首診需要過敏史資料", locale);
       }
 
       if (!values.medications.trim()) {
-        nextErrors.medications = '首診需要現正服用藥物資料';
+        nextErrors.medications = bookingText("首診需要現正服用藥物資料", locale);
       }
 
       if (!values.symptoms.trim()) {
-        nextErrors.symptoms = '首診需要主要症狀資料';
+        nextErrors.symptoms = bookingText("首診需要主要症狀資料", locale);
       }
 
       if (!values.referralSource.trim()) {
-        nextErrors.referralSource = '首診需要得知來源資料';
+        nextErrors.referralSource = bookingText("首診需要得知來源資料", locale);
       }
     }
 
@@ -1458,21 +1459,21 @@ export function BookingTabFlow({
 
   function buildBookingNotes(values: BookingFormValues): string {
     const selectedServiceLine = selectedVisitOption
-      ? `服務: ${selectedVisitOption.serviceNameZh} ${selectedVisitOption.serviceNameEn}`
+      ? bookingText("服務: {0} {1}", locale, [selectedVisitOption.serviceNameZh, selectedVisitOption.serviceNameEn])
       : null;
     const selectedPriceLine = selectedVisitOption
       ? [
           selectedVisitOption.promotionLabel,
-          getVisitOptionPriceLabel(selectedVisitOption)
-            ? `收費: ${getVisitOptionPriceLabel(selectedVisitOption)}`
+          getVisitOptionPriceLabel(selectedVisitOption, locale)
+            ? bookingText("收費: {0}", locale, [getVisitOptionPriceLabel(selectedVisitOption, locale)])
             : null,
         ].filter(Boolean).join(' | ')
       : null;
     const selectedTreatmentLine = selectedTreatmentDetails.length > 0
-      ? `治療項目: ${formatSelectedTreatments(selectedTreatmentDetails, values.treatmentOtherDetails)}`
+      ? bookingText("治療項目: {0}", locale, [formatSelectedTreatments(selectedTreatmentDetails, values.treatmentOtherDetails, locale)])
       : null;
     const sourceLine = initialSelection?.source
-      ? `預約來源: ${initialSelection.source}`
+      ? bookingText("預約來源: {0}", locale, [initialSelection.source])
       : null;
     const notes = visitType === 'first'
       ? [
@@ -1480,34 +1481,34 @@ export function BookingTabFlow({
           selectedServiceLine,
           selectedPriceLine,
           selectedTreatmentLine,
-          '[首診]',
-          `出生日期: ${values.dateOfBirth.trim() || '未提供'}`,
-          `性別: ${values.gender ? GENDER_LABELS[values.gender] : '未提供'}`,
-          `過敏史: ${values.allergies.trim() || '沒有'}`,
-          `正服用藥物／保健品: ${values.medications.trim() || '沒有'}`,
-          `主要症狀: ${values.symptoms.trim() || '未提供'}`,
-          `得知來源: ${REFERRAL_SOURCE_LABELS[values.referralSource.trim()] || '未提供'}`,
-          `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
+          bookingText("[首診]", locale),
+          bookingText("出生日期: {0}", locale, [values.dateOfBirth.trim() || '未提供']),
+          bookingText("性別: {0}", locale, [values.gender ? bookingText(GENDER_LABELS[values.gender], locale) : '未提供']),
+          bookingText("過敏史: {0}", locale, [values.allergies.trim() || '沒有']),
+          bookingText("正服用藥物／保健品: {0}", locale, [values.medications.trim() || '沒有']),
+          bookingText("主要症狀: {0}", locale, [values.symptoms.trim() || '未提供']),
+          bookingText("得知來源: {0}", locale, [bookingText(REFERRAL_SOURCE_LABELS[values.referralSource.trim()], locale) || '未提供']),
+          bookingText("收據需求: {0}", locale, [bookingText(RECEIPT_LABELS[values.needReceipt], locale)]),
         ].filter((value): value is string => Boolean(value))
       : [
           sourceLine,
           selectedServiceLine,
           selectedPriceLine,
           selectedTreatmentLine,
-          '[覆診]',
-          `收據需求: ${RECEIPT_LABELS[values.needReceipt]}`,
+          bookingText("[覆診]", locale),
+          bookingText("收據需求: {0}", locale, [bookingText(RECEIPT_LABELS[values.needReceipt], locale)]),
         ].filter((value): value is string => Boolean(value));
 
     if (isOnlineConsultation && values.medicationPickup) {
-      notes.push(`取藥方法: ${BOOKING_PICKUP_LABELS[values.medicationPickup]}`);
+      notes.push(bookingText("取藥方法: {0}", locale, [bookingText(BOOKING_PICKUP_LABELS[values.medicationPickup], locale)]));
     }
 
     if (isOnlineConsultation && isShippingBookingPickup(values.medicationPickup)) {
-      notes.push(`寄送地址／順豐站點: ${values.shippingAddressDetails.trim() || '未提供'}`);
+      notes.push(bookingText("寄送地址／順豐站點: {0}", locale, [values.shippingAddressDetails.trim() || '未提供']));
     }
 
     if (isOnlineConsultation && isClinicPickupBookingPickup(values.medicationPickup)) {
-      notes.push(`診所取藥時間／其他備註: ${values.clinicPickupRemarks.trim() || '未提供'}`);
+      notes.push(bookingText("診所取藥時間／其他備註: {0}", locale, [values.clinicPickupRemarks.trim() || '未提供']));
     }
 
     return notes.join(' | ');
@@ -1517,13 +1518,13 @@ export function BookingTabFlow({
     event.preventDefault();
 
     if (!selectedDoctor || !selectedClinic || !doctorId || !clinicId) {
-      setSubmitError('請先選擇醫師/協作服務與診所。');
+      setSubmitError(bookingText("請先選擇醫師/協作服務與診所。", locale));
       setStep('setup');
       return;
     }
 
     if (!selectedDate || !selectedTime) {
-      setSubmitError('請先選擇日期與時間。');
+      setSubmitError(bookingText("請先選擇日期與時間。", locale));
       setStep('timeslot');
       return;
     }
@@ -1532,7 +1533,7 @@ export function BookingTabFlow({
     setFormErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
-      setSubmitError('資料未填完整，請檢查必填欄位。');
+      setSubmitError(bookingText("資料未填完整，請檢查必填欄位。", locale));
       return;
     }
 
@@ -1541,6 +1542,7 @@ export function BookingTabFlow({
 
     const treatmentOptions = isOnlineConsultation || usesVisitBasedServices ? [] : selectedTreatmentOptions;
     const payload = {
+      locale,
       doctorId,
       clinicId,
       doctorName: selectedDoctor.doctorNameEn,
@@ -1593,7 +1595,7 @@ export function BookingTabFlow({
       const data = await response.json();
 
       if (!response.ok || !data?.success) {
-        setSubmitError(data?.error || '預約失敗，請稍後再試。');
+        setSubmitError(data?.error || bookingText("預約失敗，請稍後再試。", locale));
         return;
       }
 
@@ -1611,7 +1613,7 @@ export function BookingTabFlow({
       }
       setStep('success');
     } catch {
-      setSubmitError('預約時發生錯誤，請稍後再試。');
+      setSubmitError(bookingText("預約時發生錯誤，請稍後再試。", locale));
     } finally {
       setIsSubmitting(false);
     }
@@ -1629,14 +1631,14 @@ export function BookingTabFlow({
         <div className="patient-card p-6 sm:p-8">
         <h1 className="text-2xl font-semibold text-primary">{pageTitle}</h1>
         <p className="mt-3 text-sm text-slate-600">
-          {isStaffFlow ? '目前未有可用的醫師或協作服務時段，請稍後再試或由姑娘人工跟進。' : '目前未有可用的醫師或協作服務時段，請稍後再試或於聊天頁聯絡我們。'}
+          {isStaffFlow ? bookingText("目前未有可用的醫師或協作服務時段，請稍後再試或由姑娘人工跟進。", locale) : bookingText("目前未有可用的醫師或協作服務時段，請稍後再試或於聊天頁聯絡我們。", locale)}
         </p>
         {!embedMode ? (
           <Link
             href={isStaffFlow ? '/nurse' : '/chat'}
             className="mt-6 inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
           >
-            {isStaffFlow ? '返回控制台' : '返回聊天頁'}
+            {isStaffFlow ? bookingText("返回控制台", locale) : bookingText("返回聊天頁", locale)}
           </Link>
         ) : null}
       </div>
@@ -1659,8 +1661,8 @@ export function BookingTabFlow({
 
       {!isMinimalPreview ? (
         <div className="mb-6 rounded-2xl border border-primary/15 bg-primary-light/40 p-3 text-xs font-medium text-primary sm:text-sm">
-          步驟：{step === 'setup' && '1. 醫師/協作服務與診所'}{step === 'timeslot' && '2. 日期與時間'}
-          {step === 'details' && '3. 填寫資料'}{step === 'success' && '完成'}
+          {bookingText("步驟：", locale)}{step === 'setup' && bookingText("1. 醫師/協作服務與診所", locale)}{step === 'timeslot' && bookingText("2. 日期與時間", locale)}
+          {step === 'details' && bookingText("3. 填寫資料", locale)}{step === 'success' && bookingText("完成", locale)}
         </div>
       ) : null}
 
@@ -1670,11 +1672,11 @@ export function BookingTabFlow({
             <div className="w-full rounded-2xl border border-[#d5e7d8] bg-white/90 px-4 py-4 sm:px-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 items-center gap-4">
-                  <DoctorAvatar doctor={selectedDoctor} size="lg" />
+                  <DoctorAvatar doctor={selectedDoctor} size="lg" locale={locale} />
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold tracking-[0.2em] text-[#5d8c67]">已選醫師</p>
+                    <p className="text-[11px] font-semibold tracking-[0.2em] text-[#5d8c67]">{bookingText("已選醫師", locale)}</p>
                     <p className="mt-1 text-base font-semibold leading-snug text-[#254430]">
-                      {selectedDoctor.doctorNameZh}
+                      {bookingText(selectedDoctor.doctorNameZh, locale)}
                     </p>
                     {selectedDoctorSlotDurationLabel ? (
                       <p className="mt-0.5 text-xs text-slate-500">
@@ -1682,40 +1684,39 @@ export function BookingTabFlow({
                       </p>
                     ) : null}
                     <Link
-                      href="/booking-whatsapp"
+                      href={locale === 'en' ? '/en/booking' : '/booking-whatsapp'}
                       className="mt-2 inline-flex w-fit rounded-full border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-light"
                     >
-                      更改醫師
-                    </Link>
+                      {bookingText("更改醫師", locale)}</Link>
                   </div>
                 </div>
-                <CompactScheduleSummaryCard doctor={selectedDoctor} />
+                <CompactScheduleSummaryCard doctor={selectedDoctor} locale={locale} />
               </div>
             </div>
           ) : (
             <div className="space-y-4">
               <label className="space-y-2">
-                <span className="text-sm font-semibold text-slate-700">選擇醫師</span>
+                <span className="text-sm font-semibold text-slate-700">{bookingText("選擇醫師", locale)}</span>
                 <select
                   value={doctorId}
                   onChange={(event) => handleDoctorChange(event.target.value)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
                 >
-                  <option value="">請選擇醫師及服務</option>
+                  <option value="">{bookingText("請選擇醫師及服務", locale)}</option>
                   {primaryDoctorOptions.length > 0 ? (
-                    <optgroup label="中醫主診醫師">
+                    <optgroup label={bookingText("中醫主診醫師", locale)}>
                       {primaryDoctorOptions.map((doctor) => (
                         <option key={doctor.doctorId} value={doctor.doctorId}>
-                          {formatDoctorOptionLabel(doctor)}
+                          {formatDoctorOptionLabel(doctor, locale)}
                         </option>
                       ))}
                     </optgroup>
                   ) : null}
                   {supportDoctorOptions.length > 0 ? (
-                    <optgroup label="協作服務">
+                    <optgroup label={bookingText("協作服務", locale)}>
                       {supportDoctorOptions.map((doctor) => (
                         <option key={doctor.doctorId} value={doctor.doctorId}>
-                          {formatDoctorOptionLabel(doctor)}
+                          {formatDoctorOptionLabel(doctor, locale)}
                         </option>
                       ))}
                     </optgroup>
@@ -1724,8 +1725,7 @@ export function BookingTabFlow({
               </label>
               {supportDoctorOptions.length > 0 ? (
                 <p className="text-xs leading-relaxed text-slate-500">
-                  中醫主診醫師優先顯示；協作脊醫服務列於下方。
-                </p>
+                  {bookingText("中醫主診醫師優先顯示；協作脊醫服務列於下方。", locale)}</p>
               ) : null}
             </div>
           )}
@@ -1735,32 +1735,32 @@ export function BookingTabFlow({
               {isMinimalPreview ? (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-base font-semibold text-[#254430]">選擇診所</p>
-                    <p className="mt-1 text-xs text-slate-500">先選診所，再揀日期時間。</p>
+                    <p className="text-base font-semibold text-[#254430]">{bookingText("選擇診所", locale)}</p>
+                    <p className="mt-1 text-xs text-slate-500">{bookingText("先選診所，再揀日期時間。", locale)}</p>
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-4">
-                    <DoctorAvatar doctor={selectedDoctor} size="lg" />
+                    <DoctorAvatar doctor={selectedDoctor} size="lg" locale={locale} />
                     <div className="min-w-0">
                       <p className="text-xs font-semibold tracking-[0.28em] text-[#5d8c67]">
-                        {getSelectedScheduleEyebrow(selectedDoctor)}
+                        {getSelectedScheduleEyebrow(selectedDoctor, locale)}
                       </p>
                       <h2 className="mt-2 text-[1.35rem] font-semibold text-[#234230] sm:text-[1.5rem]">
-                        {selectedDoctor.doctorNameZh}
+                        {bookingText(selectedDoctor.doctorNameZh, locale)}
                       </h2>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {usesVisitBasedServices ? (
                           <>
                             {firstVisitOption ? (
                               <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
-                                首診 {formatHkdPrice(firstVisitOption.priceHkd)}
+                                {bookingText("首診", locale)}{formatHkdPrice(firstVisitOption.priceHkd, locale)}
                               </span>
                             ) : null}
                             {followupVisitOption ? (
                               <span className="inline-flex items-center rounded-full border border-[#d6e7d8] bg-white/80 px-3 py-1 text-xs font-semibold text-[#31533c]">
-                                覆診 {formatHkdPrice(followupVisitOption.priceHkd)}
+                                {bookingText("覆診", locale)}{formatHkdPrice(followupVisitOption.priceHkd, locale)}
                               </span>
                             ) : null}
                           </>
@@ -1770,21 +1770,21 @@ export function BookingTabFlow({
                             {selectedDoctorSlotDurationLabel}
                           </span>
                         ) : null}
-                        {isSupportBookingDoctor(selectedDoctor) ? (
+                        {isSupportBookingDoctor(selectedDoctor, locale) ? (
                           <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
-                            {selectedDoctor.bookingRoleLabel}
+                            {bookingText(selectedDoctor.bookingRoleLabel, locale)}
                           </span>
                         ) : null}
                       </div>
-                      {selectedDoctor.bookingSupportNote ? (
+                      {bookingText(selectedDoctor.bookingSupportNote, locale) ? (
                         <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                          {selectedDoctor.bookingSupportNote}
+                          {bookingText(selectedDoctor.bookingSupportNote, locale)}
                         </p>
                       ) : null}
                     </div>
                   </div>
 
-                  <CompactScheduleSummaryCard doctor={selectedDoctor} className="sm:max-w-[18rem]" />
+                  <CompactScheduleSummaryCard doctor={selectedDoctor} className="sm:max-w-[18rem]" locale={locale} />
                 </div>
               )}
 
@@ -1792,7 +1792,7 @@ export function BookingTabFlow({
                 <div className="mt-4 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
                   <Info className="mt-0.5 h-4 w-4 shrink-0" />
                   <div className="space-y-1">
-                    {getDoctorHolidaySummaryLines(selectedDoctor, selectedDoctorNotices).map((line) => (
+                    {getDoctorHolidaySummaryLines(selectedDoctor, selectedDoctorNotices, locale).map((line) => (
                       <p key={line}>{line}</p>
                     ))}
                   </div>
@@ -1801,7 +1801,7 @@ export function BookingTabFlow({
 
               <div className="mt-4 grid gap-3">
                 {selectedDoctor.clinics.map((clinic) => {
-                  const scheduleLines = formatScheduleLines(clinic.schedule);
+                  const scheduleLines = formatScheduleLines(clinic.schedule, locale);
                   const isChosenClinic = clinic.clinicId === clinicId;
                   const clinicStyle = CLINIC_AVAILABILITY_STYLES[clinic.clinicId];
                   const clinicSummary = clinicEarliestSummaries[clinic.clinicId];
@@ -1830,8 +1830,8 @@ export function BookingTabFlow({
                       aria-pressed={isChosenClinic}
                       aria-label={
                         isChosenClinic
-                          ? `${clinic.clinicNameZh} 已選取，再按一次取消篩選`
-                          : `選擇 ${clinic.clinicNameZh}`
+                          ? bookingText("{0} 已選取，再按一次取消篩選", locale, [bookingText(clinic.clinicNameZh, locale)])
+                          : bookingText("選擇 {0}", locale, [bookingText(clinic.clinicNameZh, locale)])
                       }
                       className={`w-full rounded-2xl border px-4 py-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
                         isChosenClinic
@@ -1842,15 +1842,14 @@ export function BookingTabFlow({
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <p className="text-base font-semibold text-slate-900">
-                            {clinic.clinicNameZh}
+                            {bookingText(clinic.clinicNameZh, locale)}
                             <span className="ml-2 text-sm font-medium text-slate-400">
-                              {clinic.clinicNameEn}
+                              {locale === 'zh' ? clinic.clinicNameEn : null}
                             </span>
                           </p>
                           {clinic.nextEffectiveFrom ? (
                             <p className="mt-1 text-xs font-medium text-sky-700">
-                              已排定新版本，{formatShortDate(clinic.nextEffectiveFrom)} 起更新
-                            </p>
+                              {bookingText("已排定新版本，", locale)}{formatShortDate(clinic.nextEffectiveFrom, locale)} {bookingText("起更新", locale)}</p>
                           ) : null}
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1858,12 +1857,11 @@ export function BookingTabFlow({
                             className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${summaryClassName}`}
                           >
                             <span className={`h-2 w-2 rounded-full ${summaryDotClassName}`} />
-                            {clinicSummary?.label || '正在查詢最早時段'}
+                            {clinicSummary?.label || bookingText("正在查詢最早時段", locale)}
                           </span>
                           {isChosenClinic && (
                             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                              已選診所
-                            </span>
+                              {bookingText("已選診所", locale)}</span>
                           )}
                         </div>
                       </div>
@@ -1880,7 +1878,7 @@ export function BookingTabFlow({
                 })}
               </div>
               <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                點按診所即可篩選。
+                {bookingText("點按診所即可篩選。", locale)}
               </p>
               {onlineConsultationMethodNotice ? (
                 <div className="mt-4 flex gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-relaxed text-sky-900">
@@ -1894,12 +1892,11 @@ export function BookingTabFlow({
           <div className="space-y-3">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <p className="text-sm font-semibold text-slate-700">
-                {usesVisitBasedServices ? '選擇服務' : '診症類型'}
+                {usesVisitBasedServices ? bookingText("選擇服務", locale) : bookingText("診症類型", locale)}
               </p>
               {usesVisitBasedServices ? (
                 <span className="text-xs font-medium text-emerald-700">
-                  脊醫服務
-                </span>
+                  {bookingText("脊醫服務", locale)}</span>
               ) : null}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -1912,26 +1909,26 @@ export function BookingTabFlow({
                     : 'border-slate-200 bg-white text-slate-700 hover:border-primary/40'
                 }`}
               >
-                <p className="font-semibold">{VISIT_TYPE_LABELS.first}</p>
+                <p className="font-semibold">{bookingText(VISIT_TYPE_LABELS.first, locale)}</p>
                 {usesVisitBasedServices && firstVisitOption ? (
                   <div className="mt-2 space-y-1">
                     <p className="text-sm font-semibold text-slate-700">
-                      {firstVisitOption.serviceNameZh}
+                      {bookingText(firstVisitOption.serviceNameZh, locale)}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {firstVisitOption.serviceNameEn}
+                      {locale === 'zh' ? firstVisitOption.serviceNameEn : null}
                     </p>
                     <p className="text-sm font-semibold text-emerald-700">
-                      {getVisitOptionPriceLabel(firstVisitOption)}
+                      {getVisitOptionPriceLabel(firstVisitOption, locale)}
                     </p>
-                    {getVisitOptionDurationLabel(firstVisitOption) ? (
+                    {getVisitOptionDurationLabel(firstVisitOption, locale) ? (
                       <p className="text-xs text-slate-500">
-                        {getVisitOptionDurationLabel(firstVisitOption)}
+                        {getVisitOptionDurationLabel(firstVisitOption, locale)}
                       </p>
                     ) : null}
                   </div>
                 ) : (
-                  <p className="mt-1 text-xs text-slate-500">第一次到診所就診</p>
+                  <p className="mt-1 text-xs text-slate-500">{bookingText("第一次到診所就診", locale)}</p>
                 )}
               </button>
 
@@ -1944,26 +1941,26 @@ export function BookingTabFlow({
                     : 'border-slate-200 bg-white text-slate-700 hover:border-primary/40'
                 }`}
               >
-                <p className="font-semibold">{VISIT_TYPE_LABELS.followup}</p>
+                <p className="font-semibold">{bookingText(VISIT_TYPE_LABELS.followup, locale)}</p>
                 {usesVisitBasedServices && followupVisitOption ? (
                   <div className="mt-2 space-y-1">
                     <p className="text-sm font-semibold text-slate-700">
-                      {followupVisitOption.serviceNameZh}
+                      {bookingText(followupVisitOption.serviceNameZh, locale)}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {followupVisitOption.serviceNameEn}
+                      {locale === 'zh' ? followupVisitOption.serviceNameEn : null}
                     </p>
                     <p className="text-sm font-semibold text-slate-700">
-                      {getVisitOptionPriceLabel(followupVisitOption)}
+                      {getVisitOptionPriceLabel(followupVisitOption, locale)}
                     </p>
-                    {getVisitOptionDurationLabel(followupVisitOption) ? (
+                    {getVisitOptionDurationLabel(followupVisitOption, locale) ? (
                       <p className="text-xs text-slate-500">
-                        {getVisitOptionDurationLabel(followupVisitOption)}
+                        {getVisitOptionDurationLabel(followupVisitOption, locale)}
                       </p>
                     ) : null}
                   </div>
                 ) : (
-                  <p className="mt-1 text-xs text-slate-500">曾經到診所就診</p>
+                  <p className="mt-1 text-xs text-slate-500">{bookingText("曾經到診所就診", locale)}</p>
                 )}
               </button>
             </div>
@@ -1975,8 +1972,7 @@ export function BookingTabFlow({
                   </p>
                 ) : null}
                 <p className="text-xs leading-relaxed text-slate-500">
-                  網上預約暫時只開放首診及覆診；X 光片及 X 光片講解會由脊醫到診後按需要再安排。
-                </p>
+                  {bookingText("網上預約暫時只開放首診及覆診；X 光片及 X 光片講解會由脊醫到診後按需要再安排。", locale)}</p>
               </div>
             ) : null}
           </div>
@@ -1984,8 +1980,8 @@ export function BookingTabFlow({
           {selectedDoctor && !isOnlineConsultation && !usesVisitBasedServices ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-slate-700">治療項目</p>
-                <span className="text-xs font-medium text-slate-500">可留空，可多選</span>
+                <p className="text-sm font-semibold text-slate-700">{bookingText("治療項目", locale)}</p>
+                <span className="text-xs font-medium text-slate-500">{bookingText("可留空，可多選", locale)}</span>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -2008,8 +2004,8 @@ export function BookingTabFlow({
                         className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
                       />
                       <span className="min-w-0">
-                        <span className="block font-semibold">{option.labelZh}</span>
-                        <span className="mt-1 block text-xs text-slate-500">{option.labelEn}</span>
+                        <span className="block font-semibold">{bookingText(option.labelZh, locale)}</span>
+                        <span className="mt-1 block text-xs text-slate-500">{locale === 'zh' ? option.labelEn : null}</span>
                       </span>
                     </label>
                   );
@@ -2018,12 +2014,12 @@ export function BookingTabFlow({
 
               {needsTreatmentOtherDetails ? (
                 <label className="space-y-1.5">
-                  <span className="text-sm font-semibold text-slate-700">其他服務內容 *</span>
+                  <span className="text-sm font-semibold text-slate-700">{bookingText("其他服務內容 *", locale)}</span>
                   <input
                     value={formValues.treatmentOtherDetails}
                     onChange={(event) => updateFormField('treatmentOtherDetails', event.target.value)}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                    placeholder="請註明想預約的其他服務"
+                    placeholder={bookingText("請註明想預約的其他服務", locale)}
                   />
                   {formErrors.treatmentOtherDetails ? (
                     <p className="text-xs text-red-600">{formErrors.treatmentOtherDetails}</p>
@@ -2032,8 +2028,7 @@ export function BookingTabFlow({
               ) : null}
 
               <p className="text-xs leading-relaxed text-slate-500">
-                如未確定做哪一項，可先留空，稍後到診時再確認。
-              </p>
+                {bookingText("如未確定做哪一項，可先留空，稍後到診時再確認。", locale)}</p>
             </div>
           ) : null}
 
@@ -2043,8 +2038,7 @@ export function BookingTabFlow({
             disabled={!canContinueSetup}
             className="inline-flex w-full items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
-            下一步：選擇日期與時間
-          </button>
+            {bookingText("下一步：選擇日期與時間", locale)}</button>
         </div>
       )}
 
@@ -2055,28 +2049,27 @@ export function BookingTabFlow({
             onClick={() => setStep('setup')}
             className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-900"
           >
-            <ArrowLeft className="h-4 w-4" /> 返回上一頁
-          </button>
+            <ArrowLeft className="h-4 w-4" /> {bookingText("返回上一頁", locale)}</button>
 
           <DoctorBookingSummary
             doctor={selectedDoctor}
-            clinicNameZh={selectedClinic?.clinicNameZh || '比較全部診所'}
+            clinicNameZh={bookingText(selectedClinic?.clinicNameZh, locale) || bookingText("比較全部診所", locale)}
             eyebrow={selectedDoctorSummaryEyebrow}
             details={compactDetails([
               usesVisitBasedServices && selectedVisitOptionSummary
-                ? `${VISIT_TYPE_LABELS[visitType]}．${selectedVisitOptionSummary}`
+                ? `${bookingText(VISIT_TYPE_LABELS[visitType], locale)}．${selectedVisitOptionSummary}`
                 : null,
               !usesVisitBasedServices && !isOnlineConsultation
                 ? treatmentSummaryDetail || availableTreatmentSummaryDetail
                 : null,
               !usesVisitBasedServices
-                ? `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`
+                ? `${bookingText(VISIT_TYPE_LABELS[visitType], locale)}．${getSlotDurationLabel(selectedDoctorSlotMinutes, locale)}`
                 : null,
               onlineConsultationMethodDetail,
               selectedClinic
-                ? '日曆只顯示所選診所燈號。'
-                : '日曆會同時顯示各診所燈號，方便直接比較日期。',
-            ])}
+                ? bookingText("日曆只顯示所選診所燈號。", locale)
+                : bookingText("日曆會同時顯示各診所燈號，方便直接比較日期。", locale),
+            ], locale)} locale={locale}
           />
 
           {groupBookingNotice ? (
@@ -2092,15 +2085,13 @@ export function BookingTabFlow({
               onClick={() => handleClinicChange('')}
               className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
             >
-              改為比較全部診所
-            </button>
+              {bookingText("改為比較全部診所", locale)}</button>
           ) : null}
 
           <div className="space-y-3">
             <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
               <CalendarDays className="h-4 w-4" />
-              選擇日期
-            </span>
+              {bookingText("選擇日期", locale)}</span>
             <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-base font-semibold text-slate-900">{calendarMonthLabel}</p>
@@ -2110,7 +2101,7 @@ export function BookingTabFlow({
                     onClick={() => setCalendarMonthKey(previousMonthKey)}
                     disabled={!canGoToPreviousMonth || bookableDatesLoading}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
-                    aria-label="上一個月"
+                    aria-label={bookingText("上一個月", locale)}
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
@@ -2119,7 +2110,7 @@ export function BookingTabFlow({
                     onClick={() => setCalendarMonthKey(nextMonthKey)}
                     disabled={!canGoToNextMonth || bookableDatesLoading}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
-                    aria-label="下一個月"
+                    aria-label={bookingText("下一個月", locale)}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -2128,8 +2119,8 @@ export function BookingTabFlow({
 
               <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-slate-400">
                 {WEEKDAY_LABELS.map((weekday) => (
-                  <span key={weekday} className="py-1">
-                    {weekday}
+                  <span key={bookingText(weekday, locale)} className="py-1">
+                    {bookingText(weekday, locale)}
                   </span>
                 ))}
               </div>
@@ -2193,12 +2184,12 @@ export function BookingTabFlow({
                         CLINIC_AVAILABILITY_STYLES[clinic.clinicId].dotClassName
                       }`}
                     />
-                    <span>{clinic.clinicNameZh}有位</span>
+                    <span>{bookingText(clinic.clinicNameZh, locale)}{bookingText("有位", locale)}</span>
                   </span>
                 ))}
                 <span className="inline-flex items-center gap-2">
                   <span className={`h-2 w-2 rounded-full ${UNAVAILABLE_DOT_CLASS_NAME}`} />
-                  <span>{clinicId ? '所選診所暫滿' : '全部診所暫滿'}</span>
+                  <span>{clinicId ? bookingText("所選診所暫滿", locale) : bookingText("全部診所暫滿", locale)}</span>
                 </span>
               </div>
             </div>
@@ -2206,24 +2197,23 @@ export function BookingTabFlow({
             {bookableDatesLoading ? (
               <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                正在掃描本月各診所可預約日子...
-              </div>
+                {bookingText("正在掃描本月各診所可預約日子...", locale)}</div>
             ) : null}
 
             {!bookableDatesLoading && bookableDatesError ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                {bookableDatesError}
+                {bookingFeedback(bookableDatesError, locale)}
               </div>
             ) : null}
 
             {selectedDate ? (
               <div className="space-y-2">
                 <p className="text-sm text-slate-600">
-                  已選日期：<span className="font-semibold text-slate-900">{formatDateForDisplay(selectedDate)}</span>
+                  {bookingText("已選日期：", locale)}<span className="font-semibold text-slate-900">{formatDateForDisplay(selectedDate, locale)}</span>
                 </p>
                 {!clinicId && selectedDateAllAvailableClinics.length > 0 ? (
                   <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                    <p className="text-sm font-semibold text-slate-700">此日可預約診所</p>
+                    <p className="text-sm font-semibold text-slate-700">{bookingText("此日可預約診所", locale)}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {selectedDateAllAvailableClinics.map((clinic) => (
                         <button
@@ -2239,64 +2229,59 @@ export function BookingTabFlow({
                               CLINIC_AVAILABILITY_STYLES[clinic.clinicId].dotClassName
                             }`}
                           />
-                          {clinic.clinicNameZh}
+                          {bookingText(clinic.clinicNameZh, locale)}
                         </button>
                       ))}
                     </div>
                     <p className="mt-3 text-xs text-slate-500">
-                      先揀診所，再顯示當日可預約時段。
-                    </p>
+                      {bookingText("先揀診所，再顯示當日可預約時段。", locale)}</p>
                   </div>
                 ) : null}
                 {clinicId &&
                 selectedDateVisibleAvailableClinics.length === 0 &&
                 selectedDateAllAvailableClinics.length > 0 ? (
                   <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-                    此日 {selectedClinic?.clinicNameZh} 暫滿，但其他診所仍有位。
-                    <button
+                    {bookingText("此日", locale)}{bookingText(selectedClinic?.clinicNameZh, locale)} {bookingText("暫滿，但其他診所仍有位。", locale)}<button
                       type="button"
                       onClick={() => handleClinicChange('')}
                       className="ml-2 font-semibold underline underline-offset-2"
                     >
-                      改為比較全部診所
-                    </button>
+                      {bookingText("改為比較全部診所", locale)}</button>
                   </div>
                 ) : null}
               </div>
             ) : (
-              <p className="text-sm text-slate-500">請先在日曆選擇日期，再選擇時段。</p>
+              <p className="text-sm text-slate-500">{bookingText("請先在日曆選擇日期，再選擇時段。", locale)}</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-semibold text-slate-700">可預約時段</p>
+            <p className="text-sm font-semibold text-slate-700">{bookingText("可預約時段", locale)}</p>
             <p className="text-xs text-slate-500">
               {selectedDoctorSlotDurationLabel
                 ? selectedDoctor
-                  ? `已按 ${selectedDoctor.doctorNameZh} 設定顯示 ${selectedDoctorSlotDurationLabel}。`
-                  : `已按醫師/協作服務設定顯示 ${selectedDoctorSlotDurationLabel}。`
+                  ? bookingText("已按 {0} 設定顯示 {1}。", locale, [selectedDoctor.doctorNameZh, selectedDoctorSlotDurationLabel])
+                  : bookingText("已按醫師/協作服務設定顯示 {0}。", locale, [selectedDoctorSlotDurationLabel])
                 : selectedDoctor
-                  ? `已按 ${selectedDoctor.doctorNameZh} 設定顯示可預約時段。`
-                  : '已按醫師/協作服務設定顯示可預約時段。'}
+                  ? bookingText("已按 {0} 設定顯示可預約時段。", locale, [bookingText(selectedDoctor.doctorNameZh, locale)])
+                  : bookingText("已按醫師/協作服務設定顯示可預約時段。", locale)}
             </p>
 
             {slotsLoading ? (
               <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                正在查詢可預約時段...
-              </div>
+                {bookingText("正在查詢可預約時段...", locale)}</div>
             ) : null}
 
             {!slotsLoading && slotError ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                {slotError}
+                {bookingFeedback(slotError, locale)}
               </div>
             ) : null}
 
             {!slotsLoading && !slotError && selectedDate && !clinicId ? (
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                請先選擇當日有位的診所，再查看可預約時段。
-              </div>
+                {bookingText("請先選擇當日有位的診所，再查看可預約時段。", locale)}</div>
             ) : null}
 
             {!slotsLoading && availableSlots.length > 0 ? (
@@ -2325,8 +2310,7 @@ export function BookingTabFlow({
             disabled={!canContinueTimeslot}
             className="inline-flex w-full items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
-            下一步：填寫個人資料
-          </button>
+            {bookingText("下一步：填寫個人資料", locale)}</button>
         </div>
       )}
 
@@ -2337,26 +2321,25 @@ export function BookingTabFlow({
             onClick={() => setStep('timeslot')}
             className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-900"
           >
-            <ArrowLeft className="h-4 w-4" /> 返回選擇時段
-          </button>
+            <ArrowLeft className="h-4 w-4" /> {bookingText("返回選擇時段", locale)}</button>
 
           <DoctorBookingSummary
             doctor={selectedDoctor}
-            clinicNameZh={selectedClinic?.clinicNameZh}
-            eyebrow="預約摘要"
+            clinicNameZh={bookingText(selectedClinic?.clinicNameZh, locale)}
+            eyebrow={bookingText("預約摘要", locale)}
             details={compactDetails([
-              `${formatDateForDisplay(selectedDate)} ${selectedTime}`,
+              `${formatDateForDisplay(selectedDate, locale)} ${selectedTime}`,
               usesVisitBasedServices && selectedVisitOptionSummary
-                ? `${VISIT_TYPE_LABELS[visitType]}．${selectedVisitOptionSummary}`
+                ? `${bookingText(VISIT_TYPE_LABELS[visitType], locale)}．${selectedVisitOptionSummary}`
                 : null,
               !usesVisitBasedServices && !isOnlineConsultation
                 ? treatmentSummaryDetail || availableTreatmentSummaryDetail
                 : null,
               !usesVisitBasedServices
-                ? `${VISIT_TYPE_LABELS[visitType]}．${getSlotDurationLabel(selectedDoctorSlotMinutes)}`
+                ? `${bookingText(VISIT_TYPE_LABELS[visitType], locale)}．${getSlotDurationLabel(selectedDoctorSlotMinutes, locale)}`
                 : null,
               onlineConsultationMethodDetail,
-            ])}
+            ], locale)} locale={locale}
           />
 
           {isWhatsappFlow ? (
@@ -2387,7 +2370,7 @@ export function BookingTabFlow({
                   dateOfBirth: prev.dateOfBirth || (preferred.date_of_birth ?? ''),
                   gender: prev.gender || ((preferred.gender as typeof prev.gender) ?? ''),
                 }));
-              }}
+              }} locale={locale}
             />
           ) : null}
 
@@ -2395,83 +2378,83 @@ export function BookingTabFlow({
             {hasAutofilledContact ? (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-800">
                 {isStaffFlow
-                  ? '已從所選病人資料帶入聯絡資料，你可按需要修改。'
-                  : '已從登入帳戶帶入可用聯絡資料，你可按需要修改。'}
+                  ? bookingText("已從所選病人資料帶入聯絡資料，你可按需要修改。", locale)
+                  : bookingText("已從登入帳戶帶入可用聯絡資料，你可按需要修改。", locale)}
               </div>
             ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="space-y-1.5">
-                <span className="text-sm font-semibold text-slate-700">名字 *</span>
+                <span className="text-sm font-semibold text-slate-700">{bookingText("名字 *", locale)}</span>
                 <input
                   type="text"
                   autoComplete="given-name"
                   value={formValues.firstName}
                   onChange={(event) => updateFormField('firstName', event.target.value)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                  placeholder="例如：大文"
+                  placeholder={bookingText("例如：大文", locale)}
                 />
                 {formErrors.firstName ? <p className="text-xs text-red-600">{formErrors.firstName}</p> : null}
               </label>
 
               <label className="space-y-1.5">
-                <span className="text-sm font-semibold text-slate-700">姓氏 *</span>
+                <span className="text-sm font-semibold text-slate-700">{bookingText("姓氏 *", locale)}</span>
                 <input
                   type="text"
                   autoComplete="family-name"
                   value={formValues.lastName}
                   onChange={(event) => updateFormField('lastName', event.target.value)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                  placeholder="例如：陳"
+                  placeholder={bookingText("例如：陳", locale)}
                 />
                 {formErrors.lastName ? <p className="text-xs text-red-600">{formErrors.lastName}</p> : null}
               </label>
             </div>
 
             <label className="space-y-1.5">
-              <span className="text-sm font-semibold text-slate-700">電話 *</span>
+              <span className="text-sm font-semibold text-slate-700">{bookingText("電話 *", locale)}</span>
               <input
                 type="tel"
                 autoComplete="tel"
                 value={formValues.phone}
                 onChange={(event) => updateFormField('phone', event.target.value)}
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                placeholder="例如：98765432"
+                placeholder={bookingText("例如：98765432", locale)}
               />
               {formErrors.phone ? <p className="text-xs text-red-600">{formErrors.phone}</p> : null}
             </label>
 
             <label className="space-y-1.5">
-              <span className="text-sm font-semibold text-slate-700">電郵（選填）</span>
+              <span className="text-sm font-semibold text-slate-700">{bookingText("電郵（選填）", locale)}</span>
               <input
                 type="email"
                 autoComplete="email"
                 value={formValues.email}
                 onChange={(event) => updateFormField('email', event.target.value)}
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                placeholder="例如：name@example.com"
+                placeholder={bookingText("例如：name@example.com", locale)}
               />
               {formErrors.email ? <p className="text-xs text-red-600">{formErrors.email}</p> : null}
             </label>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="space-y-1.5">
-                <span className="text-sm font-semibold text-slate-700">收據需求 *</span>
+                <span className="text-sm font-semibold text-slate-700">{bookingText("收據需求 *", locale)}</span>
                 <select
                   value={formValues.needReceipt}
                   onChange={(event) => updateFormField('needReceipt', event.target.value as ReceiptType)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
                 >
-                  <option value="no">不需要</option>
-                  <option value="yes_insurance">需要，用作保險索償</option>
-                  <option value="yes_not_insurance">需要，非保險用途</option>
+                  <option value="no">{bookingText("不需要", locale)}</option>
+                  <option value="yes_insurance">{bookingText("需要，用作保險索償", locale)}</option>
+                  <option value="yes_not_insurance">{bookingText("需要，非保險用途", locale)}</option>
                 </select>
               </label>
             </div>
 
             {isOnlineConsultation ? (
               <label className="space-y-1.5">
-                <span className="text-sm font-semibold text-slate-700">取藥方法 *</span>
+                <span className="text-sm font-semibold text-slate-700">{bookingText("取藥方法 *", locale)}</span>
                 <select
                   value={formValues.medicationPickup}
                   onChange={(event) =>
@@ -2479,10 +2462,10 @@ export function BookingTabFlow({
                   }
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
                 >
-                  <option value="">請選擇</option>
+                  <option value="">{bookingText("請選擇", locale)}</option>
                   {pickupOptions.map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.label}
+                      {bookingText(option.label, locale)}
                     </option>
                   ))}
                 </select>
@@ -2495,13 +2478,12 @@ export function BookingTabFlow({
             {needsShippingAddressDetails ? (
               <label className="space-y-1.5">
                 <span className="text-sm font-semibold text-slate-700">
-                  如選擇送遞，請填寫中文寄送地址／順豐站點或智能櫃代碼
-                </span>
+                  {bookingText("如選擇送遞，請填寫中文寄送地址／順豐站點或智能櫃代碼", locale)}</span>
                 <input
                   value={formValues.shippingAddressDetails}
                   onChange={(event) => updateFormField('shippingAddressDetails', event.target.value)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                  placeholder="例如：九龍尖沙咀廣東道 88 號 xx 大廈 xx 室／順豐站代碼"
+                  placeholder={bookingText("例如：九龍尖沙咀廣東道 88 號 xx 大廈 xx 室／順豐站代碼", locale)}
                 />
                 {formErrors.shippingAddressDetails ? (
                   <p className="text-xs text-red-600">{formErrors.shippingAddressDetails}</p>
@@ -2512,13 +2494,12 @@ export function BookingTabFlow({
             {needsClinicPickupRemarks ? (
               <label className="space-y-1.5">
                 <span className="text-sm font-semibold text-slate-700">
-                  若於診所取藥，請填寫取藥時間／其他備註
-                </span>
+                  {bookingText("若於診所取藥，請填寫取藥時間／其他備註", locale)}</span>
                 <textarea
                   value={formValues.clinicPickupRemarks}
                   onChange={(event) => updateFormField('clinicPickupRemarks', event.target.value)}
                   className="min-h-24 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                  placeholder="例如：星期二 4pm 後可到中環診所取藥"
+                  placeholder={bookingText("例如：星期二 4pm 後可到中環診所取藥", locale)}
                 />
                 {formErrors.clinicPickupRemarks ? (
                   <p className="text-xs text-red-600">{formErrors.clinicPickupRemarks}</p>
@@ -2530,16 +2511,15 @@ export function BookingTabFlow({
               <div className="space-y-4 rounded-2xl border border-red-100 bg-red-50/70 p-4">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-red-700">
                   <UserRound className="h-4 w-4" />
-                  首診資料（必填）
-                </p>
+                  {bookingText("首診資料（必填）", locale)}</p>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-semibold text-slate-700">出生日期 *</span>
+                  <span className="text-sm font-semibold text-slate-700">{bookingText("出生日期 *", locale)}</span>
                   <input
                     value={formValues.dateOfBirth}
                     onChange={(event) => updateFormField('dateOfBirth', event.target.value)}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                    placeholder="例如：1990/01/15"
+                    placeholder={bookingText("例如：1990/01/15", locale)}
                   />
                   {formErrors.dateOfBirth ? (
                     <p className="text-xs text-red-600">{formErrors.dateOfBirth}</p>
@@ -2547,38 +2527,38 @@ export function BookingTabFlow({
                 </label>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-semibold text-slate-700">性別 *</span>
+                  <span className="text-sm font-semibold text-slate-700">{bookingText("性別 *", locale)}</span>
                   <select
                     value={formValues.gender}
                     onChange={(event) => updateFormField('gender', event.target.value as GenderType)}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
                   >
-                    <option value="">請選擇</option>
-                    <option value="male">男</option>
-                    <option value="female">女</option>
-                    <option value="other">其他</option>
+                    <option value="">{bookingText("請選擇", locale)}</option>
+                    <option value="male">{bookingText("男", locale)}</option>
+                    <option value="female">{bookingText("女", locale)}</option>
+                    <option value="other">{bookingText("其他", locale)}</option>
                   </select>
                   {formErrors.gender ? <p className="text-xs text-red-600">{formErrors.gender}</p> : null}
                 </label>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-semibold text-slate-700">過敏史 *</span>
+                  <span className="text-sm font-semibold text-slate-700">{bookingText("過敏史 *", locale)}</span>
                   <textarea
                     value={formValues.allergies}
                     onChange={(event) => updateFormField('allergies', event.target.value)}
                     className="min-h-20 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                    placeholder="如沒有請填「沒有」"
+                    placeholder={bookingText("如沒有請填「沒有」", locale)}
                   />
                   {formErrors.allergies ? <p className="text-xs text-red-600">{formErrors.allergies}</p> : null}
                 </label>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-semibold text-slate-700">正服用藥物／保健品 *</span>
+                  <span className="text-sm font-semibold text-slate-700">{bookingText("正服用藥物／保健品 *", locale)}</span>
                   <textarea
                     value={formValues.medications}
                     onChange={(event) => updateFormField('medications', event.target.value)}
                     className="min-h-20 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                    placeholder="如沒有請填「沒有」"
+                    placeholder={bookingText("如沒有請填「沒有」", locale)}
                   />
                   {formErrors.medications ? (
                     <p className="text-xs text-red-600">{formErrors.medications}</p>
@@ -2586,32 +2566,32 @@ export function BookingTabFlow({
                 </label>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-semibold text-slate-700">主要症狀 *</span>
+                  <span className="text-sm font-semibold text-slate-700">{bookingText("主要症狀 *", locale)}</span>
                   <textarea
                     value={formValues.symptoms}
                     onChange={(event) => updateFormField('symptoms', event.target.value)}
                     className="min-h-20 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
-                    placeholder="請簡述主要問題"
+                    placeholder={bookingText("請簡述主要問題", locale)}
                   />
                   {formErrors.symptoms ? <p className="text-xs text-red-600">{formErrors.symptoms}</p> : null}
                 </label>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-semibold text-slate-700">得知來源 *</span>
+                  <span className="text-sm font-semibold text-slate-700">{bookingText("得知來源 *", locale)}</span>
                   <select
                     value={formValues.referralSource}
                     onChange={(event) => updateFormField('referralSource', event.target.value)}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
                   >
-                    <option value="">請選擇</option>
-                    <option value="google">Google 搜尋</option>
+                    <option value="">{bookingText("請選擇", locale)}</option>
+                    <option value="google">{bookingText("Google 搜尋", locale)}</option>
                     <option value="facebook">Facebook</option>
                     <option value="instagram">Instagram</option>
                     <option value="youtube">YouTube</option>
-                    <option value="friend">朋友介紹</option>
-                    <option value="doctor">醫師介紹</option>
-                    <option value="walk_in">路過</option>
-                    <option value="other">其他</option>
+                    <option value="friend">{bookingText("朋友介紹", locale)}</option>
+                    <option value="doctor">{bookingText("醫師介紹", locale)}</option>
+                    <option value="walk_in">{bookingText("路過", locale)}</option>
+                    <option value="other">{bookingText("其他", locale)}</option>
                   </select>
                   {formErrors.referralSource ? (
                     <p className="text-xs text-red-600">{formErrors.referralSource}</p>
@@ -2626,7 +2606,7 @@ export function BookingTabFlow({
 
             {submitError ? (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {submitError}
+                {bookingFeedback(submitError, locale)}
               </div>
             ) : null}
 
@@ -2660,8 +2640,8 @@ export function BookingTabFlow({
             {(isWhatsappFlow || isStaffFlow) && whatsappSent === false ? (
               <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 {isStaffFlow
-                  ? '已完成代約，但 WhatsApp 確認訊息暫時未能自動發送，請姑娘跟進。'
-                  : '已完成預約，但 WhatsApp 確認訊息暫時未能自動發送。診所會另行跟進。'}
+                  ? bookingText("已完成代約，但 WhatsApp 確認訊息暫時未能自動發送，請姑娘跟進。", locale)
+                  : bookingText("已完成預約，但 WhatsApp 確認訊息暫時未能自動發送。診所會另行跟進。", locale)}
               </p>
             ) : null}
             <p
@@ -2674,16 +2654,16 @@ export function BookingTabFlow({
 
           <DoctorBookingSummary
             doctor={selectedDoctor}
-            clinicNameZh={selectedClinic?.clinicNameZh}
-            eyebrow="完成摘要"
+            clinicNameZh={bookingText(selectedClinic?.clinicNameZh, locale)}
+            eyebrow={bookingText("完成摘要", locale)}
             details={[
-              `${formatDateForDisplay(selectedDate)} ${selectedTime}`,
+              `${formatDateForDisplay(selectedDate, locale)} ${selectedTime}`,
               ...(usesVisitBasedServices && selectedVisitOptionSummary
-                ? [`${VISIT_TYPE_LABELS[visitType]}．${selectedVisitOptionSummary}`]
+                ? [`${bookingText(VISIT_TYPE_LABELS[visitType], locale)}．${selectedVisitOptionSummary}`]
                 : []),
               ...(onlineConsultationMethodDetail ? [onlineConsultationMethodDetail] : []),
-              bookingId ? `${referenceLabel}：${bookingId}` : '確認資料已準備完成',
-            ]}
+              bookingId ? `${referenceLabel}：${bookingId}` : bookingText("確認資料已準備完成", locale),
+            ]} locale={locale}
           />
 
           <div className={`grid gap-3 ${embedMode ? '' : 'sm:grid-cols-2'}`}>
@@ -2692,15 +2672,14 @@ export function BookingTabFlow({
               onClick={startAnotherBooking}
               className="inline-flex items-center justify-center rounded-[18px] border border-primary/20 bg-white px-4 py-3 text-sm font-semibold text-primary transition hover:bg-primary-light"
             >
-              再預約一個時段
-            </button>
+              {bookingText("再預約一個時段", locale)}</button>
 
             {!embedMode ? (
               <Link
                 href={isStaffFlow ? '/nurse' : '/chat'}
                 className="inline-flex items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover"
               >
-                {isStaffFlow ? '返回姑娘主頁' : '返回聊天頁'}
+                {isStaffFlow ? bookingText("返回姑娘主頁", locale) : bookingText("返回聊天頁", locale)}
               </Link>
             ) : null}
           </div>

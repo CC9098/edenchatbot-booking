@@ -1,3 +1,4 @@
+import { parseBookingLocale, type BookingLocale } from '@/shared/booking-locale';
 import { formatInTimeZone } from 'date-fns-tz';
 
 import {
@@ -9,6 +10,7 @@ import { CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
 export interface BookingReminderMetadata {
+  locale?: BookingLocale;
   patientName: string;
   patientPhone: string;
   patientEmail: string;
@@ -78,6 +80,7 @@ export function extractBookingReminderMetadata(event: any): BookingReminderMetad
     clinicAddress,
     clinicId,
     visitType: inferVisitType(description),
+    locale: parseBookingLocale(event?.extendedProperties?.private?.locale),
   };
 }
 
@@ -135,6 +138,7 @@ export function buildBookingReminderPayloadFromIntake(
     clinicAddress,
     clinicId,
     visitType: candidate.visitType,
+    locale: parseBookingLocale(candidate.locale),
     date,
     time,
     eventId,

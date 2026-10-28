@@ -1,3 +1,6 @@
+import type { BookingLocale } from '@/shared/booking-locale';
+import { ENGLISH_PUBLIC_ORIGIN, isEnglishPublished } from '@/lib/english-publication-config';
+
 const DEFAULT_PUBLIC_BASE_URL = "https://app.edenclinic.hk";
 const LOCALHOST_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
 
@@ -115,6 +118,15 @@ export function buildPublicUrl(path: string): string {
   return `${getPublicBaseUrl()}${normalizedPath}`;
 }
 
+function buildLocalizedBookingUrl(path: string, locale?: BookingLocale, embed?: boolean): string {
+  // English outbound links switch with the published website; Chinese and embed
+  // clients retain their established origin. Browser links stay on their host.
+  if (typeof window === 'undefined' && locale === 'en' && !embed && isEnglishPublished()) {
+    return `${ENGLISH_PUBLIC_ORIGIN}${path}`;
+  }
+  return buildPublicUrl(path);
+}
+
 export type BookingVisitType = "first" | "followup";
 
 export function buildBookingUrl(options?: {
@@ -123,6 +135,7 @@ export function buildBookingUrl(options?: {
   visitType?: BookingVisitType;
   source?: string;
   embed?: boolean;
+  locale?: BookingLocale;
 }): string {
   const params = new URLSearchParams();
 
@@ -142,20 +155,23 @@ export function buildBookingUrl(options?: {
     params.set("source", options.source);
   }
 
-  const pathname = options?.embed ? "/embed/booking" : "/booking";
+  const pathname = options?.embed ? "/embed/booking" : options?.locale === "en" ? "/en/booking" : "/booking";
+  if (options?.embed && options.locale === "en") params.set("lang", "en");
   const query = params.toString();
-  return buildPublicUrl(query ? `${pathname}?${query}` : pathname);
+  return buildLocalizedBookingUrl(query ? `${pathname}?${query}` : pathname, options?.locale, options?.embed);
 }
 
 export function buildManageBookingUrl(options?: {
   embed?: boolean;
+  locale?: BookingLocale;
   action?: "reschedule" | "cancel";
   token?: string;
 }): string {
-  const pathname = options?.embed ? "/embed" : "/manage-booking";
+  const pathname = options?.embed ? "/embed" : options?.locale === "en" ? "/en/manage-booking" : "/manage-booking";
   const params = new URLSearchParams();
 
   if (options?.embed) {
+    if (options.locale === "en") params.set("lang", "en");
     params.set("intent", "manage-booking");
   }
 
@@ -168,7 +184,7 @@ export function buildManageBookingUrl(options?: {
   }
 
   const query = params.toString();
-  return buildPublicUrl(query ? `${pathname}?${query}` : pathname);
+  return buildLocalizedBookingUrl(query ? `${pathname}?${query}` : pathname, options?.locale, options?.embed);
 }
 
 export function buildOnlineConsultUrl(options: { token: string }): string {

@@ -16,6 +16,7 @@ import {
   type DoctorId,
   type PhysicalClinicId,
   isDoctorId,
+  isDoctorAcceptingBookings,
 } from '@/shared/clinic-data';
 import type { CalendarMapping, TimeRange, WeeklySchedule } from '@/shared/schedule-config';
 
@@ -351,6 +352,7 @@ export function buildVirtualOnlineScheduleFromMappings(
   mappings: CalendarMapping[],
   doctorId: DoctorId
 ): WeeklySchedule | null {
+  if (!isDoctorAcceptingBookings(doctorId)) return null;
   const explicitOnlineSchedule = buildMergedWeeklyScheduleFromMappings(
     mappings.filter(
       (mapping) => mapping.doctorId === doctorId && mapping.isActive && isOnlineClinicId(mapping.clinicId)
@@ -382,7 +384,7 @@ export async function getVirtualOnlineAvailability(params: {
 }): Promise<VirtualOnlineAvailability> {
   const { doctorId, requestedDate, durationMinutes } = params;
   const lookBusyEnabled = params.applyLookBusy ?? false;
-  if (!isDoctorId(doctorId)) {
+  if (!isDoctorId(doctorId) || !isDoctorAcceptingBookings(doctorId)) {
     return {
       mappingFound: false,
       slots: [],
@@ -448,7 +450,7 @@ export async function resolveOnlineSourceMappingForSlot(params: {
   preferredCalendarId?: string;
 }): Promise<ResolvedOnlineSourceMapping> {
   const { doctorId, requestedDate, time, durationMinutes, preferredCalendarId } = params;
-  if (!isDoctorId(doctorId)) {
+  if (!isDoctorId(doctorId) || !isDoctorAcceptingBookings(doctorId)) {
     return { errorCode: 'NOT_AVAILABLE' };
   }
 

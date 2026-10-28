@@ -1,3 +1,4 @@
+import { parseBookingLocale } from '@/shared/booking-locale';
 import type { Metadata } from "next";
 import { BookingTabFlow } from "@/components/booking/BookingTabFlow";
 import { PublicBookingTabs } from "@/components/booking/PublicBookingTabs";
@@ -8,10 +9,15 @@ import { createServiceClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
+const chineseMetadata: Metadata = {
   title: "預約服務 | 醫天圓",
   description: "成功預約後，診所會透過 WhatsApp 發送確認訊息。",
 };
+
+export function generateMetadata({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }): Metadata {
+  return parseBookingLocale(searchParams?.lang) === 'en' ? { title: { absolute: 'Book an appointment | Eden Clinic' }, description: 'Book an appointment at Eden Clinic. Confirmation is sent by WhatsApp.' } : chineseMetadata;
+}
+
 
 async function getInitialBookingContact() {
   try {
@@ -63,13 +69,15 @@ export default async function BookingPage({
     getPublicBookableScheduleData(),
     getInitialBookingContact(),
   ]);
+  const locale = parseBookingLocale(searchParams?.lang);
   const initialSelection = parseBookingInitialSelection(searchParams);
 
   return (
-    <main className="patient-pane overflow-x-hidden text-slate-800">
+    <main lang={locale === 'en' ? 'en-HK' : 'zh-Hant-HK'} className="patient-pane overflow-x-hidden text-slate-800">
       <div className="mx-auto max-w-5xl space-y-4">
-        <PublicBookingTabs current="booking" />
+        <PublicBookingTabs current="booking" locale={locale} />
         <BookingTabFlow
+          locale={locale}
           doctors={doctors}
           initialContact={initialContact}
           initialSelection={initialSelection}

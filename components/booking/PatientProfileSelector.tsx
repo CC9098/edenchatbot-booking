@@ -1,18 +1,21 @@
 "use client";
 
+import { bookingText, type BookingLocale } from '@/shared/booking-locale';
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PatientProfile } from "@/app/api/patient-profiles/route";
 
 const RELATIONSHIP_OPTIONS = ["自己", "配偶", "子女", "長輩", "其他"] as const;
 
 type PatientProfileSelectorProps = {
+  locale?: BookingLocale;
   selectedProfileId: string | null;
   onSelect: (profile: PatientProfile) => void;
   /** Optional: called the first time profiles are loaded so the parent can auto-select. */
   onInitialLoad?: (profiles: PatientProfile[]) => void;
 };
 
-export function PatientProfileSelector({
+export function PatientProfileSelector({ locale = 'zh', 
   selectedProfileId,
   onSelect,
   onInitialLoad,
@@ -63,13 +66,13 @@ export function PatientProfileSelector({
 
   return (
     <section className="rounded-2xl border border-primary/15 bg-primary-pale/60 p-4 sm:p-5">
-      <h3 className="mb-3 text-sm font-semibold text-slate-800">這次預約係為邊位？</h3>
+      <h3 className="mb-3 text-sm font-semibold text-slate-800">{bookingText("這次預約係為邊位？", locale)}</h3>
 
       <div className="space-y-2">
         {profiles.map((profile) => {
           const isSelected = profile.id === selectedProfileId;
           const relationshipLabel =
-            profile.relationship || (profile.is_default ? "自己" : null);
+            profile.relationship || (profile.is_default ? bookingText("自己", locale) : null);
           return (
             <label
               key={profile.id}
@@ -91,7 +94,7 @@ export function PatientProfileSelector({
               <span className="flex-1 text-sm text-slate-800">
                 <span className="font-semibold">{profile.display_name}</span>
                 {relationshipLabel ? (
-                  <span className="ml-1 text-slate-500">（{relationshipLabel}）</span>
+                  <span className="ml-1 text-slate-500">（{bookingText(relationshipLabel, locale)}）</span>
                 ) : null}
               </span>
             </label>
@@ -104,12 +107,11 @@ export function PatientProfileSelector({
             onClick={() => setShowAddForm(true)}
             className="inline-flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-primary/30 bg-white px-3 py-2.5 text-sm font-semibold text-primary/70 transition hover:border-primary/50 hover:text-primary"
           >
-            <span aria-hidden>＋</span> 加入新家庭成員
-          </button>
+            <span aria-hidden>＋</span> {bookingText("加入新家庭成員", locale)}</button>
         ) : (
           <AddMemberInlineForm
             onAdded={handleAdded}
-            onCancel={() => setShowAddForm(false)}
+            onCancel={() => setShowAddForm(false)} locale={locale}
           />
         )}
       </div>
@@ -118,11 +120,12 @@ export function PatientProfileSelector({
 }
 
 type AddMemberInlineFormProps = {
+  locale?: BookingLocale;
   onAdded: (profile: PatientProfile) => void;
   onCancel: () => void;
 };
 
-function AddMemberInlineForm({ onAdded, onCancel }: AddMemberInlineFormProps) {
+function AddMemberInlineForm({ locale = 'zh',  onAdded, onCancel }: AddMemberInlineFormProps) {
   const [displayName, setDisplayName] = useState("");
   const [relationship, setRelationship] = useState<string>("");
   const [dateOfBirth, setDateOfBirth] = useState("");
@@ -153,12 +156,12 @@ function AddMemberInlineForm({ onAdded, onCancel }: AddMemberInlineFormProps) {
       });
       if (!res.ok) {
         const payload = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(payload.error ?? "加入失敗，請稍後再試");
+        throw new Error(payload.error ?? bookingText("加入失敗，請稍後再試", locale));
       }
       const payload = (await res.json()) as { profile: PatientProfile };
       onAdded(payload.profile);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "加入失敗，請稍後再試");
+      setError(err instanceof Error ? err.message : bookingText("加入失敗，請稍後再試", locale));
     } finally {
       setPending(false);
     }
@@ -166,12 +169,12 @@ function AddMemberInlineForm({ onAdded, onCancel }: AddMemberInlineFormProps) {
 
   return (
     <div className="rounded-xl border border-primary/20 bg-white p-3">
-      <p className="mb-3 text-sm font-semibold text-slate-800">加入家庭成員</p>
+      <p className="mb-3 text-sm font-semibold text-slate-800">{bookingText("加入家庭成員", locale)}</p>
 
       <div className="space-y-3">
         <label className="block">
           <span className="text-xs font-medium text-slate-600">
-            姓名 <span className="text-red-500">*</span>
+            {bookingText("姓名", locale)}<span className="text-red-500">*</span>
           </span>
           <input
             ref={inputRef}
@@ -179,29 +182,29 @@ function AddMemberInlineForm({ onAdded, onCancel }: AddMemberInlineFormProps) {
             required
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="例：梁小姐"
+            placeholder={bookingText("例：梁小姐", locale)}
             className="mt-1 w-full rounded-xl border border-primary/20 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-primary focus:outline-none"
           />
         </label>
 
         <label className="block">
-          <span className="text-xs font-medium text-slate-600">與您關係</span>
+          <span className="text-xs font-medium text-slate-600">{bookingText("與您關係", locale)}</span>
           <select
             value={relationship}
             onChange={(e) => setRelationship(e.target.value)}
             className="mt-1 w-full rounded-xl border border-primary/20 bg-white px-3 py-2 text-sm text-slate-800 focus:border-primary focus:outline-none"
           >
-            <option value="">（請選擇）</option>
+            <option value="">{bookingText("（請選擇）", locale)}</option>
             {RELATIONSHIP_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
+              <option key={bookingText(opt, locale)} value={bookingText(opt, locale)}>
+                {bookingText(opt, locale)}
               </option>
             ))}
           </select>
         </label>
 
         <label className="block">
-          <span className="text-xs font-medium text-slate-600">出生日期（選填）</span>
+          <span className="text-xs font-medium text-slate-600">{bookingText("出生日期（選填）", locale)}</span>
           <input
             type="date"
             value={dateOfBirth}
@@ -211,7 +214,7 @@ function AddMemberInlineForm({ onAdded, onCancel }: AddMemberInlineFormProps) {
         </label>
       </div>
 
-      {error ? <p className="mt-2 text-xs text-red-600">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-red-600">{bookingText(error, locale)}</p> : null}
 
       <div className="mt-4 flex gap-2">
         <button
@@ -220,7 +223,7 @@ function AddMemberInlineForm({ onAdded, onCancel }: AddMemberInlineFormProps) {
           disabled={pending || !displayName.trim()}
           className="inline-flex min-h-9 items-center rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:opacity-60"
         >
-          {pending ? "加入中..." : "加入"}
+          {pending ? bookingText("加入中...", locale) : bookingText("加入", locale)}
         </button>
         <button
           type="button"
@@ -228,15 +231,14 @@ function AddMemberInlineForm({ onAdded, onCancel }: AddMemberInlineFormProps) {
           disabled={pending}
           className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
         >
-          取消
-        </button>
+          {bookingText("取消", locale)}</button>
       </div>
     </div>
   );
 }
 
 /** Split a free-text HK display_name into (lastName, firstName) to prefill the booking form. */
-export function splitHkDisplayName(displayName: string): { lastName: string; firstName: string } {
+export function splitHkDisplayName(displayName: string, locale: BookingLocale = 'zh'): { lastName: string; firstName: string } {
   const trimmed = displayName.trim();
   if (!trimmed) return { lastName: "", firstName: "" };
   // English / romanized name with a space: surname first by HK convention.

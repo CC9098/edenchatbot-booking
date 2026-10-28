@@ -1,3 +1,4 @@
+import { bookingFeedback, bookingText, parseBookingLocale, type BookingLocale } from '@/shared/booking-locale';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { fromZonedTime } from 'date-fns-tz';
@@ -53,15 +54,23 @@ function normalizeOptionalString(value: string | undefined): string | undefined 
 }
 
 export async function POST(request: NextRequest) {
+  let locale: BookingLocale = 'zh';
+  const respond = (payload: Record<string, unknown>, init?: ResponseInit) => NextResponse.json({
+    ...payload,
+    ...(typeof payload.error === 'string' ? { error: bookingFeedback(payload.error, locale) } : {}),
+    ...(typeof payload.message === 'string' ? { message: bookingFeedback(payload.message, locale) } : {}),
+  }, init);
+
   let intakeId: string | undefined;
 
   try {
     const user = await getCurrentUser().catch(() => null);
     const body = await request.json();
+    locale = parseBookingLocale(body?.locale);
     const parsed = whatsappBookingSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
+      return respond(
         { error: 'Invalid input', details: formatZodIssues(parsed.error) },
         { status: 400 },
       );
@@ -79,7 +88,7 @@ export async function POST(request: NextRequest) {
       time: bookingData.time,
     });
     const groupBookingNotice = groupBookingSession
-      ? getGroupBookingNotice(bookingData.doctorId, bookingData.clinicId)
+      ? bookingText(getGroupBookingNotice(bookingData.doctorId, bookingData.clinicId), locale)
       : null;
 
     let calendarId = '';
@@ -94,7 +103,7 @@ export async function POST(request: NextRequest) {
       });
 
       if (resolvedOnlineMapping.errorCode === 'CALENDAR_UNAVAILABLE') {
-        return NextResponse.json(
+        return respond(
           {
             error: '暫時未能讀取預約日曆，請稍後再試或聯絡診所。',
             errorCode: 'CALENDAR_UNAVAILABLE',
@@ -104,7 +113,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (!resolvedOnlineMapping.mapping) {
-        return NextResponse.json(
+        return respond(
           { error: '這個時段剛剛已滿，請選擇其他時段。' },
           { status: 409 },
         );
@@ -124,7 +133,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!calendarId) {
-      return NextResponse.json({ error: 'Doctor schedule not found' }, { status: 404 });
+      return respond({ error: 'Doctor schedule not found' }, { status: 404 });
     }
 
     const startDate = fromZonedTime(
@@ -133,18 +142,18 @@ export async function POST(request: NextRequest) {
     );
 
     if (Number.isNaN(startDate.getTime())) {
-      return NextResponse.json({ error: 'Invalid date/time' }, { status: 400 });
+      return respond({ error: 'Invalid date/time' }, { status: 400 });
     }
 
     if (isSlotBlockedBySameDayEveningCutoffUtc(startDate)) {
-      return NextResponse.json(
+      return respond(
         { error: '今日晚上時段已截止預約，請選擇其他日期或較早時段。' },
         { status: 409 },
       );
     }
 
     if (bookingData.clinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, bookingData.clinicId)) {
-      return NextResponse.json(
+      return respond(
         { error: '已超過此分店最後預約時間，請選擇較早時段。' },
         { status: 409 },
       );
@@ -161,7 +170,7 @@ export async function POST(request: NextRequest) {
       const isStillAvailable = isSlotAvailableUtc(startDate, endDate, busySlots);
 
       if (!isStillAvailable) {
-        return NextResponse.json(
+        return respond(
           { error: '這個時段剛剛已滿，請選擇其他時段。' },
           { status: 409 },
         );
@@ -170,7 +179,7 @@ export async function POST(request: NextRequest) {
       console.error(
         `[booking-whatsapp] Calendar availability re-check failed: ${getSafeErrorMessage(calendarError)}`,
       );
-      return NextResponse.json(
+      return respond(
         {
           error: '暫時未能讀取預約日曆，請稍後再試或聯絡診所。',
           errorCode: 'CALENDAR_UNAVAILABLE',
@@ -214,7 +223,7 @@ export async function POST(request: NextRequest) {
     let validatedPatientProfileId: string | undefined;
     if (bookingData.patientProfileId) {
       if (!effectiveUserId) {
-        return NextResponse.json(
+        return respond(
           { error: '請先登入才能使用家庭成員功能。' },
           { status: 401 },
         );
@@ -231,7 +240,7 @@ export async function POST(request: NextRequest) {
         } else if (profileRow && profileRow.user_id === effectiveUserId) {
           validatedPatientProfileId = profileRow.id;
         } else {
-          return NextResponse.json(
+          return respond(
             { error: '無法核對所選家庭成員，請重新選擇。' },
             { status: 403 },
           );
@@ -289,6 +298,7 @@ export async function POST(request: NextRequest) {
     }
 
     const calResult = await createBooking(calendarId, {
+      locale: bookingData.locale,
       doctorId: bookingData.doctorId,
       doctorName: bookingData.doctorName,
       doctorNameZh: bookingData.doctorNameZh,
@@ -315,7 +325,7 @@ export async function POST(request: NextRequest) {
       }
 
       console.error('[booking-whatsapp] Calendar creation failed:', calResult.error);
-      return NextResponse.json({ error: 'Failed to create booking in calendar' }, { status: 500 });
+      return respond({ error: 'Failed to create booking in calendar' }, { status: 500 });
     }
 
     const profileSync = await syncPatientProfileContact({
@@ -357,6 +367,7 @@ export async function POST(request: NextRequest) {
       : undefined;
 
     const whatsappResult = await sendBookingConfirmationWhatsapp({
+      locale: bookingData.locale,
       bookingId: calResult.eventId,
       patientName: bookingData.patientName,
       phone: bookingData.phone,
@@ -405,7 +416,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    return respond({
       success: true,
       bookingId: calResult.eventId,
       intakeId: intakeId || '',
@@ -428,6 +439,6 @@ export async function POST(request: NextRequest) {
     }
 
     console.error(`[booking-whatsapp] Error: ${getSafeErrorMessage(error)}`);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return respond({ error: 'Internal server error' }, { status: 500 });
   }
 }

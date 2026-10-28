@@ -1,0 +1,49 @@
+@font-face {
+  font-family: 'Eden English Serif';
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src: url(/english/assets/font-0.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Eden English Serif';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(/english/assets/font-1.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Eden English Serif';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(/english/assets/font-2.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Eden English Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/english/assets/font-3.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Eden English Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(/english/assets/font-4.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Eden English Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(/english/assets/font-5.ttf) format('truetype');
+}
+@font-face {
+  font-family: 'Eden English Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(/english/assets/font-6.ttf) format('truetype');
+}

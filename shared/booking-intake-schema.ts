@@ -5,6 +5,7 @@ import { ALL_BOOKING_PICKUP_VALUES } from '@/shared/booking-pickup';
 
 export const detailedBookingSchema = bookingSchema
   .extend({
+    locale: z.enum(['zh', 'en']).optional(),
     visitType: z.enum(['first', 'followup']),
     needReceipt: z.enum(['no', 'yes_insurance', 'yes_not_insurance']),
     medicationPickup: z.enum(ALL_BOOKING_PICKUP_VALUES),
