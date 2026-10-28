@@ -33,3 +33,17 @@ test("buildBookingUrl can include source tracking", () => {
   assert.equal(url.searchParams.get("doctor"), "hon");
   assert.equal(url.searchParams.get("source"), "name-card");
 });
+
+
+test("homepage date survives parsing, including leap day and array params", () => {
+  assert.equal(parseBookingInitialSelection({ date: "2026-10-30" }).date, "2026-10-30");
+  assert.equal(parseBookingInitialSelection({ date: "2028-02-29" }).date, "2028-02-29");
+  assert.equal(parseBookingInitialSelection({ date: ["2026-11-02", "2026-11-03"] }).date, "2026-11-02");
+});
+
+test("malformed and nonexistent calendar dates are ignored", () => {
+  for (const date of ["2026-02-29", "2026-04-31", "2026-13-01", "2026-00-10", "2026-1-2", "2026-11-02T12:00:00Z", "", "<script>"]) {
+    assert.equal(parseBookingInitialSelection({ date }).date, undefined, date);
+  }
+  assert.equal(parseBookingInitialSelection().date, undefined);
+});

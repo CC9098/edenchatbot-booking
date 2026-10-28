@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { parseBookingDate } from '@/lib/booking-search-params';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -103,6 +104,7 @@ type BookingTabFlowProps = {
     visitType?: VisitType;
     gad7Score?: number;
     source?: string;
+    date?: string;
   };
   staffPatientUserId?: string | null;
   initialPatientProfileId?: string | null;
@@ -704,6 +706,7 @@ export function BookingTabFlow({
   const [selectedTreatmentOptions, setSelectedTreatmentOptions] = useState<BookingTreatmentOptionId[]>([]);
 
   const [selectedDate, setSelectedDate] = useState('');
+  const initialDateConsumedRef = useRef(false);
   const [selectedTime, setSelectedTime] = useState('');
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
@@ -1335,6 +1338,16 @@ export function BookingTabFlow({
     }
 
     setSlotsLoading(false);
+  }
+
+  function continueToTimeslot() {
+    setStep('timeslot');
+    if (initialDateConsumedRef.current) return;
+    initialDateConsumedRef.current = true;
+    const date = parseBookingDate(initialSelection?.date);
+    if (date && date >= minDate && date <= maxDate) {
+      handleDateChange(date);
+    }
   }
 
   function handleDateChange(dateIso: string) {
@@ -2026,7 +2039,7 @@ export function BookingTabFlow({
 
           <button
             type="button"
-            onClick={() => setStep('timeslot')}
+            onClick={continueToTimeslot}
             disabled={!canContinueSetup}
             className="inline-flex w-full items-center justify-center rounded-[18px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           >

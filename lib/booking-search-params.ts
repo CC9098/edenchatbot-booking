@@ -7,6 +7,7 @@ export type BookingInitialSelection = {
   visitType?: BookingVisitType;
   gad7Score?: number;
   source?: string;
+  date?: string;
 };
 
 function getFirstParam(value: string | string[] | undefined): string | undefined {
@@ -15,6 +16,14 @@ function getFirstParam(value: string | string[] | undefined): string | undefined
   }
 
   return value;
+}
+
+export function parseBookingDate(value: string | undefined): string | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+    ? value
+    : undefined;
 }
 
 export function parseBookingInitialSelection(
@@ -43,5 +52,6 @@ export function parseBookingInitialSelection(
         ? gad7Score
         : undefined,
     source: source || undefined,
+    date: parseBookingDate(getFirstParam(searchParams?.date)),
   };
 }
