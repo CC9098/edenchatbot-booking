@@ -1,33 +1,10 @@
-"use client";
+import { Suspense } from 'react';
+import { englishPath, englishRoutes } from '@/content/english/site';
+import { GoogleAnalyticsClient } from './GoogleAnalyticsClient';
 
-import Script from "next/script";
-import { usePathname } from "next/navigation";
-import { GA_MEASUREMENT_ID, isTrackedPath } from "@/lib/analytics";
+// Pass public paths/titles only; article bodies stay out of the browser bundle.
+const englishPages = englishRoutes.filter(route => route.path !== '/book/').map(route => ({ path: englishPath(route.path), title: route.title }));
 
 export function GoogleAnalytics() {
-  const pathname = usePathname() || "/";
-  if (!GA_MEASUREMENT_ID) return null;
-
-  // gtag honours this flag on every hit, so client-side navigation into staff pages stops tracking too.
-  if (typeof window !== "undefined") {
-    (window as unknown as Record<string, boolean>)[`ga-disable-${GA_MEASUREMENT_ID}`] = !isTrackedPath(pathname);
-  }
-
-  return (
-    <>
-      <Script
-        id="ga4-src"
-        src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-        strategy="afterInteractive"
-      />
-      <Script id="ga4-init" strategy="afterInteractive">
-        {`window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-window.gtag = gtag;
-window['ga-disable-${GA_MEASUREMENT_ID}'] = ${JSON.stringify(!isTrackedPath(pathname))};
-gtag('js', new Date());
-gtag('config', '${GA_MEASUREMENT_ID}');`}
-      </Script>
-    </>
-  );
+  return <Suspense fallback={null}><GoogleAnalyticsClient englishPages={englishPages} /></Suspense>;
 }
