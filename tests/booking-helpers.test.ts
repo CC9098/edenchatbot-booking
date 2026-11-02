@@ -14,66 +14,38 @@ function toUtc(date: string, time: string) {
   return fromZonedTime(`${date}T${time}:00`, HONG_KONG_TIMEZONE);
 }
 
-test("central and jordan allow 13:15 lunch slots but block anything later", () => {
-  assert.equal(
-    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-03-30", "13:15"), "central"),
-    false
-  );
-  assert.equal(
-    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-03-30", "13:30"), "central"),
-    true
-  );
-  assert.equal(
-    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-03-30", "13:15"), "jordan"),
-    false
-  );
-  assert.equal(
-    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-03-30", "13:30"), "jordan"),
-    true
-  );
-});
+for (const doctorId of ['lee', 'chau']) {
+  test(`${doctorId} allows 13:15 and blocks later morning slots at every physical clinic`, () => {
+    for (const clinicId of ['central', 'jordan', 'tsuenwan']) {
+      assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', '13:15'), clinicId, doctorId), false);
+      assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', '13:30'), clinicId, doctorId), true);
+      assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', '13:45'), clinicId, doctorId), true);
+    }
+  });
 
-test("tsuen wan and central use different evening last booking cutoffs", () => {
-  assert.equal(
-    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-03-30", "18:15"), "tsuenwan"),
-    false
-  );
-  assert.equal(
-    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-03-30", "18:30"), "tsuenwan"),
-    true
-  );
-  assert.equal(
-    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-03-30", "18:45"), "central"),
-    false
-  );
-  assert.equal(
-    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-03-30", "19:00"), "central"),
-    true
-  );
-});
+  test(`${doctorId} uses 18:45 at Central/Jordan and 18:15 at Tsuen Wan`, () => {
+    for (const clinicId of ['central', 'jordan']) {
+      assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', '18:45'), clinicId, doctorId), false);
+      assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', '19:00'), clinicId, doctorId), true);
+    }
+    assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', '18:15'), 'tsuenwan', doctorId), false);
+    assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', '18:30'), 'tsuenwan', doctorId), true);
+  });
 
-test("afternoon sessions starting before 15:00 use the evening cutoff, not the lunch one", () => {
-  // Chiropractor Saturday session 14:30-16:30 at Jordan.
-  assert.equal(
-    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-10-31", "14:30"), "jordan"),
-    false
-  );
-  assert.equal(
-    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-10-31", "16:00"), "jordan"),
-    false
-  );
-  // Late morning slots are still blocked by the lunch cutoff.
-  assert.equal(
-    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-10-31", "13:45"), "jordan"),
-    true
-  );
-});
+  test(`${doctorId} keeps online slots and early afternoon sessions outside the lunch cutoff`, () => {
+    assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', '19:15'), 'online', doctorId), false);
+    assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', '14:30'), 'jordan', doctorId), false);
+  });
+}
 
-test("online bookings are not constrained by physical clinic last booking cutoffs", () => {
-  assert.equal(
-    isSlotAfterClinicLastBookingCutoffUtc(toUtc("2026-03-30", "19:15"), "online"),
-    false
-  );
+test('other practitioners keep their scheduled morning and evening slots', () => {
+  for (const doctorId of ['chan', 'hon', 'cheung', 'cheungmy', 'leung', 'wong']) {
+    for (const clinicId of ['central', 'jordan', 'tsuenwan']) {
+      for (const time of ['13:30', '13:45', '14:30', '18:30', '18:45', '19:00', '19:15']) {
+        assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', time), clinicId, doctorId), false, `${doctorId}/${clinicId}/${time}`);
+      }
+    }
+  }
 });
 
 test("same-day evening slots are blocked once Hong Kong time reaches 19:00", () => {

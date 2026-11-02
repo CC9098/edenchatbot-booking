@@ -14,6 +14,10 @@ If the user says only "chatbot", "AI 自動回覆", "最近歷史對話", "widge
 - Report each proof layer separately: local implementation, tests, commit, merged remote SHA, deployment status, authenticated production behavior, and any external-delivery proof.
 - Preserve unrelated dirty work by isolating the requested change in a clean branch or worktree instead of bundling unrelated files into the push.
 
+## Last-booking cutoffs
+
+The earlier last-booking times apply only to 李芊霖 (`lee`) and 周德健 (`chau`): 13:15 before lunch, 18:45 at Central/Jordan and 18:15 at Tsuen Wan. Other practitioners follow their scheduled hours. Always pass the doctor ID to the shared cutoff helper in availability, creation and rescheduling.
+
 ## Brand Color Guardrail
 
 Keep the public app and booking UI on Eden green brand tokens in `app/globals.css`.

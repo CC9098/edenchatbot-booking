@@ -1138,7 +1138,7 @@ export async function rescheduleWidgetBooking(params: {
     };
   }
 
-  if (!sameAsCurrentSlot && effectiveClinicId !== "online" && isSlotAfterClinicLastBookingCutoffUtc(startDate, effectiveClinicId)) {
+  if (!sameAsCurrentSlot && effectiveClinicId !== "online" && isSlotAfterClinicLastBookingCutoffUtc(startDate, effectiveClinicId, row.doctor_id)) {
     return {
       success: false,
       error: "已超過此分店最後預約時間，請選擇較早時段。",
