@@ -10,6 +10,8 @@ const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 // evening cutoff instead of being blocked by the lunch one.
 const MORNING_SESSION_END_MINUTES = 14 * 60;
 const SAME_DAY_EVENING_BOOKING_CUTOFF_MINUTES = 19 * 60;
+// These earlier last-booking times apply only to Dr. Lee and Dr. Chau.
+const LAST_BOOKING_CUTOFF_DOCTOR_IDS = new Set(['lee', 'chau']);
 const CLINIC_LAST_BOOKING_CUTOFFS: Record<
   PhysicalClinicId,
   { lunch: string; evening: string }
@@ -101,9 +103,10 @@ function getSlotMinutesInHongKong(slotStartUtc: Date, slotEndUtc: Date): { start
 
 export function isSlotAfterClinicLastBookingCutoffUtc(
   slotStartUtc: Date,
-  clinicId?: string | null
+  clinicId: string | null | undefined,
+  doctorId: string
 ): boolean {
-  if (!clinicId) return false;
+  if (!clinicId || !LAST_BOOKING_CUTOFF_DOCTOR_IDS.has(doctorId)) return false;
 
   const slotStartLabel = formatInTimeZone(slotStartUtc, HONG_KONG_TIMEZONE, 'HH:mm');
   const slotStartMinutes = toMinutes(slotStartLabel);

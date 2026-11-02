@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
                                                                                 const blockedByTimeRule =
                                                                                                 (isToday && currentSlot < bookingCutoffUtc)
                                                                                                 || isSlotBlockedBySameDayEveningCutoffUtc(currentSlot, nowUtc)
-                                                                                                || isSlotAfterClinicLastBookingCutoffUtc(currentSlot, clinicId);
+                                                                                                || isSlotAfterClinicLastBookingCutoffUtc(currentSlot, clinicId, doctorId);
 
                                                                                 if (!blockedByTimeRule && calendarFree && !holidayBlocked) {
                                                                                                 availableSlots.push(slotStr);

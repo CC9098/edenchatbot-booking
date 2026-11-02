@@ -535,7 +535,7 @@ export async function rescheduleStaffOperationBooking(
     throw new Error("今日晚上時段已截止預約，請選擇其他日期或較早時段。");
   }
 
-  if (!sameAsCurrentSlot && effectiveClinicId !== "online" && isSlotAfterClinicLastBookingCutoffUtc(startDate, effectiveClinicId)) {
+  if (!sameAsCurrentSlot && effectiveClinicId !== "online" && isSlotAfterClinicLastBookingCutoffUtc(startDate, effectiveClinicId, row.doctor_id)) {
     throw new Error("已超過此分店最後預約時間，請選擇較早時段。");
   }
 

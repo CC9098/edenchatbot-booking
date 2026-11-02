@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (bookingData.clinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, bookingData.clinicId)) {
+    if (bookingData.clinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, bookingData.clinicId, bookingData.doctorId)) {
       return respond(
         { error: '已超過此分店最後預約時間，請選擇較早時段。' },
         { status: 409 },

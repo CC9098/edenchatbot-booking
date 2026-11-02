@@ -1012,7 +1012,7 @@ export async function getAvailableTimeSlots(
           continue;
         }
 
-        if (isSlotAfterClinicLastBookingCutoffUtc(slotStart, clinicId)) {
+        if (isSlotAfterClinicLastBookingCutoffUtc(slotStart, clinicId, doctorId)) {
           currentMinute += slotMinutes;
           if (currentMinute >= 60) {
             currentMinute -= 60;
@@ -1152,7 +1152,7 @@ export async function createConversationalBooking(
       };
     }
 
-    if (clinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, clinicId)) {
+    if (clinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, clinicId, doctor.id)) {
       return {
         success: false,
         error: '已超過此分店最後預約時間，請選擇較早時段。',
