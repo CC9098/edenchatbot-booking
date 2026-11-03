@@ -49,6 +49,7 @@ import {
 } from './booking-intake-storage';
 import {
   isSlotAfterClinicLastBookingCutoffUtc,
+  isSlotBlockedByOnlineSourceLastBookingCutoffUtc,
   isSlotBlockedBySameDayEveningCutoffUtc,
 } from './booking-helpers';
 import { getSafeErrorMessage } from './error-sanitizer';
@@ -1012,7 +1013,9 @@ export async function getAvailableTimeSlots(
           continue;
         }
 
-        if (isSlotAfterClinicLastBookingCutoffUtc(slotStart, clinicId, doctorId)) {
+        if (clinicId === 'online'
+          ? isSlotBlockedByOnlineSourceLastBookingCutoffUtc(slotStart, doctorId, doctorMappings)
+          : isSlotAfterClinicLastBookingCutoffUtc(slotStart, clinicId, doctorId)) {
           currentMinute += slotMinutes;
           if (currentMinute >= 60) {
             currentMinute -= 60;
@@ -1152,7 +1155,11 @@ export async function createConversationalBooking(
       };
     }
 
-    if (clinicId !== 'online' && isSlotAfterClinicLastBookingCutoffUtc(startDate, clinicId, doctor.id)) {
+    const afterLastBookingCutoff = clinicId === 'online'
+      ? isSlotBlockedByOnlineSourceLastBookingCutoffUtc(startDate, doctor.id,
+        await getActiveScheduleMappings(normalizedBookingData.date))
+      : isSlotAfterClinicLastBookingCutoffUtc(startDate, clinicId, doctor.id);
+    if (afterLastBookingCutoff) {
       return {
         success: false,
         error: '已超過此分店最後預約時間，請選擇較早時段。',

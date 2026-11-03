@@ -3,8 +3,10 @@ import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 import {
   getApplicableHolidaysForDate,
   getScheduleForDayFromWeekly,
+  hasDoctorLastBookingCutoff,
   isSlotAvailableUtc,
   isSlotBlockedByHolidaysUtc,
+  isSlotBlockedByOnlineSourceLastBookingCutoffUtc,
   isSlotBlockedBySameDayEveningCutoffUtc,
 } from '@/lib/booking-helpers';
 import { getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
@@ -166,6 +168,16 @@ async function getActiveOnlineMappingsForDoctor(
   );
 }
 
+async function getSourceMappingsForLastBookingCutoff(
+  mapping: CalendarMapping,
+  requestedDate: string
+): Promise<CalendarMapping[]> {
+  if (!hasDoctorLastBookingCutoff(mapping.doctorId)) return [];
+  return isOnlineClinicId(mapping.clinicId)
+    ? getPhysicalMappingsForDoctor(mapping.doctorId, requestedDate)
+    : [mapping];
+}
+
 async function getAvailableSlotsForMapping(params: {
   mapping: CalendarMapping;
   requestedDate: string;
@@ -206,6 +218,7 @@ async function getAvailableSlotsForMapping(params: {
     };
   }
 
+  const cutoffSourceMappings = await getSourceMappingsForLastBookingCutoff(mapping, requestedDate);
   const busySlots = await getFreeBusy(mapping.calendarId, requestedDayUtc);
   const availableSlots: string[] = [];
   const lookBusyGrid: LookBusyGridSlot[] = [];
@@ -233,7 +246,8 @@ async function getAvailableSlotsForMapping(params: {
 
       const blockedByTimeRule =
         isPastSameDayCutoff(requestedDate, currentSlot, nowUtc) ||
-        isSlotBlockedBySameDayEveningCutoffUtc(currentSlot, nowUtc);
+        isSlotBlockedBySameDayEveningCutoffUtc(currentSlot, nowUtc) ||
+        isSlotBlockedByOnlineSourceLastBookingCutoffUtc(currentSlot, mapping.doctorId, cutoffSourceMappings);
 
       if (!blockedByTimeRule && calendarFree && !holidayBlocked) {
         availableSlots.push(slotLabel);
@@ -322,6 +336,11 @@ async function isMappingBookableForExactSlot(params: {
 
   const { slotStart, slotEnd } = buildSlotBounds(requestedDate, time, durationMinutes);
   if (isPastSameDayCutoff(requestedDate, slotStart, nowUtc)) {
+    return 'not_available';
+  }
+
+  const cutoffSourceMappings = await getSourceMappingsForLastBookingCutoff(mapping, requestedDate);
+  if (isSlotBlockedByOnlineSourceLastBookingCutoffUtc(slotStart, mapping.doctorId, cutoffSourceMappings)) {
     return 'not_available';
   }
 

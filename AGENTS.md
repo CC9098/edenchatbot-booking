@@ -18,6 +18,8 @@ If the user says only "chatbot", "AI 自動回覆", "最近歷史對話", "widge
 
 The earlier last-booking times apply only to 李芊霖 (`lee`) and 周德健 (`chau`): 13:15 before lunch, 18:45 at Central/Jordan and 18:15 at Tsuen Wan. Other practitioners follow their scheduled hours. Always pass the doctor ID to the shared cutoff helper in availability, creation and rescheduling.
 
+Confirmed 2026-11-03: their online appointments use the physical clinic's cutoff for the relevant session that day. 李芊霖's Saturday Jordan last booking is **17:45**, with the existing 18:30 closing time retained. Apply these rules to offered slots and exact-slot validation, including conversational booking and patient/staff rescheduling.
+
 ## Brand Color Guardrail
 
 Keep the public app and booking UI on Eden green brand tokens in `app/globals.css`.

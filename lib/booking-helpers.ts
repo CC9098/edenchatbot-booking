@@ -1,5 +1,5 @@
 import { formatInTimeZone } from 'date-fns-tz';
-import { WeeklySchedule, TimeRange } from '../shared/schedule-config';
+import { type CalendarMapping, WeeklySchedule, TimeRange } from '../shared/schedule-config';
 import { type Holiday } from '../shared/schema';
 import { PHYSICAL_CLINIC_IDS, type PhysicalClinicId } from '../shared/clinic-data';
 import { getHolidaysForDate } from './holiday-store';
@@ -101,12 +101,16 @@ function getSlotMinutesInHongKong(slotStartUtc: Date, slotEndUtc: Date): { start
   return { start, end };
 }
 
+export function hasDoctorLastBookingCutoff(doctorId: string): boolean {
+  return LAST_BOOKING_CUTOFF_DOCTOR_IDS.has(doctorId);
+}
+
 export function isSlotAfterClinicLastBookingCutoffUtc(
   slotStartUtc: Date,
   clinicId: string | null | undefined,
   doctorId: string
 ): boolean {
-  if (!clinicId || !LAST_BOOKING_CUTOFF_DOCTOR_IDS.has(doctorId)) return false;
+  if (!clinicId || !hasDoctorLastBookingCutoff(doctorId)) return false;
 
   const slotStartLabel = formatInTimeZone(slotStartUtc, HONG_KONG_TIMEZONE, 'HH:mm');
   const slotStartMinutes = toMinutes(slotStartLabel);
@@ -114,7 +118,13 @@ export function isSlotAfterClinicLastBookingCutoffUtc(
     return false;
   }
 
-  const cutoffTime = getClinicLastBookingCutoffTime(clinicId, slotStartMinutes);
+  // Dr. Lee's Saturday Jordan session closes at 18:30; last booking is 17:45.
+  const isLeeSaturdayJordanEvening = doctorId === 'lee' && clinicId === 'jordan'
+    && formatInTimeZone(slotStartUtc, HONG_KONG_TIMEZONE, 'i') === '6'
+    && slotStartMinutes >= MORNING_SESSION_END_MINUTES;
+  const cutoffTime = isLeeSaturdayJordanEvening
+    ? '17:45'
+    : getClinicLastBookingCutoffTime(clinicId, slotStartMinutes);
   if (!cutoffTime) {
     return false;
   }
@@ -125,6 +135,32 @@ export function isSlotAfterClinicLastBookingCutoffUtc(
   }
 
   return slotStartMinutes > cutoffMinutes;
+}
+
+export function isSlotBlockedByOnlineSourceLastBookingCutoffUtc(
+  slotStartUtc: Date,
+  doctorId: string,
+  sourceMappings: readonly CalendarMapping[]
+): boolean {
+  if (!hasDoctorLastBookingCutoff(doctorId)) return false;
+
+  const dayOfWeek = Number(formatInTimeZone(slotStartUtc, HONG_KONG_TIMEZONE, 'i')) % 7;
+  const slotMinutes = toMinutes(formatInTimeZone(slotStartUtc, HONG_KONG_TIMEZONE, 'HH:mm'));
+  if (slotMinutes === null) return false;
+
+  const daySources = sourceMappings.filter((mapping) => mapping.doctorId === doctorId
+    && mapping.isActive && isPhysicalClinicId(mapping.clinicId)
+    && (mapping.schedule[dayOfWeek]?.length ?? 0) > 0);
+  // A doctor may work at different clinics before and after lunch. Dedicated
+  // online calendars inherit that session's clinic cutoff without changing
+  // their calendar ID or their configured opening hours.
+  const sessionSources = daySources.filter((mapping) => mapping.schedule[dayOfWeek]?.some((range) => {
+    const start = toMinutes(range.start);
+    return start !== null && (start < MORNING_SESSION_END_MINUTES) === (slotMinutes < MORNING_SESSION_END_MINUTES);
+  }));
+  const sources = sessionSources.length > 0 ? sessionSources : daySources;
+  return sources.length > 0 && sources.every((mapping) =>
+    isSlotAfterClinicLastBookingCutoffUtc(slotStartUtc, mapping.clinicId, doctorId));
 }
 
 export function isSlotBlockedBySameDayEveningCutoffUtc(
