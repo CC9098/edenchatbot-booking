@@ -1,7 +1,7 @@
-import { formatInTimeZone } from 'date-fns-tz';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { type CalendarMapping, WeeklySchedule, TimeRange } from '../shared/schedule-config';
 import { type Holiday } from '../shared/schema';
-import { PHYSICAL_CLINIC_IDS, type PhysicalClinicId } from '../shared/clinic-data';
+import { getDoctorBookingSlotMinutes, PHYSICAL_CLINIC_IDS, type PhysicalClinicId } from '../shared/clinic-data';
 import { getHolidaysForDate } from './holiday-store';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
@@ -161,6 +161,46 @@ export function isSlotBlockedByOnlineSourceLastBookingCutoffUtc(
   const sources = sessionSources.length > 0 ? sessionSources : daySources;
   return sources.length > 0 && sources.every((mapping) =>
     isSlotAfterClinicLastBookingCutoffUtc(slotStartUtc, mapping.clinicId, doctorId));
+}
+
+export function isLastClinicSessionBooking(
+  mapping: CalendarMapping,
+  date: string,
+  appointmentTime: string,
+  appointmentEndTime: string,
+): boolean {
+  const { clinicId, doctorId } = mapping;
+  if (!isPhysicalClinicId(clinicId)) return false;
+
+  const appointmentStart = toMinutes(appointmentTime);
+  const appointmentEnd = toMinutes(appointmentEndTime);
+  if (appointmentStart === null || appointmentEnd === null || appointmentStart >= appointmentEnd) return false;
+
+  const day = new Date(`${date}T00:00:00Z`).getUTCDay();
+  const session = getScheduleForDayFromWeekly(mapping.schedule, day)?.find(
+    range => range.start <= appointmentTime && appointmentTime < range.end,
+  );
+  if (!session) return false;
+
+  const sessionStart = toMinutes(session.start);
+  const sessionEnd = toMinutes(session.end);
+  if (sessionStart === null || sessionEnd === null || appointmentEnd > sessionEnd) return false;
+
+  const dayStart = fromZonedTime(`${date}T00:00:00`, HONG_KONG_TIMEZONE).getTime();
+  const atMinute = (minute: number) => new Date(dayStart + minute * 60_000);
+  if (isSlotAfterClinicLastBookingCutoffUtc(atMinute(appointmentStart), clinicId, doctorId)) return false;
+
+  const slotLengths = new Set([
+    getDoctorBookingSlotMinutes(doctorId, 'first'),
+    getDoctorBookingSlotMinutes(doctorId, 'followup'),
+  ]);
+  for (const length of slotLengths) {
+    const nextSlot = sessionStart + Math.ceil((appointmentEnd - sessionStart) / length) * length;
+    for (let slot = nextSlot; slot + length <= sessionEnd; slot += length) {
+      if (!isSlotAfterClinicLastBookingCutoffUtc(atMinute(slot), clinicId, doctorId)) return false;
+    }
+  }
+  return true;
 }
 
 export function isSlotBlockedBySameDayEveningCutoffUtc(

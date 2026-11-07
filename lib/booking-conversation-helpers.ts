@@ -32,6 +32,7 @@ import {
   getFreeBusy,
   listEventsInRange,
 } from './google-calendar';
+import { hasTianJiuBookingLabel } from './booking-calendar-labels';
 import {
   sendBookingConfirmationEmail,
   sendDoctorOnlineBookingNotificationEmail,
@@ -1270,6 +1271,8 @@ export async function createConversationalBooking(
       patientName: normalizedBookingData.patientName,
       phone: normalizedBookingData.phone,
       email: normalizedBookingData.email,
+      visitType: normalizedBookingData.visitType as BookingVisitType,
+      isTianJiu: hasTianJiuBookingLabel(normalizedBookingData.notes),
       notes,
     });
 

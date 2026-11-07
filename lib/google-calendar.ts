@@ -5,6 +5,13 @@ import { randomUUID } from 'crypto';
 
 import { getGoogleAuthClient } from './google-auth';
 import { getSafeErrorMessage } from './error-sanitizer';
+import type { BookingVisitType } from './booking-intake-storage';
+import {
+  buildBookingEventSummary,
+  hasTianJiuBookingLabel,
+  readBookingCalendarPatientName,
+  readBookingCalendarVisitType,
+} from './booking-calendar-labels';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 const DEFAULT_BOOKING_COLOR_ID = '2';
@@ -36,14 +43,6 @@ type BookingEventAttendee = {
   email: string;
   displayName?: string;
 };
-
-function buildBookingEventSummary(details: {
-  doctorNameZh: string;
-  clinicNameZh: string;
-  patientName: string;
-}): string {
-  return `${details.doctorNameZh}｜${details.clinicNameZh} - ${details.patientName}`;
-}
 
 function getBookingEventColorId(doctorId?: string): string {
   if (!doctorId) return DEFAULT_BOOKING_COLOR_ID;
@@ -89,6 +88,8 @@ function buildBookingEventPrivateMetadata(details: {
   clinicId?: string;
   clinicName?: string;
   clinicNameZh: string;
+  visitType?: BookingVisitType;
+  isTianJiu?: boolean;
 }): Record<string, string> | undefined {
   const entries: Array<[string, string]> = [];
 
@@ -100,6 +101,8 @@ function buildBookingEventPrivateMetadata(details: {
     clinicId: details.clinicId,
     clinicName: details.clinicName,
     clinicNameZh: details.clinicNameZh,
+    visitType: details.visitType,
+    isTianJiu: details.isTianJiu ? 'true' : undefined,
   })) {
     if (typeof value !== 'string') continue;
     const normalized = value.trim();
@@ -142,10 +145,14 @@ function buildBookingEventUpdatePayload(
 
   const patientName =
     parseBookingEventLineValue(description, 'Patient / 病人') ||
-    summary.split(' - ').slice(1).join(' - ').trim();
+    readBookingCalendarPatientName(summary);
   const phone = parseBookingEventLineValue(description, 'Phone / 電話');
   const email = parseBookingEventLineValue(description, 'Email / 電郵');
   const notes = notesIndex >= 0 ? description.slice(notesIndex + notesMarker.length).trim() : '';
+  const visitType = readBookingCalendarVisitType(existingPrivate.visitType, description, summary);
+  const isTianJiu = existingPrivate.isTianJiu === 'true'
+    || / - (?:【新症】)?【天灸】/.test(summary)
+    || hasTianJiuBookingLabel(notes);
 
   const doctorNameZh =
     metadata.doctorNameZh?.trim() ||
@@ -190,7 +197,7 @@ function buildBookingEventUpdatePayload(
   return {
     summary:
       patientName && doctorNameZh && clinicNameZh
-        ? buildBookingEventSummary({ doctorNameZh, clinicNameZh, patientName })
+        ? buildBookingEventSummary({ doctorNameZh, clinicNameZh, patientName, visitType, isTianJiu })
         : summary,
     description: nextDescription || description,
     colorId: getBookingEventColorId(doctorId),
@@ -201,6 +208,8 @@ function buildBookingEventUpdatePayload(
       clinicId,
       clinicName,
       clinicNameZh,
+      visitType,
+      isTianJiu,
     }),
   };
 }
@@ -288,17 +297,20 @@ export async function createBooking(
     patientName: string;
     phone: string;
     email?: string;
+    visitType: BookingVisitType;
+    isTianJiu?: boolean;
     notes?: string;
   }
 ): Promise<CreateBookingResult> {
   try {
     const calendar = await getUncachableGoogleCalendarClient();
-    const privateMetadata = buildBookingEventPrivateMetadata(details);
+    const bookingLabels = { ...details, isTianJiu: details.isTianJiu || hasTianJiuBookingLabel(details.notes) };
+    const privateMetadata = buildBookingEventPrivateMetadata(bookingLabels);
     const shouldCreateMeet = isOnlineBooking(details);
     const attendees = buildBookingEventAttendees(details);
 
     const event = {
-      summary: buildBookingEventSummary(details),
+      summary: buildBookingEventSummary(bookingLabels),
       description: [
         `Patient / 病人: ${details.patientName}`,
         `Phone / 電話: ${details.phone}`,

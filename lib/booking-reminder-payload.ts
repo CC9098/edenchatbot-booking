@@ -6,6 +6,7 @@ import {
   type BookingVisitType,
 } from '@/lib/booking-intake-storage';
 import { CLINIC_ID_BY_NAME_ZH, getClinicAddress } from '@/shared/clinic-data';
+import { readBookingCalendarPatientName, readBookingCalendarVisitType } from '@/lib/booking-calendar-labels';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 
@@ -30,14 +31,6 @@ export interface BookingReminderPayload extends BookingReminderMetadata {
   calendarId: string;
 }
 
-function inferVisitType(description: string): BookingVisitType {
-  if (/first|首診/i.test(description)) {
-    return 'first';
-  }
-
-  return 'followup';
-}
-
 function parseLineValue(description: string, label: string): string {
   const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = description.match(new RegExp(`${escaped}\\s*:\\s*(.+)`));
@@ -50,7 +43,7 @@ export function extractBookingReminderMetadata(event: any): BookingReminderMetad
 
   const patientName =
     parseLineValue(description, 'Patient / 病人') ||
-    summary.split(' - ').slice(1).join(' - ').trim();
+    readBookingCalendarPatientName(summary);
   const patientPhone = parseLineValue(description, 'Phone / 電話');
   const patientEmail = parseLineValue(description, 'Email / 電郵');
 
@@ -79,7 +72,7 @@ export function extractBookingReminderMetadata(event: any): BookingReminderMetad
     clinicNameZh,
     clinicAddress,
     clinicId,
-    visitType: inferVisitType(description),
+    visitType: readBookingCalendarVisitType(event?.extendedProperties?.private?.visitType, description, summary),
     locale: parseBookingLocale(event?.extendedProperties?.private?.locale),
   };
 }

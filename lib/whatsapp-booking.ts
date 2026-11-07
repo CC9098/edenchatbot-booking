@@ -2,6 +2,7 @@ import type { BookingLocale } from '@/shared/booking-locale';
 import { notificationDoctorName, notificationClinicName } from '@/lib/booking-notification-locale';
 import { type BookingVisitType } from '@/lib/booking-intake-storage';
 import { buildManageBookingUrl } from '@/lib/public-url';
+import { CLINIC_ID_BY_NAME_ZH, PHYSICAL_CLINIC_IDS } from '@/shared/clinic-data';
 
 const VISIT_TYPE_LABELS: Record<BookingVisitType, string> = {
   first: '首診',
@@ -25,7 +26,10 @@ export interface BookingWhatsappConfirmationInput {
   groupBookingNotice?: string;
 }
 
-export interface BookingWhatsappReminderInput extends BookingWhatsappConfirmationInput {}
+export interface BookingWhatsappReminderInput extends BookingWhatsappConfirmationInput {
+  clinicId?: string;
+  isLastSessionBooking?: boolean;
+}
 
 function formatDateForWhatsapp(dateIso: string, locale?: BookingLocale): string {
   if (!dateIso) return '';
@@ -188,26 +192,61 @@ export function buildWhatsappOnlineTemplateBodyParams(
   };
 }
 
+function isInPersonReminder(input: BookingWhatsappReminderInput): boolean {
+  const clinicId = input.clinicId || CLINIC_ID_BY_NAME_ZH[input.clinicNameZh];
+  return PHYSICAL_CLINIC_IDS.some(id => id === clinicId);
+}
+
+export function getInPersonReminderTemplateName(input: BookingWhatsappReminderInput): string | undefined {
+  if (!isInPersonReminder(input)) return undefined;
+
+  const visitSuffix = input.visitType === 'first' ? '_first' : '';
+  const timeSuffix = input.isLastSessionBooking ? '_last' : '';
+  return `booking_reminder_visit_v2${visitSuffix}${timeSuffix}`;
+}
+
+function buildInPersonReminderLines(input: BookingWhatsappReminderInput): string[] {
+  if (!isInPersonReminder(input)) return [];
+
+  return input.locale === 'en' ? [
+    'We accept cash, FPS (Faster Payment System) and bank transfer only. Credit cards and EPS are not accepted.',
+    'If you need to cancel or reschedule, please let us know as soon as possible.',
+    'If you have a fever or cough, please wear a surgical mask when you come to the clinic.',
+    ...(input.isLastSessionBooking ? ['Your appointment is the last of this session. Please allow enough travel time to arrive on time.'] : []),
+    ...(input.visitType === 'first' ? ['For your first visit, please bring your identity card for registration.'] : []),
+  ] : [
+    '診所只接受現金、轉數快（FPS）及銀行轉帳。不接受信用卡或易辦事（EPS）。',
+    '如需取消或更改預約，請盡早通知我們。',
+    '如有發燒或咳嗽，到診時請佩戴外科口罩。',
+    ...(input.isLastSessionBooking ? ['這是本節最後一個看診時段，請預留交通時間，準時到診。'] : []),
+    ...(input.visitType === 'first' ? ['首次到診請帶同身份證登記。'] : []),
+  ];
+}
+
 export function buildWhatsappReminderText(
   input: BookingWhatsappReminderInput & { manageAccessToken?: string },
+  includeInPersonNotices = true,
 ): string {
   const manageUrl = buildPatientManageBookingUrl(input.manageAccessToken, input.locale);
+  const clinicNotices = includeInPersonNotices ? buildInPersonReminderLines(input) : [];
   if (input.locale === 'en') return [
     'Eden Clinic — appointment reminder', '', `Hello ${input.patientName},`,
-    'Your appointment is in approximately 24 hours.',
+    'This is a reminder of your appointment tomorrow.',
     `Practitioner: ${notificationDoctorName(input.doctorNameZh, input.locale)}`,
     `Clinic: ${notificationClinicName(input.clinicNameZh, input.locale)}`,
     `Date: ${formatDateForWhatsapp(input.appointmentDate, input.locale)}`,
     `Time: ${input.appointmentTime} (Hong Kong time)`,
     `Visit: ${input.visitType === 'first' ? 'First visit' : 'Follow-up'}`,
-    `Booking reference: ${input.bookingId}`, '', 'Change or cancel your appointment:', manageUrl,
+    `Booking reference: ${input.bookingId}`, '',
+    ...(clinicNotices.length ? [...clinicNotices, ''] : []),
+    'Change or cancel your appointment:', manageUrl,
   ].join('\n');
 
   return [
     '醫天圓中醫診所預約提醒',
     '',
     `你好 ${input.patientName}，`,
-    '溫馨提示：你的預約大約將於24小時後進行。',
+    '提提你，明天有診症預約。',
     `醫師：${input.doctorNameZh}`,
     `診所：${input.clinicNameZh}`,
     `日期：${formatDateForWhatsapp(input.appointmentDate, input.locale)}`,
@@ -215,6 +254,7 @@ export function buildWhatsappReminderText(
     `診症類型：${VISIT_TYPE_LABELS[input.visitType]}`,
     `預約編號：${input.bookingId}`,
     '',
+    ...(clinicNotices.length ? [...clinicNotices, ''] : []),
     `管理預約（更改 / 取消）：`,
     manageUrl,
   ].join('\n');

@@ -27,6 +27,7 @@ import {
   buildWhatsappOnlineTemplateBodyParams,
   buildWhatsappReminderTemplateBodyParams,
   buildWhatsappReminderText,
+  getInPersonReminderTemplateName,
   buildWhatsappRescheduleTemplateBodyParams,
   buildWhatsappRescheduleText,
   buildWhatsappTemplateBodyParams,
@@ -268,6 +269,7 @@ type TemplateConfig = {
   name: string;
   category: string;
   language: string;
+  bodyOnly?: boolean;
 };
 
 type TemplateProcessedParams = NonNullable<ChatwootMessagePayload['template_params']>['processed_params'];
@@ -1153,7 +1155,7 @@ async function sendMessageWithTemplateFallback(
   client: ChatwootWhatsappClient,
   accountId: number,
   conversationId: number,
-  content: string,
+  content: string | ((templateConfig: TemplateConfig) => string),
   templateConfigs: TemplateConfig[],
   buildBodyParams: Record<string, string> | ((templateConfig: TemplateConfig) => Record<string, string>),
 ) {
@@ -1163,14 +1165,16 @@ async function sendMessageWithTemplateFallback(
     const bodyParams = typeof buildBodyParams === 'function'
       ? buildBodyParams(templateConfig)
       : buildBodyParams;
-    const processedParamCandidates = templateConfig.category.toUpperCase() === 'AUTHENTICATION' && bodyParams.verification_code
-      ? [buildWhatsappAuthenticationOtpParams(bodyParams.verification_code)]
-      : buildTemplateProcessedParamCandidates(bodyParams);
+    const processedParamCandidates = templateConfig.bodyOnly
+      ? [{ body: bodyParams }]
+      : templateConfig.category.toUpperCase() === 'AUTHENTICATION' && bodyParams.verification_code
+        ? [buildWhatsappAuthenticationOtpParams(bodyParams.verification_code)]
+        : buildTemplateProcessedParamCandidates(bodyParams);
 
     for (const processedParams of processedParamCandidates) {
       try {
         const message = await client.createMessage(accountId, conversationId, {
-          content,
+          content: typeof content === 'function' ? content(templateConfig) : content,
           template_params: {
             name: templateConfig.name,
             category: templateConfig.category,
@@ -1203,13 +1207,7 @@ async function sendMessageWithTemplateFallback(
     }
   }
 
-  if (lastError) {
-    throw lastError;
-  }
-
-  await client.createMessage(accountId, conversationId, {
-    content,
-  });
+  throw lastError || new Error('No WhatsApp message template available');
 }
 
 function toNumericBodyParams(bodyParams: Record<string, string>): Record<string, string> {
@@ -1652,6 +1650,7 @@ async function sendBookingWhatsappNotification(
   },
   options: {
     buildContent: () => string;
+    buildTemplateContent?: (templateConfig: TemplateConfig) => string;
     buildBodyParams: (templateConfig?: TemplateConfig) => Record<string, string>;
     getTemplateConfigs: (inbox: ChatwootInbox) => TemplateConfig[];
     preferTemplateIfAvailable?: boolean;
@@ -1724,6 +1723,7 @@ async function sendBookingWhatsappNotification(
   }
 
   const content = options.buildContent();
+  const templateContent = options.buildTemplateContent || content;
   const templateConfigs = options.getTemplateConfigs(inbox);
   let deliveryStatus: string | null | undefined;
   let activeConversationTextError: unknown = null;
@@ -1734,7 +1734,7 @@ async function sendBookingWhatsappNotification(
         client,
         accountId,
         conversationId,
-        content,
+        templateContent,
         templateConfigs,
         options.buildBodyParams,
       );
@@ -1801,7 +1801,7 @@ async function sendBookingWhatsappNotification(
       client,
       accountId,
       conversationId,
-      content,
+      templateContent,
       templateConfigs,
       options.buildBodyParams,
     );
@@ -1870,12 +1870,25 @@ export async function sendBookingReminderWhatsapp(
   input: BookingWhatsappReminderNotificationInput,
 ): Promise<SendWhatsappBookingConfirmationResult> {
   try {
+    const inPersonTemplate = getInPersonReminderTemplateName(input);
     return await sendBookingWhatsappNotification(input, {
-      fallbackTextOnTemplateFailure: input.locale === 'en',
+      fallbackTextOnTemplateFailure: true,
       buildContent: () => buildWhatsappReminderText(input),
+      buildTemplateContent: config => buildWhatsappReminderText(input, config.name === inPersonTemplate),
       buildBodyParams: () => buildWhatsappReminderTemplateBodyParams(input),
-      getTemplateConfigs: inbox => localizedBookingTemplates(inbox, input.locale, getReminderTemplateConfigs(inbox), process.env.CHATWOOT_WHATSAPP_REMINDER_TEMPLATE_NAME_EN),
-      preferTemplateIfAvailable: true,
+      getTemplateConfigs: inbox => {
+        const legacy = localizedBookingTemplates(inbox, input.locale, getReminderTemplateConfigs(inbox), process.env.CHATWOOT_WHATSAPP_REMINDER_TEMPLATE_NAME_EN);
+        const language = input.locale === 'en' ? /^en(?:_|$)/i : /^zh(?:_|$)/i;
+        const enhanced = (inbox.message_templates || []).flatMap(template =>
+          inPersonTemplate && template.name === inPersonTemplate
+          && template.language && language.test(template.language)
+          && template.status?.toLowerCase() === 'approved'
+            ? [{ name: inPersonTemplate, language: template.language, category: template.category || 'UTILITY', bodyOnly: true }]
+            : [],
+        );
+        return [...enhanced, ...legacy.filter(template => template.name !== inPersonTemplate)];
+      },
+      preferTemplateIfAvailable: !inPersonTemplate,
     });
   } catch (error) {
     return {

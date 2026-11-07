@@ -28,6 +28,19 @@ test('extractBookingReminderMetadata keeps WhatsApp-only bookings eligible', () 
   assert.equal(metadata.visitType, 'followup');
 });
 
+test('calendar fallback keeps title tags out of the patient name and recognizes first visits', () => {
+  const event = {
+    summary: '醫師｜佐敦 - 【新症】【天灸】Test - Patient',
+    description: 'Doctor / 醫師: 李醫師 (Dr. Lee)\nClinic / 診所: 佐敦 (Jordan)',
+  };
+  const metadata = extractBookingReminderMetadata(event);
+  assert.equal(metadata?.patientName, 'Test - Patient');
+  assert.equal(metadata?.visitType, 'first');
+  assert.equal(extractBookingReminderMetadata({
+    ...event, summary: '醫師｜佐敦 - Test Patient', description: `${event.description}\n\nNotes / 備註:\n[First visit]`,
+  })?.visitType, 'first');
+});
+
 test('buildBookingReminderPayload returns payload without requiring email', () => {
   const payload = buildBookingReminderPayload(
     {

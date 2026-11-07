@@ -708,6 +708,7 @@ export function BookingTabFlow({ locale = 'zh',
   const [doctorId, setDoctorId] = useState<DoctorId | ''>(initialSelection?.doctorId ?? '');
   const [clinicId, setClinicId] = useState<ClinicId | ''>(initialSelection?.clinicId ?? '');
   const [selectedTreatmentOptions, setSelectedTreatmentOptions] = useState<BookingTreatmentOptionId[]>([]);
+  const [staffTianJiu, setStaffTianJiu] = useState(false);
 
   const [selectedDate, setSelectedDate] = useState('');
   const initialDateConsumedRef = useRef(false);
@@ -816,6 +817,7 @@ export function BookingTabFlow({ locale = 'zh',
     [clinicId, clinicOptions]
   );
   const isOnlineConsultation = clinicId === 'online';
+  const canMarkTianJiu = isStaffFlow && !isOnlineConsultation && !usesVisitBasedServices;
   const availableTreatmentOptions = !isOnlineConsultation
     && !usesVisitBasedServices
     ? selectedDoctor?.bookingTreatmentOptions ?? []
@@ -831,9 +833,11 @@ export function BookingTabFlow({ locale = 'zh',
       .map((optionId) => treatmentOptionById.get(optionId))
       .filter((option): option is BookingTreatmentOption => Boolean(option));
   }, [isOnlineConsultation, selectedDoctor, selectedTreatmentOptions, usesVisitBasedServices]);
-  const selectedTreatmentSummary = selectedTreatmentDetails.length > 0
-    ? formatSelectedTreatments(selectedTreatmentDetails, formValues.treatmentOtherDetails, locale)
-    : '';
+  const tianJiuLabel = locale === 'en' ? 'Tian Jiu' : '天灸';
+  const selectedTreatmentSummary = [
+    formatSelectedTreatments(selectedTreatmentDetails, formValues.treatmentOtherDetails, locale),
+    canMarkTianJiu && staffTianJiu ? tianJiuLabel : '',
+  ].filter(Boolean).join(locale === 'en' ? ', ' : '、');
   const treatmentSummaryDetail = isOnlineConsultation
     ? null
     : selectedTreatmentSummary
@@ -1256,6 +1260,7 @@ export function BookingTabFlow({ locale = 'zh',
   function handleDoctorChange(nextDoctorId: string) {
     setDoctorId(nextDoctorId as DoctorId);
     setClinicId('');
+    setStaffTianJiu(false);
     setStep('setup');
     resetSlotState();
     resetSubmissionState();
@@ -1264,6 +1269,7 @@ export function BookingTabFlow({ locale = 'zh',
   function handleClinicChange(nextClinicId: string) {
     const nextFilter = nextClinicId as ClinicId | '';
     setClinicId(nextFilter);
+    if (nextFilter === 'online') setStaffTianJiu(false);
     resetSubmissionState();
 
     if (step === 'timeslot') {
@@ -1469,8 +1475,8 @@ export function BookingTabFlow({ locale = 'zh',
             : null,
         ].filter(Boolean).join(' | ')
       : null;
-    const selectedTreatmentLine = selectedTreatmentDetails.length > 0
-      ? bookingText("治療項目: {0}", locale, [formatSelectedTreatments(selectedTreatmentDetails, values.treatmentOtherDetails, locale)])
+    const selectedTreatmentLine = selectedTreatmentSummary
+      ? bookingText("治療項目: {0}", locale, [selectedTreatmentSummary])
       : null;
     const sourceLine = initialSelection?.source
       ? bookingText("預約來源: {0}", locale, [initialSelection.source])
@@ -1621,6 +1627,7 @@ export function BookingTabFlow({ locale = 'zh',
 
   function startAnotherBooking() {
     setStep('timeslot');
+    setStaffTianJiu(false);
     resetSlotState();
     setSubmitError('');
     setFormErrors({});
@@ -2010,6 +2017,17 @@ export function BookingTabFlow({ locale = 'zh',
                     </label>
                   );
                 })}
+                {canMarkTianJiu ? (
+                  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700 hover:border-primary/40">
+                    <input
+                      type="checkbox"
+                      checked={staffTianJiu}
+                      onChange={event => setStaffTianJiu(event.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                    />
+                    <span className="font-semibold">{tianJiuLabel}</span>
+                  </label>
+                ) : null}
               </div>
 
               {needsTreatmentOtherDetails ? (

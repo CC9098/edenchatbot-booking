@@ -5,6 +5,19 @@ import {
   buildBookingEventAttendees,
   extractFreeBusySlotsFromResponse,
 } from "@/lib/google-calendar";
+import { buildBookingEventSummary, hasTianJiuBookingLabel } from "@/lib/booking-calendar-labels";
+
+test("booking titles show first visit and Tian Jiu tags directly before the patient name", () => {
+  const booking = { doctorNameZh: "李醫師", clinicNameZh: "中環", patientName: "測試病人" };
+  assert.equal(buildBookingEventSummary({
+    ...booking,
+    visitType: "first",
+    isTianJiu: hasTianJiuBookingLabel("Booking source: Test | Treatments: Other (please specify): Tian Jiu | [First visit]"),
+  }), "李醫師｜中環 - 【新症】【天灸】測試病人");
+  assert.equal(buildBookingEventSummary({
+    ...booking, visitType: "followup", isTianJiu: hasTianJiuBookingLabel("治療項目: 針灸 | 病人曾做天灸"),
+  }), "李醫師｜中環 - 測試病人");
+});
 
 test("freebusy parser surfaces per-calendar access errors", () => {
   assert.throws(

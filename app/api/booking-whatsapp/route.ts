@@ -310,6 +310,7 @@ export async function POST(request: NextRequest) {
       patientName: bookingData.patientName,
       phone: bookingData.phone,
       email: bookingData.email,
+      visitType: bookingData.visitType,
       notes: bookingData.notes,
     });
 

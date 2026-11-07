@@ -4,12 +4,29 @@ import { approvedEnglishBookingTemplates } from '@/lib/booking-notification-loca
 import { buildWhatsappConfirmationText, buildWhatsappReminderText, buildWhatsappCancellationText, buildWhatsappRescheduleText, buildWhatsappTemplateBodyParams } from '@/lib/whatsapp-booking';
 import { buildWhatsappManageAccessText, buildWhatsappManageVerificationText } from '@/lib/whatsapp-manage';
 import { buildBookingReminderPayload, buildBookingReminderPayloadFromIntake } from '@/lib/booking-reminder-payload';
+import { getInPersonReminderTemplateName } from '@/lib/whatsapp-booking';
 
 const booking = {
   locale: 'en' as const, bookingId: 'synthetic-booking', patientName: 'Test Patient',
   doctorNameZh: '陳家富醫師', clinicNameZh: '佐敦', appointmentDate: '2026-11-12',
   appointmentTime: '10:30', visitType: 'first' as const, manageAccessToken: 'synthetic-token',
 };
+
+test('in-person reminder includes localized payment and the applicable arrival instructions', () => {
+  const firstAndLast = { ...booking, isLastSessionBooking: true };
+  assert.match(buildWhatsappReminderText(firstAndLast), /cash, FPS.*bank transfer only/);
+  assert.match(buildWhatsappReminderText(firstAndLast), /last of this session/);
+  assert.match(buildWhatsappReminderText(firstAndLast), /bring your identity card/);
+  const followup = { ...booking, locale: 'zh' as const, visitType: 'followup' as const };
+  assert.match(buildWhatsappReminderText(followup), /現金、轉數快（FPS）及銀行轉帳/);
+  assert.doesNotMatch(buildWhatsappReminderText(followup), /最後一個看診時段|身份證/);
+  assert.doesNotMatch(buildWhatsappReminderText({ ...firstAndLast, clinicId: 'online' }), /cash|last of this session|identity card/);
+  assert.equal(getInPersonReminderTemplateName(followup), 'booking_reminder_visit_v2');
+  assert.equal(getInPersonReminderTemplateName(booking), 'booking_reminder_visit_v2_first');
+  assert.equal(getInPersonReminderTemplateName({ ...followup, isLastSessionBooking: true }), 'booking_reminder_visit_v2_last');
+  assert.equal(getInPersonReminderTemplateName(firstAndLast), 'booking_reminder_visit_v2_first_last');
+  assert.equal(getInPersonReminderTemplateName({ ...firstAndLast, clinicId: 'online' }), undefined);
+});
 
 test('all English booking messages use English labels and preserve the English management route', () => {
   const messages = [
@@ -74,13 +91,13 @@ test('legacy bookings retain Chinese output by default', () => {
   assert.doesNotMatch(message, /\/en\//);
 });
 
-import { sendBookingConfirmationWhatsapp } from '@/lib/chatwoot-whatsapp';
+import { sendBookingConfirmationWhatsapp, sendBookingReminderWhatsapp } from '@/lib/chatwoot-whatsapp';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
-test('sendBookingConfirmationWhatsapp sends approved English template and English management path for an English booking', async () => {
+test('Chatwoot sends approved English booking templates and falls back to the legacy reminder while approval is pending', async () => {
   const originalFetch = global.fetch;
   const originalEnv = {
     CHATWOOT_BASE_URL: process.env.CHATWOOT_BASE_URL,
@@ -93,6 +110,7 @@ test('sendBookingConfirmationWhatsapp sends approved English template and Englis
   };
 
   const sentMessagePayloads: Array<Record<string, any>> = [];
+  let reminderStatus = 'pending';
 
   process.env.CHATWOOT_BASE_URL = 'https://chatwoot.example';
   process.env.CHATWOOT_API_ACCESS_TOKEN = 'test-token';
@@ -125,6 +143,9 @@ test('sendBookingConfirmationWhatsapp sends approved English template and Englis
               status: 'approved',
               category: 'UTILITY',
             },
+            { name: 'booking_reminder_24h', language: 'en', status: 'approved', category: 'UTILITY' },
+            { name: 'booking_reminder_visit_v2_first_last', language: 'zh_HK', status: 'approved', category: 'UTILITY' },
+            { name: 'booking_reminder_visit_v2_first_last', language: 'en', status: reminderStatus, category: 'UTILITY' },
             {
               name: 'booking_confirm',
               language: 'zh_HK',
@@ -212,6 +233,23 @@ test('sendBookingConfirmationWhatsapp sends approved English template and Englis
     assert.match(sentMessagePayloads[0]?.content, /appointment confirmed/);
     assert.match(sentMessagePayloads[0]?.content, /\/en\/manage-booking/);
     assert.equal(sentMessagePayloads[0]?.template_params?.processed_params?.buttons?.[0]?.parameter, '/en/manage-booking?token=abc123');
+
+    const reminder = {
+      ...booking, phone: '90000000', email: 'synthetic@example.invalid', isLastSessionBooking: true,
+    };
+    assert.equal((await sendBookingReminderWhatsapp(reminder)).success, true);
+    assert.equal(sentMessagePayloads[1]?.template_params?.name, 'booking_reminder_24h');
+    assert.doesNotMatch(sentMessagePayloads[1]?.content, /cash|identity card/);
+
+    reminderStatus = 'approved';
+    assert.equal((await sendBookingReminderWhatsapp(reminder)).success, true);
+    assert.equal(sentMessagePayloads[2]?.template_params?.name, 'booking_reminder_visit_v2_first_last');
+    assert.equal(sentMessagePayloads[2]?.template_params?.language, 'en');
+    assert.match(sentMessagePayloads[2]?.content, /cash.*\n.*\n.*\n.*last of this session/);
+    const enhancedParams = sentMessagePayloads[2]?.template_params?.processed_params;
+    assert.deepEqual(Object.keys(enhancedParams), ['body']);
+    assert.equal(Object.keys(enhancedParams.body).length, 7);
+    assert.match(enhancedParams.body.manage_url, /\/en\/manage-booking/);
   } finally {
     global.fetch = originalFetch;
 

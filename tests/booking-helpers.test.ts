@@ -5,10 +5,42 @@ import { fromZonedTime } from "date-fns-tz";
 import type { CalendarMapping, TimeRange } from '@/shared/schedule-config';
 
 import {
+  isLastClinicSessionBooking,
   isSlotAfterClinicLastBookingCutoffUtc,
   isSlotBlockedByOnlineSourceLastBookingCutoffUtc,
   isSlotBlockedBySameDayEveningCutoffUtc,
 } from "@/lib/booking-helpers";
+
+
+test("last in-person appointment follows dated hours and the doctor's cutoff", () => {
+  const mapping: CalendarMapping = {
+    doctorId: "lee",
+    clinicId: "central",
+    calendarId: "test-calendar",
+    isActive: true,
+    schedule: {
+      1: [{ start: "11:00", end: "14:00" }, { start: "15:30", end: "19:00" }],
+      6: [{ start: "14:30", end: "18:30" }],
+    },
+  };
+  const monday = "2026-11-09";
+  const saturday = "2026-11-14";
+  assert.equal(isLastClinicSessionBooking(mapping, monday, "13:15", "13:30"), true);
+  assert.equal(isLastClinicSessionBooking(mapping, monday, "13:00", "13:15"), false);
+  assert.equal(isLastClinicSessionBooking(mapping, monday, "18:45", "19:00"), true);
+  assert.equal(isLastClinicSessionBooking(mapping, monday, "18:15", "18:30"), false);
+  assert.equal(isLastClinicSessionBooking({ ...mapping, clinicId: "tsuenwan" }, monday, "18:15", "18:30"), true);
+  assert.equal(isLastClinicSessionBooking({ ...mapping, clinicId: "jordan" }, saturday, "17:45", "18:00"), true);
+  assert.equal(isLastClinicSessionBooking({ ...mapping, clinicId: "jordan" }, saturday, "17:30", "17:45"), false);
+  assert.equal(isLastClinicSessionBooking({ ...mapping, clinicId: "online" }, monday, "18:45", "19:00"), false);
+  assert.equal(isLastClinicSessionBooking({ ...mapping, doctorId: "hon" }, monday, "13:15", "13:30"), false);
+  assert.equal(isLastClinicSessionBooking({
+    ...mapping, doctorId: "wong", schedule: { 1: [{ start: "15:00", end: "18:00" }] },
+  }, monday, "17:15", "17:45"), false);
+  assert.equal(isLastClinicSessionBooking({
+    ...mapping, schedule: { 1: [{ start: "15:30", end: "17:00" }] },
+  }, monday, "16:45", "17:00"), true);
+});
 
 const HONG_KONG_TIMEZONE = "Asia/Hong_Kong";
 

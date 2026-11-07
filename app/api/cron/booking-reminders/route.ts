@@ -13,7 +13,8 @@ import { normalizePhoneForSearch } from '@/lib/contact-utils';
 import { getClinicWhatsappPhone } from '@/lib/whatsapp-booking';
 import { createManageAccessToken } from '@/lib/widget-booking-management';
 import { authorizeBookingReminderCronRequest } from '@/lib/booking-reminder-cron-auth';
-import { getActiveCalendarIds } from '@/lib/doctor-schedule-store';
+import { getActiveCalendarIds, getActiveScheduleMappings } from '@/lib/doctor-schedule-store';
+import { isLastClinicSessionBooking } from '@/lib/booking-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -69,6 +70,7 @@ export async function GET(request: NextRequest) {
     whatsappAlreadySent: 0,
     skippedInvalid: 0,
     whatsappWouldSend: 0,
+    lastSessionBookings: 0,
     whatsappSent: 0,
     whatsappSendFailed: 0,
     whatsappSkippedInvalid: 0,
@@ -115,7 +117,10 @@ export async function GET(request: NextRequest) {
 
   const targetDayStart = fromZonedTime(`${targetDate}T00:00:00`, HONG_KONG_TIMEZONE);
   const targetDayEnd = fromZonedTime(`${targetDate}T23:59:59.999`, HONG_KONG_TIMEZONE);
-  const calendarIds = await getActiveCalendarIds();
+  const [calendarIds, scheduleMappings] = await Promise.all([
+    getActiveCalendarIds(),
+    getActiveScheduleMappings(targetDate),
+  ]);
   summary.calendarIdsScanned = calendarIds.length;
 
   const calendarResults = await Promise.all(
@@ -194,6 +199,25 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
+    const schedule = scheduleMappings.find(mapping =>
+      mapping.clinicId === payload.clinicId && mapping.calendarId === payload.calendarId
+      && (!event.extendedProperties?.private?.doctorId || mapping.doctorId === event.extendedProperties.private.doctorId),
+    );
+    const eventStart = new Date(event.start?.dateTime || '');
+    const eventEnd = new Date(event.end?.dateTime || '');
+    const isLastSessionBooking = Boolean(
+      schedule
+      && Number.isFinite(eventStart.getTime())
+      && Number.isFinite(eventEnd.getTime())
+      && formatInTimeZone(eventStart, HONG_KONG_TIMEZONE, "yyyy-MM-dd'T'HH:mm") === `${payload.date}T${payload.time.slice(0, 5)}`
+      && formatInTimeZone(eventEnd, HONG_KONG_TIMEZONE, 'yyyy-MM-dd') === payload.date
+      && isLastClinicSessionBooking(
+        schedule, payload.date, payload.time,
+        formatInTimeZone(eventEnd, HONG_KONG_TIMEZONE, 'HH:mm'),
+      ),
+    );
+    if (isLastSessionBooking && payload.patientPhone) summary.lastSessionBookings += 1;
+
     if (dryRun) {
       if (payload.patientPhone) {
         summary.whatsappWouldSend += 1;
@@ -222,6 +246,8 @@ export async function GET(request: NextRequest) {
         appointmentDate: payload.date,
         appointmentTime: payload.time,
         visitType: payload.visitType,
+        clinicId: payload.clinicId,
+        isLastSessionBooking,
         locale: payload.locale,
         clinicWhatsappPhone: reminderClinicId ? getClinicWhatsappPhone(reminderClinicId) : null,
         manageAccessToken,
