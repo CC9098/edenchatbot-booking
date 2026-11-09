@@ -340,10 +340,9 @@ const needOk = (doc, need) => !need || (need === 'chiro' ? doc.group === 'suppor
 const clinicOk = (need, clinic) => clinic !== 'online' || !['acupuncture', 'manual_therapy', 'chiro'].includes(need);
 const SLOT_MIN = 15, SAME_DAY_BUFFER = 60, EVENING_CUTOFF = 19 * 60;
 // The initial policy snapshot is replaced by the booking system's live policy.
-let lastBookingCutoffs = {"doctorIds":["lee","chau"],"morningSessionEnd":"14:00","lunch":"13:15","evening":{"central":"18:45","jordan":"18:45","tsuenwan":"18:15"},"leeSaturdayJordan":"17:45"};
+let lastBookingCutoffs = {"morningSessionEnd":"14:00","lunch":"13:15","evening":{"central":"18:45","jordan":"18:45","tsuenwan":"18:15"},"leeSaturdayJordan":"17:45"};
 function cutoffFor(doc, clinic, day, sessionStart) {
   const rules = lastBookingCutoffs;
-  if (!rules.doctorIds.includes(doc.id)) return null;
   const morning = sessionStart < toMin(rules.morningSessionEnd);
   const clinicCutoff = (id) => toMin(morning ? rules.lunch
     : doc.id === 'lee' && id === 'jordan' && day === 6 ? rules.leeSaturdayJordan : rules.evening[id]);
@@ -356,17 +355,18 @@ function cutoffFor(doc, clinic, day, sessionStart) {
 }
 function clip(r, session, date, doc, clinic) {
   const filter = SESSIONS.find((x) => x.id === session);
+  const slotMinutes = doc.slotMinutes || SLOT_MIN;
   const rangeStart = toMin(r.start);
   const rangeEnd = toMin(r.end);
   let start = Math.max(rangeStart, filter?.start ?? 0, date.i === 0 ? nowMin + SAME_DAY_BUFFER : 0);
-  start = rangeStart + Math.ceil((start - rangeStart) / SLOT_MIN) * SLOT_MIN;
+  start = rangeStart + Math.ceil((start - rangeStart) / slotMinutes) * slotMinutes;
   const end = Math.min(rangeEnd, filter?.end ?? 1440);
   const cutoff = cutoffFor(doc, clinic, date.dow, rangeStart);
   if (cutoff !== null && start > cutoff) return null;
   if (date.i === 0 && nowMin >= EVENING_CUTOFF && start >= EVENING_CUTOFF) return null;
-  if (start + SLOT_MIN > end) return null;
+  if (start + slotMinutes > end) return null;
   const lastStart = cutoff === null ? null
-    : toTime(rangeStart + Math.floor((Math.min(cutoff, rangeEnd - SLOT_MIN) - rangeStart) / SLOT_MIN) * SLOT_MIN);
+    : toTime(rangeStart + Math.floor((Math.min(cutoff, rangeEnd - slotMinutes) - rangeStart) / slotMinutes) * slotMinutes);
   return { start: toTime(start), end: toTime(end), lastStart };
 }
 const formatRange = (r) => r.start + '–' + r.end + (r.lastStart ? ' (last start ' + r.lastStart + ')' : '');

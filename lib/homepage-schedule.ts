@@ -11,6 +11,7 @@ export type HomepageScheduleData = {
     name: string;
     group: string;
     treatments: string[];
+    slotMinutes: number;
     clinics: { id: string; schedule: BookableDoctorSchedule['clinics'][number]['schedule'] }[];
   }[];
   notices: {
@@ -36,6 +37,7 @@ export function toHomepageSchedule(
       name: d.doctorNameZh,
       group: d.bookingPractitionerGroup,
       treatments: d.bookingTreatmentOptions.map((t) => t.id),
+      slotMinutes: Math.min(d.bookingSlotMinutes, ...d.bookingVisitOptions.map((visit) => visit.durationMinutes)),
       clinics: d.clinics
         .filter((c) => Object.values(c.schedule).some((ranges) => Array.isArray(ranges) && ranges.length > 0))
         .map((c) => ({ id: c.clinicId, schedule: c.schedule })),

@@ -1,7 +1,7 @@
-import type { DoctorId, PhysicalClinicId } from './clinic-data';
+import { DOCTOR_IDS, type DoctorId, type PhysicalClinicId } from './clinic-data';
 
 export const LAST_BOOKING_CUTOFFS = {
-  doctorIds: ['lee', 'chau'],
+  doctorIds: DOCTOR_IDS,
   morningSessionEnd: '14:00',
   lunch: '13:15',
   evening: { central: '18:45', jordan: '18:45', tsuenwan: '18:15' },

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { fromZonedTime } from "date-fns-tz";
 import type { CalendarMapping, TimeRange } from '@/shared/schedule-config';
+import { DOCTOR_IDS, PHYSICAL_CLINIC_IDS } from '@/shared/clinic-data';
 
 import {
   isLastClinicSessionBooking,
@@ -33,7 +34,7 @@ test("last in-person appointment follows dated hours and the doctor's cutoff", (
   assert.equal(isLastClinicSessionBooking({ ...mapping, clinicId: "jordan" }, saturday, "17:45", "18:00"), true);
   assert.equal(isLastClinicSessionBooking({ ...mapping, clinicId: "jordan" }, saturday, "17:30", "17:45"), false);
   assert.equal(isLastClinicSessionBooking({ ...mapping, clinicId: "online" }, monday, "18:45", "19:00"), false);
-  assert.equal(isLastClinicSessionBooking({ ...mapping, doctorId: "hon" }, monday, "13:15", "13:30"), false);
+  assert.equal(isLastClinicSessionBooking({ ...mapping, doctorId: "hon" }, monday, "13:15", "13:30"), true);
   assert.equal(isLastClinicSessionBooking({
     ...mapping, doctorId: "wong", schedule: { 1: [{ start: "15:00", end: "18:00" }] },
   }, monday, "17:15", "17:45"), false);
@@ -48,9 +49,9 @@ function toUtc(date: string, time: string) {
   return fromZonedTime(`${date}T${time}:00`, HONG_KONG_TIMEZONE);
 }
 
-for (const doctorId of ['lee', 'chau']) {
+for (const doctorId of DOCTOR_IDS) {
   test(`${doctorId} allows 13:15 and blocks later morning slots at every physical clinic`, () => {
-    for (const clinicId of ['central', 'jordan', 'tsuenwan']) {
+    for (const clinicId of PHYSICAL_CLINIC_IDS) {
       assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', '13:15'), clinicId, doctorId), false);
       assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', '13:30'), clinicId, doctorId), true);
       assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', '13:45'), clinicId, doctorId), true);
@@ -92,9 +93,9 @@ function sourceMapping(
   return { doctorId, clinicId, calendarId: 'synthetic-source-calendar', isActive: true, schedule: { [day]: ranges } };
 }
 
-for (const doctorId of ['lee', 'chau'] as const) {
+for (const doctorId of DOCTOR_IDS) {
   test(`${doctorId} online appointments inherit the physical source clinic's inclusive cutoffs`, () => {
-    for (const clinicId of ['central', 'jordan', 'tsuenwan'] as const) {
+    for (const clinicId of PHYSICAL_CLINIC_IDS) {
       const mappings = [sourceMapping(doctorId, clinicId, 4, [
         { start: '10:30', end: '14:00' }, { start: '15:30', end: '19:30' },
       ])];
@@ -129,20 +130,8 @@ test('Dr. Lee Saturday online appointments also stop at 17:45', () => {
   assert.equal(isSlotBlockedByOnlineSourceLastBookingCutoffUtc(toUtc('2026-11-07', '13:30'), 'lee', mappings), true);
 });
 
-test('online appointments for other practitioners retain their existing schedules', () => {
-  const mappings = [sourceMapping('hon', 'central', 4, [{ start: '15:30', end: '19:30' }])];
-  assert.equal(isSlotBlockedByOnlineSourceLastBookingCutoffUtc(toUtc('2026-11-12', '19:15'), 'hon', mappings), false);
+test('standalone online appointments use the online schedule', () => {
   assert.equal(isSlotBlockedByOnlineSourceLastBookingCutoffUtc(toUtc('2026-11-12', '23:10'), 'cheung', []), false);
-});
-
-test('other practitioners keep their scheduled morning and evening slots', () => {
-  for (const doctorId of ['chan', 'hon', 'cheung', 'cheungmy', 'leung', 'wong']) {
-    for (const clinicId of ['central', 'jordan', 'tsuenwan']) {
-      for (const time of ['13:30', '13:45', '14:30', '18:30', '18:45', '19:00', '19:15']) {
-        assert.equal(isSlotAfterClinicLastBookingCutoffUtc(toUtc('2026-11-10', time), clinicId, doctorId), false, `${doctorId}/${clinicId}/${time}`);
-      }
-    }
-  }
 });
 
 test("same-day evening slots are blocked once Hong Kong time reaches 19:00", () => {
