@@ -365,11 +365,9 @@ function clip(r, session, date, doc, clinic) {
   if (cutoff !== null && start > cutoff) return null;
   if (date.i === 0 && nowMin >= EVENING_CUTOFF && start >= EVENING_CUTOFF) return null;
   if (start + slotMinutes > end) return null;
-  const lastStart = cutoff === null ? null
-    : toTime(rangeStart + Math.floor((Math.min(cutoff, rangeEnd - slotMinutes) - rangeStart) / slotMinutes) * slotMinutes);
-  return { start: toTime(start), end: toTime(end), lastStart };
+  return { start: toTime(start), end: toTime(end) };
 }
-const formatRange = (r) => r.start + '–' + r.end + (r.lastStart ? ' (last start ' + r.lastStart + ')' : '');
+const formatRange = (r) => r.start + '–' + r.end;
 
 function slots(f) {
   const out = [];
