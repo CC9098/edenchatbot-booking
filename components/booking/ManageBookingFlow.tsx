@@ -1,7 +1,6 @@
 'use client';
 
 import { bookingFeedback, bookingText, type BookingLocale } from '@/shared/booking-locale';
-import { BookingCutoffNotice } from './BookingCutoffNotice';
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import Link from 'next/link';
@@ -872,7 +871,6 @@ export function ManageBookingFlow({ locale = 'zh',  action, manageAccessToken }:
           <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-primary sm:text-[30px]">
             {getActionLabel(action, locale)}
           </h1>
-          {action === 'reschedule' ? <BookingCutoffNotice locale={locale} /> : null}
           <div className="rounded-2xl border border-primary/15 bg-primary-light/40 p-3 text-xs font-medium text-primary sm:text-sm">
             {bookingText("步驟：", locale)}{tokenVerified ? bookingText(" 1. 已驗證", locale) : bookingText(" 1. 驗證電話", locale)}
             {bookings.length > 0 || requestSucceeded ? bookingText("  2. 選擇預約", locale) : bookingText("  2. 預約卡片", locale)}

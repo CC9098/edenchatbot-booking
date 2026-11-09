@@ -233,7 +233,6 @@ export const englishHomepageHtml = String.raw`<link href="https://fonts.googleap
     <h2 id="book-title">
      Online booking
     </h2>
-    <p><strong>Last appointment start times · All practitioners</strong><br/>Before lunch 13:15 · Central / Jordan evening 18:45 · Tsuen Wan evening 18:15<br/>Dr. Lee in Jordan on Saturdays: 17:45. Online visits follow the clinic cutoff for that session.</p>
    </div>
   </div>
   <div class="tiles-wrap">
@@ -290,7 +289,7 @@ export const englishHomepageHtml = String.raw`<link href="https://fonts.googleap
      </div>
     </div>
     <p class="res-note">
-     These are consultation hours. Check available times on the booking page.
+     Listed by consultation time. Available appointment slots are confirmed in the next step.
     </p>
     <div id="banner">
     </div>
