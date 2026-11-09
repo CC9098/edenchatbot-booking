@@ -1,6 +1,7 @@
 import { CalendarCheck, ClipboardList, MessageCircle, MapPin } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { BookingCutoffNotice } from '@/components/booking/BookingCutoffNotice';
 import { createServerClient } from "@/lib/supabase-server";
 import { isNativeAppUserAgent } from "@/lib/platform";
 import { CLINICS, DOCTORS } from "@/shared/clinic-data";
@@ -115,6 +116,8 @@ export default async function Home() {
                   );
                 })}
               </div>
+
+              <div className="mt-4"><BookingCutoffNotice /></div>
 
               <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-slate-600">
                 <span>註冊中醫師團隊</span>

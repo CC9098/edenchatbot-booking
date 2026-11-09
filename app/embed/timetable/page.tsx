@@ -1,6 +1,7 @@
 import { CalendarClock, ExternalLink } from 'lucide-react';
 import Image from "next/image";
 
+import { BookingCutoffNotice } from '@/components/booking/BookingCutoffNotice';
 import { EmbedAutoHeightReporter } from '@/components/embed/EmbedAutoHeightReporter';
 import { buildBookingUrl } from '@/lib/public-url';
 import { getPublicTimetableData, type TimetableClinicCard } from '@/lib/public-timetable-data-server';
@@ -613,6 +614,7 @@ export default async function TimetableEmbedPage({
         ) : null}
 
         <div className="space-y-8">
+          <BookingCutoffNotice />
           {visibleCards.map((card) => (
             <ClinicCard key={card.clinicId} card={card} versionLabel={versionLabel} />
           ))}

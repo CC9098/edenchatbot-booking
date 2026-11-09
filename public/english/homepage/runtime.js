@@ -339,18 +339,37 @@ const closedFor = (doc, clinic, iso) => noticesOn(iso).some((n) => (!n.doctor ||
 const needOk = (doc, need) => !need || (need === 'chiro' ? doc.group === 'support' : doc.group !== 'support' && doc.treatments.includes(need));
 const clinicOk = (need, clinic) => clinic !== 'online' || !['acupuncture', 'manual_therapy', 'chiro'].includes(need);
 const SLOT_MIN = 15, SAME_DAY_BUFFER = 60, EVENING_CUTOFF = 19 * 60;
-const LAST_START = { central: [795, 1125], jordan: [795, 1125], tsuenwan: [795, 1095] };
-function clip(r, session, today, clinic) {
-  const s = SESSIONS.find((x) => x.id === session);
-  const r0 = toMin(r.start);
-  let start = Math.max(r0, s ? s.start : 0, today ? nowMin + SAME_DAY_BUFFER : 0);
-  start = r0 + Math.ceil((start - r0) / SLOT_MIN) * SLOT_MIN;
-  const end = Math.min(toMin(r.end), s ? s.end : 1440);
-  const cut = LAST_START[clinic];
-  if (cut && start > (r0 < 14 * 60 ? cut[0] : cut[1])) return null;
-  if (today && nowMin >= EVENING_CUTOFF && start >= EVENING_CUTOFF) return null;
-  return start + SLOT_MIN <= end ? { start: toTime(start), end: toTime(end) } : null;
+// The initial policy snapshot is replaced by the booking system's live policy.
+let lastBookingCutoffs = {"doctorIds":["lee","chau"],"morningSessionEnd":"14:00","lunch":"13:15","evening":{"central":"18:45","jordan":"18:45","tsuenwan":"18:15"},"leeSaturdayJordan":"17:45"};
+function cutoffFor(doc, clinic, day, sessionStart) {
+  const rules = lastBookingCutoffs;
+  if (!rules.doctorIds.includes(doc.id)) return null;
+  const morning = sessionStart < toMin(rules.morningSessionEnd);
+  const clinicCutoff = (id) => toMin(morning ? rules.lunch
+    : doc.id === 'lee' && id === 'jordan' && day === 6 ? rules.leeSaturdayJordan : rules.evening[id]);
+  if (clinic !== 'online') return clinicCutoff(clinic);
+  const sources = doc.clinics.filter((c) => c.id !== 'online' && c.schedule[day]?.length);
+  const sessionSources = sources.filter((c) => c.schedule[day].some((r) =>
+    (toMin(r.start) < toMin(rules.morningSessionEnd)) === morning));
+  const matched = sessionSources.length ? sessionSources : sources;
+  return matched.length ? Math.max(...matched.map((c) => clinicCutoff(c.id))) : null;
 }
+function clip(r, session, date, doc, clinic) {
+  const filter = SESSIONS.find((x) => x.id === session);
+  const rangeStart = toMin(r.start);
+  const rangeEnd = toMin(r.end);
+  let start = Math.max(rangeStart, filter?.start ?? 0, date.i === 0 ? nowMin + SAME_DAY_BUFFER : 0);
+  start = rangeStart + Math.ceil((start - rangeStart) / SLOT_MIN) * SLOT_MIN;
+  const end = Math.min(rangeEnd, filter?.end ?? 1440);
+  const cutoff = cutoffFor(doc, clinic, date.dow, rangeStart);
+  if (cutoff !== null && start > cutoff) return null;
+  if (date.i === 0 && nowMin >= EVENING_CUTOFF && start >= EVENING_CUTOFF) return null;
+  if (start + SLOT_MIN > end) return null;
+  const lastStart = cutoff === null ? null
+    : toTime(rangeStart + Math.floor((Math.min(cutoff, rangeEnd - SLOT_MIN) - rangeStart) / SLOT_MIN) * SLOT_MIN);
+  return { start: toTime(start), end: toTime(end), lastStart };
+}
+const formatRange = (r) => r.start + '–' + r.end + (r.lastStart ? ' (last start ' + r.lastStart + ')' : '');
 
 function slots(f) {
   const out = [];
@@ -361,7 +380,7 @@ function slots(f) {
       for (const d of dates) {
         if (f.date && d.iso !== f.date) continue;
         if (closedFor(doc.id, c.id, d.iso)) continue;
-        const ranges = (c.schedule[d.dow] || []).map((r) => clip(r, f.session, d.i === 0, c.id)).filter(Boolean);
+        const ranges = (c.schedule[d.dow] || []).map((r) => clip(r, f.session, d, doc, c.id)).filter(Boolean);
         if (ranges.length) { out.push({ doc, c: clinicById(c.id), d, ranges, order }); break; }
       }
     }
@@ -447,7 +466,7 @@ function renderTeam() {
   const mine = slots(state), first = mine[0];
   const others = mine.slice(1).filter((x, i, a) => a.findIndex((y) => y.c.id === x.c.id) === i && x.c.id !== first?.c.id);
   const when = first
-    ? `<p class="next"><span>Earliest</span><b>${dayWord(first.d)} ${first.ranges.map((r) => `${r.start}–${r.end}`).join(' / ')}</b>・${first.c.name}${others.length ? `<br><span>Also</span>${others.map((x) => `<a href="${bookingUrl(d.id, x.c.id, x.d.iso)}" target="_blank" rel="noopener">${x.c.name}</a>`).join('・')}` : ''}</p>`
+    ? `<p class="next"><span>Earliest</span><b>${dayWord(first.d)} ${first.ranges.map(formatRange).join(' / ')}</b>・${first.c.name}${others.length ? `<br><span>Also</span>${others.map((x) => `<a href="${bookingUrl(d.id, x.c.id, x.d.iso)}" target="_blank" rel="noopener">${x.c.name}</a>`).join('・')}` : ''}</p>`
     : `<p class="next">No consultations match these filters in the next ${DAYS} days. <button type="button" class="chip clear" data-clear>Clear filters</button></p>`;
   pop.hidden = false;
   pop.innerHTML = `<img src="${portrait(d.id)}" alt="${esc(d.name)}" width="96" height="96">
@@ -521,7 +540,7 @@ function render() {
       <img src="${avatar(s.doc.id)}" alt="" width="44" height="44">
       <div class="who"><b>${esc(shortName(s.doc))}</b><small>${s.doc.group === 'support' ? 'Chiropractor' : 'TCM practitioner'}・${s.c.name}</small>${i === 0 ? '<span class="tag">Earliest</span>' : ''}</div>
       <a class="go" href="${bookingUrl(s.doc.id, s.c.id, s.d.iso)}" target="_blank" rel="noopener" aria-label="Book ${esc(s.doc.name)}，${s.c.name}，${dayWord(s.d)}">Book </a>
-      <div class="when"><strong>${dayWord(s.d)}</strong> ${s.ranges.map((r) => `${r.start}–${r.end}`).join(' / ')}</div>
+      <div class="when"><strong>${dayWord(s.d)}</strong> ${s.ranges.map(formatRange).join(' / ')}</div>
       ${s.alts.length ? `<div class="alts">Also available: ${s.alts.map((a) => `<a href="${bookingUrl(a.doc.id, a.c.id, a.d.iso)}" target="_blank" rel="noopener">${a.c.name}</a>`).join('<span aria-hidden="true">・</span>')}</div>` : ''}
       ${nd ? `<div class="note">${nd.m}/${nd.day} Closed</div>` : ''}
     </li>`;
@@ -587,6 +606,7 @@ render();
       DATA.doctors = doctors.map((doctor) => ({ ...doctor, name: DOCTOR_NAMES[doctor.id] || doctor.name }));
       DATA.notices = d.notices.filter((n) => n && n.start && n.end);
       DATA.fetchedAt = d.fetchedAt || DATA.fetchedAt;
+    if (d.lastBookingCutoffs) lastBookingCutoffs = d.lastBookingCutoffs;
       if (state.doctor && !doctorById(state.doctor)) state.doctor = '';
       render();
     })

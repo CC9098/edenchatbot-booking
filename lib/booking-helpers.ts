@@ -2,24 +2,15 @@ import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { type CalendarMapping, WeeklySchedule, TimeRange } from '../shared/schedule-config';
 import { type Holiday } from '../shared/schema';
 import { getDoctorBookingSlotMinutes, PHYSICAL_CLINIC_IDS, type PhysicalClinicId } from '../shared/clinic-data';
+import { LAST_BOOKING_CUTOFFS } from '../shared/last-booking-cutoffs';
 import { getHolidaysForDate } from './holiday-store';
 
 const HONG_KONG_TIMEZONE = 'Asia/Hong_Kong';
 // Morning sessions end at 14:00; only slots starting before then use the lunch
 // cutoff. Afternoon sessions that start earlier than 15:00 (e.g. 14:30) use the
 // evening cutoff instead of being blocked by the lunch one.
-const MORNING_SESSION_END_MINUTES = 14 * 60;
+const MORNING_SESSION_END_MINUTES = toMinutes(LAST_BOOKING_CUTOFFS.morningSessionEnd)!;
 const SAME_DAY_EVENING_BOOKING_CUTOFF_MINUTES = 19 * 60;
-// These earlier last-booking times apply only to Dr. Lee and Dr. Chau.
-const LAST_BOOKING_CUTOFF_DOCTOR_IDS = new Set(['lee', 'chau']);
-const CLINIC_LAST_BOOKING_CUTOFFS: Record<
-  PhysicalClinicId,
-  { lunch: string; evening: string }
-> = {
-  central: { lunch: '13:15', evening: '18:45' },
-  jordan: { lunch: '13:15', evening: '18:45' },
-  tsuenwan: { lunch: '13:15', evening: '18:15' },
-};
 
 // Helper: Get schedule for a specific day from weekly schedule
 export function getScheduleForDayFromWeekly(schedule: WeeklySchedule | undefined | null, dayOfWeek: number): TimeRange[] | null {
@@ -66,10 +57,9 @@ function getClinicLastBookingCutoffTime(
     return null;
   }
 
-  const cutoffs = CLINIC_LAST_BOOKING_CUTOFFS[clinicId];
   return slotStartMinutes < MORNING_SESSION_END_MINUTES
-    ? cutoffs.lunch
-    : cutoffs.evening;
+    ? LAST_BOOKING_CUTOFFS.lunch
+    : LAST_BOOKING_CUTOFFS.evening[clinicId];
 }
 
 function getHolidayMinutes(holiday: Holiday): { start: number; end: number } | null {
@@ -102,7 +92,7 @@ function getSlotMinutesInHongKong(slotStartUtc: Date, slotEndUtc: Date): { start
 }
 
 export function hasDoctorLastBookingCutoff(doctorId: string): boolean {
-  return LAST_BOOKING_CUTOFF_DOCTOR_IDS.has(doctorId);
+  return LAST_BOOKING_CUTOFFS.doctorIds.some((id) => id === doctorId);
 }
 
 export function isSlotAfterClinicLastBookingCutoffUtc(
@@ -123,7 +113,7 @@ export function isSlotAfterClinicLastBookingCutoffUtc(
     && formatInTimeZone(slotStartUtc, HONG_KONG_TIMEZONE, 'i') === '6'
     && slotStartMinutes >= MORNING_SESSION_END_MINUTES;
   const cutoffTime = isLeeSaturdayJordanEvening
-    ? '17:45'
+    ? LAST_BOOKING_CUTOFFS.leeSaturdayJordan
     : getClinicLastBookingCutoffTime(clinicId, slotStartMinutes);
   if (!cutoffTime) {
     return false;

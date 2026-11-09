@@ -1,6 +1,7 @@
 'use client';
 
 import { bookingFeedback, bookingText, type BookingLocale } from '@/shared/booking-locale';
+import { BookingCutoffNotice } from './BookingCutoffNotice';
 
 import Image from 'next/image';
 import { parseBookingDate } from '@/lib/booking-search-params';
@@ -1664,6 +1665,7 @@ export function BookingTabFlow({ locale = 'zh',
             {pageSubtitle}
           </p>
         ) : null}
+        {step === 'setup' || step === 'timeslot' ? <BookingCutoffNotice locale={locale} /> : null}
       </div>
 
       {!isMinimalPreview ? (

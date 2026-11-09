@@ -8,7 +8,6 @@ const staticRoutes = [
   "/",
   "/articles",
   "/booking",
-  "/booking-whatsapp",
   "/chat",
   "/courses",
   "/dr-wong",

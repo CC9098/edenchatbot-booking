@@ -1,9 +1,11 @@
 import type { BookableDoctorSchedule } from '@/shared/bookable-schedule-data';
 import type { HolidayNotice } from '@/lib/holiday-notices';
+import { LAST_BOOKING_CUTOFFS } from '@/shared/last-booking-cutoffs';
 
 // Shape read by the edenclinic.hk homepage booking box (website/homepage-aeo-2026-10-13).
 export type HomepageScheduleData = {
   fetchedAt: string;
+  lastBookingCutoffs: typeof LAST_BOOKING_CUTOFFS;
   doctors: {
     id: string;
     name: string;
@@ -28,6 +30,7 @@ export function toHomepageSchedule(
 ): HomepageScheduleData {
   return {
     fetchedAt: now.toISOString(),
+    lastBookingCutoffs: LAST_BOOKING_CUTOFFS,
     doctors: doctors.map((d) => ({
       id: d.doctorId,
       name: d.doctorNameZh,
