@@ -8,6 +8,8 @@ const doctors = [
     doctorNameZh: '陳家富醫師',
     bookingPractitionerGroup: 'tcm',
     bookingTreatmentOptions: [{ id: 'acupuncture' }, { id: 'herbal_prescription' }],
+    bookingSlotMinutes: 15,
+    bookingVisitOptions: [],
     clinics: [
       { clinicId: 'central', schedule: { 0: null, 1: [{ start: '11:00', end: '14:00' }], 2: null, 3: null, 4: null, 5: null, 6: null } },
       { clinicId: 'tsuenwan', schedule: { 0: null, 1: null, 2: null, 3: null, 4: null, 5: null, 6: null } },
@@ -28,6 +30,7 @@ assert.deepEqual(out.doctors[0], {
   name: '陳家富醫師',
   group: 'tcm',
   treatments: ['acupuncture', 'herbal_prescription'],
+  slotMinutes: 15,
   clinics: [{ id: 'central', schedule: { 0: null, 1: [{ start: '11:00', end: '14:00' }], 2: null, 3: null, 4: null, 5: null, 6: null } }],
 });
 assert.deepEqual(out.notices, [

@@ -1,11 +1,9 @@
 import type { BookingLocale } from '@/shared/booking-locale';
-import { DOCTOR_BY_ID } from '@/shared/clinic-data';
 import { LAST_BOOKING_CUTOFFS } from '@/shared/last-booking-cutoffs';
 
 export function BookingCutoffNotice({ locale = 'zh' }: { locale?: BookingLocale }) {
   const en = locale === 'en';
-  const { doctorIds, lunch, evening, leeSaturdayJordan } = LAST_BOOKING_CUTOFFS;
-  const doctors = doctorIds.map((id) => en ? DOCTOR_BY_ID[id].nameEn : DOCTOR_BY_ID[id].nameZh);
+  const { lunch, evening, leeSaturdayJordan } = LAST_BOOKING_CUTOFFS;
   const title = en ? 'Last appointment start times' : '最後可預約時間';
   const times = [
     [en ? 'Before lunch' : '午飯前', lunch],
@@ -15,7 +13,7 @@ export function BookingCutoffNotice({ locale = 'zh' }: { locale?: BookingLocale 
 
   return (
     <section aria-label={title} className="rounded-xl border border-primary/15 bg-primary-pale px-3 py-2.5 text-sm leading-relaxed text-slate-700 sm:px-4">
-      <p className="font-semibold text-primary">{title} · {doctors.join(en ? ' and ' : '、')}</p>
+      <p className="font-semibold text-primary">{title} · {en ? 'All practitioners' : '所有醫師'}</p>
       <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
         {times.map(([label, time]) => (
           <li key={label}>{label} <strong className="tabular-nums">{time}</strong></li>
