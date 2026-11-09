@@ -13,14 +13,16 @@ import {
 
 import { ManageBookingFlow } from '@/components/booking/ManageBookingFlow';
 import { PublicBookingTabs } from '@/components/booking/PublicBookingTabs';
+import { buildPublicUrl } from '@/lib/public-url';
 
 const chineseMetadata: Metadata = {
   title: '預約管理 | 醫天圓',
   description: '透過 WhatsApp 登入連結，以清晰卡片方式更改或取消現有預約。',
+  alternates: { canonical: buildPublicUrl('/manage-booking') },
 };
 
 export function generateMetadata({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }): Metadata {
-  return parseBookingLocale(searchParams?.lang) === 'en' ? { title: { absolute: 'Manage appointments | Eden Clinic' }, description: 'Reschedule or cancel your Eden Clinic appointment using a WhatsApp sign-in link.' } : chineseMetadata;
+  return parseBookingLocale(searchParams?.lang) === 'en' ? { ...chineseMetadata, title: { absolute: 'Manage appointments | Eden Clinic' }, description: 'Reschedule or cancel your Eden Clinic appointment using a WhatsApp sign-in link.' } : chineseMetadata;
 }
 
 

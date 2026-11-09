@@ -5,6 +5,7 @@ import { PublicBookingTabs } from "@/components/booking/PublicBookingTabs";
 import { parseBookingInitialSelection } from "@/lib/booking-search-params";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { getPublicBookableScheduleData } from "@/lib/bookable-schedule-data-server";
+import { buildPublicUrl } from "@/lib/public-url";
 import { createServiceClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -12,10 +13,11 @@ export const dynamic = "force-dynamic";
 const chineseMetadata: Metadata = {
   title: "預約服務 | 醫天圓",
   description: "成功預約後，診所會透過 WhatsApp 發送確認訊息。",
+  alternates: { canonical: buildPublicUrl("/booking") },
 };
 
 export function generateMetadata({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }): Metadata {
-  return parseBookingLocale(searchParams?.lang) === 'en' ? { title: { absolute: 'Book an appointment | Eden Clinic' }, description: 'Book an appointment at Eden Clinic. Confirmation is sent by WhatsApp.' } : chineseMetadata;
+  return parseBookingLocale(searchParams?.lang) === 'en' ? { ...chineseMetadata, title: { absolute: 'Book an appointment | Eden Clinic' }, description: 'Book an appointment at Eden Clinic. Confirmation is sent by WhatsApp.' } : chineseMetadata;
 }
 
 
